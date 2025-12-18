@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZZZ Deadly Assault Team Builder</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="deadly-assault.css">
+</head>
+<body>
+    <div class="container da-container">
+        <header>
+            <h1>Zenless Zone Zero</h1>
+            <h2>Deadly Assault Team Builder</h2>
+        </header>
+
+        <main>
+            <!-- Boss Selection Section -->
+            <section class="boss-selection-section">
+                <h3>Select 3 Bosses</h3>
+                <p class="section-description">Choose the three Deadly Assault bosses you want to build teams for.</p>
+                <div class="boss-grid" id="boss-grid"></div>
+            </section>
+
+            <!-- Unit Selection Section - Collapsible -->
+            <details class="roster-section" id="roster-section" open>
+                <summary class="roster-header">
+                    <h3>Your Roster</h3>
+                    <span class="roster-toggle-hint">Click to toggle ownership. <span class="highlight-universal">Right-click</span> to mark as flex — can complete any team, even without synergy.</span>
+                </summary>
+                
+                <div class="roster-content">
+                    <!-- Limited S-Rank Subsection -->
+                    <div class="roster-subsection" id="limited-s-section">
+                        <div class="subsection-header">
+                            <span class="subsection-title">Limited S-Rank</span>
+                            <span class="subsection-count" id="limited-s-count">0/0</span>
+                            <div class="subsection-actions">
+                                <button type="button" class="subtle-btn select-all" data-category="limited-s">All</button>
+                                <button type="button" class="subtle-btn deselect-all" data-category="limited-s">None</button>
+                            </div>
+                        </div>
+                        <div class="unit-grid" id="limited-s-grid"></div>
+                    </div>
+
+                    <!-- Standard S-Rank Subsection -->
+                    <div class="roster-subsection" id="standard-s-section">
+                        <div class="subsection-header">
+                            <span class="subsection-title">Standard S-Rank</span>
+                            <span class="subsection-count" id="standard-s-count">0/0</span>
+                            <div class="subsection-actions">
+                                <button type="button" class="subtle-btn select-all" data-category="standard-s">All</button>
+                                <button type="button" class="subtle-btn deselect-all" data-category="standard-s">None</button>
+                            </div>
+                        </div>
+                        <div class="unit-grid" id="standard-s-grid"></div>
+                    </div>
+
+                    <!-- A-Rank Subsection -->
+                    <div class="roster-subsection" id="a-rank-section">
+                        <div class="subsection-header">
+                            <span class="subsection-title">A-Rank</span>
+                            <span class="subsection-count" id="a-rank-count">0/0</span>
+                            <div class="subsection-actions">
+                                <button type="button" class="subtle-btn select-all" data-category="a-rank">All</button>
+                                <button type="button" class="subtle-btn deselect-all" data-category="a-rank">None</button>
+                            </div>
+                        </div>
+                        <div class="unit-grid" id="a-rank-grid"></div>
+                    </div>
+                </div>
+            </details>
+
+            <!-- Validation & Run -->
+            <section class="action-section">
+                <div id="validation-errors" class="validation-errors" style="display: none;"></div>
+                <button id="run-btn" class="run-btn">Find Optimal Teams</button>
+            </section>
+
+            <!-- Results Section -->
+            <section class="results-section" id="results-section" style="display: none;">
+                <h3>Recommended Team Allocations</h3>
+                <div id="results-container"></div>
+            </section>
+        </main>
+
+        <footer>
+            <p>Deadly Assault Team Builder &copy; 2025 njx</p>
+        </footer>
+    </div>
+
+    <script type="module" src="deadly-assault.js"></script>
+</body>
+</html>

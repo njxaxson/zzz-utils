@@ -1,0 +1,498 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@400;500;600&display=swap');
+
+:root {
+    --bg-primary: #0a0a0f;
+    --bg-secondary: #12121a;
+    --bg-tertiary: #1a1a26;
+    --accent-primary: #ff6b35;
+    --accent-secondary: #00d4aa;
+    --accent-glow: #ff6b3540;
+    --text-primary: #e8e8e8;
+    --text-secondary: #a0a0a0;
+    --text-muted: #606070;
+    --border-color: #2a2a3a;
+    --success: #00d4aa;
+    --warning: #ffaa00;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Rajdhani', sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    min-height: 100vh;
+    background-image: 
+        radial-gradient(ellipse at top left, rgba(255, 107, 53, 0.08) 0%, transparent 50%),
+        radial-gradient(ellipse at bottom right, rgba(0, 212, 170, 0.06) 0%, transparent 50%);
+}
+
+.container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+header {
+    text-align: center;
+    margin-bottom: 2.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+header h1 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 2.2rem;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 0.3rem;
+}
+
+header h2 {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 400;
+    color: var(--text-secondary);
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+}
+
+main {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+section {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1.5rem;
+}
+
+section h3 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 400;
+    color: var(--accent-primary);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+section h3:not(:first-child) {
+    margin-top: 1.5rem;
+}
+
+/* Collapsible Section */
+.collapsible-section {
+    margin-top: 1.5rem;
+}
+
+.collapsible-section summary {
+    cursor: pointer;
+    list-style: none;
+}
+
+.collapsible-section summary::-webkit-details-marker {
+    display: none;
+}
+
+.collapsible-section summary h3 {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0;
+}
+
+.collapsible-section summary h3::before {
+    content: '▶';
+    font-size: 0.7rem;
+    transition: transform 0.2s;
+}
+
+.collapsible-section[open] summary h3::before {
+    transform: rotate(90deg);
+}
+
+.collapsible-section .input-row {
+    margin-top: 1rem;
+}
+
+.input-group {
+    margin-bottom: 1rem;
+}
+
+.input-group label {
+    display: block;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: 0.4rem;
+}
+
+.input-group input[type="number"],
+.input-group select {
+    width: 100%;
+    padding: 0.7rem 1rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 600;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.input-group select {
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23a0a0a0' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 1rem center;
+    padding-right: 2.5rem;
+}
+
+.input-group select option {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.input-group input[type="number"]:focus,
+.input-group select:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
+.input-group input[type="number"].invalid {
+    border-color: #ff4444;
+    box-shadow: 0 0 0 2px rgba(255, 68, 68, 0.25);
+}
+
+.validation-errors {
+    background: rgba(255, 68, 68, 0.15);
+    border: 1px solid #ff4444;
+    border-radius: 4px;
+    padding: 0.8rem 1rem;
+    margin-top: 1.5rem;
+    animation: shake 0.3s ease-out;
+}
+
+.validation-errors ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.validation-errors li {
+    color: #ff6b6b;
+    font-size: 0.95rem;
+    padding: 0.2rem 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.validation-errors li::before {
+    content: '⚠';
+    font-size: 0.9rem;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-5px); }
+    40%, 80% { transform: translateX(5px); }
+}
+
+.input-group.calculated {
+    background: var(--bg-tertiary);
+    padding: 0.8rem 1rem;
+    border-radius: 4px;
+    border: 1px dashed var(--border-color);
+}
+
+.input-group.calculated label {
+    margin-bottom: 0.2rem;
+}
+
+.input-group.calculated span {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--accent-secondary);
+}
+
+.input-row {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+}
+
+.pity-row {
+    grid-template-columns: repeat(4, 1fr);
+}
+
+@media (max-width: 768px) {
+    .input-row {
+        grid-template-columns: 1fr;
+    }
+    .pity-row {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+.checkbox-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    padding: 0.5rem 0.8rem;
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    transition: border-color 0.2s, color 0.2s;
+}
+
+.checkbox-label:hover {
+    border-color: var(--accent-primary);
+    color: var(--text-primary);
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent-primary);
+}
+
+button#simulate-btn {
+    width: 100%;
+    margin-top: 1.5rem;
+    padding: 1rem 2rem;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--bg-primary);
+    background: linear-gradient(135deg, var(--accent-primary), #ff8855);
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+button#simulate-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px var(--accent-glow);
+}
+
+button#simulate-btn:active {
+    transform: translateY(0);
+}
+
+button#simulate-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Results Section */
+.results-section {
+    animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.results-content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+}
+
+@media (max-width: 900px) {
+    .results-content {
+        grid-template-columns: 1fr;
+    }
+}
+
+.results-text {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.result-block {
+    background: var(--bg-tertiary);
+    padding: 1rem;
+    border-radius: 4px;
+    border-left: 3px solid var(--accent-primary);
+}
+
+.result-block h4 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: var(--accent-secondary);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+}
+
+.result-block pre {
+    font-family: 'Rajdhani', monospace;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    color: var(--text-primary);
+    white-space: pre-wrap;
+}
+
+.distribution-table {
+    width: 100%;
+}
+
+.distribution-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.25rem 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.distribution-row:last-child {
+    border-bottom: none;
+}
+
+.distribution-row.target {
+    background: rgba(0, 212, 170, 0.2);
+    margin: 0 -0.5rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 3px;
+    border-left: 3px solid var(--accent-secondary);
+    box-shadow: 0 0 8px rgba(0, 212, 170, 0.3);
+}
+
+.distribution-row.target .distribution-label {
+    color: var(--accent-secondary);
+}
+
+.distribution-label {
+    font-weight: 600;
+    color: var(--text-primary);
+    min-width: 140px;
+}
+
+.distribution-count {
+    color: var(--text-secondary);
+    min-width: 70px;
+    text-align: right;
+}
+
+.distribution-percent {
+    color: var(--accent-secondary);
+    font-weight: 600;
+    min-width: 60px;
+    text-align: right;
+}
+
+.result-block .highlight {
+    color: var(--accent-secondary);
+    font-weight: 600;
+}
+
+.result-block .stat-line {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.3rem 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.result-block .stat-line:last-child {
+    border-bottom: none;
+}
+
+.result-block .stat-label {
+    color: var(--text-secondary);
+}
+
+.result-block .stat-value {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.result-block .stat-value.success {
+    color: var(--success);
+}
+
+.result-block .stat-note {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-weight: 400;
+}
+
+.charts-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.chart-container {
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 300px;
+}
+
+.chart-container h4 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: var(--accent-secondary);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 0.75rem;
+}
+
+.chart-container canvas {
+    max-width: 100%;
+}
+
+footer {
+    text-align: center;
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border-color);
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+

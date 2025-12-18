@@ -1,0 +1,259 @@
+[
+    {
+        "name" : "Anby",
+        "rank" : "A",
+        "tier" : 4.0,
+        "tags" : ["stun", "electric", "hares", "assist:defensive"],
+        "join" : ["electric", "hares"],
+        "stat" : "M6W5",
+        "synergy" : { "units": [], "tags": [], "avoid": [] }
+    },
+    {
+        "name" : "Anton",
+        "rank" : "A",
+        "tier" : 3.0,
+        "tags" : ["attack", "electric", "belobog", "assist:defensive"],
+        "join" : ["electric", "belobog"],
+        "stat" : "M6W4",
+        "synergy" : { "units": ["Astra"], "tags": [], "avoid": [] }
+    },
+    {
+        "name" : "Astra",
+        "rank" : "S",
+        "limited" : true,
+        "tier" : 0.0,
+        "tags" : ["ether", "support", "lyra", "assist:evasive"],
+        "join" : ["anomaly", "attack", "rupture"],
+        "stat" : "M0W0",
+        "synergy" : { "units": [], "tags": [], "avoid": [] }
+    },
+    {
+        "name" : "Ben",
+        "rank" : "A",
+        "tier" : 4.0,
+        "tags" : ["defense", "fire", "belobog", "assist:defensive"],
+        "join" : ["fire", "belobog"],
+        "stat" : "M5W3",
+        "synergy" : { "units": [], "tags": [], "avoid": [] }
+    },
+    {
+        "name" : "Billy",
+        "rank" : "A",
+        "tier" : 3.0,
+        "tags" : ["attack", "physical", "hares", "assist:evasive"],
+        "join" : ["physical", "hares"],
+        "stat" : "M6W2",
+        "synergy" : { "units": [], "tags": [], "avoid": [] }
+    },
+    {
+        "name" : "Corin",
+        "rank" : "A",
+        "tier" : 3.0,
+        "tags" : ["attack", "physical", "victoria", "assist:defensive"],
+        "join" : ["physical", "victoria"],
+        "stat" : "M6W2",
+        "synergy" : { "units": [], "tags": [], "avoid": [] }
+    },
+    {
+        "name" : "Evelyn",
+        "rank" : "S",
+        "limited" : true,
+        "tier" : 0.5,
+        "tags" : ["attack", "fire", "lyra", "assist:defensive"],
+        "join" : ["stun", "support"],
+        "stat" : "M1W1",
+        "synergy" : { "units": ["Astra"], "tags": ["stun"], "avoid": [] }
+    },
+    {
+        "name" : "Grace",
+        "rank" : "S",
+        "tier" : 3.0,
+        "limited" : false,
+        "tags" : ["anomaly", "electric", "belobog", "assist:evasive"],
+        "join" : ["electric", "belobog"],
+        "stat" : "M2W1",
+        "synergy" : { "units": [], "tags": [], "avoid": [] }
+    },
+    {
+        "name" : "Harumasa",
+        "rank" : "S",
+        "tier" : 1.5,
+        "limited" : true,
+        "tags" : ["attack", "electric", "section6", "assist:defensive"],
+        "join" : ["stun", "anomaly"],
+        "stat" : "M0W0",
+        "synergy" : { "units": [], "tags": ["stun", "anomaly", "electric"], "avoid": [] }
+    },
+    {
+        "name" : "Koleda",
+        "rank" : "S",
+        "tier" : 2.0,
+        "limited" : false,
+        "tags" : ["stun", "fire", "belobog", "assist:defensive"],
+        "join" : ["fire", "belobog", "rupture"],
+        "stat" : "M2W0",
+        "synergy" : { "units": [], "tags": [], "avoid": [] }
+    },
+    {
+        "name" : "Komano",
+        "rank" : "A",
+        "tier" : 1.0,
+        "tags" : ["rupture", "fire", "spookshack", "assist:defensive"],
+        "join" : ["support", "stun"],
+        "stat" : "M6W1",
+        "synergy" : { "units": [], "tags": [], "avoid": [] }
+    },
+    {
+        "name" : "Lucia",
+        "rank" : "S",
+        "tier" : 0.0,
+        "limited" : true,
+        "tags" : ["support", "ether", "spookshack", "assist:defensive"],
+        "join" : ["rupture", "stun"],
+        "stat" : "M0W0",
+        "synergy" : { "units": [], "tags": ["rupture"], "avoid": ["attack", "anomaly"] }
+    },    
+    {
+        "name" : "Lucy",
+        "rank" : "A",
+        "tier" : 1.5,
+        "tags" : ["support", "fire", "calydon", "assist:defensive"],
+        "join" : ["fire", "calydon", "rupture"],
+        "stat" : "M6W2",
+        "synergy" : { "units": [], "tags": ["fire"], "avoid": [] }
+    },
+    {
+        "name" : "Lycaon",
+        "rank" : "S",
+        "limited" : false,
+        "tier" : 1.0,
+        "tags" : ["stun", "ice", "victoria", "assist:defensive"],
+        "join" : ["ice", "victoria"],
+        "stat" : "M0W0",
+        "synergy" : { "units": [], "tags": [], "avoid": [] }
+    },
+    {
+        "name" : "Miyabi",
+        "rank" : "S",
+        "limited" : true,
+        "tier" : 0.0,
+        "tags" : ["anomaly", "ice", "section6", "title", "assist:defensive"],
+        "join" : ["support", "section6"],
+        "stat" : "M2W2",
+        "synergy" : { "units": [], "tags": [], "avoid": [] }
+    },
+    {
+        "name" : "Nekomata",
+        "rank" : "S",
+        "tier" : 3.0,
+        "limited" : false,
+        "tags" : ["attack", "physical", "hares", "assist:defensive"],
+        "join" : ["physical", "hares"],
+        "stat" : "M0W1",
+        "synergy" : { "units": [], "tags": [], "avoid": [] }
+    },
+    {
+        "name" : "Nicole",
+        "rank" : "A",
+        "tier" : 0.5,
+        "tags" : ["support", "ether", "hares", "assist:defensive"],
+        "join" : ["ether", "hares"],
+        "stat" : "M6W5",
+        "synergy" : { "units": ["Astra"], "tags": [], "avoid": ["rupture"] }
+    },
+    {
+        "name" : "Pan Yinhu",
+        "rank" : "A",
+        "tier" : 1.0,
+        "tags" : ["defense", "physical", "yunkui", "assist:defensive"],
+        "join" : ["rupture", "yunkui"],
+        "stat" : "M6W5",
+        "synergy" : { "units": ["Lucia"], "tags": ["rupture"], "avoid": ["attack", "anomaly"] }
+    },
+    {
+        "name" : "Piper",
+        "rank" : "A",
+        "tier" : 1.0,
+        "tags" : ["anomaly", "physical", "calydon", "assist:defensive"],
+        "join" : ["physical", "calydon"],
+        "stat" : "M6W5",
+        "synergy" : { "units": [], "tags": [], "avoid": [] }
+    },
+    {
+        "name" : "Pulchra",
+        "rank" : "A",
+        "tier" : 1.0,
+        "tags" : ["stun", "physical", "calydon", "assist:evasive"],
+        "join" : ["attack", "rupture", "calydon"],
+        "stat" : "M6W5",
+        "synergy" : { "units": [], "tags": [], "avoid": [] }
+    },
+    {
+        "name" : "Rina",
+        "rank" : "S",
+        "tier" : 1.5,
+        "limited" : false,
+        "tags" : ["support", "electric", "victoria", "assist:evasive"],
+        "join" : ["victoria", "electric"],
+        "stat" : "M1W1",
+        "synergy" : { "units": [], "tags": ["electric"], "avoid": ["rupture"] }
+    },
+    {
+        "name" : "Seth",
+        "rank" : "A",
+        "tier" : 3.0,
+        "tags" : ["defense", "electric", "pubsec", "assist:defensive"],
+        "join" : ["electric", "pubsec"],
+        "stat" : "M6W5",
+        "synergy" : { "units": [], "tags": ["anomaly"], "avoid": [] }
+    },
+    {
+        "name" : "Soldier 11",
+        "rank" : "S",
+        "tier" : 2.0,
+        "limited" : false,
+        "tags" : ["attack", "fire", "obol", "assist:defensive"],
+        "join" : ["fire", "obol"],
+        "stat" : "M0W1",
+        "synergy" : { "units": [], "tags": [], "avoid": [] }
+    },
+    {
+        "name" : "Soukaku",
+        "rank" : "A",
+        "tier" : 1.0,
+        "tags" : ["support", "ice", "section6", "assist:defensive"],
+        "join" : ["ice", "section6"],
+        "stat" : "M6W5",
+        "synergy" : { "units": ["Miyabi"], "tags": ["ice"], "avoid": [] }
+    },
+    {
+        "name" : "Trigger",
+        "rank" : "S",
+        "tier" : 0.5,
+        "limited" : true,
+        "tags" : ["stun", "electric", "obol", "assist:defensive"],
+        "join" : ["attack", "electric"],
+        "stat" : "M0W1",
+        "synergy" : { "units": [], "tags": [], "avoid": [] }
+    },
+    {
+        "name" : "Vivian",
+        "rank" : "S",
+        "tier" : 0.0,
+        "limited" : true,
+        "tags" : ["anomaly", "ether", "mockingbird", "assist:defensive"],
+        "join" : ["anomaly", "ether"],
+        "stat" : "M0W0",
+        "synergy" : { "units": ["Astra", "Nicole"], "tags": ["anomaly"], "avoid": [] }
+    },
+    {
+        "name" : "Yixuan",
+        "rank" : "S",
+        "tier" : 0.0,
+        "limited" : true,
+        "tags" : ["rupture", "ether", "yunkui", "title", "assist:defensive"],
+        "join" : ["stun", "support", "defense"], 
+        "stat" : "M2W1",
+        "synergy" : { "units": [], "tags": [], "avoid": [] }
+    }
+]

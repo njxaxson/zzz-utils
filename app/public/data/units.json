@@ -1,0 +1,439 @@
+[
+    {
+        "id": "alice",
+        "name": "Alice",
+        "rank": "S",
+        "limited": true,
+        "tier": 0.5,
+        "tags": ["anomaly", "physical", "spookshack", "assist:defensive"],
+        "join": ["anomaly", "support"],
+        "synergy": { "units": [], "tags": [], "avoid": [] }
+    },
+    {
+        "id": "anby",
+        "name": "Anby",
+        "rank": "A",
+        "tier": 4.0,
+        "tags": ["stun", "electric", "hares", "assist:defensive"],
+        "join": ["electric", "hares"],
+        "synergy": { "units": [], "tags": [], "avoid": [] }
+    },
+    {
+        "id": "anton",
+        "name": "Anton",
+        "rank": "A",
+        "tier": 3.0,
+        "tags": ["attack", "electric", "belobog", "assist:defensive"],
+        "join": ["electric", "belobog"],
+        "synergy": { "units": ["Astra"], "tags": [], "avoid": [] }
+    },
+    {
+        "id": "astra",
+        "name": "Astra",
+        "rank": "S",
+        "limited": true,
+        "tier": 0.0,
+        "tags": ["ether", "support", "lyra", "assist:evasive"],
+        "join": ["anomaly", "attack", "rupture"],
+        "synergy": { "units": [], "tags": [], "avoid": [] }
+    },
+    {
+        "id": "banyue",
+        "name": "Banyue",
+        "rank": "S",
+        "limited": true,
+        "tier": 1.0,
+        "tags": ["rupture", "fire", "krampus", "assist:defensive"],
+        "join": ["fire", "krampus"],
+        "synergy": { "units": [], "tags": [], "avoid": [] }
+    },
+    {
+        "id": "ben",
+        "name": "Ben",
+        "rank": "A",
+        "tier": 4.0,
+        "tags": ["defense", "fire", "belobog", "assist:defensive"],
+        "join": ["fire", "belobog"],
+        "synergy": { "units": [], "tags": [], "avoid": [] }
+    },
+    {
+        "id": "billy",
+        "name": "Billy",
+        "rank": "A",
+        "tier": 3.0,
+        "tags": ["attack", "physical", "hares", "assist:evasive"],
+        "join": ["physical", "hares"],
+        "synergy": { "units": [], "tags": [], "avoid": [] }
+    },
+    {
+        "id": "burnice",
+        "name": "Burnice",
+        "rank": "S",
+        "limited": true,
+        "tier": 1.0,
+        "tags": ["anomaly", "fire", "calydon", "assist:evasive"],
+        "join": ["anomaly", "calydon"],
+        "synergy": { "units": [], "tags": [], "avoid": [] }
+    },
+    {
+        "id": "caesar",
+        "name": "Caesar",
+        "rank": "S",
+        "limited": true,
+        "tier": 1.5,
+        "tags": ["defense", "physical", "calydon", "assist:defensive"],
+        "join": ["calydon", "assist:defensive"],
+        "synergy": { "units": [], "tags": [], "avoid": [] }
+    },
+    {
+        "id": "corin",
+        "name": "Corin",
+        "rank": "A",
+        "tier": 3.0,
+        "tags": ["attack", "physical", "victoria", "assist:defensive"],
+        "join": ["physical", "victoria"],
+        "synergy": { "units": [], "tags": [], "avoid": [] }
+    },
+    {
+        "id": "dialyn",
+        "name": "Dialyn",
+        "rank": "S",
+        "limited": true,
+        "tier": 0.0,
+        "tags": ["stun", "physical", "krampus", "assist:defensive"],
+        "join": ["attack", "rupture"],
+        "synergy": { "units": [], "tags": [], "avoid": [] }
+    },
+    {
+        "id": "ellen",
+        "name": "Ellen",
+        "rank": "S",
+        "limited": true,
+        "tier": 1.5,
+        "tags": ["attack", "ice", "victoria", "assist:defensive"],
+        "join": ["ice", "victoria"],
+        "synergy": { "units": [], "tags": [], "avoid": [] }
+    },
+    {
+        "id": "evelyn",
+        "name": "Evelyn",
+        "rank": "S",
+        "limited": true,
+        "tier": 0.5,
+        "tags": ["attack", "fire", "lyra", "assist:defensive"],
+        "join": ["stun", "support"],
+        "synergy": { "units": ["Astra"], "tags": ["stun"], "avoid": [] }
+    },
+    {
+        "id": "grace",
+        "name": "Grace",
+        "rank": "S",
+        "limited": false,
+        "tier": 3.0,
+        "tags": ["anomaly", "electric", "belobog", "assist:evasive"],
+        "join": ["electric", "belobog"],
+        "synergy": { "units": [], "tags": [], "avoid": [] }
+    },
+    {
+        "id": "harumasa",
+        "name": "Harumasa",
+        "rank": "S",
+        "limited": true,
+        "tier": 1.5,
+        "tags": ["attack", "electric", "section6", "assist:defensive"],
+        "join": ["stun", "anomaly"],
+        "synergy": { "units": [], "tags": ["stun", "anomaly", "electric"], "avoid": [] }
+    },
+    {
+        "id": "hugo",
+        "name": "Hugo",
+        "rank": "S",
+        "limited": true,
+        "tier": 1.0,
+        "tags": ["attack", "ice", "mockingbird", "assist:defensive"],
+        "join": ["stun", "ice"],
+        "synergy": { "units": [], "tags": ["stun"], "avoid": [] }
+    },
+    {
+        "id": "jane-doe",
+        "name": "Jane Doe",
+        "rank": "S",
+        "limited": true,
+        "tier": 1.0,
+        "tags": ["anomaly", "physical", "pubsec", "assist:defensive"],
+        "join": ["anomaly", "pubsec"],
+        "synergy": { "units": ["Seth"], "tags": [], "avoid": [] }
+    },
+    {
+        "id": "ju-fufu",
+        "name": "Ju Fufu",
+        "rank": "S",
+        "limited": true,
+        "tier": 0.5,
+        "tags": ["stun", "fire", "yunkui", "assist:defensive"],
+        "join": ["attack", "rupture"],
+        "synergy": { "units": [], "tags": ["rupture"], "avoid": [] }
+    },
+    {
+        "id": "koleda",
+        "name": "Koleda",
+        "rank": "S",
+        "limited": false,
+        "tier": 2.0,
+        "tags": ["stun", "fire", "belobog", "assist:defensive"],
+        "join": ["fire", "belobog", "rupture"],
+        "synergy": { "units": [], "tags": [], "avoid": [] }
+    },
+    {
+        "id": "komano",
+        "name": "Komano",
+        "rank": "A",
+        "tier": 1.0,
+        "tags": ["rupture", "fire", "spookshack", "assist:defensive"],
+        "join": ["support", "stun"],
+        "synergy": { "units": [], "tags": [], "avoid": [] }
+    },
+    {
+        "id": "lighter",
+        "name": "Lighter",
+        "rank": "S",
+        "limited": true,
+        "tier": 0.5,
+        "tags": ["stun", "fire", "calydon", "assist:defensive"],
+        "join": ["attack", "calydon"],
+        "synergy": { "units": [], "tags": ["fire", "ice"], "avoid": [] }
+    },
+    {
+        "id": "lucia",
+        "name": "Lucia",
+        "rank": "S",
+        "limited": true,
+        "tier": 0.0,
+        "tags": ["support", "ether", "spookshack", "assist:defensive"],
+        "join": ["rupture", "stun"],
+        "synergy": { "units": [], "tags": ["rupture"], "avoid": ["attack", "anomaly"] }
+    },
+    {
+        "id": "lucy",
+        "name": "Lucy",
+        "rank": "A",
+        "tier": 1.5,
+        "tags": ["support", "fire", "calydon", "assist:defensive"],
+        "join": ["fire", "calydon", "rupture"],
+        "synergy": { "units": [], "tags": ["fire"], "avoid": [] }
+    },
+    {
+        "id": "lycaon",
+        "name": "Lycaon",
+        "rank": "S",
+        "limited": false,
+        "tier": 1.0,
+        "tags": ["stun", "ice", "victoria", "assist:defensive"],
+        "join": ["ice", "victoria"],
+        "synergy": { "units": [], "tags": [], "avoid": [] }
+    },
+    {
+        "id": "miyabi",
+        "name": "Miyabi",
+        "rank": "S",
+        "limited": true,
+        "tier": 0.0,
+        "tags": ["anomaly", "ice", "section6", "title", "assist:defensive"],
+        "join": ["support", "section6"],
+        "synergy": { "units": [], "tags": [], "avoid": [] }
+    },
+    {
+        "id": "nekomata",
+        "name": "Nekomata",
+        "rank": "S",
+        "limited": false,
+        "tier": 3.0,
+        "tags": ["attack", "physical", "hares", "assist:defensive"],
+        "join": ["physical", "hares"],
+        "synergy": { "units": [], "tags": [], "avoid": [] }
+    },
+    {
+        "id": "nicole",
+        "name": "Nicole",
+        "rank": "A",
+        "tier": 0.5,
+        "tags": ["support", "ether", "hares", "assist:defensive"],
+        "join": ["ether", "hares"],
+        "synergy": { "units": ["Astra"], "tags": [], "avoid": ["rupture"] }
+    },
+    {
+        "id": "orphie",
+        "name": "Orphie",
+        "rank": "S",
+        "limited": true,
+        "tier": 0.0,
+        "tags": ["attack", "fire", "obol", "assist:defensive"],
+        "join": ["stun", "support"],
+        "synergy": { "units": [], "tags": [], "avoid": [] }
+    },
+    {
+        "id": "pan-yinhu",
+        "name": "Pan Yinhu",
+        "rank": "A",
+        "tier": 1.0,
+        "tags": ["defense", "physical", "yunkui", "assist:defensive"],
+        "join": ["rupture", "yunkui"],
+        "synergy": { "units": ["Lucia"], "tags": ["rupture"], "avoid": ["attack", "anomaly"] }
+    },
+    {
+        "id": "piper",
+        "name": "Piper",
+        "rank": "A",
+        "tier": 1.0,
+        "tags": ["anomaly", "physical", "calydon", "assist:defensive"],
+        "join": ["physical", "calydon"],
+        "synergy": { "units": [], "tags": [], "avoid": [] }
+    },
+    {
+        "id": "pulchra",
+        "name": "Pulchra",
+        "rank": "A",
+        "tier": 1.0,
+        "tags": ["stun", "physical", "calydon", "assist:evasive"],
+        "join": ["attack", "rupture", "calydon"],
+        "synergy": { "units": [], "tags": [], "avoid": [] }
+    },
+    {
+        "id": "qingyi",
+        "name": "Qingyi",
+        "rank": "S",
+        "limited": true,
+        "tier": 0.5,
+        "tags": ["stun", "electric", "pubsec", "assist:defensive"],
+        "join": ["attack", "pubsec"],
+        "synergy": { "units": ["Yixuan"], "tags": [], "avoid": [] }
+    },
+    {
+        "id": "rina",
+        "name": "Rina",
+        "rank": "S",
+        "limited": false,
+        "tier": 1.5,
+        "tags": ["support", "electric", "victoria", "assist:evasive"],
+        "join": ["victoria", "electric"],
+        "synergy": { "units": [], "tags": ["electric"], "avoid": ["rupture"] }
+    },
+    {
+        "id": "sanby",
+        "name": "SAnby",
+        "rank": "S",
+        "limited": true,
+        "tier": 0.5,
+        "tags": ["attack", "electric", "silver", "assist:defensive"],
+        "join": ["stun", "support"],
+        "synergy": { "units": ["Orphie", "Pulchra"], "tags": [], "avoid": [] }
+    },
+    {
+        "id": "seed",
+        "name": "Seed",
+        "rank": "S",
+        "limited": true,
+        "tier": 0.5,
+        "tags": ["attack", "electric", "obol", "assist:defensive"],
+        "join": ["attack"],
+        "synergy": { "units": ["Orphie"], "tags": ["attack"], "avoid": [] }
+    },
+    {
+        "id": "seth",
+        "name": "Seth",
+        "rank": "A",
+        "tier": 3.0,
+        "tags": ["defense", "electric", "pubsec", "assist:defensive"],
+        "join": ["electric", "pubsec"],
+        "synergy": { "units": [], "tags": ["anomaly"], "avoid": [] }
+    },
+    {
+        "id": "soldier-11",
+        "name": "Soldier 11",
+        "rank": "S",
+        "limited": false,
+        "tier": 2.0,
+        "tags": ["attack", "fire", "obol", "assist:defensive"],
+        "join": ["fire", "obol"],
+        "synergy": { "units": [], "tags": [], "avoid": [] }
+    },
+    {
+        "id": "soukaku",
+        "name": "Soukaku",
+        "rank": "A",
+        "tier": 1.0,
+        "tags": ["support", "ice", "section6", "assist:defensive"],
+        "join": ["ice", "section6"],
+        "synergy": { "units": ["Miyabi"], "tags": ["ice"], "avoid": [] }
+    },
+    {
+        "id": "trigger",
+        "name": "Trigger",
+        "rank": "S",
+        "limited": true,
+        "tier": 0.5,
+        "tags": ["stun", "electric", "obol", "assist:defensive"],
+        "join": ["attack", "electric"],
+        "synergy": { "units": [], "tags": [], "avoid": [] }
+    },
+    {
+        "id": "vivian",
+        "name": "Vivian",
+        "rank": "S",
+        "limited": true,
+        "tier": 0.0,
+        "tags": ["anomaly", "ether", "mockingbird", "assist:defensive"],
+        "join": ["anomaly", "ether"],
+        "synergy": { "units": ["Astra", "Nicole"], "tags": ["anomaly"], "avoid": [] }
+    },
+    {
+        "id": "yanagi",
+        "name": "Yanagi",
+        "rank": "S",
+        "limited": true,
+        "tier": 0.5,
+        "tags": ["anomaly", "electric", "section6", "assist:defensive"],
+        "join": ["electric", "anomaly"],
+        "synergy": { "units": [], "tags": [], "avoid": [] }
+    },
+    {
+        "id": "yidhari",
+        "name": "Yidhari",
+        "rank": "S",
+        "limited": true,
+        "tier": 0.5,
+        "tags": ["rupture", "ice", "spookshack", "assist:defensive"],
+        "join": ["stun", "support"],
+        "synergy": { "units": [], "tags": [], "avoid": [] }
+    },
+    {
+        "id": "yixuan",
+        "name": "Yixuan",
+        "rank": "S",
+        "limited": true,
+        "tier": 0.0,
+        "tags": ["rupture", "ether", "yunkui", "title", "assist:defensive"],
+        "join": ["stun", "support", "defense"],
+        "synergy": { "units": [], "tags": [], "avoid": [] }
+    },
+    {
+        "id": "yuzuha",
+        "name": "Yuzuha",
+        "rank": "S",
+        "limited": true,
+        "tier": 0.0,
+        "tags": ["support", "physical", "spookshack", "assist:defensive"],
+        "join": ["anomaly", "spookshack"],
+        "synergy": { "units": [], "tags": ["anomaly", "fire", "ice", "electric", "physical", "ether"], "avoid": ["attack", "rupture"] }
+    },
+    {
+        "id": "zhu-yuan",
+        "name": "Zhu Yuan",
+        "rank": "S",
+        "limited": true,
+        "tier": 1.0,
+        "tags": ["attack", "ether", "pubsec", "assist:defensive"],
+        "join": ["support", "pubsec"],
+        "synergy": { "units": [], "tags": [], "avoid": [] }
+    }
+]

@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Black background -->
+  <rect width="64" height="64" fill="#0a0a0a"/>
+  
+  <!-- ZZZ Logo - Three stacked Z letters with proper Z geometry -->
+  <!-- Z shape: top bar full width, diagonal from top-right to bottom-left, bottom bar full width -->
+  
+  <!-- Third Z (back, darkest) -->
+  <path d="M8 8 L56 8 L56 16 L8 48 L8 56 L56 56 L56 48 L24 48 L40 16 L8 16 Z" 
+        fill="#404040" transform="translate(4, 4)"/>
+  
+  <!-- Second Z (middle) -->
+  <path d="M8 8 L56 8 L56 16 L8 48 L8 56 L56 56 L56 48 L24 48 L40 16 L8 16 Z" 
+        fill="#888888" transform="translate(2, 2)"/>
+  
+  <!-- First Z (front, white) -->
+  <path d="M8 8 L56 8 L56 16 L8 48 L8 56 L56 56 L56 48 L24 48 L40 16 L8 16 Z" 
+        fill="#ffffff"/>
+</svg>

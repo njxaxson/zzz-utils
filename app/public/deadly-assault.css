@@ -1,0 +1,792 @@
+/**
+ * Deadly Assault Team Builder Styles
+ * Extends base style.css
+ */
+
+/* ============================================================================
+   ELEMENT COLORS - Single source of truth for all element-based styling
+   ============================================================================ */
+
+:root {
+    /* Primary element colors (used for borders, backgrounds) */
+    --element-fire: #c44125;
+    --element-ice: #5ec4e8;
+    --element-electric: #3b82f6;
+    --element-physical: #e0b040;
+    --element-ether: #d946ef;
+    
+    /* Lighter variants (used for text/initials) */
+    --element-fire-light: #ef6a5a;
+    --element-ice-light: #7dd3f0;
+    --element-electric-light: #60a5fa;
+    --element-physical-light: #f0c860;
+    --element-ether-light: #e879f9;
+}
+
+/* ============================================================================
+   LAYOUT
+   ============================================================================ */
+
+.da-container {
+    max-width: 1400px;
+}
+
+.section-description {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin-bottom: 1.5rem;
+}
+
+.section-description .highlight-universal {
+    color: var(--accent-secondary);
+    font-weight: 600;
+}
+
+/* ============================================================================
+   ROSTER SECTION - Collapsible container for all units
+   ============================================================================ */
+
+.roster-section {
+    margin-top: 1.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-tertiary);
+}
+
+.roster-header {
+    cursor: pointer;
+    padding: 1rem 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    list-style: none;
+    user-select: none;
+}
+
+.roster-header::-webkit-details-marker {
+    display: none;
+}
+
+.roster-header::before {
+    content: '▶';
+    font-size: 0.8rem;
+    color: var(--accent-primary);
+    transition: transform 0.2s;
+}
+
+.roster-section[open] .roster-header::before {
+    transform: rotate(90deg);
+}
+
+.roster-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+.roster-toggle-hint {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-left: auto;
+    display: none;
+}
+
+.roster-section[open] .roster-toggle-hint {
+    display: inline;
+}
+
+.roster-toggle-hint .highlight-universal {
+    color: var(--accent-secondary);
+    font-weight: 600;
+}
+
+.roster-content {
+    padding: 0 1rem 1rem;
+}
+
+/* ============================================================================
+   ROSTER SUBSECTIONS - Subtle separations
+   ============================================================================ */
+
+.roster-subsection {
+    padding-top: 0.75rem;
+}
+
+.roster-subsection:not(:first-child) {
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    margin-top: 0.5rem;
+}
+
+.subsection-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0 0.25rem 0.5rem;
+}
+
+.subsection-title {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.subsection-count {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.75rem;
+    color: var(--accent-secondary);
+    font-weight: 600;
+    opacity: 0.8;
+}
+
+.subsection-actions {
+    margin-left: auto;
+    display: flex;
+    gap: 0.25rem;
+}
+
+.subtle-btn {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.7rem;
+    font-weight: 500;
+    padding: 0.15rem 0.4rem;
+    border: none;
+    border-radius: 3px;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s;
+    opacity: 0.6;
+}
+
+.subtle-btn:hover {
+    opacity: 1;
+    color: var(--text-primary);
+}
+
+.subtle-btn.select-all:hover {
+    color: var(--accent-secondary);
+}
+
+.subtle-btn.deselect-all:hover {
+    color: #ff6b6b;
+}
+
+/* ============================================================================
+   UNIT GRID
+   ============================================================================ */
+
+.unit-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+/* ============================================================================
+   UNIT CARDS - Image-Focused Design
+   ============================================================================ */
+
+.unit-card {
+    background: var(--bg-tertiary);
+    border: 3px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    position: relative;
+    font-family: inherit;
+    font-size: inherit;
+    text-align: center;
+    overflow: hidden;
+    width: 80px;
+}
+
+.unit-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+/* Element border colors */
+.unit-card.element-fire { border-color: var(--element-fire); }
+.unit-card.element-ice { border-color: var(--element-ice); }
+.unit-card.element-electric { border-color: var(--element-electric); }
+.unit-card.element-physical { border-color: var(--element-physical); }
+.unit-card.element-ether { border-color: var(--element-ether); }
+
+/* Not owned - dimmed but still readable */
+.unit-card.not-owned {
+    opacity: 0.45;
+    border-color: var(--border-color);
+}
+
+.unit-card.not-owned:hover {
+    opacity: 0.7;
+}
+
+/* Universal/Flex - highlighted with glow */
+.unit-card.universal {
+    box-shadow: 0 0 12px rgba(0, 212, 170, 0.5);
+}
+
+/* Unit avatar images - fill the card */
+.unit-avatar {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    display: block;
+}
+
+/* Unit initials (fallback when no image) */
+.unit-initials {
+    font-weight: 700;
+    font-size: 1.5rem;
+    line-height: 1;
+    color: var(--text-primary);
+    width: 100%;
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+/* Subtle element tint on initials */
+.unit-card.element-fire .unit-initials { color: var(--element-fire-light); }
+.unit-card.element-ice .unit-initials { color: var(--element-ice-light); }
+.unit-card.element-electric .unit-initials { color: var(--element-electric-light); }
+.unit-card.element-physical .unit-initials { color: var(--element-physical-light); }
+.unit-card.element-ether .unit-initials { color: var(--element-ether-light); }
+
+.unit-card.not-owned .unit-initials {
+    color: var(--text-secondary);
+}
+
+/* Unit name - overlay at bottom */
+.unit-name {
+    font-size: 0.6rem;
+    font-weight: 600;
+    color: white;
+    line-height: 1.1;
+    padding: 0.2rem 0.15rem;
+    background: rgba(0, 0, 0, 0.7);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+/* Flex badge - 4-point star, half-escaping top-right corner */
+.flex-badge {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 20px;
+    height: 20px;
+    background: #8b4513;
+    color: #ffd700;
+    border-radius: 50%;
+    font-size: 14px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
+    border: 2px solid var(--bg-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    padding-top: 1px;
+    z-index: 10;
+}
+
+/* ============================================================================
+   BOSS SELECTION
+   ============================================================================ */
+
+.boss-selection-section {
+    margin-top: 1rem;
+}
+
+.boss-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 0.75rem;
+}
+
+.boss-card {
+    border: 3px solid var(--border-color);
+    border-radius: 10px;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+    font-size: inherit;
+    text-align: center;
+    overflow: hidden;
+    position: relative;
+}
+
+.boss-card:hover {
+    border-color: var(--accent-primary);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.boss-card.selected {
+    border-color: var(--accent-secondary);
+    box-shadow: 0 0 15px rgba(0, 212, 170, 0.3);
+}
+
+.boss-avatar {
+    width: 100%;
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 1.5rem;
+    background: rgba(0, 0, 0, 0.3);
+    flex-shrink: 0;
+    overflow: hidden;
+    border-radius: 0;
+    border: none;
+}
+
+.boss-avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.boss-initials {
+    color: white;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+}
+
+.boss-card .boss-name {
+    font-weight: 700;
+    font-size: 0.7rem;
+    color: white;
+    text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.8);
+    line-height: 1.2;
+    padding: 0.4rem 0.3rem;
+    background: rgba(0, 0, 0, 0.7);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Unselected boss cards - dark background */
+.boss-card {
+    background: var(--bg-secondary);
+}
+
+/* Selected boss cards - single weakness solid colors */
+.boss-card.selected.weakness-fire { background: var(--element-fire); }
+.boss-card.selected.weakness-ice { background: var(--element-ice); }
+.boss-card.selected.weakness-electric { background: var(--element-electric); }
+.boss-card.selected.weakness-physical { background: var(--element-physical); }
+.boss-card.selected.weakness-ether { background: var(--element-ether); }
+
+/* Selected boss cards - dual weakness gradients with sharp transition */
+.boss-card.selected.weakness-electric-ether { background: linear-gradient(135deg, var(--element-electric) 35%, var(--element-ether) 65%); }
+.boss-card.selected.weakness-ether-ice { background: linear-gradient(135deg, var(--element-ether) 35%, var(--element-ice) 65%); }
+.boss-card.selected.weakness-ice-ether { background: linear-gradient(135deg, var(--element-ice) 35%, var(--element-ether) 65%); }
+.boss-card.selected.weakness-ether-physical { background: linear-gradient(135deg, var(--element-ether) 35%, var(--element-physical) 65%); }
+.boss-card.selected.weakness-electric-physical { background: linear-gradient(135deg, var(--element-electric) 35%, var(--element-physical) 65%); }
+.boss-card.selected.weakness-fire-ice { background: linear-gradient(135deg, var(--element-fire) 35%, var(--element-ice) 65%); }
+.boss-card.selected.weakness-ice-physical { background: linear-gradient(135deg, var(--element-ice) 35%, var(--element-physical) 65%); }
+.boss-card.selected.weakness-fire-electric { background: linear-gradient(135deg, var(--element-fire) 35%, var(--element-electric) 65%); }
+.boss-card.selected.weakness-fire-physical { background: linear-gradient(135deg, var(--element-fire) 35%, var(--element-physical) 65%); }
+.boss-card.selected.weakness-fire-ether { background: linear-gradient(135deg, var(--element-fire) 35%, var(--element-ether) 65%); }
+.boss-card.selected.weakness-physical-ether { background: linear-gradient(135deg, var(--element-physical) 35%, var(--element-ether) 65%); }
+
+/* ============================================================================
+   ACTION SECTION
+   ============================================================================ */
+
+.action-section {
+    margin-top: 1rem;
+}
+
+.run-btn {
+    width: 100%;
+    padding: 1rem 2rem;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--bg-primary);
+    background: linear-gradient(135deg, var(--accent-primary), #ff8855);
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.run-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px var(--accent-glow);
+}
+
+.run-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* ============================================================================
+   RESULTS SECTION - Carousel Layout
+   ============================================================================ */
+
+.results-section {
+    margin-top: 1.5rem;
+}
+
+.no-results {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-secondary);
+}
+
+.no-results p {
+    margin: 0.5rem 0;
+}
+
+/* Carousel Container */
+.carousel {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.carousel-viewport {
+    flex: 1;
+    overflow: hidden;
+    border-radius: 12px;
+}
+
+.carousel-track {
+    display: flex;
+    transition: transform 0.4s ease-out;
+}
+
+.carousel-slide {
+    flex: 0 0 100%;
+    padding: 1.5rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    box-sizing: border-box;
+}
+
+/* Carousel Navigation Buttons */
+.carousel-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: 2px solid var(--border-color);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-size: 1.8rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.carousel-btn:hover:not(:disabled) {
+    border-color: var(--accent-primary);
+    background: var(--bg-tertiary);
+    transform: scale(1.05);
+}
+
+.carousel-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.carousel-btn span {
+    line-height: 1;
+    margin-top: -4px;
+}
+
+/* Carousel Indicators (dots) */
+.carousel-indicators {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.carousel-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    border: none;
+    background: var(--border-color);
+    cursor: pointer;
+    transition: all 0.2s;
+    padding: 0;
+}
+
+.carousel-dot:hover {
+    background: var(--text-secondary);
+}
+
+.carousel-dot.active {
+    background: var(--accent-secondary);
+    transform: scale(1.2);
+}
+
+/* Carousel Counter */
+.carousel-counter {
+    text-align: center;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    font-weight: 700;
+}
+
+/* Result Slide Content */
+.result-label {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--accent-secondary);
+    margin-bottom: 1.5rem;
+    text-align: center;
+    letter-spacing: 0.05em;
+}
+
+/* 3 columns side by side */
+.result-columns {
+    display: flex;
+    gap: 2rem;
+    justify-content: center;
+}
+
+/* Each column: boss on top, team below */
+.result-column {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+/* Boss tile in results - larger with more breathing room */
+.result-boss-tile {
+    width: 140px;
+    border: 3px solid rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    overflow: hidden;
+    background: var(--bg-secondary);
+}
+
+.result-boss-tile .result-boss-avatar {
+    width: 100%;
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+}
+
+.result-boss-tile .boss-avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.result-boss-tile .boss-initials {
+    font-weight: 700;
+    font-size: 1.3rem;
+    color: white;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+}
+
+.result-boss-tile .boss-name {
+    font-weight: 600;
+    font-size: 0.75rem;
+    color: white;
+    text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.7);
+    text-align: center;
+    padding: 0.4rem 0.3rem;
+    background: rgba(0, 0, 0, 0.7);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Apply weakness colors to result boss tiles */
+.result-boss-tile.weakness-fire { background: var(--element-fire); }
+.result-boss-tile.weakness-ice { background: var(--element-ice); }
+.result-boss-tile.weakness-electric { background: var(--element-electric); }
+.result-boss-tile.weakness-physical { background: var(--element-physical); }
+.result-boss-tile.weakness-ether { background: var(--element-ether); }
+
+.result-boss-tile.weakness-electric-ether { background: linear-gradient(135deg, var(--element-electric) 35%, var(--element-ether) 65%); }
+.result-boss-tile.weakness-ether-ice { background: linear-gradient(135deg, var(--element-ether) 35%, var(--element-ice) 65%); }
+.result-boss-tile.weakness-ice-ether { background: linear-gradient(135deg, var(--element-ice) 35%, var(--element-ether) 65%); }
+.result-boss-tile.weakness-ether-physical { background: linear-gradient(135deg, var(--element-ether) 35%, var(--element-physical) 65%); }
+.result-boss-tile.weakness-electric-physical { background: linear-gradient(135deg, var(--element-electric) 35%, var(--element-physical) 65%); }
+.result-boss-tile.weakness-fire-ice { background: linear-gradient(135deg, var(--element-fire) 35%, var(--element-ice) 65%); }
+.result-boss-tile.weakness-ice-physical { background: linear-gradient(135deg, var(--element-ice) 35%, var(--element-physical) 65%); }
+.result-boss-tile.weakness-fire-electric { background: linear-gradient(135deg, var(--element-fire) 35%, var(--element-electric) 65%); }
+.result-boss-tile.weakness-fire-physical { background: linear-gradient(135deg, var(--element-fire) 35%, var(--element-physical) 65%); }
+.result-boss-tile.weakness-fire-ether { background: linear-gradient(135deg, var(--element-fire) 35%, var(--element-ether) 65%); }
+.result-boss-tile.weakness-physical-ether { background: linear-gradient(135deg, var(--element-physical) 35%, var(--element-ether) 65%); }
+
+/* Team stack - 3 unit cards side by side */
+.result-team-stack {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+/* Unit cards in results - image-focused like roster */
+.result-unit-card {
+    width: 80px;
+    background: var(--bg-secondary);
+    border: 3px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Element border colors */
+.result-unit-card.element-fire { border-color: var(--element-fire); }
+.result-unit-card.element-ice { border-color: var(--element-ice); }
+.result-unit-card.element-electric { border-color: var(--element-electric); }
+.result-unit-card.element-physical { border-color: var(--element-physical); }
+.result-unit-card.element-ether { border-color: var(--element-ether); }
+
+.result-unit-card .unit-avatar {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    display: block;
+}
+
+.result-unit-card .unit-initials {
+    font-weight: 700;
+    font-size: 1.5rem;
+    width: 100%;
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+/* Element tint on initials */
+.result-unit-card.element-fire .unit-initials { color: var(--element-fire-light); }
+.result-unit-card.element-ice .unit-initials { color: var(--element-ice-light); }
+.result-unit-card.element-electric .unit-initials { color: var(--element-electric-light); }
+.result-unit-card.element-physical .unit-initials { color: var(--element-physical-light); }
+.result-unit-card.element-ether .unit-initials { color: var(--element-ether-light); }
+
+.result-unit-card .unit-name {
+    font-size: 0.55rem;
+    color: white;
+    font-weight: 600;
+    padding: 0.15rem;
+    background: rgba(0, 0, 0, 0.7);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+    text-align: center;
+}
+
+/* ============================================================================
+   RESPONSIVE DESIGN
+   ============================================================================ */
+
+@media (max-width: 768px) {
+    .unit-card {
+        width: 70px;
+    }
+    
+    .boss-grid {
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    }
+    
+    .subsection-actions {
+        display: none;
+    }
+    
+    .carousel-btn {
+        width: 36px;
+        height: 36px;
+        font-size: 1.4rem;
+    }
+    
+    .carousel-slide {
+        padding: 1rem;
+    }
+    
+    .result-columns {
+        gap: 1rem;
+    }
+    
+    .result-boss-tile {
+        width: 110px;
+    }
+    
+    .result-boss-tile .boss-initials {
+        font-size: 1.1rem;
+    }
+    
+    .result-unit-card {
+        width: 70px;
+    }
+}
+
+@media (max-width: 480px) {
+    .unit-card {
+        width: 60px;
+    }
+    
+    .carousel-btn {
+        width: 32px;
+        height: 32px;
+        font-size: 1.2rem;
+    }
+    
+    .result-columns {
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+    
+    .result-column {
+        flex-direction: row;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+    
+    .result-team-stack {
+        flex-direction: column;
+    }
+    
+    .result-boss-tile {
+        width: 90px;
+    }
+    
+    .result-unit-card {
+        width: 60px;
+    }
+}
+

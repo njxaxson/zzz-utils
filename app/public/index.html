@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZZZ Gacha Simulator</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Zenless Zone Zero</h1>
+            <h2>Gacha Odds Calculator</h2>
+        </header>
+
+        <main>
+            <section class="input-section">
+                <h3>Resources</h3>
+                <div class="input-row">
+                    <div class="input-group">
+                        <label for="polychrome">Polychrome</label>
+                        <input type="number" id="polychrome" value="0" min="0">
+                    </div>
+                    <div class="input-group">
+                        <label for="tapes">Encrypted Master Tapes</label>
+                        <input type="number" id="tapes" value="0" min="0">
+                    </div>
+                </div>
+                <div class="input-group calculated">
+                    <label>Total Pulls Available</label>
+                    <span id="total-pulls">0</span>
+                </div>
+
+                <h3>Targets</h3>
+                <div class="input-row">
+                    <div class="input-group">
+                        <label for="target-c">Character</label>
+                        <select id="target-c">
+                            <option value="0">Skip</option>
+                            <option value="1" selected>M0</option>
+                            <option value="2">M1</option>
+                            <option value="3">M2</option>
+                            <option value="4">M3</option>
+                            <option value="5">M4</option>
+                            <option value="6">M5</option>
+                            <option value="7">M6</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label for="target-w">W-Engine</label>
+                        <select id="target-w">
+                            <option value="0" selected>Skip</option>
+                            <option value="1">W1</option>
+                            <option value="2">W2</option>
+                            <option value="3">W3</option>
+                            <option value="4">W4</option>
+                            <option value="5">W5</option>
+                        </select>
+                    </div>
+                </div>
+
+                <details class="collapsible-section">
+                    <summary><h3>Current Pity</h3></summary>
+                    <div class="input-row pity-row">
+                        <div class="input-group">
+                            <label for="pity-sc">S-Rank Character</label>
+                            <input type="number" id="pity-sc" value="0" min="0" max="89">
+                        </div>
+                        <div class="input-group">
+                            <label for="pity-sw">S-Rank W-Engine</label>
+                            <input type="number" id="pity-sw" value="0" min="0" max="79">
+                        </div>
+                        <div class="input-group">
+                            <label for="pity-ac">A-Rank Character</label>
+                            <input type="number" id="pity-ac" value="0" min="0" max="9">
+                        </div>
+                        <div class="input-group">
+                            <label for="pity-aw">A-Rank W-Engine</label>
+                            <input type="number" id="pity-aw" value="0" min="0" max="9">
+                        </div>
+                    </div>
+                </details>
+
+                <h3>Guarantees</h3>
+                <div class="checkbox-row">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="guarantee-c">
+                        <span>Character Banner (won 50/50)</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="guarantee-w">
+                        <span>W-Engine Banner (won 75/25)</span>
+                    </label>
+                </div>
+
+                <h3>Options</h3>
+                <div class="checkbox-row">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="include-refunds" checked="true">
+                        <span>Also Pull A-Rank Refunds</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="show-standard">
+                        <span>Show Standard S-Rank Wins</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="show-arank">
+                        <span>Show A-Rank Distribution</span>
+                    </label>
+                </div>
+
+                <div id="validation-errors" class="validation-errors" style="display: none;"></div>
+                <button id="simulate-btn">Run Simulation</button>
+            </section>
+
+            <section class="results-section" id="results-section" style="display: none;">
+                <h3>Results</h3>
+                <div class="results-content">
+                    <div class="results-text">
+                        <div id="target-info" class="result-block"></div>
+                        <div id="s-limited" class="result-block"></div>
+                        <div id="s-standard" class="result-block" style="display: none;"></div>
+                        <div id="a-featured" class="result-block" style="display: none;"></div>
+                        <div id="stats" class="result-block"></div>
+                    </div>
+                    <div class="charts-wrapper">
+                        <div class="chart-container">
+                            <h4>Featured S-Rank</h4>
+                            <canvas id="results-chart"></canvas>
+                        </div>
+                        <div class="chart-container" id="standard-chart-container" style="display: none;">
+                            <h4>Standard S-Rank</h4>
+                            <canvas id="standard-chart"></canvas>
+                        </div>
+                        <div class="chart-container" id="arank-chart-container" style="display: none;">
+                            <h4>Featured A-Rank Distribution</h4>
+                            <canvas id="arank-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>Simulation runs 100,000 iterations for statistical accuracy. &copy; 2025 njx</p>
+
+        </footer>
+    </div>
+
+    <script src="simulation.js"></script>
+</body>
+</html>
+

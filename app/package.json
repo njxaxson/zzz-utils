@@ -1,0 +1,17 @@
+{
+  "name": "zzz-utils",
+  "version": "1.0.1",
+  "description": "Zenless Zone Zero Utils",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "browser-sync start --server public --files \"public/**/*\" --no-notify"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "browser-sync": "^3.0.2"
+  }
+}
+

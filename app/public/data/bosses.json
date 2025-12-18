@@ -1,0 +1,124 @@
+[
+    {
+        "id": "dead-end-butcher",
+        "name": "Notorious Dead End Butcher",
+        "shortName": "Dead End Butcher",
+        "weaknesses": ["ice", "ether"],
+        "resistances": [],
+        "shill": "anomaly",
+        "anti": [],
+        "assists": 0,
+        "favored": ["Miyabi", "Vivian"]
+    },
+    {
+        "id": "corruption-complex",
+        "name": "Unknown Corruption Complex",
+        "shortName": "Corruption Complex",
+        "weaknesses": ["electric", "ether"],
+        "resistances": [],
+        "shill": null,
+        "anti": [],
+        "assists": 0,
+        "favored": []
+    },
+    {
+        "id": "marionettes",
+        "name": "Notorious Marionettes",
+        "shortName": "Marionettes",
+        "weaknesses": ["ice", "ether"],
+        "resistances": [],
+        "shill": null,
+        "anti": [],
+        "assists": 0,
+        "favored": []
+    },
+    {
+        "id": "pompey",
+        "name": "Notorious Pompey",
+        "shortName": "Pompey",
+        "weaknesses": ["fire"],
+        "resistances": ["electric"],
+        "shill": null,
+        "anti": [],
+        "assists": 0,
+        "favored": ["Evelyn"]
+    },
+    {
+        "id": "typhon-slugger",
+        "name": "Typhon Slugger",
+        "shortName": "Typhon Slugger",
+        "weaknesses": ["electric"],
+        "resistances": ["fire"],
+        "shill": null,
+        "anti": [],
+        "assists": 3,
+        "favored": []
+    },
+    {
+        "id": "sacrifice-bringer",
+        "name": "Sacrifice Bringer",
+        "shortName": "Sacrifice Bringer",
+        "weaknesses": ["ice"],
+        "resistances": ["physical"],
+        "shill": "anomaly",
+        "anti": [],
+        "assists": 0,
+        "favored": ["Miyabi"]
+    },
+    {
+        "id": "miasma-priest",
+        "name": "Miasma Priest",
+        "shortName": "Miasma Priest",
+        "weaknesses": ["ether"],
+        "resistances": ["ice"],
+        "shill": "rupture",
+        "anti": [],
+        "assists": 2,
+        "favored": ["Yixuan"]
+    },
+    {
+        "id": "miasmic-fiend",
+        "name": "Miasmic Fiend Unfathomable",
+        "shortName": "Miasmic Fiend",
+        "weaknesses": ["ether", "physical"],
+        "resistances": ["fire"],
+        "shill": "anomaly",
+        "anti": [],
+        "assists": 0,
+        "favored": ["Alice", "Jane", "Vivian"]
+    },
+    {
+        "id": "defiler",
+        "name": "The Defiler",
+        "shortName": "The Defiler",
+        "weaknesses": ["electric", "physical"],
+        "resistances": ["ice"],
+        "shill": "attack",
+        "anti": ["anomaly"],
+        "assists": 2,
+        "favored": ["Seed", "Orphie"]
+    },
+    {
+        "id": "wandering-hunter",
+        "name": "Wandering Hunter",
+        "shortName": "Wandering Hunter",
+        "weaknesses": ["fire", "ice"],
+        "resistances": ["physical"],
+        "shill": "rupture",
+        "anti": ["anomaly", "attack"],
+        "assists": 2,
+        "favored": ["Yidhari", "Banyue"]
+    },
+    {
+        "id": "thrall-sobek",
+        "name": "Thrall & Sobek",
+        "shortName": "Thrall & Sobek",
+        "weaknesses": ["ice", "physical"],
+        "resistances": ["electric"],
+        "shill": "stun",
+        "anti": ["anomaly"],
+        "assists": 3,
+        "favored": ["Dialyn", "Yidhari"]
+    }
+]
+
