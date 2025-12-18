@@ -102,7 +102,7 @@
         "tier": 0.0,
         "tags": ["stun", "physical", "krampus", "assist:defensive"],
         "join": ["attack", "rupture"],
-        "synergy": { "units": [], "tags": [], "avoid": [] }
+        "synergy": { "units": [], "tags": ["attack", "rupture"], "avoid": [] }
     },
     {
         "id": "ellen",
@@ -122,7 +122,7 @@
         "tier": 0.5,
         "tags": ["attack", "fire", "lyra", "assist:defensive"],
         "join": ["stun", "support"],
-        "synergy": { "units": ["Astra"], "tags": ["stun"], "avoid": [] }
+        "synergy": { "units": ["Astra"], "tags": [], "avoid": [] }
     },
     {
         "id": "grace",
@@ -142,7 +142,7 @@
         "tier": 1.5,
         "tags": ["attack", "electric", "section6", "assist:defensive"],
         "join": ["stun", "anomaly"],
-        "synergy": { "units": [], "tags": ["stun", "anomaly", "electric"], "avoid": [] }
+        "synergy": { "units": [], "tags": ["anomaly", "electric"], "avoid": [] }
     },
     {
         "id": "hugo",
@@ -269,7 +269,7 @@
         "tier": 0.0,
         "tags": ["attack", "fire", "obol", "assist:defensive"],
         "join": ["stun", "support"],
-        "synergy": { "units": [], "tags": [], "avoid": [] }
+        "synergy": { "units": ["Seed","SAnby"], "tags": ["attack"], "avoid": [] }
     },
     {
         "id": "pan-yinhu",
@@ -278,7 +278,7 @@
         "tier": 1.0,
         "tags": ["defense", "physical", "yunkui", "assist:defensive"],
         "join": ["rupture", "yunkui"],
-        "synergy": { "units": ["Lucia"], "tags": ["rupture"], "avoid": ["attack", "anomaly"] }
+        "synergy": { "units": [], "tags": ["rupture"], "avoid": ["attack", "anomaly"] }
     },
     {
         "id": "piper",
@@ -303,7 +303,7 @@
         "name": "Qingyi",
         "rank": "S",
         "limited": true,
-        "tier": 0.5,
+        "tier": 1.0,
         "tags": ["stun", "electric", "pubsec", "assist:defensive"],
         "join": ["attack", "pubsec"],
         "synergy": { "units": ["Yixuan"], "tags": [], "avoid": [] }
@@ -336,7 +336,7 @@
         "tier": 0.5,
         "tags": ["attack", "electric", "obol", "assist:defensive"],
         "join": ["attack"],
-        "synergy": { "units": ["Orphie"], "tags": ["attack"], "avoid": [] }
+        "synergy": { "units": ["Orphie"], "tags": ["attack", "obol"], "avoid": [] }
     },
     {
         "id": "seth",
@@ -374,7 +374,7 @@
         "tier": 0.5,
         "tags": ["stun", "electric", "obol", "assist:defensive"],
         "join": ["attack", "electric"],
-        "synergy": { "units": [], "tags": [], "avoid": [] }
+        "synergy": { "units": ["SAnby"], "tags": [], "avoid": [] }
     },
     {
         "id": "vivian",

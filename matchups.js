@@ -6,8 +6,7 @@
  */
 
 const myUnits = require('./units.json');
-const otherCharacters = require('./characters.json');
-const bosses = require('./bosses.json');
+const bosses = require('./app/public/data/bosses.json');
 const allUnits = require('./app/public/data/units.json');
 const { getTeams, sortTeamByRole, getTeamLabel, extendTeamsWithUniversalUnits } = require('./lib/team-builder.js');
 const { scoreTeamForBoss } = require('./lib/team-scorer.js');
@@ -16,10 +15,8 @@ const { scoreTeamForBoss } = require('./lib/team-scorer.js');
 // BUILD FULL ROSTER
 // ============================================================================
 
-// Combine both sources into full roster (myUnits takes precedence for duplicates)
-const myUnitNames = new Set(myUnits.map(u => u.name));
-const additionalCharacters = otherCharacters.filter(c => !myUnitNames.has(c.name));
-const fullRoster = [...myUnits, ...additionalCharacters];
+// Combine both sources into full roster 
+const fullRoster = [...allUnits];
 
 // ============================================================================
 // CONFIGURATION
