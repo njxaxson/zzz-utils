@@ -538,6 +538,18 @@ function calculateOptimalTeams() {
     const selectedBossObjects = selectedBosses.map(id => allBosses.find(b => b.id === id));
     const selectedBossNames = selectedBossObjects.map(b => b.name);
     
+    // DEBUG: Log available units
+    console.group('🎮 Deadly Assault Debug Info');
+    console.log('📋 Available Units:', availableUnits.length);
+    console.table(availableUnits.map(u => ({
+        name: u.name,
+        tier: u.tier,
+        tags: u.tags.join(', '),
+        synergy: u.synergy ? JSON.stringify(u.synergy) : 'none'
+    })));
+    console.log('🌟 Universal Units:', universalUnitNames);
+    console.log('👹 Selected Bosses:', selectedBossObjects.map(b => b.name));
+    
     // Generate all valid teams
     const allTeams = getTeams(availableUnits);
     
@@ -553,6 +565,11 @@ function calculateOptimalTeams() {
         }
     }
     
+    // DEBUG: Log team counts before extension
+    console.log('🔢 Teams before universal extension:');
+    console.log(`   2-person teams: ${Object.keys(twoCharTeams).length}`);
+    console.log(`   3-person teams: ${Object.keys(threeCharTeams).length}`);
+    
     // Extend 2-person teams with universal units
     const universalUnitObjects = availableUnits.filter(u => universalUnitNames.includes(u.name));
     if (universalUnitObjects.length > 0) {
@@ -561,11 +578,25 @@ function calculateOptimalTeams() {
     
     const teamLabels = Object.keys(threeCharTeams);
     
+    // DEBUG: Log team counts after extension
+    console.log('🔢 Teams after universal extension:');
+    console.log(`   3-person teams: ${teamLabels.length}`);
+    console.log('📝 All 3-person team labels:', teamLabels);
+    
     // Score teams for each boss
     const viableTeamsByBoss = {};
     
     for (const boss of selectedBossObjects) {
         viableTeamsByBoss[boss.name] = [];
+        
+        // DEBUG: Log boss info
+        console.group(`👹 Scoring teams for: ${boss.name}`);
+        console.log('   Weaknesses:', boss.weaknesses);
+        console.log('   Resistances:', boss.resistances);
+        console.log('   Shill:', boss.shill || 'none');
+        console.log('   Anti:', boss.anti || 'none');
+        
+        const disqualifiedTeams = [];
         
         // First pass: normal scoring
         for (const label of teamLabels) {
@@ -574,11 +605,41 @@ function calculateOptimalTeams() {
             
             if (score > 0) {
                 viableTeamsByBoss[boss.name].push({ label, team, score });
+            } else {
+                disqualifiedTeams.push({ label, score, team });
             }
+        }
+        
+        // DEBUG: Log scoring results
+        console.log(`   ✅ Viable teams: ${viableTeamsByBoss[boss.name].length}`);
+        console.log(`   ❌ Disqualified teams: ${disqualifiedTeams.length}`);
+        
+        // DEBUG: Run detailed debug on first few disqualified teams to understand why
+        if (disqualifiedTeams.length > 0 && viableTeamsByBoss[boss.name].length === 0) {
+            console.log('   🔍 Debugging disqualified teams:');
+            for (const dt of disqualifiedTeams.slice(0, 5)) {
+                const debugResult = scoreTeamForBoss(dt.team, boss, { debug: true });
+                console.log(`      ${dt.label}:`, debugResult);
+            }
+        }
+        
+        if (viableTeamsByBoss[boss.name].length > 0) {
+            console.log('   Top viable teams:');
+            const topViable = [...viableTeamsByBoss[boss.name]]
+                .sort((a, b) => b.score - a.score)
+                .slice(0, 5);
+            console.table(topViable.map(t => ({ label: t.label, score: t.score })));
+        }
+        
+        if (disqualifiedTeams.length > 0 && viableTeamsByBoss[boss.name].length === 0) {
+            console.log('   All teams were disqualified. Sample disqualified teams:');
+            console.table(disqualifiedTeams.slice(0, 10).map(t => ({ label: t.label, score: t.score })));
         }
         
         // Fallback: lenient mode if no viable teams
         if (viableTeamsByBoss[boss.name].length === 0) {
+            console.log('   ⚠️ No viable teams - trying lenient mode...');
+            
             for (const label of teamLabels) {
                 const team = threeCharTeams[label];
                 const score = scoreTeamForBoss(team, boss, { lenient: true });
@@ -587,14 +648,31 @@ function calculateOptimalTeams() {
                     viableTeamsByBoss[boss.name].push({ label, team, score, lenient: true });
                 }
             }
+            
+            console.log(`   Lenient mode viable teams: ${viableTeamsByBoss[boss.name].length}`);
         }
         
         // Sort by score descending
         viableTeamsByBoss[boss.name].sort((a, b) => b.score - a.score);
+        console.groupEnd();
     }
     
     // Find exclusive combinations
     const combinations = findExclusiveCombinations(viableTeamsByBoss, selectedBossNames);
+    
+    // DEBUG: Log final results
+    console.log('🏆 Final Results:');
+    console.log(`   Total exclusive combinations found: ${combinations.length}`);
+    if (combinations.length > 0) {
+        console.log('   Top combinations:');
+        combinations.slice(0, 3).forEach((combo, i) => {
+            console.log(`   #${i + 1} (score: ${combo.totalScore}):`);
+            combo.assignments.forEach(a => {
+                console.log(`      ${a.boss}: ${a.label} (${a.score})`);
+            });
+        });
+    }
+    console.groupEnd();
     
     return {
         combinations: combinations.slice(0, RESULT_LIMIT),

@@ -5,18 +5,21 @@
  * team ranking algorithm across all matchups at once.
  */
 
-const myUnits = require('./units.json');
-const bosses = require('./app/public/data/bosses.json');
 const allUnits = require('./app/public/data/units.json');
+const bosses = require('./app/public/data/bosses.json');
+const myRoster = require('./roster.json'); // Map of unit name -> stat (e.g., "M6W5")
 const { getTeams, sortTeamByRole, getTeamLabel, extendTeamsWithUniversalUnits } = require('./lib/team-builder.js');
 const { scoreTeamForBoss } = require('./lib/team-scorer.js');
 
 // ============================================================================
-// BUILD FULL ROSTER
+// BUILD ROSTERS
 // ============================================================================
 
-// Combine both sources into full roster 
+// Full roster: all units from the master units.json
 const fullRoster = [...allUnits];
+
+// Personal roster: units from allUnits filtered by roster.json
+const myUnits = allUnits.filter(u => myRoster.hasOwnProperty(u.name));
 
 // ============================================================================
 // CONFIGURATION
@@ -34,15 +37,15 @@ const EXCLUDED_UNITS = [
 ];
 
 // Optional: Specify a subset of units to use (whitelist)
-const INCLUDED_UNITS = 
-  //myUnits.map(u => u.name);
-  allUnits.map(u => u.name);
-  //allUnits.filter(u => u.rank == "A" || !u.limited).map(u => u.name);
+// Use one of the following options:
+const INCLUDED_UNITS = allUnits.map(u => u.name);           // Full roster (all units)
+// const INCLUDED_UNITS = myUnits.map(u => u.name);         // Personal roster (from roster.json)
+// const INCLUDED_UNITS = ["Ellen", "Harumasa", ...];       // Custom list
 
 // Universal units: Can join ANY 2-person team to form a 3-person team
 const UNIVERSAL_UNITS = [
     "Nicole",
-    "Astra",
+    // "Astra",  // Not in test roster
 ];
 
 // ============================================================================

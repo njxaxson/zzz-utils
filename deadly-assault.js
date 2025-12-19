@@ -5,8 +5,9 @@
  * ensuring no unit overlap and matching teams to boss requirements.
  */
 
-const units = require('./units.json');
-const bosses = require('./bosses.json');
+const allUnits = require('./app/public/data/units.json');
+const bosses = require('./app/public/data/bosses.json');
+const myRoster = require('./roster.json'); // Map of unit name -> stat (e.g., "M6W5")
 const { 
     getTeams, 
     sortTeamByRole, 
@@ -332,8 +333,10 @@ function main() {
     }
     console.log();
     
-    // Start with base units (clone to avoid modifying original)
-    let availableUnits = [...units];
+    // Start with base units - filter by roster.json for personal roster, or use all units
+    // const baseUnits = allUnits.filter(u => myRoster.hasOwnProperty(u.name)); // Personal roster
+    const baseUnits = [...allUnits]; // Full roster
+    let availableUnits = [...baseUnits];
     
     // Add developer units if any
     if (DEVELOPER_UNITS && DEVELOPER_UNITS.length > 0) {

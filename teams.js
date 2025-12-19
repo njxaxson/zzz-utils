@@ -1,27 +1,30 @@
-const units = require('./units.json');
+const allUnits = require('./app/public/data/units.json');
+const myRoster = require('./roster.json'); // Map of unit name -> stat (e.g., "M6W5")
 const { getTeams } = require('./lib/team-builder.js');
 
+// Filter to personal roster (or use allUnits for full roster)
+const units = allUnits.filter(u => myRoster.hasOwnProperty(u.name));
+// const units = [...allUnits]; // Uncomment to use full roster
+
+// Developer-only: Add unreleased/hypothetical units for testing
 // units.push({
 //         "name" : "Estelle",
 //         "rank" : "S",
 //         "tags" : ["defense", "ether", "pubsec"],
-//         "join" : ["attack", "ether", "pubsec"],
-//         "stat" : "M0W0"
-//     })
+//         "join" : ["attack", "ether", "pubsec"]
+//     });
 units.push({
         "name" : "Ye Shunguong",
         "rank" : "S",
         "tags" : ["attack", "physical", "yunkui", "title"],
-        "join" : ["support", "defense"],
-        "stat" : "M2W1"
-    })
+        "join" : ["support", "defense"]
+    });
 units.push({
         "name" : "Zhao",
         "rank" : "S",
         "tags" : ["defense", "ice", "krampus"],
-        "join" : ["attack", "anomaly", "rupture"],
-        "stat" : "M0W0"
-    })
+        "join" : ["attack", "anomaly", "rupture"]
+    });
 
 
 const padding = Math.max(...units.map(unit => unit.name.length)) - 1; 

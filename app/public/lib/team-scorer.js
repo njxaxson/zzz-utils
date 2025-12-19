@@ -292,9 +292,16 @@ export function calculateDPSMixingPenalty(team) {
 // ============================================================================
 
 export function scoreTeamForBoss(team, boss, options = {}) {
-    const { lenient = false } = options;
+    const { lenient = false, debug = false } = options;
     // In lenient mode, start with higher base score to offset unavoidable penalties
     let score = lenient ? 200 : 100;
+    const debugReasons = [];
+    
+    const log = (reason, delta = 0) => {
+        if (debug) {
+            debugReasons.push({ reason, delta, runningScore: score + delta });
+        }
+    };
     
     const dpsUnits = team.filter(isDPS);
     const attackers = team.filter(isAttacker);
@@ -390,20 +397,49 @@ export function scoreTeamForBoss(team, boss, options = {}) {
     const nonAnomalyDPS = dpsUnits.filter(u => !u.tags.includes("anomaly"));
     
     if (nonTitledAnomalyUnits.length > 0 && anomalyUnits.length < 2) {
-        if (nonAnomalyDPS.length > 0) {
-            // Non-titled anomaly with non-anomaly DPS - normally invalid
-            if (lenient) {
-                score -= 80; // Heavy penalty but allow in desperate situations
-            } else {
-                return -1;
+        // Check for Monoshock exception: attacker with anomaly+element synergy paired with same-element anomaly
+        // Example: Harumasa (attack, electric, synergy: anomaly+electric) + Grace (anomaly, electric)
+        let hasMonoshockException = false;
+        
+        for (const attacker of attackers) {
+            if (attacker.synergy?.tags?.includes("anomaly")) {
+                const attackerElement = getElement(attacker);
+                // Check for matching element synergy (e.g., Harumasa's "electric" in synergy.tags)
+                const hasSynergyElement = attacker.synergy.tags.some(t => ELEMENTS.includes(t));
+                const matchingAnomalies = nonTitledAnomalyUnits.filter(a => getElement(a) === attackerElement);
+                
+                if (matchingAnomalies.length > 0 && (hasSynergyElement || !hasSynergyElement)) {
+                    // Attacker has anomaly synergy AND there's a same-element anomaly unit
+                    hasMonoshockException = true;
+                    log(`Monoshock exception: ${attacker.name} + ${matchingAnomalies[0].name}`, 10);
+                    score += 10; // Small bonus for valid Monoshock composition
+                    break;
+                }
             }
         }
-        if (dpsUnits.length === nonTitledAnomalyUnits.length) {
-            // Solo non-titled anomaly - normally invalid
-            if (lenient) {
-                score -= 100; // Very heavy penalty but allow
-            } else {
-                return -1;
+        
+        if (!hasMonoshockException) {
+            if (nonAnomalyDPS.length > 0) {
+                // Non-titled anomaly with non-anomaly DPS - normally invalid
+                if (lenient) {
+                    log('Non-titled anomaly with non-anomaly DPS (lenient)', -80);
+                    score -= 80; // Heavy penalty but allow in desperate situations
+                } else {
+                    log('DISQUALIFIED: Non-titled anomaly with non-anomaly DPS');
+                    if (debug) console.log('Team disqualified:', team.map(u => u.name).join('/'), debugReasons);
+                    return -1;
+                }
+            }
+            if (dpsUnits.length === nonTitledAnomalyUnits.length) {
+                // Solo non-titled anomaly - normally invalid
+                if (lenient) {
+                    log('Solo non-titled anomaly (lenient)', -100);
+                    score -= 100; // Very heavy penalty but allow
+                } else {
+                    log('DISQUALIFIED: Solo non-titled anomaly');
+                    if (debug) console.log('Team disqualified:', team.map(u => u.name).join('/'), debugReasons);
+                    return -1;
+                }
             }
         }
     }
@@ -484,11 +520,25 @@ export function scoreTeamForBoss(team, boss, options = {}) {
     
     // Attack teams NEED a stunner - it's fundamental to the playstyle
     // Ideal: stun/attack/support or stun/attack/defense
+    // EXCEPTION: Monoshock teams (attacker with anomaly synergy + same-element anomaly)
     if (boss.shill === "attack" || (!boss.shill && attackers.length > 0)) {
-        if (stunUnits.length >= 1) {
+        // Check for Monoshock composition
+        const hasMonoshockComp = attackers.some(a => {
+            if (!a.synergy?.tags?.includes("anomaly")) return false;
+            const attackerElement = getElement(a);
+            return anomalyUnits.some(an => getElement(an) === attackerElement);
+        });
+        
+        if (hasMonoshockComp && anomalyUnits.length > 0) {
+            // Monoshock: attacker + anomaly = valid hybrid, no stunner needed
+            log('Monoshock composition - stunner not required', 5);
+            score += 5;
+        } else if (stunUnits.length >= 1) {
+            log('Attack team with stunner', 15);
             score += 15;
         } else {
-            score -= 60; // Near-disqualifying: attack teams need stunner
+            log('Attack team without stunner', -60);
+            score -= 60; // Near-disqualifying: normal attack teams need stunner
         }
         if (supportUnits.length >= 1 || defenseUnits.length >= 1) {
             score += 10;
@@ -704,6 +754,11 @@ export function scoreTeamForBoss(team, boss, options = {}) {
     }
     
     score += (defensiveAssistCount - boss.assists) * 3;
+    
+    if (debug) {
+        log(`Final score: ${score}`);
+        return { score, debugReasons };
+    }
     
     return score;
 }
