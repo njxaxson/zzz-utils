@@ -10,10 +10,7 @@
 </head>
 <body>
     <div class="container">
-        <header>
-            <h1>Zenless Zone Zero</h1>
-            <h2>Gacha Odds Calculator</h2>
-        </header>
+        <div id="header-container"></div>
 
         <main>
             <section class="input-section">
@@ -67,18 +64,22 @@
                         <div class="input-group">
                             <label for="pity-sc">S-Rank Character</label>
                             <input type="number" id="pity-sc" value="0" min="0" max="89">
+                            <span class="pity-hint" id="pity-sc-hint">90 until guarantee</span>
                         </div>
                         <div class="input-group">
                             <label for="pity-sw">S-Rank W-Engine</label>
                             <input type="number" id="pity-sw" value="0" min="0" max="79">
+                            <span class="pity-hint" id="pity-sw-hint">80 until guarantee</span>
                         </div>
                         <div class="input-group">
                             <label for="pity-ac">A-Rank Character</label>
                             <input type="number" id="pity-ac" value="0" min="0" max="9">
+                            <span class="pity-hint" id="pity-ac-hint">10 until guarantee</span>
                         </div>
                         <div class="input-group">
                             <label for="pity-aw">A-Rank W-Engine</label>
                             <input type="number" id="pity-aw" value="0" min="0" max="9">
+                            <span class="pity-hint" id="pity-aw-hint">10 until guarantee</span>
                         </div>
                     </div>
                 </details>
@@ -143,13 +144,13 @@
             </section>
         </main>
 
-        <footer>
-            <p>Simulation runs 100,000 iterations for statistical accuracy. &copy; 2025 njx</p>
-
-        </footer>
+        <div id="footer-container"></div>
     </div>
 
+    <script type="module">
+        import { loadSharedComponents } from './lib/components.js';
+        loadSharedComponents('gacha');
+    </script>
     <script src="simulation.js"></script>
 </body>
 </html>
-

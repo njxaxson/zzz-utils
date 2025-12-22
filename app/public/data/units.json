@@ -247,7 +247,7 @@
         "name": "Nekomata",
         "rank": "S",
         "limited": false,
-        "tier": 3.0,
+        "tier": 3.5,
         "tags": ["attack", "physical", "hares", "assist:defensive"],
         "join": ["physical", "hares"],
         "synergy": { "units": [], "tags": [], "avoid": [] }

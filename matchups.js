@@ -5,11 +5,15 @@
  * team ranking algorithm across all matchups at once.
  */
 
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+
 const allUnits = require('./app/public/data/units.json');
 const bosses = require('./app/public/data/bosses.json');
 const myRoster = require('./roster.json'); // Map of unit name -> stat (e.g., "M6W5")
-const { getTeams, sortTeamByRole, getTeamLabel, extendTeamsWithUniversalUnits } = require('./lib/team-builder.js');
-const { scoreTeamForBoss } = require('./lib/team-scorer.js');
+
+import { getTeams, sortTeamByRole, getTeamLabel, extendTeamsWithUniversalUnits } from './app/public/lib/team-builder.js';
+import { scoreTeamForBoss } from './app/public/lib/team-scorer.js';
 
 // ============================================================================
 // BUILD ROSTERS
@@ -22,10 +26,36 @@ const fullRoster = [...allUnits];
 const myUnits = allUnits.filter(u => myRoster.hasOwnProperty(u.name));
 
 // ============================================================================
+// COMMAND-LINE ARGUMENTS
+// ============================================================================
+
+function parseArgs() {
+    const args = process.argv.slice(2);
+    const options = {
+        filter: null,   // Case-insensitive boss name filter (contains match)
+        depth: 7        // Number of top teams to display per boss
+    };
+    
+    for (let i = 0; i < args.length; i++) {
+        if (args[i] === '--filter' && args[i + 1]) {
+            options.filter = args[i + 1].toLowerCase();
+            i++;
+        } else if (args[i] === '--depth' && args[i + 1]) {
+            options.depth = parseInt(args[i + 1], 10);
+            i++;
+        }
+    }
+    
+    return options;
+}
+
+const CLI_OPTIONS = parseArgs();
+
+// ============================================================================
 // CONFIGURATION
 // ============================================================================
 
-const TOP_TEAMS_PER_BOSS = 7;
+const TOP_TEAMS_PER_BOSS = CLI_OPTIONS.depth;
 
 const EXCLUDED_UNITS = [
     // "Anby",
@@ -100,8 +130,18 @@ function main() {
     console.log(`Total 3-character teams: ${teamLabels.length}\n`);
     console.log("=".repeat(60) + "\n");
     
+    // Filter bosses if --filter specified
+    let filteredBosses = bosses;
+    if (CLI_OPTIONS.filter) {
+        filteredBosses = bosses.filter(b => 
+            b.name.toLowerCase().includes(CLI_OPTIONS.filter) ||
+            b.shortName.toLowerCase().includes(CLI_OPTIONS.filter)
+        );
+        console.log(`Boss filter: "${CLI_OPTIONS.filter}" (${filteredBosses.length} matches)\n`);
+    }
+    
     // Process each boss
-    for (const boss of bosses) {
+    for (const boss of filteredBosses) {
         const weakStr = boss.weaknesses.join(", ") || "none";
         const resistStr = boss.resistances.join(", ") || "none";
         const shillStr = boss.shill || "none";

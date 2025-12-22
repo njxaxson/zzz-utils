@@ -6,14 +6,10 @@
     <title>ZZZ Deadly Assault Team Builder</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="deadly-assault.css">
 </head>
 <body>
-    <div class="container da-container">
-        <header>
-            <h1>Zenless Zone Zero</h1>
-            <h2>Deadly Assault Team Builder</h2>
-        </header>
+    <div class="container extra-wide">
+        <div id="header-container"></div>
 
         <main>
             <!-- Boss Selection Section -->
@@ -85,11 +81,13 @@
             </section>
         </main>
 
-        <footer>
-            <p>Deadly Assault Team Builder &copy; 2025 njx</p>
-        </footer>
+        <div id="footer-container"></div>
     </div>
 
+    <script type="module">
+        import { loadSharedComponents } from './lib/components.js';
+        loadSharedComponents('deadly-assault');
+    </script>
     <script type="module" src="deadly-assault.js"></script>
 </body>
 </html>

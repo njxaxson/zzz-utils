@@ -5,18 +5,22 @@
  * ensuring no unit overlap and matching teams to boss requirements.
  */
 
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+
 const allUnits = require('./app/public/data/units.json');
 const bosses = require('./app/public/data/bosses.json');
 const myRoster = require('./roster.json'); // Map of unit name -> stat (e.g., "M6W5")
-const { 
+
+import { 
     getTeams, 
     sortTeamByRole, 
     getTeamLabel,
     teamsOverlap,
     extendTeamsWithUniversalUnits,
     findExclusiveCombinations
-} = require('./lib/team-builder.js');
-const { scoreTeamForBoss } = require('./lib/team-scorer.js');
+} from './app/public/lib/team-builder.js';
+import { scoreTeamForBoss } from './app/public/lib/team-scorer.js';
 
 // ============================================================================
 // CONFIGURATION - Modify these values as needed
@@ -240,13 +244,13 @@ function isDominatedCombination(combination, viableTeamsByBoss, availableUnits) 
     const usedUnitIds = new Set();
     for (const assignment of combination.assignments) {
         for (const unit of assignment.team) {
-            usedUnitIds.add(unit.id);
+            usedUnitIds.add(unit.numericId);
         }
     }
     
     // Get Tier 0 units that are NOT used
     const tier0Units = availableUnits.filter(u => u.tier === 0);
-    const missingTier0 = tier0Units.filter(u => !usedUnitIds.has(u.id));
+    const missingTier0 = tier0Units.filter(u => !usedUnitIds.has(u.numericId));
     
     if (missingTier0.length === 0) {
         // All Tier 0 units are used - not dominated
@@ -266,7 +270,7 @@ function isDominatedCombination(combination, viableTeamsByBoss, availableUnits) 
             for (let j = 0; j < combination.assignments.length; j++) {
                 if (j !== i) {
                     for (const unit of combination.assignments[j].team) {
-                        otherTeamUnitIds.add(unit.id);
+                        otherTeamUnitIds.add(unit.numericId);
                     }
                 }
             }
@@ -276,11 +280,11 @@ function isDominatedCombination(combination, viableTeamsByBoss, availableUnits) 
             // 2. Doesn't conflict with the other two teams
             // 3. Has a score >= current team's score (or at least is viable)
             for (const candidateTeam of viableTeams) {
-                const hasUnit = candidateTeam.team.some(u => u.id === missingUnit.id);
+                const hasUnit = candidateTeam.team.some(u => u.numericId === missingUnit.numericId);
                 if (!hasUnit) continue;
                 
                 // Check for conflicts with other teams
-                const hasConflict = candidateTeam.team.some(u => otherTeamUnitIds.has(u.id));
+                const hasConflict = candidateTeam.team.some(u => otherTeamUnitIds.has(u.numericId));
                 if (hasConflict) continue;
                 
                 // Found a valid swap - this combination is dominated

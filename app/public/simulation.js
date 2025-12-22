@@ -203,10 +203,29 @@ function validatePityInput(input, maxValue) {
     }
 }
 
-pitySCInput.addEventListener('input', () => validatePityInput(pitySCInput, 90));
-pitySWInput.addEventListener('input', () => validatePityInput(pitySWInput, 80));
-pityACInput.addEventListener('input', () => validatePityInput(pityACInput, 10));
-pityAWInput.addEventListener('input', () => validatePityInput(pityAWInput, 10));
+// Pity hint elements
+const pitySCHint = document.getElementById('pity-sc-hint');
+const pitySWHint = document.getElementById('pity-sw-hint');
+const pityACHint = document.getElementById('pity-ac-hint');
+const pityAWHint = document.getElementById('pity-aw-hint');
+
+// Update pity hints
+function updatePityHints() {
+    const scValue = parseInt(pitySCInput.value) || 0;
+    const swValue = parseInt(pitySWInput.value) || 0;
+    const acValue = parseInt(pityACInput.value) || 0;
+    const awValue = parseInt(pityAWInput.value) || 0;
+    
+    pitySCHint.textContent = `${90 - scValue} until guarantee`;
+    pitySWHint.textContent = `${80 - swValue} until guarantee`;
+    pityACHint.textContent = `${10 - acValue} until guarantee`;
+    pityAWHint.textContent = `${10 - awValue} until guarantee`;
+}
+
+pitySCInput.addEventListener('input', () => { validatePityInput(pitySCInput, 90); updatePityHints(); });
+pitySWInput.addEventListener('input', () => { validatePityInput(pitySWInput, 80); updatePityHints(); });
+pityACInput.addEventListener('input', () => { validatePityInput(pityACInput, 10); updatePityHints(); });
+pityAWInput.addEventListener('input', () => { validatePityInput(pityAWInput, 10); updatePityHints(); });
 
 // Validation error display
 function showValidationErrors(errors) {
@@ -691,4 +710,5 @@ simulateBtn.addEventListener('click', () => {
 // Initialize
 loadInputs();
 updateTotalPulls();
+updatePityHints();
 

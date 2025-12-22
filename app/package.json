@@ -1,6 +1,7 @@
 {
   "name": "zzz-utils",
   "version": "1.0.1",
+  "type": "module",
   "description": "Zenless Zone Zero Utils",
   "main": "server.js",
   "scripts": {

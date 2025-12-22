@@ -1,6 +1,10 @@
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+
 const allUnits = require('./app/public/data/units.json');
 const myRoster = require('./roster.json'); // Map of unit name -> stat (e.g., "M6W5")
-const { getTeams } = require('./lib/team-builder.js');
+
+import { getTeams } from './app/public/lib/team-builder.js';
 
 // Filter to personal roster (or use allUnits for full roster)
 const units = allUnits.filter(u => myRoster.hasOwnProperty(u.name));
@@ -32,7 +36,7 @@ const padding = Math.max(...units.map(unit => unit.name.length)) - 1;
 //now sort the list of teams by their team-name-as-string, so that we can iterate in order
 const teams = getTeams(units);
 var labels = [];
-for(label in teams) {
+for(var label in teams) {
     labels.push(label);
 }
 labels.sort();

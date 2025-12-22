@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZZZ Team Builder</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container wide">
+        <div id="header-container"></div>
+
+        <main>
+            <!-- Unit Selection Section - Collapsible -->
+            <details class="roster-section" id="roster-section" open>
+                <summary class="roster-header">
+                    <h3>Your Roster</h3>
+                    <span class="roster-toggle-hint">Click to toggle ownership. <span class="highlight-universal">Right-click</span> to mark as flex.</span>
+                </summary>
+                
+                <div class="roster-content">
+                    <!-- Limited S-Rank Subsection -->
+                    <div class="roster-subsection" id="limited-s-section">
+                        <div class="subsection-header">
+                            <span class="subsection-title">Limited S-Rank</span>
+                            <span class="subsection-count" id="limited-s-count">0/0</span>
+                            <div class="subsection-actions">
+                                <button type="button" class="subtle-btn select-all" data-category="limited-s">All</button>
+                                <button type="button" class="subtle-btn deselect-all" data-category="limited-s">None</button>
+                            </div>
+                        </div>
+                        <div class="unit-grid" id="limited-s-grid"></div>
+                    </div>
+
+                    <!-- Standard S-Rank Subsection -->
+                    <div class="roster-subsection" id="standard-s-section">
+                        <div class="subsection-header">
+                            <span class="subsection-title">Standard S-Rank</span>
+                            <span class="subsection-count" id="standard-s-count">0/0</span>
+                            <div class="subsection-actions">
+                                <button type="button" class="subtle-btn select-all" data-category="standard-s">All</button>
+                                <button type="button" class="subtle-btn deselect-all" data-category="standard-s">None</button>
+                            </div>
+                        </div>
+                        <div class="unit-grid" id="standard-s-grid"></div>
+                    </div>
+
+                    <!-- A-Rank Subsection -->
+                    <div class="roster-subsection" id="a-rank-section">
+                        <div class="subsection-header">
+                            <span class="subsection-title">A-Rank</span>
+                            <span class="subsection-count" id="a-rank-count">0/0</span>
+                            <div class="subsection-actions">
+                                <button type="button" class="subtle-btn select-all" data-category="a-rank">All</button>
+                                <button type="button" class="subtle-btn deselect-all" data-category="a-rank">None</button>
+                            </div>
+                        </div>
+                        <div class="unit-grid" id="a-rank-grid"></div>
+                    </div>
+                </div>
+            </details>
+
+            <!-- Filter Section - Collapsible -->
+            <details class="filter-section collapsible-filter" id="filter-section" open>
+                <summary class="filter-header">
+                    <h3>Team Filters</h3>
+                    <span class="filter-toggle-hint">Configure filters to find specific team compositions.</span>
+                </summary>
+                
+                <div class="filters-grid">
+                    <!-- Elements Multi-Select -->
+                    <div class="filter-group">
+                        <label class="filter-label">Elements</label>
+                        <div class="multi-dropdown" data-filter="elements">
+                            <button type="button" class="dropdown-toggle">
+                                <span class="dropdown-text">Any element</span>
+                                <span class="dropdown-arrow">▼</span>
+                            </button>
+                            <div class="dropdown-menu">
+                                <label class="dropdown-item">
+                                    <input type="checkbox" value="fire"> 
+                                    <span class="element-tag fire">Fire</span>
+                                </label>
+                                <label class="dropdown-item">
+                                    <input type="checkbox" value="ice"> 
+                                    <span class="element-tag ice">Ice</span>
+                                </label>
+                                <label class="dropdown-item">
+                                    <input type="checkbox" value="electric"> 
+                                    <span class="element-tag electric">Electric</span>
+                                </label>
+                                <label class="dropdown-item">
+                                    <input type="checkbox" value="physical"> 
+                                    <span class="element-tag physical">Physical</span>
+                                </label>
+                                <label class="dropdown-item">
+                                    <input type="checkbox" value="ether"> 
+                                    <span class="element-tag ether">Ether</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="filter-hint">At least 2 units with selected element(s)</div>
+                    </div>
+
+                    <!-- DPS Role Multi-Select -->
+                    <div class="filter-group">
+                        <label class="filter-label">DPS Role</label>
+                        <div class="multi-dropdown" data-filter="dps-role">
+                            <button type="button" class="dropdown-toggle">
+                                <span class="dropdown-text">Any DPS</span>
+                                <span class="dropdown-arrow">▼</span>
+                            </button>
+                            <div class="dropdown-menu">
+                                <label class="dropdown-item">
+                                    <input type="checkbox" value="attack"> 
+                                    <span>Attack</span>
+                                </label>
+                                <label class="dropdown-item">
+                                    <input type="checkbox" value="anomaly"> 
+                                    <span>Anomaly</span>
+                                </label>
+                                <label class="dropdown-item">
+                                    <input type="checkbox" value="rupture"> 
+                                    <span>Rupture</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="filter-hint">Team must include at least one selected role</div>
+                    </div>
+
+                    <!-- Min S-Ranks -->
+                    <div class="filter-group">
+                        <label class="filter-label">Min S-Ranks</label>
+                        <div class="button-group" data-filter="min-s-rank">
+                            <button type="button" class="filter-btn active" data-value="0">Any</button>
+                            <button type="button" class="filter-btn" data-value="1">1+</button>
+                            <button type="button" class="filter-btn" data-value="2">2+</button>
+                            <button type="button" class="filter-btn" data-value="3">3</button>
+                        </div>
+                    </div>
+
+                    <!-- Max Tier -->
+                    <div class="filter-group">
+                        <label class="filter-label">Max Unit Tier</label>
+                        <div class="button-group" data-filter="max-tier">
+                            <button type="button" class="filter-btn active" data-value="99">Any</button>
+                            <button type="button" class="filter-btn" data-value="0.5">0.5</button>
+                            <button type="button" class="filter-btn" data-value="1">1.0</button>
+                            <button type="button" class="filter-btn" data-value="1.5">1.5</button>
+                            <button type="button" class="filter-btn" data-value="2">2.0</button>
+                        </div>
+                        <div class="filter-hint">Exclude units above this tier</div>
+                    </div>
+
+                    <!-- Must Include Units -->
+                    <div class="filter-group filter-group-wide">
+                        <label class="filter-label">Must Include</label>
+                        <div class="multi-dropdown multi-dropdown-wide" data-filter="must-include" data-searchable="true">
+                            <button type="button" class="dropdown-toggle">
+                                <span class="dropdown-text">No specific units</span>
+                                <span class="dropdown-arrow">▼</span>
+                            </button>
+                            <div class="dropdown-menu dropdown-menu-units" id="must-include-menu">
+                                <div class="dropdown-search-row">
+                                    <input type="text" class="dropdown-search-input" placeholder="Search...">
+                                    <div class="dropdown-quick-filters">
+                                        <button type="button" class="quick-filter-btn" data-role-filter="stun">Stun</button>
+                                        <button type="button" class="quick-filter-btn" data-role-filter="attack,anomaly,rupture">DPS</button>
+                                        <button type="button" class="quick-filter-btn" data-role-filter="support,defense">Support</button>
+                                    </div>
+                                    <div class="dropdown-select-actions">
+                                        <button type="button" class="select-action-btn select-all-visible">All</button>
+                                        <button type="button" class="select-action-btn select-none-visible">None</button>
+                                    </div>
+                                </div>
+                                <div class="dropdown-items">
+                                    <!-- Populated dynamically -->
+                                </div>
+                            </div>
+                        </div>
+                        <div class="filter-hint">Team must include at least one of these units</div>
+                    </div>
+
+                    <!-- Exclude Units -->
+                    <div class="filter-group filter-group-wide">
+                        <label class="filter-label">Exclude</label>
+                        <div class="multi-dropdown multi-dropdown-wide" data-filter="exclude" data-searchable="true">
+                            <button type="button" class="dropdown-toggle">
+                                <span class="dropdown-text">No exclusions</span>
+                                <span class="dropdown-arrow">▼</span>
+                            </button>
+                            <div class="dropdown-menu dropdown-menu-units" id="exclude-menu">
+                                <div class="dropdown-search-row">
+                                    <input type="text" class="dropdown-search-input" placeholder="Search...">
+                                    <div class="dropdown-quick-filters">
+                                        <button type="button" class="quick-filter-btn" data-tier-filter="2">Tier 2</button>
+                                        <button type="button" class="quick-filter-btn" data-tier-filter="3">Tier 3</button>
+                                        <button type="button" class="quick-filter-btn" data-tier-filter="4">Tier 4</button>
+                                    </div>
+                                    <div class="dropdown-select-actions">
+                                        <button type="button" class="select-action-btn select-all-visible">All</button>
+                                        <button type="button" class="select-action-btn select-none-visible">None</button>
+                                    </div>
+                                </div>
+                                <div class="dropdown-items">
+                                    <!-- Populated dynamically -->
+                                </div>
+                            </div>
+                        </div>
+                        <div class="filter-hint">Teams with these units will be hidden</div>
+                    </div>
+                </div>
+            </details>
+
+            <!-- Action Section -->
+            <section class="action-section">
+                <div id="validation-errors" class="validation-errors" style="display: none;"></div>
+                <div class="action-buttons">
+                    <button id="clear-filters-btn" class="secondary-btn">Clear Filters</button>
+                    <button id="build-btn" class="run-btn">Build Teams</button>
+                </div>
+            </section>
+
+            <!-- Results Section -->
+            <section class="results-section" id="results-section" style="display: none;">
+                <div class="results-header">
+                    <h3>Team Combinations</h3>
+                    <span class="results-count" id="results-count"></span>
+                </div>
+                <div class="teams-grid" id="teams-grid">
+                    <!-- Teams will be rendered here -->
+                </div>
+                <div class="results-pagination" id="results-pagination" style="display: none;">
+                    <button class="pagination-btn" id="prev-page" disabled>← Previous</button>
+                    <span class="pagination-info" id="pagination-info">Page 1 of 1</span>
+                    <button class="pagination-btn" id="next-page">Next →</button>
+                </div>
+            </section>
+        </main>
+
+        <div id="footer-container"></div>
+    </div>
+
+    <script type="module">
+        import { loadSharedComponents } from './lib/components.js';
+        loadSharedComponents('team-builder');
+    </script>
+    <script type="module" src="team-builder-page.js"></script>
+</body>
+</html>

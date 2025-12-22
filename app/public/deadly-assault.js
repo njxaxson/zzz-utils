@@ -19,7 +19,8 @@ import { scoreTeamForBoss } from './lib/team-scorer.js';
 const RESULT_LIMIT = 5;
 const MIN_UNITS_REQUIRED = 9;
 const BOSSES_REQUIRED = 3;
-const STORAGE_KEY = 'zzz-deadly-assault';
+const ROSTER_STORAGE_KEY = 'zzz-roster';           // Shared with team-builder page
+const PAGE_STORAGE_KEY = 'zzz-deadly-assault';     // Page-specific settings
 
 // ============================================================================
 // STATE
@@ -83,42 +84,80 @@ function initializeUnitStates() {
 // LOCAL STORAGE
 // ============================================================================
 
-function saveToStorage() {
+function saveRosterToStorage() {
     const data = {
         unitStates,
-        selectedBosses,
         rosterOpen
     };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    localStorage.setItem(ROSTER_STORAGE_KEY, JSON.stringify(data));
+}
+
+function savePageToStorage() {
+    const data = {
+        selectedBosses
+    };
+    localStorage.setItem(PAGE_STORAGE_KEY, JSON.stringify(data));
+}
+
+function saveToStorage() {
+    saveRosterToStorage();
+    savePageToStorage();
 }
 
 function loadFromStorage() {
+    // Load roster (shared with team-builder page)
     try {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (!saved) return;
-        
-        const data = JSON.parse(saved);
-        
-        if (data.unitStates) {
-            // Merge saved states with defaults (for new units)
-            for (const unitId in data.unitStates) {
-                if (unitStates[unitId]) {
-                    unitStates[unitId] = { ...unitStates[unitId], ...data.unitStates[unitId] };
+        const saved = localStorage.getItem(ROSTER_STORAGE_KEY);
+        if (saved) {
+            const data = JSON.parse(saved);
+            
+            if (data.unitStates) {
+                for (const unitId in data.unitStates) {
+                    if (unitStates[unitId]) {
+                        unitStates[unitId] = { ...unitStates[unitId], ...data.unitStates[unitId] };
+                    }
                 }
+            }
+            
+            if (typeof data.rosterOpen === 'boolean') {
+                rosterOpen = data.rosterOpen;
             }
         }
         
-        if (data.selectedBosses) {
-            selectedBosses = data.selectedBosses.filter(id => 
-                allBosses.some(b => b.id === id)
-            );
-        }
-        
-        if (typeof data.rosterOpen === 'boolean') {
-            rosterOpen = data.rosterOpen;
+        // Migration: check if old storage has data we should use
+        const oldSaved = localStorage.getItem(PAGE_STORAGE_KEY);
+        if (oldSaved && !saved) {
+            const oldData = JSON.parse(oldSaved);
+            if (oldData.unitStates) {
+                for (const unitId in oldData.unitStates) {
+                    if (unitStates[unitId]) {
+                        unitStates[unitId] = { ...unitStates[unitId], ...oldData.unitStates[unitId] };
+                    }
+                }
+            }
+            if (typeof oldData.rosterOpen === 'boolean') {
+                rosterOpen = oldData.rosterOpen;
+            }
+            saveRosterToStorage();
         }
     } catch (e) {
-        console.warn('Failed to load saved state:', e);
+        console.warn('Failed to load roster state:', e);
+    }
+    
+    // Load page-specific settings
+    try {
+        const pageSaved = localStorage.getItem(PAGE_STORAGE_KEY);
+        if (pageSaved) {
+            const data = JSON.parse(pageSaved);
+            
+            if (data.selectedBosses) {
+                selectedBosses = data.selectedBosses.filter(id => 
+                    allBosses.some(b => b.id === id)
+                );
+            }
+        }
+    } catch (e) {
+        console.warn('Failed to load page state:', e);
     }
 }
 
