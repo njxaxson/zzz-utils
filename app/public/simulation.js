@@ -1,158 +1,20 @@
-// ZZZ Gacha Simulator - Client-side Logic
-// Ported from simulation.js
+// ZZZ Gacha Simulator - Client-side UI
+// Imports core logic from shared module
 
-// Constants
-const SIMULATIONS = 100000.0;
-const RATE_S = 0.006;
-const RATE_A = 0.072;
-const PITY_C = 90;
-const PITY_W = 80;
-const PITY_A = 10;
-const CFEATURED = 0.5;
-const WFEATURED = 0.75;
-const REFUND_RATE = 0.043;
-const RESULT_FEATURED_S = 4;
-const RESULT_STANDARD_S = 3;
-const RESULT_FEATURED_A = 2;
-const RESULT_STANDARD_A = 1;
-const RESULT_NOTHING = 0;
+import {
+    SIMULATIONS,
+    REFUND_RATE,
+    PITY_C,
+    PITY_W,
+    PITY_A,
+    TACTICS,
+    simulate,
+    toLabel,
+    toPercentage,
+    runBatchSimulation
+} from './lib/gacha-core.js';
 
-// Tracking for average calculations
-let caverage = {
-    pulls: 0,
-    wins: 0
-};
-
-function cpull(state) {
-    state.cpity++;
-    const roll = Math.random();
-    if (state.cpity >= PITY_C || roll < RATE_S) {
-        caverage.pulls += state.cpity;
-        caverage.wins++;
-        state.cpity = 0;
-        if (state.cguaranteed || Math.random() < CFEATURED) {
-            state.cguaranteed = false;
-            return RESULT_FEATURED_S;
-        }
-        //otherwise
-        state.cguaranteed = true;
-        return RESULT_STANDARD_S;
-    } else
-    if (state.apity >= PITY_A || roll < RATE_S + RATE_A) {
-        state.apity = 0;
-        if (state.aguaranteed || Math.random() < CFEATURED) {
-            state.aguaranteed = false;
-            return RESULT_FEATURED_A;
-        }
-        //otherwise
-        state.aguaranteed = true;
-        return RESULT_STANDARD_A;
-    }
-    //otherwise
-    return RESULT_NOTHING;
-}
-
-function wpull(state) {
-    state.wpity++;
-    const roll = Math.random();
-    if (state.wpity >= PITY_W || roll < RATE_S) {
-        state.wpity = 0;
-        if (state.wguaranteed || Math.random() < WFEATURED) {
-            state.wguaranteed = false;
-            return RESULT_FEATURED_S;
-        }
-        //otherwise
-        state.wguaranteed = true;
-        return RESULT_STANDARD_S;
-    } else
-    if (state.epity >= PITY_A || roll < RATE_S + RATE_A) {
-        state.epity = 0;
-        if (state.eguaranteed || Math.random() < WFEATURED) {
-            state.eguaranteed = false;
-            return RESULT_FEATURED_A;
-        }
-        //otherwise
-        state.eguaranteed = true;
-        return RESULT_STANDARD_A;
-    }
-    //otherwise
-    return RESULT_NOTHING;
-}
-
-function simulate(context) {
-    let state = {
-        cpity: context.pity && context.pity.length > 0 && context.pity[0] ? context.pity[0] : 0,
-        wpity: context.pity && context.pity.length > 1 && context.pity[1] ? context.pity[1] : 0,
-        apity: context.pity && context.pity.length > 2 && context.pity[2] ? context.pity[2] : 0,
-        epity: context.pity && context.pity.length > 3 && context.pity[3] ? context.pity[3] : 0,
-        cguaranteed: context.guarantees && context.guarantees.length > 0 && context.guarantees[0],
-        wguaranteed: context.guarantees && context.guarantees.length > 1 && context.guarantees[1],
-        aguaranteed: context.guarantees && context.guarantees.length > 2 && context.guarantees[2],
-        eguaranteed: context.guarantees && context.guarantees.length > 3 && context.guarantees[3]
-    };
-    let results = {
-        fc: 0,
-        fw: 0,
-        sc: 0,
-        sw: 0,
-        fa: 0,
-        sa: 0,
-        fe: 0,
-        se: 0
-    };
-    let pulls = context.p;
-    //Minimum success 1
-    while (context.c > 0 && pulls > 0 && results.fc == 0) {
-        pulls--;
-        const result = cpull(state);
-        ctally(result, results);
-    }
-    while (context.w > 0 && pulls > 0 && results.fw == 0) {
-        pulls--;
-        const result = wpull(state);
-        wtally(result, results);
-    }
-    //Extra successes
-    while (results.fc < context.c && pulls > 0) {
-        pulls--;
-        const result = cpull(state);
-        ctally(result, results);
-    }
-    while (results.fw < context.w && pulls > 0) {
-        pulls--;
-        const result = wpull(state);
-        wtally(result, results);
-    }
-    results.p = pulls;
-    return results;
-}
-
-function ctally(result, results) {
-    if (result == RESULT_FEATURED_S) results.fc++; else
-    if (result == RESULT_STANDARD_S) results.sc++; else
-    if (result == RESULT_FEATURED_A) results.fa++; else
-    if (result == RESULT_STANDARD_A) results.sa++;
-}
-
-function wtally(result, results) {
-    if (result == RESULT_FEATURED_S) results.fw++; else
-    if (result == RESULT_STANDARD_S) results.sw++; else
-    if (result == RESULT_FEATURED_A) results.fe++; else
-    if (result == RESULT_STANDARD_A) results.se++;
-}
-
-function toLabel(c, w) {
-    const label = (c == 0) ? "MxW" + w : "M" + Math.min(c - 1, 6) + "W" + Math.min(w, 5);
-    return label == "MxW0" ? "None" : label;
-}
-
-function toPercentage(n, d) {
-    if (d === undefined) d = SIMULATIONS;
-    const ratio = n / d;
-    const adjusted = Math.round(ratio * 1000) / 10;
-    const percent = adjusted.toFixed(1).toString() + "%";
-    return percent.padStart(6);
-}
+import { replaceSelect } from './lib/custom-dropdown.js';
 
 // DOM Elements
 const polychromeInput = document.getElementById('polychrome');
@@ -169,6 +31,7 @@ const guaranteeWInput = document.getElementById('guarantee-w');
 const includeRefundsInput = document.getElementById('include-refunds');
 const showStandardInput = document.getElementById('show-standard');
 const showARankInput = document.getElementById('show-arank');
+const pullTacticInput = document.getElementById('pull-tactic');
 const simulateBtn = document.getElementById('simulate-btn');
 const resultsSection = document.getElementById('results-section');
 const standardChartContainer = document.getElementById('standard-chart-container');
@@ -178,6 +41,29 @@ const validationErrorsDiv = document.getElementById('validation-errors');
 let chartInstance = null;
 let standardChartInstance = null;
 let arankChartInstance = null;
+
+// Custom dropdown instances
+let targetCDropdown = null;
+let targetWDropdown = null;
+let tacticDropdown = null;
+
+// Initialize custom dropdowns
+function initCustomDropdowns() {
+    // Replace Character target select
+    targetCDropdown = replaceSelect(targetCInput, {
+        onChange: () => updateTacticVisibility()
+    });
+    
+    // Replace W-Engine target select
+    targetWDropdown = replaceSelect(targetWInput, {
+        onChange: () => updateTacticVisibility()
+    });
+    
+    // Replace Pull Tactic select with inline style
+    tacticDropdown = replaceSelect(pullTacticInput, {
+        className: 'inline'
+    });
+}
 
 // Update total pulls display
 function updateTotalPulls() {
@@ -190,6 +76,23 @@ function updateTotalPulls() {
 // Add event listeners for pull calculation
 polychromeInput.addEventListener('input', updateTotalPulls);
 tapesInput.addEventListener('input', updateTotalPulls);
+
+// Show/hide tactic option based on targets
+function updateTacticVisibility() {
+    const targetC = parseInt(targetCInput.value) || 0;
+    const targetW = parseInt(targetWInput.value) || 0;
+    // Only show tactic option when pulling for both character AND engine
+    // and when aiming for more than M0 (since M0W1 has no practical difference between tactics)
+    const shouldShow = targetC > 1 && targetW > 0;
+    
+    if (tacticDropdown) {
+        if (shouldShow) {
+            tacticDropdown.show();
+        } else {
+            tacticDropdown.hide();
+        }
+    }
+}
 
 // Pity validation
 function validatePityInput(input, maxValue) {
@@ -216,16 +119,16 @@ function updatePityHints() {
     const acValue = parseInt(pityACInput.value) || 0;
     const awValue = parseInt(pityAWInput.value) || 0;
     
-    pitySCHint.textContent = `${90 - scValue} until guarantee`;
-    pitySWHint.textContent = `${80 - swValue} until guarantee`;
-    pityACHint.textContent = `${10 - acValue} until guarantee`;
-    pityAWHint.textContent = `${10 - awValue} until guarantee`;
+    pitySCHint.textContent = `${PITY_C - scValue} until guarantee`;
+    pitySWHint.textContent = `${PITY_W - swValue} until guarantee`;
+    pityACHint.textContent = `${PITY_A - acValue} until guarantee`;
+    pityAWHint.textContent = `${PITY_A - awValue} until guarantee`;
 }
 
-pitySCInput.addEventListener('input', () => { validatePityInput(pitySCInput, 90); updatePityHints(); });
-pitySWInput.addEventListener('input', () => { validatePityInput(pitySWInput, 80); updatePityHints(); });
-pityACInput.addEventListener('input', () => { validatePityInput(pityACInput, 10); updatePityHints(); });
-pityAWInput.addEventListener('input', () => { validatePityInput(pityAWInput, 10); updatePityHints(); });
+pitySCInput.addEventListener('input', () => { validatePityInput(pitySCInput, PITY_C); updatePityHints(); });
+pitySWInput.addEventListener('input', () => { validatePityInput(pitySWInput, PITY_W); updatePityHints(); });
+pityACInput.addEventListener('input', () => { validatePityInput(pityACInput, PITY_A); updatePityHints(); });
+pityAWInput.addEventListener('input', () => { validatePityInput(pityAWInput, PITY_A); updatePityHints(); });
 
 // Validation error display
 function showValidationErrors(errors) {
@@ -250,9 +153,6 @@ function runSimulation() {
     // Use setTimeout to allow UI to update
     setTimeout(() => {
         try {
-            // Reset caverage
-            caverage = { pulls: 0, wins: 0 };
-
             // Build context from inputs
             const polychrome = parseInt(polychromeInput.value) || 0;
             const tapes = parseInt(tapesInput.value) || 0;
@@ -276,7 +176,8 @@ function runSimulation() {
                 guarantees: [
                     guaranteeCInput.checked,
                     guaranteeWInput.checked
-                ]
+                ],
+                tactic: pullTacticInput.value
             };
 
             // Validation
@@ -295,45 +196,11 @@ function runSimulation() {
             
             hideValidationErrors();
 
-            // Prepare keys
-            const s_limited = {}, s_standard = {}, a_featured = {};
-            for (let w = 0; w <= context.w; w++) {
-                for (let c = 0; c <= context.c; c++) {
-                    s_limited[toLabel(c, w)] = 0;
-                    s_standard[toLabel(c, w)] = 0;
-                }
-            }
-
-            // Run simulations
-            const target = toLabel(context.c, context.w);
-            let totalPullsUsed = 0;
-            let remaining = 0;
-            let set = [];
-
-            for (let i = 0, n = SIMULATIONS; i < n; i++) {
-                const result = simulate(context);
-                s_limited[toLabel(result.fc, result.fw)]++;
-                s_standard[toLabel(result.sc, result.sw)]++;
-                if (result.fa.toString() in a_featured) {
-                    a_featured[result.fa.toString()]++;
-                } else {
-                    a_featured[result.fa.toString()] = 1;
-                }
-                remaining += result.p;
-                totalPullsUsed += context.p - result.p;
-                if (result.p > 0) set.push(result.p);
-            }
-
-            let mean = remaining / s_limited[target];
-            set = set.map(k => (k - mean) ** 2);
-            const squaresum = set.reduce((sum, item) => sum + item, 0);
-            const variance = squaresum / set.length;
-            let stddev = Math.sqrt(variance);
-            mean = Math.round(mean);
-            stddev = Math.round(stddev);
+            // Run batch simulation using shared core
+            const results = runBatchSimulation(context);
 
             // Display results
-            displayResults(context, s_limited, s_standard, a_featured, target, totalPullsUsed, mean, stddev, includeRefunds);
+            displayResults(context, results, includeRefunds);
 
         } finally {
             simulateBtn.disabled = false;
@@ -342,7 +209,9 @@ function runSimulation() {
     }, 50);
 }
 
-function displayResults(context, s_limited, s_standard, a_featured, target, totalPullsUsed, mean, stddev, includeRefunds) {
+function displayResults(context, results, includeRefunds) {
+    const { target, s_limited, s_standard, a_featured, mean, stddev, avgP } = results;
+    
     resultsSection.style.display = 'block';
 
     // Target info
@@ -425,7 +294,6 @@ function displayResults(context, s_limited, s_standard, a_featured, target, tota
     }
 
     // Stats
-    const avgP = Math.ceil(totalPullsUsed / SIMULATIONS);
     const statsDiv = document.getElementById('stats');
     statsDiv.innerHTML = `
         <h4>Statistics</h4>
@@ -672,7 +540,8 @@ function saveInputs() {
         guaranteeW: guaranteeWInput.checked,
         includeRefunds: includeRefundsInput.checked,
         showStandard: showStandardInput.checked,
-        showARank: showARankInput.checked
+        showARank: showARankInput.checked,
+        pullTactic: pullTacticInput.value
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(inputs));
 }
@@ -696,8 +565,22 @@ function loadInputs() {
         if (inputs.includeRefunds !== undefined) includeRefundsInput.checked = inputs.includeRefunds;
         if (inputs.showStandard !== undefined) showStandardInput.checked = inputs.showStandard;
         if (inputs.showARank !== undefined) showARankInput.checked = inputs.showARank;
+        if (inputs.pullTactic !== undefined) pullTacticInput.value = inputs.pullTactic;
     } catch (e) {
         console.warn('Failed to load saved inputs:', e);
+    }
+}
+
+// Sync custom dropdowns with loaded values
+function syncCustomDropdowns() {
+    if (targetCDropdown && targetCInput.value) {
+        targetCDropdown.setValue(targetCInput.value);
+    }
+    if (targetWDropdown && targetWInput.value) {
+        targetWDropdown.setValue(targetWInput.value);
+    }
+    if (tacticDropdown && pullTacticInput.value) {
+        tacticDropdown.setValue(pullTacticInput.value);
     }
 }
 
@@ -709,6 +592,8 @@ simulateBtn.addEventListener('click', () => {
 
 // Initialize
 loadInputs();
+initCustomDropdowns();
+syncCustomDropdowns();
 updateTotalPulls();
 updatePityHints();
-
+updateTacticVisibility();

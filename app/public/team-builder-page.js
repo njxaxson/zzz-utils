@@ -4,6 +4,7 @@
  */
 
 import { getTeams, sortTeamByRole, getTeamLabel } from './lib/team-builder.js';
+import { scoreTeamForBoss, isDPS, isStun, isSupport, isDefense, getElement, ELEMENTS, DPS_ROLES } from './lib/team-scorer.js';
 
 // ============================================================================
 // CONSTANTS
@@ -11,7 +12,64 @@ import { getTeams, sortTeamByRole, getTeamLabel } from './lib/team-builder.js';
 
 const ROSTER_STORAGE_KEY = 'zzz-roster';
 const FILTERS_STORAGE_KEY = 'zzz-team-builder-filters';
-const TEAMS_PER_PAGE = 20;
+const MIN_TEAMS_TO_SHOW = 6;
+
+// Elements and DPS types for grid
+const GRID_ELEMENTS = ['fire', 'ice', 'electric', 'physical', 'ether'];
+const GRID_DPS_TYPES = ['attack', 'anomaly', 'rupture'];
+
+/**
+ * Check if a team has a DPS unit that matches BOTH the target element AND DPS type.
+ * e.g., for Ice Anomaly, we need a unit that is both ice element AND anomaly role.
+ */
+function teamHasMatchingDPS(team, targetElement, targetDpsType) {
+    for (const unit of team) {
+        const unitElement = getElement(unit);
+        const unitDpsType = getDpsTypeForUnit(unit);
+        
+        if (unitElement === targetElement && unitDpsType === targetDpsType) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Create a synthetic boss for a specific element + DPS type combination.
+ * The boss is weak to the target element, shills the target DPS type,
+ * and is ANTI the other DPS types.
+ * 
+ * For attack: Also RESISTS other elements (want on-element stunners)
+ * For anomaly: NO resistances (dual-element teams are common)
+ * For rupture: NO resistances (double-support compositions are common)
+ *              REQUIRES 2 defensive assists (favors Pan/Lucia over Astra)
+ */
+function createSyntheticBoss(element, dpsType) {
+    // Anti the other two DPS types to pigeonhole teams into the correct cell
+    const allDpsTypes = ['attack', 'anomaly', 'rupture'];
+    const antiTypes = allDpsTypes.filter(t => t !== dpsType);
+    
+    // Only attack teams need element resistances (to favor on-element stunners)
+    // Anomaly and rupture teams have more flexible compositions
+    let resistedElements = [];
+    if (dpsType === 'attack') {
+        const allElements = ['fire', 'ice', 'electric', 'physical', 'ether'];
+        resistedElements = allElements.filter(e => e !== element);
+    }
+    
+    // Rupture teams typically need 2 defensive assists (Pan/Lucia style)
+    const assistsRequired = dpsType === 'rupture' ? 2 : 0;
+    
+    return {
+        name: `${element}-${dpsType}`,
+        weaknesses: element ? [element] : [],
+        resistances: resistedElements,
+        shill: dpsType,
+        anti: antiTypes,
+        favored: [],
+        assists: assistsRequired
+    };
+}
 
 // ============================================================================
 // STATE
@@ -756,11 +814,11 @@ function buildTeams() {
                 .filter(([label, team]) => team.length === 3)
                 .map(([label, team]) => ({ label, team }));
             
-            // Apply filters
-            filteredTeams = applyFilters(teams);
+            // Apply user filters first
+            teams = applyUserFilters(teams);
             
-            // Sort alphabetically by label
-            filteredTeams.sort((a, b) => a.label.localeCompare(b.label));
+            // Select best teams using synthetic boss scoring
+            filteredTeams = selectBestTeams(teams, availableUnits);
             
             // Reset pagination and display
             currentPage = 0;
@@ -785,7 +843,7 @@ function getAvailableUnits() {
     }));
 }
 
-function applyFilters(teams) {
+function applyUserFilters(teams) {
     return teams.filter(({ label, team }) => {
         // Filter: Element (at least 2 units with selected element)
         if (filters.elements.length > 0) {
@@ -836,6 +894,383 @@ function applyFilters(teams) {
     });
 }
 
+function selectBestTeams(teams, availableUnits) {
+    if (teams.length === 0) return [];
+    
+    // Determine available elements and DPS types based on filters and roster
+    const availableElements = getAvailableElements(availableUnits);
+    const availableDpsTypes = getAvailableDpsTypes(availableUnits);
+    
+    // Build grid: element -> dpsType -> best team
+    const grid = {};
+    const allGridTeams = new Map(); // label -> teamData (to avoid duplicates)
+    
+    // Step 1: Populate the grid with best team for each (element, dpsType) cell
+    for (const element of availableElements) {
+        grid[element] = {};
+        
+        for (const dpsType of availableDpsTypes) {
+            const boss = createSyntheticBoss(element, dpsType);
+            
+            // Filter to teams that have a DPS unit matching BOTH element AND DPS type
+            // e.g., Ice Anomaly cell needs a unit that is BOTH ice AND anomaly
+            const matchingTeams = teams.filter(({ team }) => {
+                return teamHasMatchingDPS(team, element, dpsType);
+            });
+            
+            // Score matching teams against this specific boss
+            const scoredTeams = matchingTeams.map(({ label, team }) => {
+                const score = scoreTeamForBoss(team, boss, { lenient: true });
+                
+                // Debug: Compare synthetic boss vs real Priest boss
+                if (element === 'ether' && dpsType === 'rupture') {
+                    if (label === 'Yixuan / Astra / Lucia' || label === 'Yixuan / Pan Yinhu / Lucia') {
+                        // Real Priest boss for comparison
+                        const priestBoss = {
+                            name: "Miasma Priest",
+                            weaknesses: ["ether"],
+                            resistances: ["ice"],
+                            shill: "rupture",
+                            anti: [],
+                            assists: 2,
+                            favored: ["Yixuan"]
+                        };
+                        const syntheticScore = score;
+                        const priestScore = scoreTeamForBoss(team, priestBoss, { lenient: true });
+                        const priestScoreNormal = scoreTeamForBoss(team, priestBoss);
+                        console.log(`[DEBUG] ${label}:`);
+                        console.log(`  Synthetic boss (lenient): ${syntheticScore}`);
+                        console.log(`  Priest boss (lenient): ${priestScore}`);
+                        console.log(`  Priest boss (normal): ${priestScoreNormal}`);
+                    }
+                }
+                
+                return { label, team, score, element, dpsType };
+            }).filter(t => t.score > 0)
+              .sort((a, b) => b.score - a.score);
+            
+            // Keep only the BEST team per cell (to avoid clutter)
+            if (scoredTeams.length > 0) {
+                grid[element][dpsType] = [scoredTeams[0]];
+            }
+        }
+    }
+    
+    // Step 2: Collect unique teams from grid
+    const candidateTeams = new Map(); // label -> teamData
+    
+    for (const element of Object.keys(grid)) {
+        for (const dpsType of Object.keys(grid[element])) {
+            const cellTeams = grid[element][dpsType];
+            if (cellTeams) {
+                for (const teamData of cellTeams) {
+                    if (!candidateTeams.has(teamData.label)) {
+                        candidateTeams.set(teamData.label, teamData);
+                    }
+                }
+            }
+        }
+    }
+    
+    // Step 3: Remove teams that are A-rank substitutions of better teams
+    const teamsToRemove = new Set();
+    const candidateList = Array.from(candidateTeams.values());
+    
+    for (let i = 0; i < candidateList.length; i++) {
+        for (let j = 0; j < candidateList.length; j++) {
+            if (i === j) continue;
+            
+            const teamA = candidateList[i];
+            const teamB = candidateList[j];
+            
+            // Check if teamA is an inferior version of teamB
+            if (isInferiorSubstitution(teamA.team, teamB.team)) {
+                teamsToRemove.add(teamA.label);
+            }
+        }
+    }
+    
+    // Remove inferior teams
+    for (const label of teamsToRemove) {
+        candidateTeams.delete(label);
+    }
+    
+    // Step 4: Track S-rank coverage from remaining teams
+    const coveredSRanks = new Set();
+    for (const teamData of candidateTeams.values()) {
+        teamData.team.forEach(u => {
+            if (u.rank === 'S') coveredSRanks.add(u.id);
+        });
+    }
+    
+    // Step 5: Add teams for uncovered S-ranks (but avoid redundant coverage)
+    const eligibleSRanks = getEligibleSRanks(teams, availableUnits);
+    
+    for (const sRankId of eligibleSRanks) {
+        if (coveredSRanks.has(sRankId)) continue;
+        
+        const sRankUnit = availableUnits.find(u => u.id === sRankId);
+        if (!sRankUnit) continue;
+        
+        const sRankElement = getElement(sRankUnit);
+        const sRankDpsType = getDpsTypeForUnit(sRankUnit);
+        const boss = createSyntheticBoss(sRankElement, sRankDpsType || 'attack');
+        
+        // Find teams containing this S-rank
+        const teamsWithSRank = teams.filter(({ team }) => 
+            team.some(u => u.id === sRankId)
+        );
+        
+        const scoredTeams = teamsWithSRank.map(({ label, team }) => {
+            const score = scoreTeamForBoss(team, boss, { lenient: true });
+            return { label, team, score, element: sRankElement, dpsType: sRankDpsType };
+        }).filter(t => t.score > 0)
+          .sort((a, b) => b.score - a.score);
+        
+        // Find a team that's not already in our list and not an inferior substitution
+        for (const teamData of scoredTeams) {
+            if (candidateTeams.has(teamData.label)) continue;
+            
+            // Check if this would be an inferior substitution
+            let isInferior = false;
+            for (const existingTeam of candidateTeams.values()) {
+                if (isInferiorSubstitution(teamData.team, existingTeam.team)) {
+                    isInferior = true;
+                    break;
+                }
+            }
+            
+            if (!isInferior) {
+                candidateTeams.set(teamData.label, teamData);
+                teamData.team.forEach(u => {
+                    if (u.rank === 'S') coveredSRanks.add(u.id);
+                });
+                break;
+            }
+        }
+    }
+    
+    // Step 6: Ensure minimum team count
+    if (candidateTeams.size < MIN_TEAMS_TO_SHOW) {
+        for (const element of availableElements) {
+            if (candidateTeams.size >= MIN_TEAMS_TO_SHOW) break;
+            
+            for (const dpsType of availableDpsTypes) {
+                if (candidateTeams.size >= MIN_TEAMS_TO_SHOW) break;
+                
+                const boss = createSyntheticBoss(element, dpsType);
+                
+                // Filter to teams that have a DPS unit matching both element and DPS type
+                const matchingTeams = teams.filter(({ team }) => {
+                    return teamHasMatchingDPS(team, element, dpsType);
+                });
+                
+                const scoredTeams = matchingTeams.map(({ label, team }) => {
+                    const score = scoreTeamForBoss(team, boss, { lenient: true });
+                    return { label, team, score, element, dpsType };
+                }).filter(t => t.score > 0)
+                  .sort((a, b) => b.score - a.score);
+                
+                for (const teamData of scoredTeams) {
+                    if (candidateTeams.size >= MIN_TEAMS_TO_SHOW) break;
+                    if (!candidateTeams.has(teamData.label)) {
+                        // Check not inferior
+                        let isInferior = false;
+                        for (const existingTeam of candidateTeams.values()) {
+                            if (isInferiorSubstitution(teamData.team, existingTeam.team)) {
+                                isInferior = true;
+                                break;
+                            }
+                        }
+                        if (!isInferior) {
+                            candidateTeams.set(teamData.label, teamData);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // Convert to array and sort by score
+    return Array.from(candidateTeams.values())
+        .sort((a, b) => b.score - a.score);
+}
+
+/**
+ * Check if teamA is an inferior substitution of teamB
+ * (same team but with A-rank(s) instead of S-rank(s))
+ */
+function isInferiorSubstitution(teamA, teamB) {
+    // Teams must have same size
+    if (teamA.length !== teamB.length) return false;
+    
+    // Count how many units are shared vs different
+    const idsA = new Set(teamA.map(u => u.id));
+    const idsB = new Set(teamB.map(u => u.id));
+    
+    let sharedCount = 0;
+    let aHasWorseUnit = false;
+    let bHasWorseUnit = false;
+    
+    for (const id of idsA) {
+        if (idsB.has(id)) {
+            sharedCount++;
+        }
+    }
+    
+    // Must share at least 2 units to be considered a substitution
+    if (sharedCount < 2) return false;
+    
+    // Find the differing units
+    const onlyInA = teamA.filter(u => !idsB.has(u.id));
+    const onlyInB = teamB.filter(u => !idsA.has(u.id));
+    
+    // If same number of different units, compare ranks
+    if (onlyInA.length !== onlyInB.length) return false;
+    
+    // Check if A's unique units are all A-rank and B's are all S-rank
+    const aUniqueARanks = onlyInA.filter(u => u.rank === 'A').length;
+    const bUniqueSRanks = onlyInB.filter(u => u.rank === 'S').length;
+    
+    // TeamA is inferior if its unique units are A-rank while B's are S-rank
+    return aUniqueARanks > 0 && bUniqueSRanks > 0 && aUniqueARanks >= bUniqueSRanks;
+}
+
+/**
+ * Get DPS type for a unit
+ */
+function getDpsTypeForUnit(unit) {
+    if (unit.tags.includes('attack')) return 'attack';
+    if (unit.tags.includes('anomaly')) return 'anomaly';
+    if (unit.tags.includes('rupture')) return 'rupture';
+    return null;
+}
+
+function getEligibleSRanks(teams, availableUnits) {
+    const sRanksInTeams = new Set();
+    
+    // Find all S-ranks that appear in at least one team
+    for (const { team } of teams) {
+        for (const unit of team) {
+            if (unit.rank === 'S' && !filters.exclude.includes(unit.id)) {
+                sRanksInTeams.add(unit.id);
+            }
+        }
+    }
+    
+    return sRanksInTeams;
+}
+
+function getAvailableElements(availableUnits) {
+    // Elements available in roster (considering filters)
+    const elements = new Set();
+    
+    // Only consider elements that have DPS units
+    for (const unit of availableUnits) {
+        if (filters.exclude.includes(unit.id)) continue;
+        if (isDPS(unit)) {
+            const element = getElement(unit);
+            if (element) {
+                // If element filter is active, only include those elements
+                if (filters.elements.length === 0 || filters.elements.includes(element)) {
+                    elements.add(element);
+                }
+            }
+        }
+    }
+    
+    return elements;
+}
+
+function getAvailableDpsTypes(availableUnits) {
+    // DPS types available in roster (considering filters)
+    const dpsTypes = new Set();
+    
+    for (const unit of availableUnits) {
+        if (filters.exclude.includes(unit.id)) continue;
+        
+        for (const role of DPS_ROLES) {
+            if (unit.tags.includes(role)) {
+                // If DPS filter is active, only include those types
+                if (filters.dpsRoles.length === 0 || filters.dpsRoles.includes(role)) {
+                    // Attack+Anomaly hybrid counts as attack
+                    if (role === 'anomaly' && unit.tags.includes('attack')) {
+                        dpsTypes.add('attack');
+                    } else {
+                        dpsTypes.add(role);
+                    }
+                }
+            }
+        }
+    }
+    
+    return dpsTypes;
+}
+
+/**
+ * Get team element(s) based on DPS units only.
+ * Falls back to stun, then support/defense if no DPS.
+ */
+function getTeamElements(team) {
+    const elements = [];
+    
+    // Priority 1: DPS units
+    const dpsUnits = team.filter(isDPS);
+    if (dpsUnits.length > 0) {
+        for (const unit of dpsUnits) {
+            const el = getElement(unit);
+            if (el && !elements.includes(el)) {
+                elements.push(el);
+            }
+        }
+        return elements;
+    }
+    
+    // Priority 2: Stun units
+    const stunUnits = team.filter(isStun);
+    if (stunUnits.length > 0) {
+        for (const unit of stunUnits) {
+            const el = getElement(unit);
+            if (el && !elements.includes(el)) {
+                elements.push(el);
+            }
+        }
+        return elements;
+    }
+    
+    // Priority 3: Support/Defense units
+    const supportDefenseUnits = team.filter(u => isSupport(u) || isDefense(u));
+    for (const unit of supportDefenseUnits) {
+        const el = getElement(unit);
+        if (el && !elements.includes(el)) {
+            elements.push(el);
+        }
+    }
+    
+    return elements;
+}
+
+/**
+ * Get team DPS type. Attack+Anomaly hybrid = attack.
+ */
+function getTeamDpsType(team) {
+    const dpsUnits = team.filter(isDPS);
+    
+    if (dpsUnits.length === 0) return null;
+    
+    const hasAttack = dpsUnits.some(u => u.tags.includes('attack'));
+    const hasAnomaly = dpsUnits.some(u => u.tags.includes('anomaly'));
+    const hasRupture = dpsUnits.some(u => u.tags.includes('rupture'));
+    
+    // Attack+Anomaly hybrid = attack
+    if (hasAttack && hasAnomaly) return 'attack';
+    if (hasAttack) return 'attack';
+    if (hasAnomaly) return 'anomaly';
+    if (hasRupture) return 'rupture';
+    
+    return null;
+}
+
 // ============================================================================
 // RESULTS DISPLAY
 // ============================================================================
@@ -856,67 +1291,119 @@ function displayResults() {
         countEl.innerHTML = '';
         pagination.style.display = 'none';
     } else {
-        const totalPages = Math.ceil(filteredTeams.length / TEAMS_PER_PAGE);
-        const startIdx = currentPage * TEAMS_PER_PAGE;
-        const endIdx = Math.min(startIdx + TEAMS_PER_PAGE, filteredTeams.length);
-        const pageTeams = filteredTeams.slice(startIdx, endIdx);
+        // Build grid display: rows = elements, columns = DPS types
+        grid.innerHTML = createTeamGrid(filteredTeams);
         
-        grid.innerHTML = pageTeams.map(({ label, team }) => createTeamCard(team)).join('');
+        countEl.innerHTML = `Showing <span class="highlight">${filteredTeams.length}</span> recommended team${filteredTeams.length !== 1 ? 's' : ''}`;
         
-        countEl.innerHTML = `Showing <span class="highlight">${startIdx + 1}-${endIdx}</span> of <span class="highlight">${filteredTeams.length}</span> teams`;
-        
-        // Update pagination
-        if (totalPages > 1) {
-            pagination.style.display = 'flex';
-            document.getElementById('prev-page').disabled = currentPage === 0;
-            document.getElementById('next-page').disabled = currentPage >= totalPages - 1;
-            document.getElementById('pagination-info').textContent = `Page ${currentPage + 1} of ${totalPages}`;
-        } else {
-            pagination.style.display = 'none';
-        }
+        // Hide pagination for curated results
+        pagination.style.display = 'none';
     }
     
     section.style.display = 'block';
     section.scrollIntoView({ behavior: 'smooth' });
 }
 
-function createTeamCard(team) {
+/**
+ * Create a grid display with elements as rows and DPS types as columns
+ */
+function createTeamGrid(teams) {
+    // Group teams by the cell they were selected for
+    const teamsByCell = {};
+    
+    for (const teamData of teams) {
+        // Use the element/dpsType the team was selected for (not all matching elements)
+        const element = teamData.element;
+        const dpsType = teamData.dpsType;
+        const key = `${element}-${dpsType}`;
+        
+        if (!teamsByCell[key]) {
+            teamsByCell[key] = [];
+        }
+        teamsByCell[key].push(teamData);
+    }
+    
+    // Get available elements and DPS types from filters
+    const availableElements = filters.elements.length > 0 ? filters.elements : GRID_ELEMENTS;
+    const availableDpsTypes = filters.dpsRoles.length > 0 ? filters.dpsRoles : GRID_DPS_TYPES;
+    
+    // Build grid HTML
+    let html = '<div class="team-grid-container">';
+    
+    // Header row with DPS type labels
+    html += '<div class="team-grid-header">';
+    html += '<div class="grid-corner"></div>'; // Empty corner cell
+    for (const dpsType of availableDpsTypes) {
+        html += `<div class="grid-header-cell dps-${dpsType}">${capitalizeFirst(dpsType)}</div>`;
+    }
+    html += '</div>';
+    
+    // Data rows (one per element)
+    for (const element of availableElements) {
+        html += '<div class="team-grid-row">';
+        
+        // Row label (element)
+        html += `<div class="grid-row-label element-${element}">${capitalizeFirst(element)}</div>`;
+        
+        // Cells for each DPS type
+        for (const dpsType of availableDpsTypes) {
+            const key = `${element}-${dpsType}`;
+            const cellTeams = teamsByCell[key] || [];
+            
+            html += '<div class="grid-cell">';
+            if (cellTeams.length > 0) {
+                // Show ALL teams in this cell
+                html += '<div class="grid-cell-teams">';
+                for (const teamData of cellTeams) {
+                    html += createTeamCard(teamData.team, true);
+                }
+                html += '</div>';
+            } else {
+                html += '<div class="grid-cell-empty">—</div>';
+            }
+            html += '</div>';
+        }
+        
+        html += '</div>';
+    }
+    
+    html += '</div>';
+    
+    return html;
+}
+
+function capitalizeFirst(str) {
+    return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+function createTeamCard(team, compact = false) {
     const unitsHtml = team.map(unit => createTeamUnitCard(unit)).join('');
     
-    // Determine team element (most common element)
-    const elements = ['fire', 'ice', 'electric', 'physical', 'ether'];
-    const elementCounts = {};
-    team.forEach(u => {
-        const el = u.tags.find(t => elements.includes(t));
-        if (el) elementCounts[el] = (elementCounts[el] || 0) + 1;
-    });
-    
-    // Get badges
+    // Get badges using new logic (skip badges in compact/grid mode - they're implicit from position)
     const badges = [];
     
-    // Element badge (if 2+ share same element)
-    for (const [element, count] of Object.entries(elementCounts)) {
-        if (count >= 2) {
+    if (!compact) {
+        // Element badges (based on DPS units, falling back to stun, then support/defense)
+        const teamElements = getTeamElements(team);
+        for (const element of teamElements) {
             badges.push(`<span class="team-badge element-badge ${element}">${element}</span>`);
+        }
+        
+        // DPS type badge (attack+anomaly = attack)
+        const dpsType = getTeamDpsType(team);
+        if (dpsType) {
+            badges.push(`<span class="team-badge role-badge">${dpsType}</span>`);
         }
     }
     
-    // Role badge
-    const dpsRoles = ['attack', 'anomaly', 'rupture'];
-    const teamDps = team.find(u => dpsRoles.some(r => u.tags.includes(r)));
-    if (teamDps) {
-        const role = dpsRoles.find(r => teamDps.tags.includes(r));
-        badges.push(`<span class="team-badge role-badge">${role}</span>`);
-    }
+    const cardClass = compact ? 'team-card team-card-compact' : 'team-card';
     
     return `
-        <div class="team-card">
+        <div class="${cardClass}">
             <div class="team-card-units">
                 ${unitsHtml}
             </div>
-            <div class="team-card-info">
-                ${badges.join('')}
-            </div>
+            ${badges.length > 0 ? `<div class="team-card-info">${badges.join('')}</div>` : ''}
         </div>
     `;
 }

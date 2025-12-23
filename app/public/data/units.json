@@ -397,6 +397,16 @@
         "synergy": { "units": [], "tags": [], "avoid": [] }
     },
     {
+        "id" : "ysg",
+        "name" : "Ye Shunguong",
+        "rank" : "S",
+        "limited" : true,
+        "tier" : 0.0,
+        "tags" : ["attack", "physical", "yunkui", "title", "assist:defensive"],
+        "join" : ["support", "defense"],
+        "synergy": { "units": ["Zhao"], "tags": [], "avoid": [] }
+    },
+    {
         "id": "yidhari",
         "name": "Yidhari",
         "rank": "S",
@@ -427,6 +437,16 @@
         "synergy": { "units": [], "tags": ["anomaly", "fire", "ice", "electric", "physical", "ether"], "avoid": ["attack", "rupture"] }
     },
     {
+        "id" : "zhao",
+        "name" : "Zhao",
+        "rank" : "S",
+        "limited" : true,
+        "tier" : 1.5,
+        "tags" : ["defense", "ice", "krampus", "assist:defensive"],
+        "join" : ["attack", "anomaly", "krampus"],
+        "synergy": { "units": ["Ye Shunguong"], "tags": [], "avoid": [] }
+    },
+    {
         "id": "zhu-yuan",
         "name": "Zhu Yuan",
         "rank": "S",
@@ -437,3 +457,4 @@
         "synergy": { "units": [], "tags": [], "avoid": [] }
     }
 ]
+

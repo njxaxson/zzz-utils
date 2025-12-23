@@ -77,3 +77,4 @@ async function loadSharedComponents(pageId) {
 // Export for module usage
 export { loadSharedComponents, loadComponent, initHeader };
 
+

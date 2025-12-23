@@ -110,6 +110,10 @@
                         <input type="checkbox" id="show-arank">
                         <span>Show A-Rank Distribution</span>
                     </label>
+                    <select id="pull-tactic" class="tactic-select" style="display: none;">
+                        <option value="engine-first" selected>Pull M0W1 before M1W1</option>
+                        <option value="mindscapes-first">Pull M1W0 before M0W1</option>
+                    </select>
                 </div>
 
                 <div id="validation-errors" class="validation-errors" style="display: none;"></div>
@@ -151,6 +155,6 @@
         import { loadSharedComponents } from './lib/components.js';
         loadSharedComponents('gacha');
     </script>
-    <script src="simulation.js"></script>
+    <script type="module" src="simulation.js"></script>
 </body>
 </html>

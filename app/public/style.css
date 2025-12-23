@@ -157,6 +157,15 @@ main {
     color: var(--text-secondary);
 }
 
+.nav-divider {
+    border: none;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border-color) 20%, var(--border-color) 80%, transparent);
+    margin: 0.6rem auto 0;
+    width: 60%;
+    max-width: 400px;
+}
+
 /* Legacy header support */
 header {
     text-align: center;
@@ -321,14 +330,16 @@ section h3:not(:first-child) {
     border-radius: 4px;
     color: var(--text-primary);
     font-family: 'Rajdhani', sans-serif;
-    font-size: 1.1rem;
-    font-weight: 600;
+    font-size: 1rem;
+    font-weight: 500;
     transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .input-group select {
     cursor: pointer;
     appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23a0a0a0' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 1rem center;
@@ -338,6 +349,146 @@ section h3:not(:first-child) {
 .input-group select option {
     background: var(--bg-tertiary);
     color: var(--text-primary);
+    font: inherit;
+    padding: 0.5rem;
+}
+
+/* ============================================================================
+   CUSTOM DROPDOWN COMPONENT
+   ============================================================================ */
+
+.custom-dropdown-wrapper {
+    width: 100%;
+}
+
+.custom-dropdown-wrapper:has(.custom-dropdown.inline) {
+    width: auto;
+    display: inline-block;
+}
+
+.custom-dropdown {
+    position: relative;
+    width: 100%;
+    cursor: pointer;
+    user-select: none;
+}
+
+.custom-dropdown-display {
+    width: 100%;
+    padding: 0.7rem 2.5rem 0.7rem 1rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 1rem;
+    font-weight: 500;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    position: relative;
+    box-sizing: border-box;
+}
+
+.custom-dropdown:hover .custom-dropdown-display,
+.custom-dropdown:focus .custom-dropdown-display {
+    border-color: var(--accent-primary);
+}
+
+.custom-dropdown:focus {
+    outline: none;
+}
+
+.custom-dropdown:focus .custom-dropdown-display {
+    box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
+.custom-dropdown-arrow {
+    position: absolute;
+    right: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    transition: transform 0.2s;
+    pointer-events: none;
+}
+
+.custom-dropdown.open .custom-dropdown-arrow {
+    transform: translateY(-50%) rotate(180deg);
+}
+
+.custom-dropdown-options {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    margin-top: 4px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    max-height: 250px;
+    overflow-y: auto;
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-8px);
+    transition: opacity 0.15s, transform 0.15s, visibility 0.15s;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.custom-dropdown.open .custom-dropdown-options {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.custom-dropdown-option {
+    padding: 0.6rem 1rem;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    transition: background-color 0.1s, color 0.1s;
+}
+
+.custom-dropdown-option:hover,
+.custom-dropdown-option.focused {
+    background: var(--bg-secondary);
+    color: var(--accent-primary);
+}
+
+.custom-dropdown-option.selected {
+    color: var(--accent-secondary);
+    font-weight: 600;
+}
+
+.custom-dropdown-option.selected::before {
+    content: '✓ ';
+    color: var(--accent-secondary);
+}
+
+/* Inline variant for options row (like tactic select) */
+.custom-dropdown.inline {
+    width: auto;
+    display: inline-block;
+}
+
+.custom-dropdown.inline .custom-dropdown-display {
+    font-size: 0.9rem;
+    padding: 0.5rem 2rem 0.5rem 0.8rem;
+    color: var(--text-secondary);
+}
+
+.custom-dropdown.inline:hover .custom-dropdown-display,
+.custom-dropdown.inline:focus .custom-dropdown-display {
+    color: var(--text-primary);
+}
+
+.custom-dropdown.inline .custom-dropdown-options {
+    min-width: 200px;
+}
+
+.custom-dropdown.inline .custom-dropdown-option {
+    font-size: 0.9rem;
 }
 
 .input-group input[type="number"]:focus,
@@ -427,6 +578,34 @@ section h3:not(:first-child) {
     width: 16px;
     height: 16px;
     accent-color: var(--accent-primary);
+}
+
+.tactic-select {
+    font-size: 0.9rem;
+    font-weight: inherit;
+    font-family: inherit;
+    color: var(--text-secondary);
+    padding: 0.5rem 0.8rem;
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+    height: auto;
+}
+
+.tactic-select:hover {
+    border-color: var(--accent-primary);
+    color: var(--text-primary);
+}
+
+.tactic-select:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+}
+
+.tactic-select option {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.9rem;
 }
 
 /* ============================================================================
@@ -1096,7 +1275,7 @@ button#simulate-btn:disabled,
 
 .boss-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     gap: 0.75rem;
 }
 
@@ -1189,7 +1368,7 @@ button#simulate-btn:disabled,
 
 @media (max-width: 768px) {
     .boss-grid {
-        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     }
 }
 
@@ -1651,6 +1830,187 @@ button#simulate-btn:disabled,
     color: var(--accent-secondary);
 }
 
+/* ============================================================================
+   TEAM GRID LAYOUT (Element rows x DPS type columns)
+   ============================================================================ */
+
+.team-grid-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow-x: auto;
+    grid-column: 1 / -1; /* Span all columns when inside CSS grid */
+    width: 100%;
+}
+
+.team-grid-header {
+    display: flex;
+    background: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.grid-corner {
+    width: 80px;
+    min-width: 80px;
+    padding: 0.5rem;
+    border-right: 1px solid var(--border-color);
+}
+
+.grid-header-cell {
+    flex: 1;
+    min-width: 180px;
+    padding: 0.6rem 0.5rem;
+    text-align: center;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+    border-right: 1px solid var(--border-color);
+}
+
+.grid-header-cell:last-child {
+    border-right: none;
+}
+
+/* DPS type headers - use consistent teal/cyan color */
+.grid-header-cell.dps-attack,
+.grid-header-cell.dps-anomaly,
+.grid-header-cell.dps-rupture {
+    color: var(--text-primary);
+}
+
+.team-grid-row {
+    display: flex;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.team-grid-row:last-child {
+    border-bottom: none;
+}
+
+.grid-row-label {
+    width: 80px;
+    min-width: 80px;
+    padding: 0.75rem 0.5rem;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 1rem;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    border-right: 1px solid var(--border-color);
+    background: var(--bg-tertiary);
+}
+
+.grid-row-label.element-fire { color: var(--element-fire-light); }
+.grid-row-label.element-ice { color: var(--element-ice-light); }
+.grid-row-label.element-electric { color: var(--element-electric-light); }
+.grid-row-label.element-physical { color: var(--element-physical-light); }
+.grid-row-label.element-ether { color: var(--element-ether-light); }
+
+.grid-cell {
+    flex: 1;
+    min-width: 180px;
+    padding: 0.5rem;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    border-right: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+}
+
+.grid-cell:last-child {
+    border-right: none;
+}
+
+.grid-cell-empty {
+    color: var(--text-muted);
+    font-size: 1.2rem;
+}
+
+.grid-cell-teams {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    width: 100%;
+}
+
+/* Compact team card for grid */
+.team-card-compact {
+    padding: 0.4rem;
+    margin: 0;
+}
+
+.team-card-compact .team-card-units {
+    gap: 0.25rem;
+}
+
+.team-card-compact .team-unit {
+    width: 55px;
+}
+
+.team-card-compact .team-unit .unit-name {
+    font-size: 0.45rem;
+}
+
+/* Additional teams section */
+.additional-teams {
+    margin-top: 1.5rem;
+    grid-column: 1 / -1; /* Span all columns when inside CSS grid */
+}
+
+.additional-teams-header {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.additional-teams-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+/* Responsive grid adjustments */
+@media (max-width: 900px) {
+    .grid-corner,
+    .grid-row-label {
+        width: 60px;
+        min-width: 60px;
+        font-size: 0.7rem;
+    }
+    
+    .team-card-compact .team-unit {
+        width: 45px;
+    }
+    
+    .team-card-compact .team-unit .unit-name {
+        font-size: 0.4rem;
+    }
+}
+
+@media (max-width: 600px) {
+    .team-grid-container {
+        overflow-x: auto;
+    }
+    
+    .team-grid-header,
+    .team-grid-row {
+        min-width: 500px;
+    }
+}
+
 @media (max-width: 768px) {
     .team-unit {
         width: 60px;
@@ -1835,7 +2195,7 @@ button#simulate-btn:disabled,
 
 /* Result boss tile */
 .result-boss-tile {
-    width: 140px;
+    width: 170px;
     border: 3px solid rgba(255, 255, 255, 0.2);
     border-radius: 10px;
     display: flex;
@@ -1977,7 +2337,7 @@ button#simulate-btn:disabled,
     }
     
     .result-boss-tile {
-        width: 110px;
+        width: 135px;
     }
     
     .result-boss-tile .boss-initials {
@@ -2012,7 +2372,7 @@ button#simulate-btn:disabled,
     }
     
     .result-boss-tile {
-        width: 90px;
+        width: 110px;
     }
     
     .result-unit-card {

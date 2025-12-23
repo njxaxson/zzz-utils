@@ -5,84 +5,81 @@
  * team ranking algorithm across all matchups at once.
  */
 
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
+async function main() {
+    // Dynamic imports for ES modules
+    const { default: allUnits } = await import('./app/public/data/units.json', { with: { type: 'json' } });
+    const { default: bosses } = await import('./app/public/data/bosses.json', { with: { type: 'json' } });
+    const { default: myRoster } = await import('./roster.json', { with: { type: 'json' } });
+    const { getTeams, sortTeamByRole, getTeamLabel, extendTeamsWithUniversalUnits } = await import('./app/public/lib/team-builder.js');
+    const { scoreTeamForBoss } = await import('./app/public/lib/team-scorer.js');
 
-const allUnits = require('./app/public/data/units.json');
-const bosses = require('./app/public/data/bosses.json');
-const myRoster = require('./roster.json'); // Map of unit name -> stat (e.g., "M6W5")
+    // ============================================================================
+    // BUILD ROSTERS
+    // ============================================================================
 
-import { getTeams, sortTeamByRole, getTeamLabel, extendTeamsWithUniversalUnits } from './app/public/lib/team-builder.js';
-import { scoreTeamForBoss } from './app/public/lib/team-scorer.js';
+    // Full roster: all units from the master units.json
+    const fullRoster = [...allUnits];
 
-// ============================================================================
-// BUILD ROSTERS
-// ============================================================================
+    // Personal roster: units from allUnits filtered by roster.json
+    const myUnits = allUnits.filter(u => myRoster.hasOwnProperty(u.name));
 
-// Full roster: all units from the master units.json
-const fullRoster = [...allUnits];
+    // ============================================================================
+    // COMMAND-LINE ARGUMENTS
+    // ============================================================================
 
-// Personal roster: units from allUnits filtered by roster.json
-const myUnits = allUnits.filter(u => myRoster.hasOwnProperty(u.name));
-
-// ============================================================================
-// COMMAND-LINE ARGUMENTS
-// ============================================================================
-
-function parseArgs() {
-    const args = process.argv.slice(2);
-    const options = {
-        filter: null,   // Case-insensitive boss name filter (contains match)
-        depth: 7        // Number of top teams to display per boss
-    };
-    
-    for (let i = 0; i < args.length; i++) {
-        if (args[i] === '--filter' && args[i + 1]) {
-            options.filter = args[i + 1].toLowerCase();
-            i++;
-        } else if (args[i] === '--depth' && args[i + 1]) {
-            options.depth = parseInt(args[i + 1], 10);
-            i++;
+    function parseArgs() {
+        const args = process.argv.slice(2);
+        const options = {
+            filter: null,   // Case-insensitive boss name filter (contains match)
+            depth: 7        // Number of top teams to display per boss
+        };
+        
+        for (let i = 0; i < args.length; i++) {
+            if (args[i] === '--filter' && args[i + 1]) {
+                options.filter = args[i + 1].toLowerCase();
+                i++;
+            } else if (args[i] === '--depth' && args[i + 1]) {
+                options.depth = parseInt(args[i + 1], 10);
+                i++;
+            }
         }
+        
+        return options;
     }
-    
-    return options;
-}
 
-const CLI_OPTIONS = parseArgs();
+    const CLI_OPTIONS = parseArgs();
 
-// ============================================================================
-// CONFIGURATION
-// ============================================================================
+    // ============================================================================
+    // CONFIGURATION
+    // ============================================================================
 
-const TOP_TEAMS_PER_BOSS = CLI_OPTIONS.depth;
+    const TOP_TEAMS_PER_BOSS = CLI_OPTIONS.depth;
 
-const EXCLUDED_UNITS = [
-    // "Anby",
-    // "Anton",
-    // "Ben",
-    // "Billy",
-    // "Corin",
-    // "Seth"
-];
+    const EXCLUDED_UNITS = [
+        // "Anby",
+        // "Anton",
+        // "Ben",
+        // "Billy",
+        // "Corin",
+        // "Seth"
+    ];
 
-// Optional: Specify a subset of units to use (whitelist)
-// Use one of the following options:
-const INCLUDED_UNITS = allUnits.map(u => u.name);           // Full roster (all units)
-// const INCLUDED_UNITS = myUnits.map(u => u.name);         // Personal roster (from roster.json)
-// const INCLUDED_UNITS = ["Ellen", "Harumasa", ...];       // Custom list
+    // Optional: Specify a subset of units to use (whitelist)
+    // Use one of the following options:
+    const INCLUDED_UNITS = allUnits.map(u => u.name);           // Full roster (all units)
+    // const INCLUDED_UNITS = myUnits.map(u => u.name);         // Personal roster (from roster.json)
+    // const INCLUDED_UNITS = ["Ellen", "Harumasa", ...];       // Custom list
 
-// Universal units: Can join ANY 2-person team to form a 3-person team
-const UNIVERSAL_UNITS = [
-    "Nicole",
-    // "Astra",  // Not in test roster
-];
+    // Universal units: Can join ANY 2-person team to form a 3-person team
+    const UNIVERSAL_UNITS = [
+        "Nicole",
+        // "Astra",  // Not in test roster
+    ];
 
-// ============================================================================
-// MAIN EXECUTION
-// ============================================================================
+    // ============================================================================
+    // MAIN EXECUTION
+    // ============================================================================
 
-function main() {
     console.log("===== Team Matchups - All Bosses =====\n");
     console.log(`Full roster: ${fullRoster.length} characters\n`);
     
@@ -175,4 +172,4 @@ function main() {
     }
 }
 
-main();
+main().catch(console.error);

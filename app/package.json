@@ -1,8 +1,8 @@
 {
   "name": "zzz-utils",
   "version": "1.0.1",
-  "type": "module",
   "description": "Zenless Zone Zero Utils",
+  "type": "module",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

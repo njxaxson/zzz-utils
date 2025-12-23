@@ -5,309 +5,310 @@
  * ensuring no unit overlap and matching teams to boss requirements.
  */
 
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
+async function main() {
+    // Dynamic imports for ES modules
+    const { default: allUnits } = await import('./app/public/data/units.json', { with: { type: 'json' } });
+    const { default: bosses } = await import('./app/public/data/bosses.json', { with: { type: 'json' } });
+    const { default: myRoster } = await import('./roster.json', { with: { type: 'json' } });
+    const { 
+        getTeams, 
+        sortTeamByRole, 
+        getTeamLabel,
+        teamsOverlap,
+        extendTeamsWithUniversalUnits,
+        findExclusiveCombinations
+    } = await import('./app/public/lib/team-builder.js');
+    const { scoreTeamForBoss } = await import('./app/public/lib/team-scorer.js');
 
-const allUnits = require('./app/public/data/units.json');
-const bosses = require('./app/public/data/bosses.json');
-const myRoster = require('./roster.json'); // Map of unit name -> stat (e.g., "M6W5")
+    // ============================================================================
+    // CONFIGURATION - Modify these values as needed
+    // ============================================================================
 
-import { 
-    getTeams, 
-    sortTeamByRole, 
-    getTeamLabel,
-    teamsOverlap,
-    extendTeamsWithUniversalUnits,
-    findExclusiveCombinations
-} from './app/public/lib/team-builder.js';
-import { scoreTeamForBoss } from './app/public/lib/team-scorer.js';
+    // Specify which 3 bosses to analyze (use exact names from bosses.json)
+    const SELECTED_BOSSES = [
+        "Notorious Dead End Butcher",
+        "Unknown Corruption Complex",
+        //"Notorious Marionettes",
+        "Notorious Pompey",
+        //"Typhon Slugger",
+        //"Sacrifice Bringer",
+        //"Miasma Priest",
+        //"Miasmic Fiend Unfathomable",
+        // "The Defiler",
+        // "Wandering Hunter",
+        // "Thrall & Sobek",
+    ];
 
-// ============================================================================
-// CONFIGURATION - Modify these values as needed
-// ============================================================================
+    // Maximum number of team combinations to display
+    const RESULT_LIMIT = 5;
 
-// Specify which 3 bosses to analyze (use exact names from bosses.json)
-const SELECTED_BOSSES = [
-    "Notorious Dead End Butcher",
-    "Unknown Corruption Complex",
-    //"Notorious Marionettes",
-    "Notorious Pompey",
-    //"Typhon Slugger",
-    //"Sacrifice Bringer",
-    //"Miasma Priest",
-    //"Miasmic Fiend Unfathomable",
-    // "The Defiler",
-    // "Wandering Hunter",
-    // "Thrall & Sobek",
-];
+    // Set to true to show top teams per boss (for debugging)
+    // Can also be enabled via command line: node deadly-assault.js --debug
+    const DEBUG_MATCHUPS_CONFIG = false;
+    const DEBUG_MATCHUPS = DEBUG_MATCHUPS_CONFIG || process.argv.includes('--debug');
 
-// Maximum number of team combinations to display
-const RESULT_LIMIT = 5;
+    // Units to exclude from consideration (not good enough to include)
+    const EXCLUDED_UNITS = [
+        // "Anby",
+        // "Anton",
+        // "Ben",
+        // "Billy",
+        // "Corin",
+        // "Seth"
+    ];
 
-// Set to true to show top teams per boss (for debugging)
-// Can also be enabled via command line: node deadly-assault.js --debug
-const DEBUG_MATCHUPS_CONFIG = false;
-const DEBUG_MATCHUPS = DEBUG_MATCHUPS_CONFIG || process.argv.includes('--debug');
+    // Optional: Specify a subset of units to use (whitelist)
+    // If empty/undefined, all units in units.json will be available (minus excluded)
+    // Example: Only A-ranks and standard S-ranks
+    const INCLUDED_UNITS = [
+        // "Anby",
+        // "Anton",
+        // "Ben",
+        // "Billy",
+        // "Corin",
+        // "Grace",
+        // "Koleda",
+        // "Komano",
+        // "Lucy",
+        // "Lycaon",
+        // "Nekomata",
+        // "Nicole",
+        // "Pan Yinhu",
+        // "Piper",
+        // "Pulchra",
+        // "Rina",
+        // "Seth",
+        // "Soldier 11",
+        // "Soukaku",
+    ];
 
-// Units to exclude from consideration (not good enough to include)
-const EXCLUDED_UNITS = [
-    // "Anby",
-    // "Anton",
-    // "Ben",
-    // "Billy",
-    // "Corin",
-    // "Seth"
-];
+    // Universal units: Can join ANY 2-person team to form a 3-person team,
+    // even if they don't satisfy normal join conditions.
+    // Useful for strong support units with limited join options (e.g., Nicole)
+    const UNIVERSAL_UNITS = [
+        "Nicole",
+        "Astra"
+    ];
 
-// Optional: Specify a subset of units to use (whitelist)
-// If empty/undefined, all units in units.json will be available (minus excluded)
-// Example: Only A-ranks and standard S-ranks
-const INCLUDED_UNITS = [
-    // "Anby",
-    // "Anton",
-    // "Ben",
-    // "Billy",
-    // "Corin",
-    // "Grace",
-    // "Koleda",
-    // "Komano",
-    // "Lucy",
-    // "Lycaon",
-    // "Nekomata",
-    // "Nicole",
-    // "Pan Yinhu",
-    // "Piper",
-    // "Pulchra",
-    // "Rina",
-    // "Seth",
-    // "Soldier 11",
-    // "Soukaku",
-];
+    // Developer-only: Additional units not in units.json
+    // Useful for testing unreleased characters, characters you don't own, or hypothetical units
+    const DEVELOPER_UNITS = [
+        // {
+        //     "name" : "Ye Shunguong",
+        //     "rank" : "S",
+        //     "limited" : true,
+        //     "tier" : 0,
+        //     "tags" : ["attack", "physical", "yunkui", "title", "assist:defensive"],
+        //     "join" : ["support", "defense"],
+        //     "stat" : "M2W1",
+        //     "synergy" : { "units": ["Zhao", "Lucia"], "tags": [], "avoid": [] }
+        // },
+        // {
+        //     "name" : "Zhao",
+        //     "rank" : "S",
+        //     "limited" : true,
+        //     "tier" : 1.0,
+        //     "tags" : ["defense", "ice", "krampus", "assist:defensive"],
+        //     "join" : ["attack", "anomaly", "rupture"],
+        //     "stat" : "M0W0",
+        //     "synergy" : { "units": ["Ye Shunguong"], "tags": ["rupture"], "avoid": [] }
+        // },
+    ];
 
-// Universal units: Can join ANY 2-person team to form a 3-person team,
-// even if they don't satisfy normal join conditions.
-// Useful for strong support units with limited join options (e.g., Nicole)
-const UNIVERSAL_UNITS = [
-    "Nicole",
-    "Astra"
-];
+    // ============================================================================
+    // TIER 0 SANITY CHECK
+    // ============================================================================
 
-// Developer-only: Additional units not in units.json
-// Useful for testing unreleased characters, characters you don't own, or hypothetical units
-const DEVELOPER_UNITS = [
-    // {
-    //     "name" : "Ye Shunguong",
-    //     "rank" : "S",
-    //     "limited" : true,
-    //     "tier" : 0,
-    //     "tags" : ["attack", "physical", "yunkui", "title", "assist:defensive"],
-    //     "join" : ["support", "defense"],
-    //     "stat" : "M2W1",
-    //     "synergy" : { "units": ["Zhao", "Lucia"], "tags": [], "avoid": [] }
-    // },
-    // {
-    //     "name" : "Zhao",
-    //     "rank" : "S",
-    //     "limited" : true,
-    //     "tier" : 1.0,
-    //     "tags" : ["defense", "ice", "krampus", "assist:defensive"],
-    //     "join" : ["attack", "anomaly", "rupture"],
-    //     "stat" : "M0W0",
-    //     "synergy" : { "units": ["Ye Shunguong"], "tags": ["rupture"], "avoid": [] }
-    // },
-];
+    const DPS_ROLES = ["attack", "anomaly", "rupture"];
+    const ELEMENTS = ["fire", "ice", "electric", "physical", "ether"];
 
-// ============================================================================
-// TIER 0 SANITY CHECK
-// ============================================================================
-
-const DPS_ROLES = ["attack", "anomaly", "rupture"];
-const ELEMENTS = ["fire", "ice", "electric", "physical", "ether"];
-
-/**
- * Analyzes a combination for Tier 0 unit utilization.
- * Returns warnings/notes if key units are missing.
- * 
- * Rules:
- * - Tier 0 supports should be used UNLESS their synergy.avoid conflicts with ALL teams
- * - Tier 0 DPS should be used if their element matches any boss weakness (and not anti'd)
- */
-function checkTier0Utilization(combination, availableUnits, selectedBosses, bosses) {
-    const warnings = [];
-    const notes = [];
-    
-    // Get all units used in this combination
-    const usedUnits = new Set();
-    for (const assignment of combination.assignments) {
-        for (const unit of assignment.team) {
-            usedUnits.add(unit.name);
-        }
-    }
-    
-    // Get DPS types present in the combination
-    const dpsTypesInCombo = new Set();
-    for (const assignment of combination.assignments) {
-        for (const unit of assignment.team) {
-            for (const role of DPS_ROLES) {
-                if (unit.tags.includes(role)) {
-                    dpsTypesInCombo.add(role);
-                }
+    /**
+     * Analyzes a combination for Tier 0 unit utilization.
+     * Returns warnings/notes if key units are missing.
+     * 
+     * Rules:
+     * - Tier 0 supports should be used UNLESS their synergy.avoid conflicts with ALL teams
+     * - Tier 0 DPS should be used if their element matches any boss weakness (and not anti'd)
+     */
+    function checkTier0Utilization(combination, availableUnits, selectedBosses, bosses) {
+        const warnings = [];
+        const notes = [];
+        
+        // Get all units used in this combination
+        const usedUnits = new Set();
+        for (const assignment of combination.assignments) {
+            for (const unit of assignment.team) {
+                usedUnits.add(unit.name);
             }
         }
-    }
-    
-    // Get available Tier 0 units
-    const tier0Units = availableUnits.filter(u => u.tier === 0);
-    const tier0Supports = tier0Units.filter(u => u.tags.includes("support"));
-    const tier0DPS = tier0Units.filter(u => DPS_ROLES.some(role => u.tags.includes(role)));
-    
-    // Check Tier 0 Supports
-    for (const support of tier0Supports) {
-        if (usedUnits.has(support.name)) continue;
         
-        // Check if this support's synergy.avoid conflicts with ALL DPS types in combo
-        const avoidTags = support.synergy?.avoid || [];
-        
-        if (avoidTags.length === 0) {
-            // No restrictions - this support should definitely be used
-            warnings.push(`⚠️  ${support.name} (Tier 0 support, no restrictions) is not used`);
-        } else {
-            // Check if there's ANY DPS type in combo that this support doesn't avoid
-            const canFitSomewhere = [...dpsTypesInCombo].some(dpsType => !avoidTags.includes(dpsType));
-            
-            if (canFitSomewhere) {
-                // There's a team this support could join but wasn't used
-                const compatibleTypes = [...dpsTypesInCombo].filter(t => !avoidTags.includes(t));
-                warnings.push(`⚠️  ${support.name} (Tier 0 support) not used despite compatible teams (${compatibleTypes.join("/")})`);
-            }
-            // If canFitSomewhere is false, it's expected this support isn't used
-        }
-    }
-    
-    // Check Tier 0 DPS
-    const bossData = selectedBosses.map(name => bosses.find(b => b.name === name));
-    
-    for (const dps of tier0DPS) {
-        if (usedUnits.has(dps.name)) continue;
-        
-        const dpsElement = dps.tags.find(t => ELEMENTS.includes(t));
-        const dpsType = dps.tags.find(t => DPS_ROLES.includes(t));
-        
-        // Find bosses that could use this DPS (weakness match + not anti'd)
-        const matchingBosses = bossData.filter(boss => {
-            const weaknessMatch = boss.weaknesses.includes(dpsElement);
-            const notAnti = !boss.anti || !boss.anti.includes(dpsType);
-            return weaknessMatch && notAnti;
-        });
-        
-        if (matchingBosses.length > 0) {
-            const bossNames = matchingBosses.map(b => 
-                b.name.replace("Notorious ", "").substring(0, 15)
-            ).join(", ");
-            notes.push(`ℹ️  ${dps.name} (Tier 0 ${dpsType}) not used but matches weakness for: ${bossNames}`);
-        }
-    }
-    
-    // Summary: count how many Tier 0 units are used
-    const tier0Used = [...usedUnits].filter(name => {
-        const unit = availableUnits.find(u => u.name === name);
-        return unit && unit.tier === 0;
-    }).length;
-    
-    const tier0Available = tier0Units.length;
-    
-    return {
-        warnings,
-        notes,
-        tier0Used,
-        tier0Available,
-        usedUnits: [...usedUnits]
-    };
-}
-
-// ============================================================================
-// DOMINANCE CHECK
-// ============================================================================
-
-/**
- * Checks if a combination is dominated by a better alternative.
- * A combination is dominated if:
- * - It's missing a Tier 0 unit
- * - There exists a team with that Tier 0 unit for some boss
- * - That team doesn't conflict with the other teams in the combination
- * 
- * This means we could improve the combination by swapping in the better team,
- * so the current combination is strictly worse and should be filtered out.
- */
-function isDominatedCombination(combination, viableTeamsByBoss, availableUnits) {
-    // Get all units used in this combination
-    const usedUnitIds = new Set();
-    for (const assignment of combination.assignments) {
-        for (const unit of assignment.team) {
-            usedUnitIds.add(unit.numericId);
-        }
-    }
-    
-    // Get Tier 0 units that are NOT used
-    const tier0Units = availableUnits.filter(u => u.tier === 0);
-    const missingTier0 = tier0Units.filter(u => !usedUnitIds.has(u.numericId));
-    
-    if (missingTier0.length === 0) {
-        // All Tier 0 units are used - not dominated
-        return { dominated: false };
-    }
-    
-    // For each missing Tier 0 unit, check if we could fit them
-    for (const missingUnit of missingTier0) {
-        // For each boss assignment, check if there's a team with this unit
-        for (let i = 0; i < combination.assignments.length; i++) {
-            const assignment = combination.assignments[i];
-            const bossName = assignment.boss;
-            const viableTeams = viableTeamsByBoss[bossName] || [];
-            
-            // Get the other two teams' unit IDs (to check for conflicts)
-            const otherTeamUnitIds = new Set();
-            for (let j = 0; j < combination.assignments.length; j++) {
-                if (j !== i) {
-                    for (const unit of combination.assignments[j].team) {
-                        otherTeamUnitIds.add(unit.numericId);
+        // Get DPS types present in the combination
+        const dpsTypesInCombo = new Set();
+        for (const assignment of combination.assignments) {
+            for (const unit of assignment.team) {
+                for (const role of DPS_ROLES) {
+                    if (unit.tags.includes(role)) {
+                        dpsTypesInCombo.add(role);
                     }
                 }
             }
+        }
+        
+        // Get available Tier 0 units
+        const tier0Units = availableUnits.filter(u => u.tier === 0);
+        const tier0Supports = tier0Units.filter(u => u.tags.includes("support"));
+        const tier0DPS = tier0Units.filter(u => DPS_ROLES.some(role => u.tags.includes(role)));
+        
+        // Check Tier 0 Supports
+        for (const support of tier0Supports) {
+            if (usedUnits.has(support.name)) continue;
             
-            // Find a team for this boss that:
-            // 1. Contains the missing Tier 0 unit
-            // 2. Doesn't conflict with the other two teams
-            // 3. Has a score >= current team's score (or at least is viable)
-            for (const candidateTeam of viableTeams) {
-                const hasUnit = candidateTeam.team.some(u => u.numericId === missingUnit.numericId);
-                if (!hasUnit) continue;
+            // Check if this support's synergy.avoid conflicts with ALL DPS types in combo
+            const avoidTags = support.synergy?.avoid || [];
+            
+            if (avoidTags.length === 0) {
+                // No restrictions - this support should definitely be used
+                warnings.push(`⚠️  ${support.name} (Tier 0 support, no restrictions) is not used`);
+            } else {
+                // Check if there's ANY DPS type in combo that this support doesn't avoid
+                const canFitSomewhere = [...dpsTypesInCombo].some(dpsType => !avoidTags.includes(dpsType));
                 
-                // Check for conflicts with other teams
-                const hasConflict = candidateTeam.team.some(u => otherTeamUnitIds.has(u.numericId));
-                if (hasConflict) continue;
-                
-                // Found a valid swap - this combination is dominated
-                return {
-                    dominated: true,
-                    reason: `Could use ${candidateTeam.label} for ${bossName.replace("Notorious ", "")} to include ${missingUnit.name}`
-                };
+                if (canFitSomewhere) {
+                    // There's a team this support could join but wasn't used
+                    const compatibleTypes = [...dpsTypesInCombo].filter(t => !avoidTags.includes(t));
+                    warnings.push(`⚠️  ${support.name} (Tier 0 support) not used despite compatible teams (${compatibleTypes.join("/")})`);
+                }
+                // If canFitSomewhere is false, it's expected this support isn't used
             }
         }
+        
+        // Check Tier 0 DPS
+        const bossData = selectedBosses.map(name => bosses.find(b => b.name === name));
+        
+        for (const dps of tier0DPS) {
+            if (usedUnits.has(dps.name)) continue;
+            
+            const dpsElement = dps.tags.find(t => ELEMENTS.includes(t));
+            const dpsType = dps.tags.find(t => DPS_ROLES.includes(t));
+            
+            // Find bosses that could use this DPS (weakness match + not anti'd)
+            const matchingBosses = bossData.filter(boss => {
+                const weaknessMatch = boss.weaknesses.includes(dpsElement);
+                const notAnti = !boss.anti || !boss.anti.includes(dpsType);
+                return weaknessMatch && notAnti;
+            });
+            
+            if (matchingBosses.length > 0) {
+                const bossNames = matchingBosses.map(b => 
+                    b.name.replace("Notorious ", "").substring(0, 15)
+                ).join(", ");
+                notes.push(`ℹ️  ${dps.name} (Tier 0 ${dpsType}) not used but matches weakness for: ${bossNames}`);
+            }
+        }
+        
+        // Summary: count how many Tier 0 units are used
+        const tier0Used = [...usedUnits].filter(name => {
+            const unit = availableUnits.find(u => u.name === name);
+            return unit && unit.tier === 0;
+        }).length;
+        
+        const tier0Available = tier0Units.length;
+        
+        return {
+            warnings,
+            notes,
+            tier0Used,
+            tier0Available,
+            usedUnits: [...usedUnits]
+        };
     }
-    
-    return { dominated: false };
-}
 
-// ============================================================================
-// COMBINATION FINDER (uses shared functions from team-builder.js)
-// ============================================================================
+    // ============================================================================
+    // DOMINANCE CHECK
+    // ============================================================================
 
-// ============================================================================
-// MAIN EXECUTION
-// ============================================================================
+    /**
+     * Checks if a combination is dominated by a better alternative.
+     * A combination is dominated if:
+     * - There exists a swap that includes a missing Tier 0 unit
+     * - AND the swap has a BETTER score than the current team
+     * - AND doesn't conflict with other teams
+     * 
+     * This is less aggressive than the original version which filtered
+     * any combination missing a Tier 0 unit.
+     */
+    function isDominatedCombination(combination, viableTeamsByBoss, availableUnits) {
+        // Get all units used in this combination
+        const usedUnitIds = new Set();
+        for (const assignment of combination.assignments) {
+            for (const unit of assignment.team) {
+                usedUnitIds.add(unit.id);
+            }
+        }
+        
+        // Get Tier 0 units that are NOT used
+        const tier0Units = availableUnits.filter(u => u.tier === 0);
+        const missingTier0 = tier0Units.filter(u => !usedUnitIds.has(u.id));
+        
+        if (missingTier0.length === 0) {
+            // All Tier 0 units are used - not dominated
+            return { dominated: false };
+        }
+        
+        // For each missing Tier 0 unit, check if we could IMPROVE by swapping them in
+        for (const missingUnit of missingTier0) {
+            // For each boss assignment, check if there's a BETTER team with this unit
+            for (let i = 0; i < combination.assignments.length; i++) {
+                const assignment = combination.assignments[i];
+                const bossName = assignment.boss;
+                const currentScore = assignment.score;
+                const viableTeams = viableTeamsByBoss[bossName] || [];
+                
+                // Get the other two teams' unit IDs (to check for conflicts)
+                const otherTeamUnitIds = new Set();
+                for (let j = 0; j < combination.assignments.length; j++) {
+                    if (j !== i) {
+                        for (const unit of combination.assignments[j].team) {
+                            otherTeamUnitIds.add(unit.id);
+                        }
+                    }
+                }
+                
+                // Find a team for this boss that:
+                // 1. Contains the missing Tier 0 unit
+                // 2. Doesn't conflict with the other two teams
+                // 3. Has a BETTER score than the current team (strict improvement)
+                for (const candidateTeam of viableTeams) {
+                    // Must have better score to be a strict improvement
+                    if (candidateTeam.score <= currentScore) continue;
+                    
+                    const hasUnit = candidateTeam.team.some(u => u.id === missingUnit.id);
+                    if (!hasUnit) continue;
+                    
+                    // Check for conflicts with other teams
+                    const hasConflict = candidateTeam.team.some(u => otherTeamUnitIds.has(u.id));
+                    if (hasConflict) continue;
+                    
+                    // Found a strictly better swap - this combination is dominated
+                    return {
+                        dominated: true,
+                        reason: `Could use ${candidateTeam.label} (${candidateTeam.score}) for ${bossName.replace("Notorious ", "")} instead of ${assignment.label} (${currentScore}) to include ${missingUnit.name}`
+                    };
+                }
+            }
+        }
+        
+        return { dominated: false };
+    }
 
-function main() {
+    // ============================================================================
+    // COMBINATION FINDER (uses shared functions from team-builder.js)
+    // ============================================================================
+
+    // ============================================================================
+    // MAIN EXECUTION
+    // ============================================================================
+
     console.log("===== Deadly Assault Team Builder =====\n");
     
     // Validate selected bosses
@@ -531,4 +532,4 @@ function main() {
     }
 }
 
-main();
+main().catch(console.error);

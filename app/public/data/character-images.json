@@ -43,5 +43,7 @@
     "lucia": "./assets/characters/lucia.webp",
     "yidhari": "./assets/characters/yidhari.webp",
     "banyue": "./assets/characters/banyue.webp",
-    "dialyn": "./assets/characters/dialyn.webp"
+    "dialyn": "./assets/characters/dialyn.webp",
+    "ysg": "./assets/characters/ysg.webp",
+    "zhao": "./assets/characters/zhao.webp"
 }
