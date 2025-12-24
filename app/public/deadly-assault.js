@@ -11,6 +11,14 @@ import {
     findExclusiveCombinations 
 } from './lib/team-builder.js';
 import { scoreTeamForBoss } from './lib/team-scorer.js';
+import { 
+    decodeRoster, 
+    getRosterFromUrl, 
+    decodeBosses,
+    getBossesFromUrl,
+    generateShareUrlWithBosses, 
+    copyToClipboard 
+} from './lib/roster-share.js';
 
 // ============================================================================
 // CONSTANTS
@@ -39,6 +47,12 @@ let selectedBosses = [];
 
 // Roster section collapse state
 let rosterOpen = true;
+
+// Shared roster mode - when true, localStorage is NOT used for roster
+let sharedRosterMode = false;
+
+// Shared bosses mode - when true, localStorage is NOT used for page settings
+let sharedBossesMode = false;
 
 // ============================================================================
 // DATA LOADING
@@ -85,6 +99,11 @@ function initializeUnitStates() {
 // ============================================================================
 
 function saveRosterToStorage() {
+    // Do NOT save to localStorage when viewing a shared roster
+    if (sharedRosterMode) {
+        return;
+    }
+    
     const data = {
         unitStates,
         rosterOpen
@@ -93,6 +112,11 @@ function saveRosterToStorage() {
 }
 
 function savePageToStorage() {
+    // Do NOT save to localStorage when viewing shared bosses
+    if (sharedBossesMode) {
+        return;
+    }
+    
     const data = {
         selectedBosses
     };
@@ -105,6 +129,53 @@ function saveToStorage() {
 }
 
 function loadFromStorage() {
+    // Check for shared roster in URL parameter first
+    const rosterParam = getRosterFromUrl();
+    if (rosterParam !== null) {
+        sharedRosterMode = true;
+        
+        // Decode the roster from URL
+        const sharedStates = decodeRoster(rosterParam, allUnits);
+        if (sharedStates) {
+            // Apply the shared roster states
+            for (const unitId in sharedStates) {
+                if (unitStates[unitId]) {
+                    unitStates[unitId] = sharedStates[unitId];
+                }
+            }
+        } else {
+            console.warn('Failed to decode shared roster, falling back to defaults');
+        }
+        
+        // Show the shared roster banner
+        showSharedRosterBanner();
+    } else {
+        // Normal mode: load roster from localStorage
+        sharedRosterMode = false;
+        loadRosterFromLocalStorage();
+    }
+    
+    // Check for shared bosses in URL parameter
+    const bossesParam = getBossesFromUrl();
+    if (bossesParam !== null) {
+        sharedBossesMode = true;
+        
+        // Decode the bosses from URL
+        const sharedBosses = decodeBosses(bossesParam, allBosses);
+        if (sharedBosses) {
+            selectedBosses = sharedBosses;
+        } else {
+            console.warn('Failed to decode shared bosses, starting with none selected');
+            selectedBosses = [];
+        }
+    } else {
+        // Normal mode: load page settings from localStorage
+        sharedBossesMode = false;
+        loadPageFromStorage();
+    }
+}
+
+function loadRosterFromLocalStorage() {
     // Load roster (shared with team-builder page)
     try {
         const saved = localStorage.getItem(ROSTER_STORAGE_KEY);
@@ -143,7 +214,9 @@ function loadFromStorage() {
     } catch (e) {
         console.warn('Failed to load roster state:', e);
     }
-    
+}
+
+function loadPageFromStorage() {
     // Load page-specific settings
     try {
         const pageSaved = localStorage.getItem(PAGE_STORAGE_KEY);
@@ -158,6 +231,13 @@ function loadFromStorage() {
         }
     } catch (e) {
         console.warn('Failed to load page state:', e);
+    }
+}
+
+function showSharedRosterBanner() {
+    const banner = document.getElementById('shared-roster-banner');
+    if (banner) {
+        banner.style.display = 'flex';
     }
 }
 
@@ -211,7 +291,7 @@ function createUnitCard(unit) {
                 title="${unit.name}${state.universal ? ' (Flex)' : ''}">
             ${avatarHtml}
             <span class="unit-name">${unit.name}</span>
-            ${state.universal ? '<span class="flex-badge">✦</span>' : ''}
+            ${state.universal ? '<span class="flex-badge">FLEX</span>' : ''}
         </button>
     `;
 }
@@ -346,6 +426,73 @@ function setupEventListeners() {
     
     // Run button
     document.getElementById('run-btn').addEventListener('click', runOptimization);
+    
+    // Share button
+    const shareBtn = document.getElementById('share-roster-btn');
+    if (shareBtn) {
+        shareBtn.addEventListener('click', handleShareClick);
+    }
+}
+
+// ============================================================================
+// SHARE FUNCTIONALITY
+// ============================================================================
+
+async function handleShareClick(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const btn = document.getElementById('share-roster-btn');
+    
+    // Generate the share URL (includes both roster AND bosses)
+    const shareUrl = generateShareUrlWithBosses(unitStates, allUnits, selectedBosses);
+    
+    // Copy to clipboard
+    const success = await copyToClipboard(shareUrl);
+    
+    if (success) {
+        // Show success state on button
+        btn.classList.add('copied');
+        const textEl = btn.querySelector('.share-text');
+        const originalText = textEl.textContent;
+        textEl.textContent = 'Copied!';
+        
+        // Show toast
+        showToast('Share link copied to clipboard!');
+        
+        // Reset button after delay
+        setTimeout(() => {
+            btn.classList.remove('copied');
+            textEl.textContent = originalText;
+        }, 2000);
+    } else {
+        showToast('Failed to copy link. Try again.', true);
+    }
+}
+
+function showToast(message, isError = false) {
+    // Remove any existing toast
+    const existingToast = document.querySelector('.share-toast');
+    if (existingToast) {
+        existingToast.remove();
+    }
+    
+    // Create toast element
+    const toast = document.createElement('div');
+    toast.className = 'share-toast' + (isError ? ' error' : '');
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    
+    // Trigger animation
+    requestAnimationFrame(() => {
+        toast.classList.add('visible');
+    });
+    
+    // Remove after delay
+    setTimeout(() => {
+        toast.classList.remove('visible');
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
 }
 
 function handleUnitClick(e) {
@@ -396,7 +543,7 @@ function updateUnitCard(card, unitId) {
     if (state.universal && !existingBadge) {
         const badge = document.createElement('span');
         badge.className = 'flex-badge';
-        badge.textContent = '✦';
+        badge.textContent = 'FLEX';
         card.appendChild(badge);
     } else if (!state.universal && existingBadge) {
         existingBadge.remove();

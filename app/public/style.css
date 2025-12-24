@@ -1228,25 +1228,24 @@ button#simulate-btn:disabled,
     text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
 }
 
-/* Flex badge */
+/* Flex badge - overlay bubble at bottom of portrait */
 .flex-badge {
     position: absolute;
-    top: -6px;
-    right: -6px;
-    width: 20px;
-    height: 20px;
-    background: #8b4513;
-    color: #ffd700;
-    border-radius: 50%;
-    font-size: 14px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
-    border: 2px solid var(--bg-primary);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-sizing: border-box;
-    padding-top: 1px;
+    bottom: 18px; /* Sits above the unit name */
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 0.15rem 0.4rem;
+    background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+    color: var(--bg-primary);
+    border-radius: 3px;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.5rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
     z-index: 10;
+    white-space: nowrap;
 }
 
 @media (max-width: 768px) {
@@ -2377,5 +2376,158 @@ button#simulate-btn:disabled,
     
     .result-unit-card {
         width: 60px;
+    }
+}
+
+/* ============================================================================
+   SHARE BUTTON & SHARED ROSTER BANNER
+   ============================================================================ */
+
+/* Share button in roster header */
+.share-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.7rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-secondary);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-left: 0.75rem;
+}
+
+.share-btn:hover {
+    border-color: var(--accent-secondary);
+    color: var(--accent-secondary);
+    background: rgba(0, 212, 170, 0.1);
+}
+
+.share-btn:active {
+    transform: scale(0.97);
+}
+
+.share-btn .share-icon {
+    flex-shrink: 0;
+}
+
+.share-btn .share-text {
+    white-space: nowrap;
+}
+
+/* Share button success state (after copy) */
+.share-btn.copied {
+    border-color: var(--success);
+    color: var(--success);
+    background: rgba(0, 212, 170, 0.15);
+}
+
+.share-btn.copied .share-icon {
+    display: none;
+}
+
+.share-btn.copied .share-text::before {
+    content: '✓ ';
+}
+
+/* Shared roster banner */
+.shared-roster-banner {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: linear-gradient(135deg, rgba(255, 107, 53, 0.15), rgba(0, 212, 170, 0.1));
+    border: 1px solid var(--accent-primary);
+    border-radius: 8px;
+    margin-bottom: 1rem;
+}
+
+.shared-roster-banner .shared-icon {
+    font-size: 1.2rem;
+    flex-shrink: 0;
+}
+
+.shared-roster-banner .shared-text {
+    flex: 1;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.shared-roster-banner .shared-reset-link {
+    padding: 0.35rem 0.75rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--accent-secondary);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.shared-roster-banner .shared-reset-link:hover {
+    border-color: var(--accent-secondary);
+    background: rgba(0, 212, 170, 0.1);
+}
+
+/* Toast notification */
+.share-toast {
+    position: fixed;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    padding: 0.75rem 1.25rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--accent-secondary);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 500;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    z-index: 10000;
+    opacity: 0;
+    transition: transform 0.3s ease, opacity 0.3s ease;
+    pointer-events: none;
+}
+
+.share-toast.visible {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+}
+
+.share-toast.error {
+    border-color: var(--error);
+}
+
+@media (max-width: 768px) {
+    .share-btn .share-text {
+        display: none;
+    }
+    
+    .share-btn {
+        padding: 0.35rem 0.5rem;
+    }
+    
+    .shared-roster-banner {
+        flex-wrap: wrap;
+    }
+    
+    .shared-roster-banner .shared-text {
+        order: 2;
+        flex-basis: 100%;
+        margin-top: 0.25rem;
+    }
+    
+    .shared-roster-banner .shared-reset-link {
+        margin-left: auto;
     }
 }

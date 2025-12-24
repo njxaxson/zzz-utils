@@ -5,6 +5,14 @@
 
 import { getTeams, sortTeamByRole, getTeamLabel } from './lib/team-builder.js';
 import { scoreTeamForBoss, isDPS, isStun, isSupport, isDefense, getElement, ELEMENTS, DPS_ROLES } from './lib/team-scorer.js';
+import { 
+    encodeRoster, 
+    decodeRoster, 
+    getRosterFromUrl, 
+    isSharedRosterMode, 
+    generateShareUrl, 
+    copyToClipboard 
+} from './lib/roster-share.js';
 
 // ============================================================================
 // CONSTANTS
@@ -85,6 +93,9 @@ let unitStates = {};
 let rosterOpen = true;
 let filtersOpen = true;
 
+// Shared roster mode - when true, localStorage is NOT used
+let sharedRosterMode = false;
+
 // Filter state
 let filters = {
     elements: [],         // Array of selected elements
@@ -140,6 +151,11 @@ function initializeUnitStates() {
 // ============================================================================
 
 function saveRosterToStorage() {
+    // Do NOT save to localStorage when viewing a shared roster
+    if (sharedRosterMode) {
+        return;
+    }
+    
     const data = {
         unitStates,
         rosterOpen,
@@ -153,6 +169,35 @@ function saveFiltersToStorage() {
 }
 
 function loadFromStorage() {
+    // Check for shared roster in URL parameter first
+    const rosterParam = getRosterFromUrl();
+    if (rosterParam !== null) {
+        sharedRosterMode = true;
+        
+        // Decode the roster from URL
+        const sharedStates = decodeRoster(rosterParam, allUnits);
+        if (sharedStates) {
+            // Apply the shared roster states
+            for (const unitId in sharedStates) {
+                if (unitStates[unitId]) {
+                    unitStates[unitId] = sharedStates[unitId];
+                }
+            }
+        } else {
+            console.warn('Failed to decode shared roster, falling back to defaults');
+        }
+        
+        // Show the shared roster banner
+        showSharedRosterBanner();
+        
+        // Still load filters from localStorage (those are personal preference)
+        loadFiltersFromStorage();
+        return;
+    }
+    
+    // Normal mode: load from localStorage
+    sharedRosterMode = false;
+    
     // Load roster (shared with other pages)
     try {
         const saved = localStorage.getItem(ROSTER_STORAGE_KEY);
@@ -193,6 +238,10 @@ function loadFromStorage() {
         console.warn('Failed to load roster state:', e);
     }
     
+    loadFiltersFromStorage();
+}
+
+function loadFiltersFromStorage() {
     // Load filters (page-specific)
     try {
         const savedFilters = localStorage.getItem(FILTERS_STORAGE_KEY);
@@ -202,6 +251,13 @@ function loadFromStorage() {
         }
     } catch (e) {
         console.warn('Failed to load filter state:', e);
+    }
+}
+
+function showSharedRosterBanner() {
+    const banner = document.getElementById('shared-roster-banner');
+    if (banner) {
+        banner.style.display = 'flex';
     }
 }
 
@@ -256,7 +312,7 @@ function createUnitCard(unit) {
                 title="${unit.name}${state.universal ? ' (Flex)' : ''}">
             ${avatarHtml}
             <span class="unit-name">${unit.name}</span>
-            ${state.universal ? '<span class="flex-badge">✦</span>' : ''}
+            ${state.universal ? '<span class="flex-badge">FLEX</span>' : ''}
         </button>
     `;
 }
@@ -505,9 +561,76 @@ function setupEventListeners() {
     document.getElementById('build-btn').addEventListener('click', buildTeams);
     document.getElementById('clear-filters-btn').addEventListener('click', clearFilters);
     
+    // Share button
+    const shareBtn = document.getElementById('share-roster-btn');
+    if (shareBtn) {
+        shareBtn.addEventListener('click', handleShareClick);
+    }
+    
     // Pagination
     document.getElementById('prev-page').addEventListener('click', () => changePage(-1));
     document.getElementById('next-page').addEventListener('click', () => changePage(1));
+}
+
+// ============================================================================
+// SHARE FUNCTIONALITY
+// ============================================================================
+
+async function handleShareClick(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const btn = document.getElementById('share-roster-btn');
+    
+    // Generate the share URL
+    const shareUrl = generateShareUrl(unitStates, allUnits);
+    
+    // Copy to clipboard
+    const success = await copyToClipboard(shareUrl);
+    
+    if (success) {
+        // Show success state on button
+        btn.classList.add('copied');
+        const textEl = btn.querySelector('.share-text');
+        const originalText = textEl.textContent;
+        textEl.textContent = 'Copied!';
+        
+        // Show toast
+        showToast('Share link copied to clipboard!');
+        
+        // Reset button after delay
+        setTimeout(() => {
+            btn.classList.remove('copied');
+            textEl.textContent = originalText;
+        }, 2000);
+    } else {
+        showToast('Failed to copy link. Try again.', true);
+    }
+}
+
+function showToast(message, isError = false) {
+    // Remove any existing toast
+    const existingToast = document.querySelector('.share-toast');
+    if (existingToast) {
+        existingToast.remove();
+    }
+    
+    // Create toast element
+    const toast = document.createElement('div');
+    toast.className = 'share-toast' + (isError ? ' error' : '');
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    
+    // Trigger animation
+    requestAnimationFrame(() => {
+        toast.classList.add('visible');
+    });
+    
+    // Remove after delay
+    setTimeout(() => {
+        toast.classList.remove('visible');
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
 }
 
 function handleUnitClick(e) {
@@ -553,7 +676,7 @@ function updateUnitCard(card, unitId) {
     if (state.universal && !existingBadge) {
         const badge = document.createElement('span');
         badge.className = 'flex-badge';
-        badge.textContent = '✦';
+        badge.textContent = 'FLEX';
         card.appendChild(badge);
     } else if (!state.universal && existingBadge) {
         existingBadge.remove();
@@ -921,30 +1044,6 @@ function selectBestTeams(teams, availableUnits) {
             // Score matching teams against this specific boss
             const scoredTeams = matchingTeams.map(({ label, team }) => {
                 const score = scoreTeamForBoss(team, boss, { lenient: true });
-                
-                // Debug: Compare synthetic boss vs real Priest boss
-                if (element === 'ether' && dpsType === 'rupture') {
-                    if (label === 'Yixuan / Astra / Lucia' || label === 'Yixuan / Pan Yinhu / Lucia') {
-                        // Real Priest boss for comparison
-                        const priestBoss = {
-                            name: "Miasma Priest",
-                            weaknesses: ["ether"],
-                            resistances: ["ice"],
-                            shill: "rupture",
-                            anti: [],
-                            assists: 2,
-                            favored: ["Yixuan"]
-                        };
-                        const syntheticScore = score;
-                        const priestScore = scoreTeamForBoss(team, priestBoss, { lenient: true });
-                        const priestScoreNormal = scoreTeamForBoss(team, priestBoss);
-                        console.log(`[DEBUG] ${label}:`);
-                        console.log(`  Synthetic boss (lenient): ${syntheticScore}`);
-                        console.log(`  Priest boss (lenient): ${priestScore}`);
-                        console.log(`  Priest boss (normal): ${priestScoreNormal}`);
-                    }
-                }
-                
                 return { label, team, score, element, dpsType };
             }).filter(t => t.score > 0)
               .sort((a, b) => b.score - a.score);
@@ -1323,9 +1422,27 @@ function createTeamGrid(teams) {
         teamsByCell[key].push(teamData);
     }
     
-    // Get available elements and DPS types from filters
-    const availableElements = filters.elements.length > 0 ? filters.elements : GRID_ELEMENTS;
-    const availableDpsTypes = filters.dpsRoles.length > 0 ? filters.dpsRoles : GRID_DPS_TYPES;
+    // Determine which elements and DPS types to display
+    let displayElements;
+    let displayDpsTypes;
+    
+    if (filters.elements.length > 0) {
+        // User has selected specific elements - show only those (maintain order)
+        displayElements = GRID_ELEMENTS.filter(el => filters.elements.includes(el));
+    } else {
+        // No filter - show only elements that have teams
+        const elementsWithTeams = new Set(teams.map(t => t.element).filter(Boolean));
+        displayElements = GRID_ELEMENTS.filter(el => elementsWithTeams.has(el));
+    }
+    
+    if (filters.dpsRoles.length > 0) {
+        // User has selected specific DPS types - show only those (maintain order)
+        displayDpsTypes = GRID_DPS_TYPES.filter(role => filters.dpsRoles.includes(role));
+    } else {
+        // No filter - show only DPS types that have teams
+        const dpsTypesWithTeams = new Set(teams.map(t => t.dpsType).filter(Boolean));
+        displayDpsTypes = GRID_DPS_TYPES.filter(role => dpsTypesWithTeams.has(role));
+    }
     
     // Build grid HTML
     let html = '<div class="team-grid-container">';
@@ -1333,20 +1450,20 @@ function createTeamGrid(teams) {
     // Header row with DPS type labels
     html += '<div class="team-grid-header">';
     html += '<div class="grid-corner"></div>'; // Empty corner cell
-    for (const dpsType of availableDpsTypes) {
+    for (const dpsType of displayDpsTypes) {
         html += `<div class="grid-header-cell dps-${dpsType}">${capitalizeFirst(dpsType)}</div>`;
     }
     html += '</div>';
     
     // Data rows (one per element)
-    for (const element of availableElements) {
+    for (const element of displayElements) {
         html += '<div class="team-grid-row">';
         
         // Row label (element)
         html += `<div class="grid-row-label element-${element}">${capitalizeFirst(element)}</div>`;
         
         // Cells for each DPS type
-        for (const dpsType of availableDpsTypes) {
+        for (const dpsType of displayDpsTypes) {
             const key = `${element}-${dpsType}`;
             const cellTeams = teamsByCell[key] || [];
             
