@@ -51,25 +51,40 @@
                     <div class="substat-dropdowns">
                         <div class="substat-dropdown-row">
                             <label>Substat 1</label>
-                            <div id="substat1-container"></div>
+                            <div class="substat-inputs">
+                                <div id="substat1-container" class="substat-select-container"></div>
+                                <div id="substat1-upgrade-container" class="substat-upgrade-container"></div>
+                            </div>
                         </div>
                         <div class="substat-dropdown-row">
                             <label>Substat 2</label>
-                            <div id="substat2-container"></div>
+                            <div class="substat-inputs">
+                                <div id="substat2-container" class="substat-select-container"></div>
+                                <div id="substat2-upgrade-container" class="substat-upgrade-container"></div>
+                            </div>
                         </div>
                         <div class="substat-dropdown-row">
                             <label>Substat 3</label>
-                            <div id="substat3-container"></div>
+                            <div class="substat-inputs">
+                                <div id="substat3-container" class="substat-select-container"></div>
+                                <div id="substat3-upgrade-container" class="substat-upgrade-container"></div>
+                            </div>
                         </div>
                         <div class="substat-dropdown-row">
                             <label>Substat 4</label>
-                            <div id="substat4-container"></div>
+                            <div class="substat-inputs">
+                                <div id="substat4-container" class="substat-select-container"></div>
+                                <div id="substat4-upgrade-container" class="substat-upgrade-container"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Calculate Button -->
-                <button id="calculate-btn" class="run-btn">Calculate</button>
+                <!-- Actions -->
+                <div class="action-buttons" style="margin-top: 1.5rem;">
+                    <button id="reset-btn" class="secondary-btn">Reset</button>
+                    <button id="calculate-btn" class="run-btn">Calculate</button>
+                </div>
             </section>
 
             <!-- Loading Indicator -->
@@ -95,10 +110,6 @@
                             <div class="stat-line">
                                 <span class="stat-label">Average Discs Required</span>
                                 <span class="stat-value" id="result-average">—</span>
-                            </div>
-                            <div class="stat-line">
-                                <span class="stat-label">Standard Deviation</span>
-                                <span class="stat-value" id="result-stddev">—</span>
                             </div>
                             <div class="stat-line">
                                 <span class="stat-label">Simulations Run</span>
