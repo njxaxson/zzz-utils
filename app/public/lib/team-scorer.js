@@ -78,7 +78,7 @@ export function hasDefensiveAssist(unit) {
 // SYNERGY SCORING
 // ============================================================================
 
-export function calculateSynergyScore(unit, teammates, boss) {
+export function calculateSynergyScore(unit, teammates, boss, lenient = false) {
     let score = 0;
     const synergy = unit.synergy;
     if (!synergy) return 0;
@@ -100,6 +100,9 @@ export function calculateSynergyScore(unit, teammates, boss) {
         const synergyElements = synergy.tags.filter(tag => ELEMENTS.includes(tag));
         const hasElementSynergy = synergyElements.length > 0;
         
+        // Check if this unit has subdps synergy (like Burnice, Grace, Vivian, Orphie)
+        const hasSubDPSSynergy = synergy.tags.includes("subdps");
+        
         if (hasElementSynergy) {
             // Check if ANY teammate matches ANY of the synergy elements
             // This handles both single-element (Soukaku: ice) and multi-element (Yuzuha: all) synergies
@@ -112,6 +115,35 @@ export function calculateSynergyScore(unit, teammates, boss) {
                 // (e.g., Soukaku on Harumasa team) - this is a complete waste
                 // Should only appear as last resort when forced by other constraints
                 score -= 120;
+            }
+        }
+        
+        if (hasSubDPSSynergy) {
+            // Units with subdps synergy (Burnice, Grace, Vivian, Orphie) need a MAIN DPS teammate
+            // A main DPS is any DPS unit that does NOT have the subdps tag
+            // The main DPS can be any role type - doesn't have to match
+            // Examples: 
+            //   - Grace (anomaly/subdps) + Harumasa (attack, no subdps) = VALID
+            //   - Burnice (anomaly/subdps) + Jane Doe (anomaly, no subdps) = VALID
+            //   - Burnice + Vivian (both subdps) = INVALID (no main DPS)
+            //   - Orphie (attack/subdps) alone with supports = INVALID (no main DPS)
+            
+            const otherMainDPSCount = teammates.filter(t => 
+                isDPS(t) && !t.synergy?.tags?.includes("subdps")
+            ).length;
+            
+            if (otherMainDPSCount === 0) {
+                // No main DPS teammate - only subdps units or supports
+                // These teams lack a primary damage dealer
+                if (lenient) {
+                    // In lenient mode, ignore this penalty (desperate situations)
+                    // No penalty applied
+                } else {
+                    score -= 100; // Heavy penalty in strict mode
+                }
+            } else {
+                // Has a main DPS teammate - good synergy
+                score += 20;
             }
         }
         
@@ -188,6 +220,42 @@ export function getDPSType(unit) {
     return null;
 }
 
+/**
+ * Determines if a unit is a specialist.
+ * A specialist has synergy with exactly ONE DPS type and avoids the other two.
+ * Examples: Lucia (rupture specialist), Yuzuha (anomaly specialist), Pan (rupture specialist)
+ */
+export function isSpecialist(unit) {
+    if (!unit.synergy) return false;
+    
+    const synergyTags = unit.synergy.tags || [];
+    const avoidTags = unit.synergy.avoid || [];
+    
+    // Count how many DPS types are in synergy tags
+    const dpsTypesInSynergy = DPS_ROLES.filter(role => synergyTags.includes(role));
+    
+    // Count how many DPS types are in avoid tags
+    const dpsTypesInAvoid = DPS_ROLES.filter(role => avoidTags.includes(role));
+    
+    // Specialist: synergizes with exactly 1 DPS type AND avoids the other 2
+    return dpsTypesInSynergy.length === 1 && dpsTypesInAvoid.length === 2;
+}
+
+/**
+ * Gets the DPS type a specialist synergizes with (null if not a specialist)
+ */
+export function getSpecialistType(unit) {
+    if (!isSpecialist(unit)) return null;
+    
+    const synergyTags = unit.synergy.tags || [];
+    for (const role of DPS_ROLES) {
+        if (synergyTags.includes(role)) {
+            return role;
+        }
+    }
+    return null;
+}
+
 export function unitsHaveSynergy(unit1, unit2) {
     const u1SynergizesU2 = 
         unit1.synergy?.units?.includes(unit2.name) ||
@@ -224,7 +292,7 @@ export function calculateDPSMixingPenalty(team) {
             }
         }
         if (!hasSynergy) {
-            penalty -= 60; // Attack teams want stun/attack/support, not 2x attack
+            penalty -= 200; // Attack teams want stun/attack/support, not 2x attack. Heavy penalty to disqualify unless huge synergy elsewhere
         }
     }
     
@@ -240,7 +308,7 @@ export function calculateDPSMixingPenalty(team) {
             }
         }
         if (!hasSynergy) {
-            penalty -= 60; // Rupture teams want stun/rupture/support or rupture/2x support
+            penalty -= 200; // Rupture teams want stun/rupture/support or rupture/2x support. Heavy penalty.
         }
     }
     
@@ -452,6 +520,39 @@ export function scoreTeamForBoss(team, boss, options = {}) {
         }
     }
     
+    // Solo titled anomaly agent validation
+    if (anomalyUnits.length === 1 && dpsUnits.length === 1 && isTitled(anomalyUnits[0])) {
+        const hasSupportOrDefense = supportUnits.length > 0 || defenseUnits.length > 0;
+        const hasStun = stunUnits.length > 0;
+        
+        // Check for explicit unit synergy (named synergy)
+        let hasExplicitSynergy = false;
+        for (let i = 0; i < team.length; i++) {
+            for (let j = i + 1; j < team.length; j++) {
+                const u1 = team[i];
+                const u2 = team[j];
+                // Check if u1 lists u2, or u2 lists u1 in synergy.units
+                if (u1.synergy?.units?.includes(u2.name) || u2.synergy?.units?.includes(u1.name)) {
+                    hasExplicitSynergy = true;
+                    break;
+                }
+            }
+            if (hasExplicitSynergy) break;
+        }
+
+        // Must have Support/Defense AND (Stun OR Explicit Synergy)
+        if (!hasSupportOrDefense || (!hasStun && !hasExplicitSynergy)) {
+             if (lenient) {
+                 log('Invalid solo titled anomaly comp (lenient)', -100);
+                 score -= 100;
+             } else {
+                 log('DISQUALIFIED: Invalid solo titled anomaly comp');
+                 if (debug) console.log('Team disqualified:', team.map(u => u.name).join('/'), debugReasons);
+                 return -1;
+             }
+        }
+    }
+
     // Anomaly boss composition
     if (boss.shill === "anomaly") {
         const hasTitledAnomaly = anomalyUnits.some(isTitled);
@@ -552,20 +653,37 @@ export function scoreTeamForBoss(team, boss, options = {}) {
             score += 10;
         }
         if (attackers.length > 1) {
-            score -= 50; // Double attacker rarely makes sense
+             const hasSubDPS = attackers.some(u => u.synergy?.tags?.includes("subdps"));
+             if (!hasSubDPS) {
+                 score -= 50; // Double attacker rarely makes sense UNLESS one is SubDPS
+             }
         }
     }
     
     // Rupture teams
     if (boss.shill === "rupture" || (!boss.shill && ruptureUnits.length > 0)) {
         // Two valid compositions:
-        // 1. stun/rupture/[support|defense] 
-        // 2. rupture/2x[support|defense]
+        // 1. stun/rupture/[support|defense] - traditional composition (with bonus)
+        // 2. rupture/2x[support|defense] - double support composition
         const hasStunComposition = stunUnits.length >= 1 && (supportUnits.length >= 1 || defenseUnits.length >= 1);
         const hasDoubleSupport = supportUnits.length + defenseUnits.length >= 2;
         
         if (hasStunComposition || hasDoubleSupport) {
             score += 15;
+            
+            // Bonus for the traditional stun/rupture/support|defense composition
+            // Consensus: rupture teams with stun are generally better than double-support
+            if (hasStunComposition) {
+                score += 25; // Increased base bonus to lift the entire Stun/Rupture archetype
+                
+                // Extra bonus if the stunner specifically synergizes with Rupture
+                // (e.g. Dialyn, Ju Fufu) - this makes them superior to generic stunners
+                const synergisticStunner = stunUnits.some(u => u.synergy?.tags?.includes("rupture"));
+                if (synergisticStunner) {
+                    log('Synergistic Stunner in Rupture team', 20);
+                    score += 20;
+                }
+            }
         }
         
         // For rupture teams, stunners without rupture synergy are suboptimal
@@ -594,11 +712,21 @@ export function scoreTeamForBoss(team, boss, options = {}) {
         
         if (boss.weaknesses.includes(element)) {
             dpsMatchesWeakness = true;
+            const isSubDPS = unit.synergy?.tags?.includes("subdps");
+
             // On-element DPS is the foundation of team building
             if (isSRank(unit)) {
-                score += 40; // S-rank on-element DPS is the starting point
+                if (isSubDPS) {
+                    score += 25; // Reduced for subdps
+                } else {
+                    score += 40; // S-rank on-element DPS is the starting point
+                }
             } else {
-                score += 20; // A-rank on-element still good
+                if (isSubDPS) {
+                    score += 10; // Reduced for subdps
+                } else {
+                    score += 20; // A-rank on-element still good
+                }
             }
         } else {
             // Off-element DPS - significant penalty (reduced in lenient mode)
@@ -610,9 +738,9 @@ export function scoreTeamForBoss(team, boss, options = {}) {
     }
     
     if (dpsUnits.length > 0 && !dpsMatchesWeakness && boss.weaknesses.length > 0) {
-        // No DPS matches weakness - extra penalty (reduced in lenient mode)
-        // Skip if boss has no weaknesses (element-neutral)
-        score -= lenient ? 5 : 15;
+        // No DPS matches weakness - SEVERE penalty
+        // In elemental weakness game, not hitting weakness with DPS is a major flaw
+        score -= lenient ? 40 : 100;
     }
     
     // Stun weakness/resistance - stun units deal damage, so element matters
@@ -627,13 +755,24 @@ export function scoreTeamForBoss(team, boss, options = {}) {
         if (boss.weaknesses.includes(element)) {
             score += 15;
         } else if (!boss.resistances.includes(element) && boss.weaknesses.length > 0) {
-            // Neutral/off-element stun - only penalize if boss has weaknesses
-            if (boss.shill === "stun") {
-                // On stun-shill, off-element is acceptable (stun is priority)
-                score -= 15;
+            // Neutral/off-element stun
+            
+            // EXCEPTION: If stunner has explicit synergy with the team's DPS type, waive the penalty
+            // Synergy trumps element for utility roles
+            const dpsTypes = new Set(dpsUnits.map(getDPSType).filter(t => t !== null));
+            const hasTypeSynergy = unit.synergy?.tags?.some(tag => dpsTypes.has(tag));
+            
+            if (hasTypeSynergy) {
+                log(`Off-element stunner waived due to synergy (${unit.name})`, 0);
             } else {
-                // On non-stun-shill, off-element stunner is a bigger issue
-                score -= 35;
+                // Only penalize if boss has weaknesses (element-neutral)
+                if (boss.shill === "stun") {
+                    // On stun-shill, off-element is acceptable (stun is priority)
+                    score -= 15;
+                } else {
+                    // On non-stun-shill, off-element stunner is a bigger issue
+                    score -= 35;
+                }
             }
         }
     }
@@ -708,45 +847,116 @@ export function scoreTeamForBoss(team, boss, options = {}) {
         }
     }
     
-    // Specialized beats universal (rupture teams)
-    // Pan/Lucia with rupture synergy should ALWAYS beat Astra/Nicole on rupture teams
-    const hasRuptureDPS = ruptureUnits.length > 0;
+    // Specialist vs Generalist Support/Defense Scoring
+    // Specialists: synergize with exactly ONE DPS type and avoid the other two
+    // Examples: Lucia (rupture), Yuzuha (anomaly), Pan (rupture)
+    // Generalists: synergize with multiple or no specific DPS types
+    // Examples: Astra, Nicole (but Nicole avoids rupture)
+    //
+    // Matching specialist should ALWAYS beat generalist for their DPS type
+    // Mismatched specialist should ALWAYS lose to generalist (heavy penalty)
     
-    if (hasRuptureDPS) {
-        for (const unit of [...supportUnits, ...defenseUnits]) {
+    for (const unit of [...supportUnits, ...defenseUnits]) {
+        if (isSpecialist(unit)) {
+            const specialistType = getSpecialistType(unit);
+            const teamDPSTypes = dpsUnits.map(getDPSType).filter(t => t !== null);
+            const primaryDPSType = teamDPSTypes[0]; // Assume first DPS defines team type
+            
+            if (primaryDPSType === specialistType) {
+                // Matching specialist - strong bonus
+                // This ensures specialists beat generalists when matched
+                
+                // CRITICAL CHECK: Does the specialist match the BOSS SHILL?
+                // If the boss shills "rupture" but this is an "anomaly" specialist, they are boosting the wrong mechanic.
+                // Even if they match the TEAM, the TEAM is wrong for the BOSS.
+                if (boss.shill && DPS_ROLES.includes(boss.shill) && specialistType !== boss.shill) {
+                    score -= 40; // Penalize specialist for focusing on the wrong mechanic for this boss
+                } else {
+                    if (isARank(unit)) {
+                         score += 55; // Significantly increased to beat S-Rank Generalists
+                    } else {
+                         score += 65; // E.g., Lucia on rupture team beats Astra on rupture team
+                    }
+                }
+            } else {
+                // Mismatched specialist - severe penalty
+                // This ensures specialists lose to generalists when mismatched
+                score -= 80; // E.g., Lucia on attack team loses to Astra on attack team
+            }
+        } else {
+            // Generalist support/defense
             const hasTagPreferences = unit.synergy?.tags?.length > 0;
-            const hasRuptureSynergy = unit.synergy?.tags?.includes("rupture");
             
             if (!hasTagPreferences) {
-                // Universal support on rupture team - heavy penalty
-                score -= 60; // Pan/Lucia MUST beat Astra/Nicole
-            } else if (!hasRuptureSynergy) {
-                // Has preferences but wrong type (e.g., ice support on rupture)
-                score -= 35;
+                // Pure generalist (no tag preferences at all) - e.g., Caesar, Ben
+                // These are flexible but never optimal
+                const teamDPSTypes = dpsUnits.map(getDPSType).filter(t => t !== null);
+                if (teamDPSTypes.length > 0) {
+                    score -= 15; // Small penalty for not being specialized
+                }
+            } else {
+                // Partial generalist (has preferences but not a specialist)
+                // E.g., Nicole (avoids rupture but not a specialist), Astra (no avoid)
+                const teamDPSTypes = dpsUnits.map(getDPSType).filter(t => t !== null);
+                const primaryDPSType = teamDPSTypes[0];
+                
+                // Check if preferences match team DPS
+                const matchesTeamDPS = unit.synergy?.tags?.includes(primaryDPSType);
+                const avoidsTeamDPS = unit.synergy?.avoid?.includes(primaryDPSType);
+                
+                if (avoidsTeamDPS) {
+                    // Generalist that avoids this DPS type - heavy penalty
+                    score -= 60; // E.g., Nicole on rupture team
+                } else if (matchesTeamDPS) {
+                    // Generalist with matching preference - small bonus but still loses to specialist
+                    score += 10; // Less than specialist bonus (40)
+                } else {
+                    // Generalist with non-matching preference - moderate penalty
+                    score -= 25; // E.g., element-focused support on wrong-element team
+                }
             }
-            // Rupture-specialized supports get no penalty (they're optimal)
         }
     }
     
     // Synergy scoring
     for (const unit of team) {
         const teammates = team.filter(t => t.numericId !== unit.numericId);
-        score += calculateSynergyScore(unit, teammates, boss);
+        score += calculateSynergyScore(unit, teammates, boss, lenient);
     }
     
     // DPS mixing penalty
     score += calculateDPSMixingPenalty(team);
     
     // Double stun penalty
+    // Two stunners without synergy is wasteful - you'd rather have support/defense
     if (stunUnits.length >= 2) {
         let hasStunSynergy = false;
+        
+        // Check for specific stun synergy:
+        // 1. Explicit unit synergy (one stunner lists the other in synergy.units)
+        // 2. Explicit tag synergy for 'stun' (one stunner lists 'stun' in synergy.tags)
+        // 3. DPS unit explicitly requests 'stun' synergy (rare, but possible)
+        
         for (let i = 0; i < stunUnits.length; i++) {
             for (let j = i + 1; j < stunUnits.length; j++) {
-                if (unitsHaveSynergy(stunUnits[i], stunUnits[j])) {
+                const s1 = stunUnits[i];
+                const s2 = stunUnits[j];
+                
+                // Check named synergy
+                if (s1.synergy?.units?.includes(s2.name) || s2.synergy?.units?.includes(s1.name)) {
                     hasStunSynergy = true;
                     break;
                 }
+                
+                // Check specific 'stun' tag synergy
+                // We do NOT count elemental tags here because sharing an element doesn't justify double stun
+                if (s1.synergy?.tags?.includes('stun') || s2.synergy?.tags?.includes('stun')) {
+                     hasStunSynergy = true;
+                     break;
+                }
             }
+            if (hasStunSynergy) break;
+            
             for (const dps of dpsUnits) {
                 if (dps.synergy?.tags?.includes("stun")) {
                     hasStunSynergy = true;
@@ -754,8 +964,9 @@ export function scoreTeamForBoss(team, boss, options = {}) {
                 }
             }
         }
+        
         if (!hasStunSynergy) {
-            score -= 30;
+            score -= 150; // Heavy penalty - double stun without synergy is inefficient and should be disqualified
         }
     }
     

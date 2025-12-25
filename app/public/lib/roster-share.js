@@ -16,6 +16,14 @@ function getDefaultOwned(unit) {
 }
 
 /**
+ * Get default universal/flex state for a unit
+ * Nicole defaults to universal (flex), all others default to false
+ */
+function getDefaultUniversal(unit) {
+    return unit.id === 'nicole';
+}
+
+/**
  * Encode roster state to a URL-safe string
  * Format: owned_limited|not_owned_others|universal
  * Then compressed with pako and base64url encoded
@@ -27,13 +35,14 @@ function getDefaultOwned(unit) {
 export function encodeRoster(unitStates, allUnits) {
     const ownedLimited = [];      // Limited S-ranks that ARE owned (non-default)
     const notOwnedOthers = [];    // Non-limited units that are NOT owned (non-default)
-    const universal = [];          // Any units marked as universal/flex
+    const universal = [];          // Any units marked as universal/flex (non-default)
     
     for (const unit of allUnits) {
         const state = unitStates[unit.id];
         if (!state) continue;
         
         const defaultOwned = getDefaultOwned(unit);
+        const defaultUniversal = getDefaultUniversal(unit);
         
         // Track non-default ownership
         if (state.owned && !defaultOwned) {
@@ -44,8 +53,8 @@ export function encodeRoster(unitStates, allUnits) {
             notOwnedOthers.push(unit.id);
         }
         
-        // Track universal (always non-default since default is false)
-        if (state.universal && state.owned) {
+        // Track universal if different from default
+        if (state.universal !== defaultUniversal && state.owned) {
             universal.push(unit.id);
         }
     }
@@ -121,8 +130,9 @@ export function decodeRoster(encoded, allUnits) {
     
     for (const unit of allUnits) {
         const defaultOwned = getDefaultOwned(unit);
+        const defaultUniversal = getDefaultUniversal(unit);
         let owned = defaultOwned;
-        let universal = false;
+        let universal = defaultUniversal;
         
         // Apply deltas
         if (ownedLimited.has(unit.id)) {

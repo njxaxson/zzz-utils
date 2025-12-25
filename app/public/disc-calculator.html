@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZZZ Disc Calculator</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <div id="header-container"></div>
+
+        <main>
+            <!-- Calculator Section -->
+            <section class="calculator-section">
+                <h3>Disc Target Configuration</h3>
+                <p class="section-description">
+                    Configure your ideal disc to calculate how many discs you'll need to generate on average.
+                </p>
+
+                <!-- Slot Selection -->
+                <div class="input-row">
+                    <div class="input-group">
+                        <label for="slot-select">Target Slot</label>
+                        <div id="slot-dropdown-container"></div>
+                    </div>
+
+                    <!-- Main Stat Selection (dynamic) -->
+                    <div class="input-group" id="mainstat-group">
+                        <label>Main Stat</label>
+                        <div id="mainstat-container">
+                            <!-- Will be populated dynamically -->
+                        </div>
+                        
+                        <!-- Tuning Calibrators (Conditional) -->
+                        <div class="calibrator-row" id="calibrator-section" style="display: none;">
+                            <label class="checkbox-label simple-checkbox">
+                                <input type="checkbox" id="use-calibrators">
+                                Use Tuning Calibrators:
+                            </label>
+                            <input type="number" id="calibrator-input" min="1" value="1" class="number-input inline-input" disabled>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Substat Selection -->
+                <div class="substat-section">
+                    <label class="filter-label">Target Substats</label>
+                    <p class="filter-hint">Select up to 4 substats that must appear on the disc. Stats that conflict with main stat are disabled.</p>
+                    <div class="substat-dropdowns">
+                        <div class="substat-dropdown-row">
+                            <label>Substat 1</label>
+                            <div id="substat1-container"></div>
+                        </div>
+                        <div class="substat-dropdown-row">
+                            <label>Substat 2</label>
+                            <div id="substat2-container"></div>
+                        </div>
+                        <div class="substat-dropdown-row">
+                            <label>Substat 3</label>
+                            <div id="substat3-container"></div>
+                        </div>
+                        <div class="substat-dropdown-row">
+                            <label>Substat 4</label>
+                            <div id="substat4-container"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Calculate Button -->
+                <button id="calculate-btn" class="run-btn">Calculate</button>
+            </section>
+
+            <!-- Loading Indicator -->
+            <div class="loading-overlay" id="loading-overlay" style="display: none;">
+                <div class="loading-spinner"></div>
+                <div class="loading-text">Running simulation...</div>
+            </div>
+
+            <!-- Results Section -->
+            <section class="results-section" id="results-section" style="display: none;">
+                <h3>Simulation Results</h3>
+                <div class="results-content">
+                    <div class="results-text">
+                        <!-- Summary Block -->
+                        <div class="result-block">
+                            <h4>Target Configuration</h4>
+                            <div id="target-summary"></div>
+                        </div>
+
+                        <!-- Statistics Block -->
+                        <div class="result-block">
+                            <h4>Statistics</h4>
+                            <div class="stat-line">
+                                <span class="stat-label">Average Discs Required</span>
+                                <span class="stat-value" id="result-average">—</span>
+                            </div>
+                            <div class="stat-line">
+                                <span class="stat-label">Standard Deviation</span>
+                                <span class="stat-value" id="result-stddev">—</span>
+                            </div>
+                            <div class="stat-line">
+                                <span class="stat-label">Simulations Run</span>
+                                <span class="stat-value" id="result-count">—</span>
+                            </div>
+                        </div>
+
+                        <!-- Interpretation Block -->
+                        <div class="result-block interpretation-block">
+                            <h4>Interpretation</h4>
+                            <p id="result-interpretation"></p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <div id="footer-container"></div>
+    </div>
+
+    <script type="module">
+        import { loadSharedComponents } from './lib/components.js';
+        loadSharedComponents('disc-calculator');
+    </script>
+    <script type="module" src="disc-calculator.js"></script>
+</body>
+</html>
+
+

@@ -86,9 +86,11 @@ function initializeUnitStates() {
         if (!unitStates[unit.id]) {
             // Default: Limited S-ranks are NOT owned, others ARE owned
             const defaultOwned = unit.rank === 'A' || (unit.rank === 'S' && !unit.limited);
+            // Default: Nicole is universal (flex), others are not
+            const defaultUniversal = unit.id === 'nicole';
             unitStates[unit.id] = {
                 owned: defaultOwned,
-                universal: false
+                universal: defaultUniversal
             };
         }
     }

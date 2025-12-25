@@ -73,7 +73,7 @@
         "tier": 1.0,
         "tags": ["anomaly", "fire", "calydon", "assist:evasive"],
         "join": ["anomaly", "calydon"],
-        "synergy": { "units": [], "tags": [], "avoid": [] }
+        "synergy": { "units": [], "tags": ["subdps"], "avoid": [] }
     },
     {
         "id": "caesar",
@@ -132,7 +132,7 @@
         "tier": 3.0,
         "tags": ["anomaly", "electric", "belobog", "assist:evasive"],
         "join": ["electric", "belobog"],
-        "synergy": { "units": [], "tags": [], "avoid": [] }
+        "synergy": { "units": [], "tags": ["subdps"], "avoid": [] }
     },
     {
         "id": "harumasa",
@@ -182,7 +182,7 @@
         "tier": 2.0,
         "tags": ["stun", "fire", "belobog", "assist:defensive"],
         "join": ["fire", "belobog", "rupture"],
-        "synergy": { "units": [], "tags": [], "avoid": [] }
+        "synergy": { "units": ["Evelyn"], "tags": [], "avoid": [] }
     },
     {
         "id": "komano",
@@ -269,7 +269,7 @@
         "tier": 0.0,
         "tags": ["attack", "fire", "obol", "assist:defensive"],
         "join": ["stun", "support"],
-        "synergy": { "units": ["Seed","SAnby"], "tags": ["attack"], "avoid": [] }
+        "synergy": { "units": ["Seed","SAnby"], "tags": ["attack","subdps"], "avoid": [] }
     },
     {
         "id": "pan-yinhu",
@@ -296,7 +296,7 @@
         "tier": 1.0,
         "tags": ["stun", "physical", "calydon", "assist:evasive"],
         "join": ["attack", "rupture", "calydon"],
-        "synergy": { "units": [], "tags": [], "avoid": [] }
+        "synergy": { "units": ["SAnby"], "tags": [], "avoid": [] }
     },
     {
         "id": "qingyi",
@@ -384,7 +384,7 @@
         "tier": 0.0,
         "tags": ["anomaly", "ether", "mockingbird", "assist:defensive"],
         "join": ["anomaly", "ether"],
-        "synergy": { "units": ["Astra", "Nicole"], "tags": ["anomaly"], "avoid": [] }
+        "synergy": { "units": ["Astra", "Nicole"], "tags": ["anomaly","subdps"], "avoid": [] }
     },
     {
         "id": "yanagi",

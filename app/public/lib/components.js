@@ -6,7 +6,8 @@
 const PAGE_TITLES = {
     'gacha': 'Gacha Odds Calculator',
     'team-builder': 'Team Builder',
-    'deadly-assault': 'Deadly Assault Team Builder'
+    'deadly-assault': 'Deadly Assault Team Builder',
+    'disc-calculator': 'Disc Calculator'
 };
 
 /**
