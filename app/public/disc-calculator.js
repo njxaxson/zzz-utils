@@ -165,6 +165,68 @@ function discMatchesTarget(disc, target) {
 }
 
 // ============================================================================
+// PROBABILITY HELPERS
+// ============================================================================
+
+function factorial(n) {
+    if (n === 0 || n === 1) return 1;
+    let result = 1;
+    for (let i = 2; i <= n; i++) result *= i;
+    return result;
+}
+
+function combination(n, k) {
+    if (k < 0 || k > n) return 0;
+    return factorial(n) / (factorial(k) * factorial(n - k));
+}
+
+/**
+ * Calculates the probability of getting at least 'needed' successes in 'rolls' trials
+ * P(X >= k) = sum_{i=k}^{n} C(n,i) * p^i * (1-p)^{n-i}
+ */
+function calculateProbability(rolls, needed, p = 0.25) {
+    if (needed <= 0) return 1.0;
+    if (rolls < needed) return 0.0;
+    
+    let prob = 0;
+    for (let i = needed; i <= rolls; i++) {
+        prob += combination(rolls, i) * Math.pow(p, i) * Math.pow(1 - p, rolls - i);
+    }
+    return prob;
+}
+
+/**
+ * Calculates the baseline probability for a fresh viable disc
+ * Adapts based on whether the target REQUIRES a 4-substat start
+ */
+function getBaselineProbability(target) {
+    // 1. Determine if this target forces a 4-substat start
+    // A 4-substat start is forced if:
+    // - We are looking for 4 specific substats
+    // - OR we need 5 upgrades total (can only happen with 5 rolls)
+    
+    const numGoalStats = Object.keys(target.substatGoals).length;
+    const totalUpgradesNeeded = Object.values(target.substatGoals).reduce((sum, val) => sum + val, 0);
+    
+    const requires4Lines = (numGoalStats >= 4) || (totalUpgradesNeeded >= 5);
+    
+    // 2. Set Max Rolls based on viability requirement
+    // If 4-lines required: we only accept 4-line discs, so baseline has 5 rolls
+    // If NOT required: we accept 3-line discs (most common), so baseline is conservative (4 upgrade rolls)
+    const maxRolls = requires4Lines ? 5 : 4;
+    
+    // 3. Estimate "p" (probability per roll)
+    // If looking for 1 specific stat: p = 0.25
+    // If looking for "any 2 stats": p = 0.5 (assuming both present)
+    // We approximate this by: num_goal_stats_present / 4
+    // For a fresh disc, we assume "best case viable scenario": all goal stats are present on the disc
+    // (Because non-viable discs are filtered out at Level 0 anyway)
+    const p = Math.min(numGoalStats / 4.0, 1.0);
+    
+    return calculateProbability(maxRolls, totalUpgradesNeeded, p);
+}
+
+// ============================================================================
 // SIMULATION
 // ============================================================================
 
@@ -214,16 +276,58 @@ function simulateUpgradeProcess(disc, target) {
         }
     }
     
+    // UPGRADE DECISION GATE (LEVEL 0): Check if initial 3-substat disc is worth upgrading
+    if (numSubstats === 3) {
+        const numGoalStats = Object.keys(target.substatGoals).length;
+        
+        // Count how many goal stats are already present on the disc
+        let matchingStats = 0;
+        for (const stat in target.substatGoals) {
+            if (currentUpgrades[stat] !== -1) { // stat is present
+                matchingStats++;
+            }
+        }
+        
+        // Decision logic based on number of desired substats
+        if (numGoalStats <= 2) {
+            // Looking for 1-2 substats: need at least 1 matching
+            if (matchingStats < 1) {
+                return { success: false, exp: 0, dennies: 0 };
+            }
+        } else if (numGoalStats === 3) {
+            // Looking for 3 substats: need at least 2 matching
+            if (matchingStats < 2) {
+                return { success: false, exp: 0, dennies: 0 };
+            }
+        } else if (numGoalStats >= 4) {
+            // Looking for 4 substats: must have at least 3 matching
+            // (Mathematically, need 3 of the 4 desired stats to roll the 4th)
+            if (matchingStats < 3) {
+                return { success: false, exp: 0, dennies: 0 };
+            }
+        }
+    }
+    
+    // DYNAMIC PROBABILITY: Calculate baseline probability for a fresh viable disc
+    const pFresh = getBaselineProbability(target);
+    
     const thresholds = [3, 6, 9, 12, 15];
     
     for (const threshold of thresholds) {
         // Calculate needed upgrades
         let neededTotal = 0;
         let allFound = true;
+        let possibleTargets = 0; // Number of "hit" zones on the disc
         
         for (const stat in target.substatGoals) {
             const goal = target.substatGoals[stat];
             const current = currentUpgrades[stat];
+            
+            // Is this stat on the disc?
+            if (current !== -1) {
+                possibleTargets++; // This is a valid target for upgrades
+            }
+            
             if (current === -1) {
                 neededTotal += goal;
                 allFound = false;
@@ -232,20 +336,64 @@ function simulateUpgradeProcess(disc, target) {
             }
         }
         
-        // Stop if goals met
+        // VICTORY LAP: If goals met, force upgrade to 15 and return success
         if (allFound && neededTotal === 0) {
-             return { success: true, exp: totalExp, dennies: totalDennies };
+             const remainingCost = getCost(currentLevel, 15);
+             return { 
+                 success: true, 
+                 exp: totalExp + remainingCost.exp, 
+                 dennies: totalDennies + remainingCost.dennies 
+             };
         }
         
         // Calculate remaining opportunities
         const pendingSteps = thresholds.filter(t => t > currentLevel);
         let futureUpgrades = 0;
+        let pCurrent = 0;
         
         if (numSubstats === 3) {
             // First step is reveal (0 upgrades)
             futureUpgrades = Math.max(0, pendingSteps.length - 1);
+            // Probability logic for 3-substat disc is complex (reveal + upgrades)
+            // For simplicity in this step, we'll let it pass to the reveal
+            // The probability check works best when we have 4 substats and are upgrading
+            pCurrent = 1.0; 
         } else {
+            // 4 substats: standard upgrades
             futureUpgrades = pendingSteps.length;
+            
+            // Calculate Current Probability
+            // p = chance per roll = (number of goal stats present) / 4
+            const pRoll = possibleTargets / 4.0;
+            pCurrent = calculateProbability(futureUpgrades, neededTotal, pRoll);
+            
+            // RISK MANAGEMENT: Compare pCurrent vs pFresh
+            // Rule: If pCurrent >= pFresh, ALWAYS CONTINUE.
+            // If pCurrent < pFresh, CONSIDER STOPPING based on cost and rarity.
+            if (pCurrent < pFresh) {
+                // 1. Determine strictness based on level (cost)
+                let strictness = 0;
+                if (currentLevel < 9) {
+                    strictness = 0.5; // Lenient early on (allow 50% of baseline)
+                } else {
+                    strictness = 0.8; // Strict later on (require 80% of baseline)
+                }
+                
+                // 2. Adjust for Main Stat Rarity (Search Cost Bias)
+                // If main stat is rare (Slots 4-6 specific), we are more patient (lower threshold)
+                // because replacing the disc costs significant Hi-Fi.
+                let rarityBias = 1.0;
+                if (target.slot >= 4 && target.mainStats.length > 0) {
+                    rarityBias = 0.3; // Significantly lower the bar for rare main stats
+                }
+                
+                const threshold = pFresh * strictness * rarityBias;
+                
+                if (pCurrent < threshold) {
+                    // Fold
+                    return { success: false, exp: totalExp, dennies: totalDennies };
+                }
+            }
         }
         
         if (neededTotal > futureUpgrades) {
