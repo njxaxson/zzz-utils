@@ -65,7 +65,7 @@ let filters = {
     dpsRoles: [],         // Array of selected DPS roles
     minSRank: 0,          // Minimum S-rank count
     maxTier: 99,          // Maximum unit tier allowed
-    teamsPerArchetype: 1, // Number of teams to show per archetype (element + DPS type)
+    teamsPerArchetype: 2, // Number of teams to show per archetype (element + DPS type)
     mustInclude: [],      // Unit IDs that must be included
     exclude: []           // Unit IDs to exclude
 };
@@ -861,7 +861,7 @@ function clearFilters() {
         dpsRoles: [],
         minSRank: 0,
         maxTier: 99,
-        teamsPerArchetype: 1,
+        teamsPerArchetype: 2,
         mustInclude: [],
         exclude: []
     };
@@ -1093,23 +1093,13 @@ function selectBestTeams(teams, availableUnits) {
                         return b.score - a.score;
                     });
             } else {
-                // For attack/rupture: prefer teams with more units matching element
-                // Then sort by global team score
+                // For attack/rupture: prefer teams with 2+ units matching element
+                // Sort by global team score (treating 2-element and 3-element matches as equal candidates)
                 const teamsWithGoodElement = matchingTeams
                     .filter(teamData => countUnitsWithElement(teamData.team, element) >= 2)
-                    .map(teamData => ({
-                        ...teamData,
-                        elementCount: countUnitsWithElement(teamData.team, element)
-                    }))
-                    .sort((a, b) => {
-                        // Primary: more matching units (3 fire > 2 fire)
-                        if (a.elementCount !== b.elementCount) {
-                            return b.elementCount - a.elementCount;
-                        }
-                        // Tiebreaker: global team score
-                        return b.score - a.score;
-                    });
+                    .sort((a, b) => b.score - a.score); // Sort purely by global score
                 
+                // Fallback to rainbow teams only if no cohesive teams exist
                 rankedTeams = teamsWithGoodElement.length > 0 ? teamsWithGoodElement : matchingTeams.sort((a, b) => b.score - a.score);
             }
             
