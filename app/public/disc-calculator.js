@@ -676,6 +676,8 @@ function handleUpgradeChange(index, newValue) {
         upgradeHistory.push(index);
     }
     upgradeHistory = upgradeHistory.filter(i => selectedUpgrades[i] > 0);
+    
+    saveState();
 }
 
 function initSubstatDropdowns() {
@@ -769,6 +771,7 @@ function renderSubstatDropdown(index, container) {
             }
             
             renderSubstatDropdowns(); // Re-render all to update disabled options
+            saveState();
         }
     });
     
@@ -1035,6 +1038,9 @@ function showLoading(show) {
 // ============================================================================
 
 function runCalculation() {
+    // Save state before running calculation
+    saveState();
+    
     // Build target substats array and goals
     const targetSubstats = [];
     const substatGoals = {};
@@ -1099,37 +1105,76 @@ function loadState() {
         
         const state = JSON.parse(saved);
         
+        // Restore slot selection
         if (state.slot) {
             selectedSlot = state.slot;
-            initSlotDropdown();
+            // Update the dropdown value without triggering onChange
+            if (slotDropdown) {
+                const index = slotDropdown.options.findIndex(opt => opt.value === state.slot);
+                if (index >= 0) {
+                    slotDropdown.selectedValue = state.slot;
+                    slotDropdown.selectedLabel = slotDropdown.options[index].label;
+                    slotDropdown.display.textContent = slotDropdown.selectedLabel;
+                    slotDropdown.display.appendChild(slotDropdown.arrow);
+                    slotDropdown.optionElements.forEach((el, i) => {
+                        el.classList.toggle('selected', i === index);
+                    });
+                }
+            }
         }
         
+        // Restore main stats selection
         if (state.mainStats && Array.isArray(state.mainStats)) {
-            selectedMainStats = state.mainStats;
-            renderMainStatSelector();
+            selectedMainStats = [...state.mainStats];
         }
         
-        if (state.substats && Array.isArray(state.substats)) selectedSubstats = state.substats;
-        if (state.upgrades && Array.isArray(state.upgrades)) selectedUpgrades = state.upgrades;
+        // Restore substats and upgrades
+        if (state.substats && Array.isArray(state.substats)) {
+            selectedSubstats = [...state.substats];
+        }
+        if (state.upgrades && Array.isArray(state.upgrades)) {
+            selectedUpgrades = [...state.upgrades];
+        }
         
+        // Update UI components
+        renderMainStatSelector();
         renderSubstatDropdowns();
         
+        // Restore upgrade widget values
         selectedUpgrades.forEach((val, i) => {
-            if (upgradeWidgets[i]) upgradeWidgets[i].setValue(val);
+            if (upgradeWidgets[i]) {
+                upgradeWidgets[i].setValue(val);
+                upgradeWidgets[i].setDisabled(selectedSubstats[i] === '');
+            }
         });
         
+        // Rebuild upgrade history based on current upgrades
+        upgradeHistory = [];
+        selectedUpgrades.forEach((val, i) => {
+            if (val > 0) {
+                upgradeHistory.push(i);
+            }
+        });
+        
+        // Restore calibrator settings
         if (typeof state.useCalibrators === 'boolean') {
             useCalibrators = state.useCalibrators;
             const cb = document.getElementById('use-calibrators');
             if (cb) cb.checked = useCalibrators;
-            const inp = document.getElementById('calibrator-input');
-            if (inp) inp.disabled = !useCalibrators;
         }
         
-        if (typeof state.maxCalibrators === 'number') {
+        if (typeof state.maxCalibrators === 'number' && state.maxCalibrators > 0) {
             maxCalibrators = state.maxCalibrators;
             const inp = document.getElementById('calibrator-input');
-            if (inp && maxCalibrators > 0) inp.value = maxCalibrators;
+            if (inp) {
+                inp.value = maxCalibrators;
+                inp.disabled = !useCalibrators;
+            }
+        } else {
+            const inp = document.getElementById('calibrator-input');
+            if (inp) {
+                inp.disabled = !useCalibrators;
+            }
         }
         
         updateCalibratorVisibility();
@@ -1196,6 +1241,9 @@ function init() {
     initSlotDropdown();
     initSubstatDropdowns();
     
+    // Load saved state from localStorage
+    loadState();
+    
     // Buttons
     const calcBtn = document.getElementById('calculate-btn');
     if (calcBtn) calcBtn.addEventListener('click', runCalculation);
@@ -1230,6 +1278,7 @@ function init() {
             } else {
                 maxCalibrators = 0;
             }
+            saveState();
         });
         
         calibratorInput.addEventListener('change', (e) => {
@@ -1239,6 +1288,7 @@ function init() {
                 e.target.value = 1;
             }
             maxCalibrators = val;
+            saveState();
         });
     }
     
