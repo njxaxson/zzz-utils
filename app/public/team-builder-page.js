@@ -42,43 +42,6 @@ function teamHasMatchingDPS(team, targetElement, targetDpsType) {
     return false;
 }
 
-/**
- * Create a synthetic boss for a specific element + DPS type combination.
- * The boss is weak to the target element, shills the target DPS type,
- * and is ANTI the other DPS types.
- * 
- * For attack: Also RESISTS other elements (want on-element stunners)
- * For anomaly: NO resistances (dual-element teams are common)
- * For rupture: NO resistances (double-support compositions are common)
- *              REQUIRES 2 defensive assists (favors Pan/Lucia over Astra)
- */
-function createSyntheticBoss(element, dpsType) {
-    // Anti the other two DPS types to pigeonhole teams into the correct cell
-    const allDpsTypes = ['attack', 'anomaly', 'rupture'];
-    const antiTypes = allDpsTypes.filter(t => t !== dpsType);
-    
-    // Only attack teams need element resistances (to favor on-element stunners)
-    // Anomaly and rupture teams have more flexible compositions
-    let resistedElements = [];
-    if (dpsType === 'attack') {
-        const allElements = ['fire', 'ice', 'electric', 'physical', 'ether'];
-        resistedElements = allElements.filter(e => e !== element);
-    }
-    
-    // Rupture teams typically need 2 defensive assists (Pan/Lucia style)
-    const assistsRequired = dpsType === 'rupture' ? 2 : 0;
-    
-    return {
-        name: `${element}-${dpsType}`,
-        weaknesses: element ? [element] : [],
-        resistances: resistedElements,
-        shill: dpsType,
-        anti: antiTypes,
-        favored: [],
-        assists: assistsRequired
-    };
-}
-
 // ============================================================================
 // STATE
 // ============================================================================
@@ -102,6 +65,7 @@ let filters = {
     dpsRoles: [],         // Array of selected DPS roles
     minSRank: 0,          // Minimum S-rank count
     maxTier: 99,          // Maximum unit tier allowed
+    teamsPerArchetype: 1, // Number of teams to show per archetype (element + DPS type)
     mustInclude: [],      // Unit IDs that must be included
     exclude: []           // Unit IDs to exclude
 };
@@ -431,6 +395,14 @@ function applyFilterStates() {
     if (maxTierGroup) {
         maxTierGroup.querySelectorAll('.filter-btn').forEach(btn => {
             btn.classList.toggle('active', parseFloat(btn.dataset.value) === filters.maxTier);
+        });
+    }
+    
+    // Teams Per Archetype buttons
+    const teamsPerArchetypeGroup = document.querySelector('[data-filter="teams-per-archetype"]');
+    if (teamsPerArchetypeGroup) {
+        teamsPerArchetypeGroup.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.classList.toggle('active', parseInt(btn.dataset.value) === filters.teamsPerArchetype);
         });
     }
     
@@ -875,6 +847,9 @@ function handleButtonGroupClick(group, clickedBtn) {
         case 'max-tier':
             filters.maxTier = value;
             break;
+        case 'teams-per-archetype':
+            filters.teamsPerArchetype = value;
+            break;
     }
     
     saveFiltersToStorage();
@@ -886,6 +861,7 @@ function clearFilters() {
         dpsRoles: [],
         minSRank: 0,
         maxTier: 99,
+        teamsPerArchetype: 1,
         mustInclude: [],
         exclude: []
     };
@@ -1026,215 +1002,191 @@ function selectBestTeams(teams, availableUnits) {
     const availableElements = getAvailableElements(availableUnits);
     const availableDpsTypes = getAvailableDpsTypes(availableUnits);
     
-    // Build grid: element -> dpsType -> best team
-    const grid = {};
-    const allGridTeams = new Map(); // label -> teamData (to avoid duplicates)
+    // Use a neutral boss for global scoring (no element bias)
+    const neutralBoss = {
+        name: 'neutral',
+        weaknesses: [],
+        resistances: [],
+        shill: null,
+        anti: [],
+        favored: [],
+        assists: 0
+    };
     
-    // Step 1: Populate the grid with best team for each (element, dpsType) cell
+    // Step 1: Score all teams globally with consistent scoring
+    const scoredTeams = teams.map(({ label, team }) => {
+        const score = scoreTeamForBoss(team, neutralBoss, { lenient: true });
+        return { label, team, score };
+    }).filter(t => t.score > 0)
+      .sort((a, b) => b.score - a.score);
+    
+    // Step 2: Build grid by finding highest-ranked teams for each archetype
+    const grid = {};
+    const usedTeams = new Set(); // Track which teams are already in the grid
+    
     for (const element of availableElements) {
         grid[element] = {};
-        
         for (const dpsType of availableDpsTypes) {
-            const boss = createSyntheticBoss(element, dpsType);
+            grid[element][dpsType] = []; // Array to hold multiple teams
+        }
+    }
+    
+    // Helper to count how many units in a team have a specific element
+    const countUnitsWithElement = (team, element) => {
+        return team.filter(u => u.tags.includes(element)).length;
+    };
+    
+    // Helper to score anomaly teams for a specific element archetype
+    const scoreAnomalyTeam = (team, element) => {
+        const anomalyUnits = team.filter(u => u.tags.includes('anomaly'));
+        
+        // Check if we have 2 different-element anomaly agents
+        const anomalyElements = new Set(anomalyUnits.map(u => getElement(u)));
+        const hasDualAnomaly = anomalyUnits.length >= 2 && anomalyElements.size >= 2;
+        
+        // Check if on-element anomaly is NOT a subdps
+        const onElementAnomaly = anomalyUnits.find(u => u.tags.includes(element));
+        const onElementIsMainDPS = onElementAnomaly && !onElementAnomaly.synergy?.tags?.includes('subdps');
+        
+        // Count element matches (tiebreaker)
+        const elementMatches = countUnitsWithElement(team, element);
+        
+        // Scoring (higher is better):
+        // 1000 points for dual anomaly
+        // 100 points for on-element being main DPS (not subdps)
+        // 1 point per matching element unit (tiebreaker)
+        let score = 0;
+        if (hasDualAnomaly) score += 1000;
+        if (onElementIsMainDPS) score += 100;
+        score += elementMatches;
+        
+        return score;
+    };
+    
+    // First pass: Prefer teams with 2+ units matching the archetype's element
+    // For anomaly archetypes, use special scoring that prioritizes dual-anomaly compositions
+    for (const element of availableElements) {
+        for (const dpsType of availableDpsTypes) {
+            // Get all teams that match this archetype
+            const matchingTeams = scoredTeams
+                .filter(teamData => !usedTeams.has(teamData.label))
+                .filter(teamData => teamHasMatchingDPS(teamData.team, element, dpsType));
             
-            // Filter to teams that have a DPS unit matching BOTH element AND DPS type
-            // e.g., Ice Anomaly cell needs a unit that is BOTH ice AND anomaly
-            const matchingTeams = teams.filter(({ team }) => {
-                return teamHasMatchingDPS(team, element, dpsType);
-            });
+            if (matchingTeams.length === 0) continue;
             
-            // Score matching teams against this specific boss
-            const scoredTeams = matchingTeams.map(({ label, team }) => {
-                const score = scoreTeamForBoss(team, boss, { lenient: true });
-                return { label, team, score, element, dpsType };
-            }).filter(t => t.score > 0)
-              .sort((a, b) => b.score - a.score);
+            let rankedTeams = [];
             
-            // Keep only the BEST team per cell (to avoid clutter)
-            if (scoredTeams.length > 0) {
-                grid[element][dpsType] = [scoredTeams[0]];
+            if (dpsType === 'anomaly') {
+                // Special handling for anomaly: prioritize dual anomaly with main DPS on-element
+                // Then sort by global team score as tiebreaker
+                rankedTeams = matchingTeams
+                    .map(teamData => ({
+                        ...teamData,
+                        anomalyScore: scoreAnomalyTeam(teamData.team, element)
+                    }))
+                    .sort((a, b) => {
+                        // Primary: anomaly score (dual anomaly, main DPS preference)
+                        if (a.anomalyScore !== b.anomalyScore) {
+                            return b.anomalyScore - a.anomalyScore;
+                        }
+                        // Tiebreaker: global team score
+                        return b.score - a.score;
+                    });
+            } else {
+                // For attack/rupture: prefer teams with more units matching element
+                // Then sort by global team score
+                const teamsWithGoodElement = matchingTeams
+                    .filter(teamData => countUnitsWithElement(teamData.team, element) >= 2)
+                    .map(teamData => ({
+                        ...teamData,
+                        elementCount: countUnitsWithElement(teamData.team, element)
+                    }))
+                    .sort((a, b) => {
+                        // Primary: more matching units (3 fire > 2 fire)
+                        if (a.elementCount !== b.elementCount) {
+                            return b.elementCount - a.elementCount;
+                        }
+                        // Tiebreaker: global team score
+                        return b.score - a.score;
+                    });
+                
+                rankedTeams = teamsWithGoodElement.length > 0 ? teamsWithGoodElement : matchingTeams.sort((a, b) => b.score - a.score);
+            }
+            
+            // Take up to teamsPerArchetype teams for this archetype
+            const teamsToAdd = rankedTeams.slice(0, filters.teamsPerArchetype);
+            
+            for (const teamData of teamsToAdd) {
+                grid[element][dpsType].push({
+                    ...teamData,
+                    element,
+                    dpsType
+                });
+                usedTeams.add(teamData.label);
             }
         }
     }
     
-    // Step 2: Collect unique teams from grid
+    // Second pass: Fill remaining empty archetypes (or add more teams to archetypes below limit)
+    for (const teamData of scoredTeams) {
+        if (usedTeams.has(teamData.label)) continue;
+        
+        // Find an archetype that still needs teams
+        let assigned = false;
+        for (const element of availableElements) {
+            for (const dpsType of availableDpsTypes) {
+                // Check if this archetype needs more teams
+                if (grid[element][dpsType].length >= filters.teamsPerArchetype) continue;
+                
+                // Check if team matches this archetype's criteria
+                if (teamHasMatchingDPS(teamData.team, element, dpsType)) {
+                    grid[element][dpsType].push({
+                        ...teamData,
+                        element,
+                        dpsType
+                    });
+                    usedTeams.add(teamData.label);
+                    assigned = true;
+                    break;
+                }
+            }
+            if (assigned) break;
+        }
+    }
+    
+    // Step 3: Collect all teams from grid
     const candidateTeams = new Map(); // label -> teamData
     
     for (const element of Object.keys(grid)) {
         for (const dpsType of Object.keys(grid[element])) {
             const cellTeams = grid[element][dpsType];
-            if (cellTeams) {
-                for (const teamData of cellTeams) {
-                    if (!candidateTeams.has(teamData.label)) {
-                        candidateTeams.set(teamData.label, teamData);
-                    }
+            for (const teamData of cellTeams) {
+                if (teamData && !candidateTeams.has(teamData.label)) {
+                    candidateTeams.set(teamData.label, teamData);
                 }
             }
         }
     }
     
-    // Step 3: Remove teams that are A-rank substitutions of better teams
-    const teamsToRemove = new Set();
-    const candidateList = Array.from(candidateTeams.values());
-    
-    for (let i = 0; i < candidateList.length; i++) {
-        for (let j = 0; j < candidateList.length; j++) {
-            if (i === j) continue;
-            
-            const teamA = candidateList[i];
-            const teamB = candidateList[j];
-            
-            // Check if teamA is an inferior version of teamB
-            if (isInferiorSubstitution(teamA.team, teamB.team)) {
-                teamsToRemove.add(teamA.label);
-            }
+    // Step 4: Ensure minimum team count by adding top teams not yet included
+    let nextTeamIndex = 0;
+    while (candidateTeams.size < MIN_TEAMS_TO_SHOW && nextTeamIndex < scoredTeams.length) {
+        const teamData = scoredTeams[nextTeamIndex];
+        if (!candidateTeams.has(teamData.label)) {
+            // Assign element/dpsType based on team composition
+            const element = getTeamElements(teamData.team)[0];
+            const dpsType = getTeamDpsType(teamData.team);
+            candidateTeams.set(teamData.label, {
+                ...teamData,
+                element,
+                dpsType
+            });
         }
+        nextTeamIndex++;
     }
     
-    // Remove inferior teams
-    for (const label of teamsToRemove) {
-        candidateTeams.delete(label);
-    }
-    
-    // Step 4: Track S-rank coverage from remaining teams
-    const coveredSRanks = new Set();
-    for (const teamData of candidateTeams.values()) {
-        teamData.team.forEach(u => {
-            if (u.rank === 'S') coveredSRanks.add(u.id);
-        });
-    }
-    
-    // Step 5: Add teams for uncovered S-ranks (but avoid redundant coverage)
-    const eligibleSRanks = getEligibleSRanks(teams, availableUnits);
-    
-    for (const sRankId of eligibleSRanks) {
-        if (coveredSRanks.has(sRankId)) continue;
-        
-        const sRankUnit = availableUnits.find(u => u.id === sRankId);
-        if (!sRankUnit) continue;
-        
-        const sRankElement = getElement(sRankUnit);
-        const sRankDpsType = getDpsTypeForUnit(sRankUnit);
-        const boss = createSyntheticBoss(sRankElement, sRankDpsType || 'attack');
-        
-        // Find teams containing this S-rank
-        const teamsWithSRank = teams.filter(({ team }) => 
-            team.some(u => u.id === sRankId)
-        );
-        
-        const scoredTeams = teamsWithSRank.map(({ label, team }) => {
-            const score = scoreTeamForBoss(team, boss, { lenient: true });
-            return { label, team, score, element: sRankElement, dpsType: sRankDpsType };
-        }).filter(t => t.score > 0)
-          .sort((a, b) => b.score - a.score);
-        
-        // Find a team that's not already in our list and not an inferior substitution
-        for (const teamData of scoredTeams) {
-            if (candidateTeams.has(teamData.label)) continue;
-            
-            // Check if this would be an inferior substitution
-            let isInferior = false;
-            for (const existingTeam of candidateTeams.values()) {
-                if (isInferiorSubstitution(teamData.team, existingTeam.team)) {
-                    isInferior = true;
-                    break;
-                }
-            }
-            
-            if (!isInferior) {
-                candidateTeams.set(teamData.label, teamData);
-                teamData.team.forEach(u => {
-                    if (u.rank === 'S') coveredSRanks.add(u.id);
-                });
-                break;
-            }
-        }
-    }
-    
-    // Step 6: Ensure minimum team count
-    if (candidateTeams.size < MIN_TEAMS_TO_SHOW) {
-        for (const element of availableElements) {
-            if (candidateTeams.size >= MIN_TEAMS_TO_SHOW) break;
-            
-            for (const dpsType of availableDpsTypes) {
-                if (candidateTeams.size >= MIN_TEAMS_TO_SHOW) break;
-                
-                const boss = createSyntheticBoss(element, dpsType);
-                
-                // Filter to teams that have a DPS unit matching both element and DPS type
-                const matchingTeams = teams.filter(({ team }) => {
-                    return teamHasMatchingDPS(team, element, dpsType);
-                });
-                
-                const scoredTeams = matchingTeams.map(({ label, team }) => {
-                    const score = scoreTeamForBoss(team, boss, { lenient: true });
-                    return { label, team, score, element, dpsType };
-                }).filter(t => t.score > 0)
-                  .sort((a, b) => b.score - a.score);
-                
-                for (const teamData of scoredTeams) {
-                    if (candidateTeams.size >= MIN_TEAMS_TO_SHOW) break;
-                    if (!candidateTeams.has(teamData.label)) {
-                        // Check not inferior
-                        let isInferior = false;
-                        for (const existingTeam of candidateTeams.values()) {
-                            if (isInferiorSubstitution(teamData.team, existingTeam.team)) {
-                                isInferior = true;
-                                break;
-                            }
-                        }
-                        if (!isInferior) {
-                            candidateTeams.set(teamData.label, teamData);
-                        }
-                    }
-                }
-            }
-        }
-    }
-    
-    // Convert to array and sort by score
-    return Array.from(candidateTeams.values())
-        .sort((a, b) => b.score - a.score);
-}
-
-/**
- * Check if teamA is an inferior substitution of teamB
- * (same team but with A-rank(s) instead of S-rank(s))
- */
-function isInferiorSubstitution(teamA, teamB) {
-    // Teams must have same size
-    if (teamA.length !== teamB.length) return false;
-    
-    // Count how many units are shared vs different
-    const idsA = new Set(teamA.map(u => u.id));
-    const idsB = new Set(teamB.map(u => u.id));
-    
-    let sharedCount = 0;
-    let aHasWorseUnit = false;
-    let bHasWorseUnit = false;
-    
-    for (const id of idsA) {
-        if (idsB.has(id)) {
-            sharedCount++;
-        }
-    }
-    
-    // Must share at least 2 units to be considered a substitution
-    if (sharedCount < 2) return false;
-    
-    // Find the differing units
-    const onlyInA = teamA.filter(u => !idsB.has(u.id));
-    const onlyInB = teamB.filter(u => !idsA.has(u.id));
-    
-    // If same number of different units, compare ranks
-    if (onlyInA.length !== onlyInB.length) return false;
-    
-    // Check if A's unique units are all A-rank and B's are all S-rank
-    const aUniqueARanks = onlyInA.filter(u => u.rank === 'A').length;
-    const bUniqueSRanks = onlyInB.filter(u => u.rank === 'S').length;
-    
-    // TeamA is inferior if its unique units are A-rank while B's are S-rank
-    return aUniqueARanks > 0 && bUniqueSRanks > 0 && aUniqueARanks >= bUniqueSRanks;
+    // Convert to array and return (already sorted by score)
+    return Array.from(candidateTeams.values());
 }
 
 /**
@@ -1245,21 +1197,6 @@ function getDpsTypeForUnit(unit) {
     if (unit.tags.includes('anomaly')) return 'anomaly';
     if (unit.tags.includes('rupture')) return 'rupture';
     return null;
-}
-
-function getEligibleSRanks(teams, availableUnits) {
-    const sRanksInTeams = new Set();
-    
-    // Find all S-ranks that appear in at least one team
-    for (const { team } of teams) {
-        for (const unit of team) {
-            if (unit.rank === 'S' && !filters.exclude.includes(unit.id)) {
-                sRanksInTeams.add(unit.id);
-            }
-        }
-    }
-    
-    return sRanksInTeams;
 }
 
 function getAvailableElements(availableUnits) {
@@ -1409,7 +1346,7 @@ function displayResults() {
  * Create a grid display with elements as rows and DPS types as columns
  */
 function createTeamGrid(teams) {
-    // Group teams by the cell they were selected for
+    // Group teams by the archetype they were selected for
     const teamsByCell = {};
     
     for (const teamData of teams) {
