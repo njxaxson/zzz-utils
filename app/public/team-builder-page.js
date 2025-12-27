@@ -13,6 +13,7 @@ import {
     generateShareUrl, 
     copyToClipboard 
 } from './lib/roster-share.js';
+import { addLongPressListener } from './lib/touch-utils.js';
 
 // ============================================================================
 // CONSTANTS
@@ -254,6 +255,19 @@ function renderUnitSections() {
 function renderUnitGrid(containerId, units) {
     const container = document.getElementById(containerId);
     container.innerHTML = units.map(unit => createUnitCard(unit)).join('');
+    
+    // Attach long press listeners for mobile context menu simulation
+    container.querySelectorAll('.unit-card').forEach(card => {
+        addLongPressListener(card, (e) => {
+            // Dispatch a contextmenu event that bubbles
+            const event = new MouseEvent('contextmenu', {
+                bubbles: true,
+                cancelable: true,
+                view: window
+            });
+            card.dispatchEvent(event);
+        });
+    });
 }
 
 function createUnitCard(unit) {
@@ -544,6 +558,14 @@ function setupEventListeners() {
     // Pagination
     document.getElementById('prev-page').addEventListener('click', () => changePage(-1));
     document.getElementById('next-page').addEventListener('click', () => changePage(1));
+
+    // Mode Toggle (Mobile)
+    document.querySelectorAll('.mode-toggle-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            document.querySelectorAll('.mode-toggle-btn').forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
+        });
+    });
 }
 
 // ============================================================================
@@ -611,6 +633,18 @@ function handleUnitClick(e) {
     const card = e.target.closest('.unit-card');
     if (!card) return;
     
+    // Check if we are in "Mark Flex" mode (Mobile only)
+    const flexBtn = document.querySelector('.mode-toggle-btn[data-mode="flex"]');
+    // Check if button exists, is active, and is visible (container not hidden)
+    const isFlexMode = flexBtn && 
+                       flexBtn.classList.contains('active') && 
+                       getComputedStyle(document.getElementById('mode-toggle-container')).display !== 'none';
+
+    if (isFlexMode) {
+        handleUnitRightClick(e);
+        return;
+    }
+
     const unitId = card.dataset.unitId;
     const state = unitStates[unitId];
     
