@@ -1036,8 +1036,19 @@ function selectBestTeams(teams, availableUnits) {
         return team.filter(u => u.tags.includes(element)).length;
     };
     
-    // Helper to score anomaly teams for a specific element archetype
-    const scoreAnomalyTeam = (team, element) => {
+    // Helper to check if anomaly team has preferred role pairing
+    const hasPreferredAnomalyPairing = (team, element) => {
+        const anomalyUnits = team.filter(u => u.tags.includes('anomaly'));
+        const onElementAnomaly = anomalyUnits.find(u => u.tags.includes(element));
+        
+        const supportUnits = team.filter(u => u.tags.includes('support'));
+        const hasOnElementSupport = supportUnits.some(u => u.tags.includes(element));
+        
+        return onElementAnomaly && hasOnElementSupport;
+    };
+    
+    // Helper to score anomaly teams for special cases (dual anomaly, subdps)
+    const scoreAnomalyTeamSpecial = (team, element) => {
         const anomalyUnits = team.filter(u => u.tags.includes('anomaly'));
         
         // Check if we have 2 different-element anomaly agents
@@ -1048,19 +1059,26 @@ function selectBestTeams(teams, availableUnits) {
         const onElementAnomaly = anomalyUnits.find(u => u.tags.includes(element));
         const onElementIsMainDPS = onElementAnomaly && !onElementAnomaly.synergy?.tags?.includes('subdps');
         
-        // Count element matches (tiebreaker)
-        const elementMatches = countUnitsWithElement(team, element);
-        
         // Scoring (higher is better):
         // 1000 points for dual anomaly
         // 100 points for on-element being main DPS (not subdps)
-        // 1 point per matching element unit (tiebreaker)
         let score = 0;
         if (hasDualAnomaly) score += 1000;
         if (onElementIsMainDPS) score += 100;
-        score += elementMatches;
         
         return score;
+    };
+    
+    // Helper to check if attack/rupture team has preferred role pairing
+    const hasPreferredAttackRupturePairing = (team, element) => {
+        // Find DPS and stun units
+        const dpsUnits = team.filter(u => u.tags.includes('attack') || u.tags.includes('rupture'));
+        const stunUnits = team.filter(u => u.tags.includes('stun'));
+        
+        // Check if DPS + stun both match the element
+        const hasOnElementDPS = dpsUnits.some(u => u.tags.includes(element));
+        const hasOnElementStun = stunUnits.some(u => u.tags.includes(element));
+        return hasOnElementDPS && hasOnElementStun;
     };
     
     // First pass: Prefer teams with 2+ units matching the archetype's element
@@ -1077,30 +1095,42 @@ function selectBestTeams(teams, availableUnits) {
             let rankedTeams = [];
             
             if (dpsType === 'anomaly') {
-                // Special handling for anomaly: prioritize dual anomaly with main DPS on-element
-                // Then sort by global team score as tiebreaker
+                // Special handling for anomaly: prioritize DPS + support matching element
+                // Then sort by global team score, with special scoring for dual anomaly as final tiebreaker
                 rankedTeams = matchingTeams
                     .map(teamData => ({
                         ...teamData,
-                        anomalyScore: scoreAnomalyTeam(teamData.team, element)
+                        hasPreferredPairing: hasPreferredAnomalyPairing(teamData.team, element),
+                        anomalySpecialScore: scoreAnomalyTeamSpecial(teamData.team, element)
                     }))
                     .sort((a, b) => {
-                        // Primary: anomaly score (dual anomaly, main DPS preference)
-                        if (a.anomalyScore !== b.anomalyScore) {
-                            return b.anomalyScore - a.anomalyScore;
+                        // Primary: has preferred pairing (DPS + support)
+                        if (a.hasPreferredPairing !== b.hasPreferredPairing) {
+                            return b.hasPreferredPairing - a.hasPreferredPairing;
                         }
-                        // Tiebreaker: global team score
-                        return b.score - a.score;
+                        // Secondary: global team score
+                        if (a.score !== b.score) {
+                            return b.score - a.score;
+                        }
+                        // Tertiary: special anomaly scoring (dual anomaly, subdps handling)
+                        return b.anomalySpecialScore - a.anomalySpecialScore;
                     });
             } else {
-                // For attack/rupture: prefer teams with 2+ units matching element
-                // Sort by global team score (treating 2-element and 3-element matches as equal candidates)
-                const teamsWithGoodElement = matchingTeams
-                    .filter(teamData => countUnitsWithElement(teamData.team, element) >= 2)
-                    .sort((a, b) => b.score - a.score); // Sort purely by global score
-                
-                // Fallback to rainbow teams only if no cohesive teams exist
-                rankedTeams = teamsWithGoodElement.length > 0 ? teamsWithGoodElement : matchingTeams.sort((a, b) => b.score - a.score);
+                // For attack/rupture: prioritize DPS + stun matching element
+                // Then sort by global team score
+                rankedTeams = matchingTeams
+                    .map(teamData => ({
+                        ...teamData,
+                        hasPreferredPairing: hasPreferredAttackRupturePairing(teamData.team, element)
+                    }))
+                    .sort((a, b) => {
+                        // Primary: has preferred pairing (DPS + stun)
+                        if (a.hasPreferredPairing !== b.hasPreferredPairing) {
+                            return b.hasPreferredPairing - a.hasPreferredPairing;
+                        }
+                        // Secondary: global team score (this ensures Koleda/Komano/Lucia beats Koleda/Komano/Lucy)
+                        return b.score - a.score;
+                    });
             }
             
             // Take up to teamsPerArchetype teams for this archetype
