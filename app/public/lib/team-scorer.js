@@ -643,6 +643,9 @@ export function scoreTeamForBoss(team, boss, options = {}) {
             return anomalyUnits.some(an => getElement(an) === attackerElement);
         });
         
+        // Check for Stunless composition (e.g. Ye Shunguong)
+        const hasStunlessAttacker = attackers.some(a => a.synergy?.tags?.includes("stunless"));
+
         if (hasAnomalyAttackComp && anomalyUnits.length > 0) {
             // Monoshock: attacker + anomaly = valid hybrid, no stunner needed
             log('Anomaly-attack composition - stunner not required', 5);
@@ -650,6 +653,9 @@ export function scoreTeamForBoss(team, boss, options = {}) {
         } else if (stunUnits.length >= 1) {
             log('Attack team with stunner', 15);
             score += 15;
+        } else if (hasStunlessAttacker && boss.shill !== "stun") {
+            log('Stunless attack unit present - stunner not required', 5);
+            score += 5;
         } else {
             log('Attack team without stunner', -60);
             score -= 60; // Near-disqualifying: normal attack teams need stunner

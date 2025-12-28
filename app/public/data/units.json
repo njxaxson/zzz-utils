@@ -404,7 +404,7 @@
         "tier" : 0.0,
         "tags" : ["attack", "physical", "yunkui", "title", "assist:defensive"],
         "join" : ["support", "defense"],
-        "synergy": { "units": ["Zhao"], "tags": [], "avoid": [] }
+        "synergy": { "units": ["Zhao"], "tags": ["stunless"], "avoid": [] }
     },
     {
         "id": "yidhari",
