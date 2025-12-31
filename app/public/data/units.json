@@ -266,7 +266,7 @@
         "name": "Orphie",
         "rank": "S",
         "limited": true,
-        "tier": 0.0,
+        "tier": 0.5,
         "tags": ["attack", "fire", "obol", "assist:defensive"],
         "join": ["stun", "support"],
         "synergy": { "units": ["Seed","SAnby"], "tags": ["attack","subdps"], "avoid": [] }
@@ -441,7 +441,7 @@
         "name" : "Zhao",
         "rank" : "S",
         "limited" : true,
-        "tier" : 1.5,
+        "tier" : 1.0,
         "tags" : ["defense", "ice", "krampus", "assist:defensive"],
         "join" : ["attack", "anomaly", "krampus"],
         "synergy": { "units": ["Ye Shunguong"], "tags": [], "avoid": [] }

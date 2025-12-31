@@ -66,15 +66,24 @@ async function main() {
 
     // Optional: Specify a subset of units to use (whitelist)
     // Use one of the following options:
-    const INCLUDED_UNITS = allUnits.map(u => u.name);           // Full roster (all units)
-    // const INCLUDED_UNITS = myUnits.map(u => u.name);         // Personal roster (from roster.json)
-    // const INCLUDED_UNITS = ["Ellen", "Harumasa", ...];       // Custom list
+    //const INCLUDED_UNITS = allUnits.map(u => u.name);           // Full roster (all units)
+    const INCLUDED_UNITS = myUnits.map(u => u.name);         // Personal roster (from roster.json)
+     //const INCLUDED_UNITS = ["Lighter", "Koleda", "Banyue", "Lucy", "Ceasar", "Lucia"];       // Custom list
 
     // Universal units: Can join ANY 2-person team to form a 3-person team
     const UNIVERSAL_UNITS = [
         "Nicole",
-        // "Astra",  // Not in test roster
     ];
+
+    const NEUTRAL_BOSS = {
+        name: 'Synthetic Neutral Boss',
+        weaknesses: [],
+        resistances: [],
+        shill: null,
+        anti: [],
+        favored: [],
+        assists: 0
+    };
 
     // ============================================================================
     // MAIN EXECUTION
@@ -109,6 +118,10 @@ async function main() {
             threeCharTeams[label] = allTeams[label];
         }
     }
+    // console.log("Trio Teams:")
+    // Object.keys(threeCharTeams).forEach(label => console.log(`\t${label}`));
+    // console.log("Due Teams:")
+    // Object.keys(twoCharTeams).forEach(label => console.log(`\t${label}`));
     
     // Extend 2-person teams with universal units
     const universalUnitObjects = availableUnits.filter(u => UNIVERSAL_UNITS.includes(u.name));
@@ -126,9 +139,12 @@ async function main() {
     const teamLabels = Object.keys(threeCharTeams);
     console.log(`Total 3-character teams: ${teamLabels.length}\n`);
     console.log("=".repeat(60) + "\n");
+    // teamLabels.forEach(label => console.log(`\t${label}`));
     
     // Filter bosses if --filter specified
-    let filteredBosses = bosses;
+    let filteredBosses = 
+        // bosses;
+        [NEUTRAL_BOSS];
     if (CLI_OPTIONS.filter) {
         filteredBosses = bosses.filter(b => 
             b.name.toLowerCase().includes(CLI_OPTIONS.filter) ||
