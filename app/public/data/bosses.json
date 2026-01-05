@@ -119,6 +119,17 @@
         "anti": ["anomaly"],
         "assists": 3,
         "favored": ["Dialyn", "Ye Shunguong"]
+    },
+    {
+        "id": "primordial-nightmare",
+        "name": "Primordial Nightmare",
+        "shortName": "Primordial Nightmare",
+        "weaknesses": ["physical"],
+        "resistances": ["ice", "ether"],
+        "shill": null,
+        "anti": ["rupture"],
+        "assists": 0,
+        "favored": ["Ye Shunguong"]
     }
 ]
 

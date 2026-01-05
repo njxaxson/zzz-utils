@@ -66,8 +66,8 @@ async function main() {
 
     // Optional: Specify a subset of units to use (whitelist)
     // Use one of the following options:
-    //const INCLUDED_UNITS = allUnits.map(u => u.name);           // Full roster (all units)
-    const INCLUDED_UNITS = myUnits.map(u => u.name);         // Personal roster (from roster.json)
+    const INCLUDED_UNITS = allUnits.map(u => u.name);           // Full roster (all units)
+    //const INCLUDED_UNITS = myUnits.map(u => u.name);         // Personal roster (from roster.json)
      //const INCLUDED_UNITS = ["Lighter", "Koleda", "Banyue", "Lucy", "Ceasar", "Lucia"];       // Custom list
 
     // Universal units: Can join ANY 2-person team to form a 3-person team
@@ -143,8 +143,8 @@ async function main() {
     
     // Filter bosses if --filter specified
     let filteredBosses = 
-        // bosses;
-        [NEUTRAL_BOSS];
+        bosses;
+        //[NEUTRAL_BOSS];
     if (CLI_OPTIONS.filter) {
         filteredBosses = bosses.filter(b => 
             b.name.toLowerCase().includes(CLI_OPTIONS.filter) ||

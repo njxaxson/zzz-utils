@@ -90,6 +90,10 @@ export function calculateSynergyScore(unit, teammates, boss, lenient = false) {
             if (synergy.units.includes(teammate.name)) {
                 score += 5;
             }
+            if(unitsHaveMutualSynergy(unit, teammate)) {
+                //Additional bonus for mutual synergy, particularly for enabling DPS units 
+                score += isDPS(unit) ? 25 : 5;
+            }
         }
     }
     
@@ -271,6 +275,12 @@ export function unitsHaveSynergy(unit1, unit2) {
         unit2.synergy?.tags?.some(tag => unit1.tags.includes(tag));
     
     return u1SynergizesU2 || u2SynergizesU1;
+}
+export function unitsHaveMutualSynergy(unit1, unit2) {
+    //This is an explicit tag-team duo bonus:
+    const u1SynergizesU2 = unit1.synergy?.units?.includes(unit2.name);
+    const u2SynergizesU1 = unit2.synergy?.units?.includes(unit1.name);
+    return u1SynergizesU2 && u2SynergizesU1;
 }
 
 export function calculateDPSMixingPenalty(team) {
@@ -651,11 +661,16 @@ export function scoreTeamForBoss(team, boss, options = {}) {
             log('Anomaly-attack composition - stunner not required', 5);
             score += 5;
         } else if (stunUnits.length >= 1) {
-            log('Attack team with stunner', 15);
-            score += 15;
+            if(hasStunlessAttacker && boss.shill !== "stun") {
+                log('Stunless attack unit present - stunner not required', -10);
+                score -= 10;
+            } else {
+                log('Attack team with stunner', 15);
+                score += 15;
+           }
         } else if (hasStunlessAttacker && boss.shill !== "stun") {
             log('Stunless attack unit present - stunner not required', 5);
-            score += 5;
+            score += 10;
         } else {
             log('Attack team without stunner', -60);
             score -= 60; // Near-disqualifying: normal attack teams need stunner
