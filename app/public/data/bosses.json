@@ -127,7 +127,7 @@
         "weaknesses": ["physical"],
         "resistances": ["ice", "ether"],
         "shill": null,
-        "anti": ["rupture"],
+        "anti": ["rupture", "anomaly"],
         "assists": 0,
         "favored": ["Ye Shunguong"]
     }
