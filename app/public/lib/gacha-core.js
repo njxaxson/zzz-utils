@@ -26,17 +26,28 @@ export const RESULT_NOTHING = 0;
  * Simulate a single character banner pull
  * @param {Object} state - Current pity/guarantee state (mutated)
  * @param {Object} tracker - Optional tracker for average calculations
+ * @param {boolean} useSoftPity - Whether to use undocumented soft-pity rates
  * @returns {number} Result constant
  */
-export function cpull(state, tracker = null) {
+export function cpull(state, tracker = null, useSoftPity = false) {
     state.cpity++;
+    state.apity++;
     const roll = Math.random();
-    if (state.cpity >= PITY_C || roll < RATE_S) {
+    
+    // Calculate S-rank rate (with soft-pity if enabled)
+    let sRate = RATE_S;
+    if (useSoftPity && state.cpity >= 74 && state.cpity < PITY_C) {
+        sRate = RATE_S + (state.cpity - 73) * 0.06;
+    }
+    
+    // Hard guarantee or S-rank roll
+    if (state.cpity >= PITY_C || roll < sRate) {
         if (tracker) {
             tracker.pulls += state.cpity;
             tracker.wins++;
         }
         state.cpity = 0;
+        state.apity = 0; // A-rank counter resets when S-rank is pulled
         if (state.cguaranteed || Math.random() < CFEATURED) {
             state.cguaranteed = false;
             return RESULT_FEATURED_S;
@@ -44,8 +55,16 @@ export function cpull(state, tracker = null) {
         //otherwise
         state.cguaranteed = true;
         return RESULT_STANDARD_S;
-    } else
-    if (state.apity >= PITY_A || roll < RATE_S + RATE_A) {
+    }
+    
+    // Calculate A-rank rate (with soft-pity if enabled)
+    let aRate = RATE_A;
+    if (useSoftPity && state.apity === 9) {
+        aRate = RATE_A + 0.5; // 57.2% instead of 7.2%
+    }
+    
+    // Hard guarantee or A-rank roll
+    if (state.apity >= PITY_A || roll < RATE_S + aRate) {
         state.apity = 0;
         if (state.aguaranteed || Math.random() < CFEATURED) {
             state.aguaranteed = false;
@@ -62,13 +81,24 @@ export function cpull(state, tracker = null) {
 /**
  * Simulate a single W-Engine banner pull
  * @param {Object} state - Current pity/guarantee state (mutated)
+ * @param {boolean} useSoftPity - Whether to use undocumented soft-pity rates
  * @returns {number} Result constant
  */
-export function wpull(state) {
+export function wpull(state, useSoftPity = false) {
     state.wpity++;
+    state.epity++;
     const roll = Math.random();
-    if (state.wpity >= PITY_W || roll < RATE_S) {
+    
+    // Calculate S-rank rate (with soft-pity if enabled)
+    let sRate = RATE_S;
+    if (useSoftPity && state.wpity >= 65 && state.wpity < PITY_W) {
+        sRate = RATE_S + (state.wpity - 64) * 0.06;
+    }
+    
+    // Hard guarantee or S-rank roll
+    if (state.wpity >= PITY_W || roll < sRate) {
         state.wpity = 0;
+        state.epity = 0; // A-rank counter resets when S-rank is pulled
         if (state.wguaranteed || Math.random() < WFEATURED) {
             state.wguaranteed = false;
             return RESULT_FEATURED_S;
@@ -76,8 +106,16 @@ export function wpull(state) {
         //otherwise
         state.wguaranteed = true;
         return RESULT_STANDARD_S;
-    } else
-    if (state.epity >= PITY_A || roll < RATE_S + RATE_A) {
+    }
+    
+    // Calculate A-rank rate (with soft-pity if enabled)
+    let aRate = RATE_A;
+    if (useSoftPity && state.epity === 9) {
+        aRate = RATE_A + 0.5; // 57.2% instead of 7.2%
+    }
+    
+    // Hard guarantee or A-rank roll
+    if (state.epity >= PITY_A || roll < RATE_S + aRate) {
         state.epity = 0;
         if (state.eguaranteed || Math.random() < WFEATURED) {
             state.eguaranteed = false;
@@ -130,39 +168,40 @@ export function simulate(context, tracker = null) {
     };
     let pulls = context.p;
     const tactic = context.tactic || TACTICS.ENGINE_FIRST;
+    const useSoftPity = context.useSoftPity || false;
     
     if (tactic === TACTICS.MINDSCAPES_FIRST) {
         // All mindscapes first, then all engines
         while (results.fc < context.c && pulls > 0) {
             pulls--;
-            const result = cpull(state, tracker);
+            const result = cpull(state, tracker, useSoftPity);
             ctally(result, results);
         }
         while (results.fw < context.w && pulls > 0) {
             pulls--;
-            const result = wpull(state);
+            const result = wpull(state, useSoftPity);
             wtally(result, results);
         }
     } else {
         // Default: engine-first (1 char, 1 engine, remaining chars, remaining engines)
         while (context.c > 0 && pulls > 0 && results.fc == 0) {
             pulls--;
-            const result = cpull(state, tracker);
+            const result = cpull(state, tracker, useSoftPity);
             ctally(result, results);
         }
         while (context.w > 0 && pulls > 0 && results.fw == 0) {
             pulls--;
-            const result = wpull(state);
+            const result = wpull(state, useSoftPity);
             wtally(result, results);
         }
         while (results.fc < context.c && pulls > 0) {
             pulls--;
-            const result = cpull(state, tracker);
+            const result = cpull(state, tracker, useSoftPity);
             ctally(result, results);
         }
         while (results.fw < context.w && pulls > 0) {
             pulls--;
-            const result = wpull(state);
+            const result = wpull(state, useSoftPity);
             wtally(result, results);
         }
     }

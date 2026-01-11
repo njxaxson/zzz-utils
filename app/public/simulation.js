@@ -28,6 +28,7 @@ const pityACInput = document.getElementById('pity-ac');
 const pityAWInput = document.getElementById('pity-aw');
 const guaranteeCInput = document.getElementById('guarantee-c');
 const guaranteeWInput = document.getElementById('guarantee-w');
+const useSoftPityInput = document.getElementById('use-soft-pity');
 const includeRefundsInput = document.getElementById('include-refunds');
 const showStandardInput = document.getElementById('show-standard');
 const showARankInput = document.getElementById('show-arank');
@@ -177,7 +178,8 @@ function runSimulation() {
                     guaranteeCInput.checked,
                     guaranteeWInput.checked
                 ],
-                tactic: pullTacticInput.value
+                tactic: pullTacticInput.value,
+                useSoftPity: useSoftPityInput.checked
             };
 
             // Validation
@@ -538,6 +540,7 @@ function saveInputs() {
         pityAW: pityAWInput.value,
         guaranteeC: guaranteeCInput.checked,
         guaranteeW: guaranteeWInput.checked,
+        useSoftPity: useSoftPityInput.checked,
         includeRefunds: includeRefundsInput.checked,
         showStandard: showStandardInput.checked,
         showARank: showARankInput.checked,
@@ -562,6 +565,7 @@ function loadInputs() {
         if (inputs.pityAW !== undefined) pityAWInput.value = inputs.pityAW;
         if (inputs.guaranteeC !== undefined) guaranteeCInput.checked = inputs.guaranteeC;
         if (inputs.guaranteeW !== undefined) guaranteeWInput.checked = inputs.guaranteeW;
+        if (inputs.useSoftPity !== undefined) useSoftPityInput.checked = inputs.useSoftPity;
         if (inputs.includeRefunds !== undefined) includeRefundsInput.checked = inputs.includeRefunds;
         if (inputs.showStandard !== undefined) showStandardInput.checked = inputs.showStandard;
         if (inputs.showARank !== undefined) showARankInput.checked = inputs.showARank;

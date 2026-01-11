@@ -38,6 +38,7 @@ async function main() {
     // OPTIONS
     // ============================================================================
     
+    const useSoftPity = true;                   // Use undocumented soft-pity rates
     const showStandardWins = context.p >= 300; // Show standard S-rank distribution
     const showDistributionA = false;            // Show A-rank distribution
     const includeRefunds = context.p > 100;     // Include A-rank refund estimates
@@ -47,6 +48,9 @@ async function main() {
             * 0.065); // Assuming 1/10 is guaranteed A-rank, 65% are characters = refund
             //* 0.031); // Lower-end statistical rate-of-return for M6+ A residual signals
     }
+    
+    // Add soft-pity option to context
+    context.useSoftPity = useSoftPity;
 
     // ============================================================================
     // VALIDATION
