@@ -101,10 +101,12 @@ async function loadData() {
 function initializeUnitStates() {
     for (const unit of allUnits) {
         if (!unitStates[unit.id]) {
-            // Default: Limited S-ranks are NOT owned, others ARE owned
-            const defaultOwned = unit.rank === 'A' || (unit.rank === 'S' && !unit.limited);
-            // Default: Nicole is universal (flex), others are not
-            const defaultUniversal = unit.id === 'nicole';
+            // Unavailable units are always not owned
+            const isAvailable = unit.available !== false;
+            // Default: Limited S-ranks are NOT owned, others ARE owned (only if available)
+            const defaultOwned = isAvailable && (unit.rank === 'A' || (unit.rank === 'S' && !unit.limited));
+            // Default: Nicole is universal (flex), others are not (only if available)
+            const defaultUniversal = isAvailable && unit.id === 'nicole';
             unitStates[unit.id] = {
                 owned: defaultOwned,
                 universal: defaultUniversal
@@ -275,9 +277,11 @@ function createUnitCard(unit) {
     const initials = getInitials(unit.name);
     const element = getUnitElement(unit);
     const imageUrl = getCharacterImageUrl(unit.id);
+    const isAvailable = unit.available !== false;
     
     const classes = ['unit-card'];
     classes.push(`element-${element}`);
+    if (!isAvailable) classes.push('unavailable');
     if (!state.owned) classes.push('not-owned');
     if (state.universal) classes.push('universal');
     
@@ -285,11 +289,13 @@ function createUnitCard(unit) {
         ? `<img class="unit-avatar" src="${imageUrl}" alt="${unit.name}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="unit-initials" style="display:none">${initials}</span>`
         : `<span class="unit-initials">${initials}</span>`;
     
+    const titleText = !isAvailable ? `${unit.name} (Unavailable)` : `${unit.name}${state.universal ? ' (Flex)' : ''}`;
+    
     return `
         <button type="button" class="${classes.join(' ')}" 
                 data-unit-id="${unit.id}" 
                 data-element="${element}"
-                title="${unit.name}${state.universal ? ' (Flex)' : ''}">
+                title="${titleText}">
             ${avatarHtml}
             <span class="unit-name">${unit.name}</span>
             ${state.universal ? '<span class="flex-badge">FLEX</span>' : ''}
@@ -300,7 +306,9 @@ function createUnitCard(unit) {
 function renderMustIncludeDropdown() {
     const menu = document.getElementById('must-include-menu');
     const itemsContainer = menu.querySelector('.dropdown-items');
-    itemsContainer.innerHTML = allUnits
+    // Only show available units in the dropdown
+    const availableUnits = allUnits.filter(u => u.available !== false);
+    itemsContainer.innerHTML = availableUnits
         .sort((a, b) => a.name.localeCompare(b.name))
         .map(unit => {
             const checked = filters.mustInclude.includes(unit.id) ? 'checked' : '';
@@ -317,7 +325,9 @@ function renderMustIncludeDropdown() {
 function renderExcludeDropdown() {
     const menu = document.getElementById('exclude-menu');
     const itemsContainer = menu.querySelector('.dropdown-items');
-    itemsContainer.innerHTML = allUnits
+    // Only show available units in the dropdown
+    const availableUnits = allUnits.filter(u => u.available !== false);
+    itemsContainer.innerHTML = availableUnits
         .sort((a, b) => a.name.localeCompare(b.name))
         .map(unit => {
             const checked = filters.exclude.includes(unit.id) ? 'checked' : '';
@@ -356,8 +366,10 @@ function updateCounts() {
 
 function updateCategoryCount(category, filterFn) {
     const units = allUnits.filter(filterFn);
-    const owned = units.filter(u => unitStates[u.id].owned).length;
-    const total = units.length;
+    // Only count available units for the total
+    const availableUnits = units.filter(u => u.available !== false);
+    const owned = availableUnits.filter(u => unitStates[u.id].owned).length;
+    const total = availableUnits.length;
     
     const countEl = document.getElementById(`${category}-count`);
     if (countEl) {
@@ -633,6 +645,9 @@ function handleUnitClick(e) {
     const card = e.target.closest('.unit-card');
     if (!card) return;
     
+    // Ignore clicks on unavailable units
+    if (card.classList.contains('unavailable')) return;
+    
     // Check if we are in "Mark Flex" mode (Mobile only)
     const flexBtn = document.querySelector('.mode-toggle-btn[data-mode="flex"]');
     // Check if button exists, is active, and is visible (container not hidden)
@@ -662,6 +677,9 @@ function handleUnitRightClick(e) {
     e.preventDefault();
     const card = e.target.closest('.unit-card');
     if (!card) return;
+    
+    // Ignore right-clicks on unavailable units
+    if (card.classList.contains('unavailable')) return;
     
     const unitId = card.dataset.unitId;
     const state = unitStates[unitId];
@@ -713,6 +731,9 @@ function handleCategoryAction(e) {
     
     const units = allUnits.filter(filterFn);
     for (const unit of units) {
+        // Skip unavailable units - they cannot be owned
+        if (unit.available === false) continue;
+        
         unitStates[unit.id].owned = isSelectAll;
         if (!isSelectAll) {
             unitStates[unit.id].universal = false;

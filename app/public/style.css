@@ -1183,6 +1183,27 @@ button#simulate-btn:disabled,
     opacity: 0.7;
 }
 
+/* Unavailable/unreleased unit state */
+.unit-card.unavailable {
+    opacity: 0.5;
+    border-color: var(--border-color);
+    cursor: not-allowed;
+    filter: grayscale(100%);
+}
+
+.unit-card.unavailable:hover {
+    transform: none;
+    box-shadow: none;
+}
+
+.unit-card.unavailable .unit-avatar {
+    filter: grayscale(100%);
+}
+
+.unit-card.unavailable .unit-initials {
+    color: var(--text-muted);
+}
+
 /* Universal/Flex state */
 .unit-card.universal {
     box-shadow: 0 0 12px rgba(0, 212, 170, 0.5);
@@ -2326,6 +2347,31 @@ button#simulate-btn:disabled,
     text-align: center;
 }
 
+/* Carousel mobile responsiveness - use fluid sizing */
+@media (max-width: 900px) {
+    .result-columns {
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+    
+    .result-column {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+    
+    .result-boss-tile {
+        width: clamp(100px, 18vw, 150px);
+    }
+    
+    .result-unit-card {
+        width: clamp(55px, 10vw, 75px);
+    }
+    
+    .result-team-stack {
+        gap: 0.35rem;
+    }
+}
+
 @media (max-width: 768px) {
     .carousel-btn {
         width: 36px;
@@ -2334,15 +2380,15 @@ button#simulate-btn:disabled,
     }
     
     .carousel-slide {
-        padding: 1rem;
+        padding: 1rem 0.75rem;
     }
     
     .result-columns {
-        gap: 1rem;
+        gap: 0.75rem;
     }
     
     .result-boss-tile {
-        width: 135px;
+        width: clamp(90px, 22vw, 130px);
     }
     
     .result-boss-tile .boss-initials {
@@ -2350,38 +2396,127 @@ button#simulate-btn:disabled,
     }
     
     .result-unit-card {
-        width: 70px;
+        width: clamp(50px, 13vw, 70px);
+    }
+    
+    .result-unit-card .unit-name {
+        font-size: 0.5rem;
     }
 }
 
-@media (max-width: 480px) {
+@media (max-width: 600px) {
+    .carousel {
+        gap: 0.25rem;
+    }
+    
     .carousel-btn {
         width: 32px;
         height: 32px;
         font-size: 1.2rem;
     }
     
+    .carousel-slide {
+        padding: 0.75rem 0.5rem;
+    }
+    
+    .result-label {
+        font-size: 0.9rem;
+        margin-bottom: 1rem;
+    }
+    
     .result-columns {
         flex-direction: column;
-        gap: 1.5rem;
+        gap: 1.25rem;
+        align-items: center;
     }
     
     .result-column {
         flex-direction: row;
         align-items: flex-start;
-        gap: 1rem;
+        gap: 0.75rem;
+        width: 100%;
+        max-width: 320px;
+    }
+    
+    .result-boss-tile {
+        width: 90px;
+        flex-shrink: 0;
+    }
+    
+    .result-boss-tile .boss-name {
+        font-size: 0.65rem;
+        padding: 0.3rem 0.2rem;
     }
     
     .result-team-stack {
         flex-direction: column;
-    }
-    
-    .result-boss-tile {
-        width: 110px;
+        gap: 0.35rem;
+        flex: 1;
+        min-width: 0;
     }
     
     .result-unit-card {
-        width: 60px;
+        width: 100%;
+        max-width: none;
+        flex-direction: row;
+        border-radius: 6px;
+        border-width: 2px;
+    }
+    
+    .result-unit-card .unit-avatar {
+        width: 40px;
+        height: 40px;
+        aspect-ratio: 1;
+        flex-shrink: 0;
+    }
+    
+    .result-unit-card .unit-initials {
+        width: 40px;
+        height: 40px;
+        font-size: 1rem;
+        flex-shrink: 0;
+    }
+    
+    .result-unit-card .unit-name {
+        flex: 1;
+        padding: 0.25rem 0.5rem;
+        font-size: 0.7rem;
+        text-align: left;
+        display: flex;
+        align-items: center;
+    }
+}
+
+@media (max-width: 480px) {
+    .carousel-slide {
+        padding: 0.5rem;
+    }
+    
+    .result-column {
+        gap: 0.5rem;
+        max-width: 280px;
+    }
+    
+    .result-boss-tile {
+        width: 75px;
+    }
+    
+    .result-boss-tile .boss-name {
+        font-size: 0.55rem;
+    }
+    
+    .result-boss-tile .boss-initials {
+        font-size: 0.9rem;
+    }
+    
+    .result-unit-card .unit-avatar,
+    .result-unit-card .unit-initials {
+        width: 35px;
+        height: 35px;
+    }
+    
+    .result-unit-card .unit-name {
+        font-size: 0.65rem;
     }
 }
 

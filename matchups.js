@@ -31,7 +31,9 @@ async function main() {
         const args = process.argv.slice(2);
         const options = {
             filter: null,   // Case-insensitive boss name filter (contains match)
-            depth: 7        // Number of top teams to display per boss
+            depth: 20,      // Number of top teams to display per boss
+            onlyMine: false, // Use only personal roster units
+            preview: false  // Include preview/unavailable units
         };
         
         for (let i = 0; i < args.length; i++) {
@@ -41,6 +43,10 @@ async function main() {
             } else if (args[i] === '--depth' && args[i + 1]) {
                 options.depth = parseInt(args[i + 1], 10);
                 i++;
+            } else if (args[i] === '--only-mine') {
+                options.onlyMine = true;
+            } else if (args[i] === '--preview') {
+                options.preview = true;
             }
         }
         
@@ -66,9 +72,10 @@ async function main() {
 
     // Optional: Specify a subset of units to use (whitelist)
     // Use one of the following options:
-    const INCLUDED_UNITS = allUnits.map(u => u.name);           // Full roster (all units)
-    //const INCLUDED_UNITS = myUnits.map(u => u.name);         // Personal roster (from roster.json)
-     //const INCLUDED_UNITS = ["Lighter", "Koleda", "Banyue", "Lucy", "Ceasar", "Lucia"];       // Custom list
+    const INCLUDED_UNITS = CLI_OPTIONS.onlyMine 
+        ? myUnits.map(u => u.name)                              // Personal roster (from roster.json) - when --only-mine flag is used
+        : allUnits.map(u => u.name);                            // Full roster (all units)
+    //const INCLUDED_UNITS = ["Lighter", "Koleda", "Banyue", "Lucy", "Ceasar", "Lucia"];       // Custom list
 
     // Universal units: Can join ANY 2-person team to form a 3-person team
     const UNIVERSAL_UNITS = [
@@ -84,6 +91,7 @@ async function main() {
         favored: [],
         assists: 0
     };
+    bosses.push(NEUTRAL_BOSS);
 
     // ============================================================================
     // MAIN EXECUTION
@@ -101,6 +109,16 @@ async function main() {
     }
     
     availableUnits = availableUnits.filter(u => !EXCLUDED_UNITS.includes(u.name));
+    
+    // Filter out preview/unavailable units unless --preview flag is set
+    if (!CLI_OPTIONS.preview) {
+        const beforeCount = availableUnits.length;
+        availableUnits = availableUnits.filter(u => u.available !== false);
+        const filteredCount = beforeCount - availableUnits.length;
+        if (filteredCount > 0) {
+            console.log(`Filtered out ${filteredCount} preview/unavailable unit(s) (use --preview to include)`);
+        }
+    }
     
     const whitelistNote = (INCLUDED_UNITS && INCLUDED_UNITS.length > 0) ? " (whitelist mode)" : "";
     console.log(`Using ${availableUnits.length} units${whitelistNote}\n`);
@@ -148,7 +166,7 @@ async function main() {
     if (CLI_OPTIONS.filter) {
         filteredBosses = bosses.filter(b => 
             b.name.toLowerCase().includes(CLI_OPTIONS.filter) ||
-            b.shortName.toLowerCase().includes(CLI_OPTIONS.filter)
+            (b.shortName && b.shortName.toLowerCase().includes(CLI_OPTIONS.filter))
         );
         console.log(`Boss filter: "${CLI_OPTIONS.filter}" (${filteredBosses.length} matches)\n`);
     }
@@ -180,8 +198,20 @@ async function main() {
         
         // Display top teams
         const topTeams = viableTeams.slice(0, TOP_TEAMS_PER_BOSS);
+        let currentRank = 1;
+        let previousScore = null;
         topTeams.forEach((t, i) => {
-            console.log(`    #${i + 1}: ${t.label} (${t.score.toFixed(1)})`);
+            // Assign rank: same score = same rank, different score = increment rank
+            if (previousScore !== null && t.score !== previousScore) {
+                currentRank = i + 1;
+            }
+            previousScore = t.score;
+            
+            // Check if all team members are in personal roster
+            const allInRoster = t.team.every(unit => myUnits.some(u => u.name === unit.name));
+            const rosterIndicator = allInRoster ? '✓' : ' ';
+            const teamNum = String(currentRank).padStart(2, ' ');
+            console.log(`    #${teamNum}: ${rosterIndicator} ${t.label} (${t.score.toFixed(1)})`);
         });
         
         console.log();

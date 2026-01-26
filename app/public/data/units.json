@@ -28,6 +28,17 @@
         "synergy": { "units": ["Astra"], "tags": [], "avoid": [] }
     },
     {
+        "id": "aria",
+        "name": "Aria",
+        "rank": "S",
+        "limited": true,
+        "tier": 1.0,
+        "tags": ["anomaly", "ether", "aod", "assist:defensive"],
+        "join": ["attack", "support"],
+        "available": false,
+        "synergy": { "units": [], "tags": ["attack", "stun"], "avoid": [] }
+    },
+    {
         "id": "astra",
         "name": "Astra",
         "rank": "S",
@@ -367,6 +378,17 @@
         "synergy": { "units": ["Miyabi"], "tags": ["ice"], "avoid": [] }
     },
     {
+        "id": "sunna",
+        "name": "Sunna",
+        "rank": "S",
+        "limited": true,
+        "tier": 1.0,
+        "tags": ["support", "physical", "aod", "assist:defensive"],
+        "join": ["attack", "aod"],
+        "available": false,
+        "synergy": { "units": ["Ye Shunguong", "Aria"], "tags": ["attack", "anomaly"], "avoid": ["rupture"] }
+    },
+    {
         "id": "trigger",
         "name": "Trigger",
         "rank": "S",
@@ -444,7 +466,7 @@
         "tier" : 0.5,
         "tags" : ["defense", "ice", "krampus", "assist:defensive"],
         "join" : ["attack", "anomaly", "support"],
-        "synergy": { "units": ["Ye Shunguong"], "tags": [], "avoid": [] }
+        "synergy": { "units": ["Ye Shunguong"], "tags": [], "avoid": ["rupture"] }
     },
     {
         "id": "zhu-yuan",

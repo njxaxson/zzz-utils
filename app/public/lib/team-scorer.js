@@ -450,8 +450,8 @@ export function scoreTeamForBoss(team, boss, options = {}) {
         }
     }
     
-    // TIER scoring - cliff-based system with big gaps between tiers
-    for (const unit of team) {
+    // TIER scoring for DPS - cliff-based system with big gaps between tiers (full weight)
+    for (const unit of dpsUnits) {
         const tier = unit.tier ?? 2.5;
         
         if (tier <= 0.5) {
@@ -471,6 +471,31 @@ export function scoreTeamForBoss(team, boss, options = {}) {
         } else {
             // Terrible tier - disqualifying
             score -= lenient ? 60 : 130;
+        }
+    }
+    
+    // TIER scoring for support/defense/stun - REDUCED weight (~35% of DPS)
+    // DPS matters MORE than supports; supports enhance good teams but can't carry bad DPS
+    for (const unit of [...supportUnits, ...defenseUnits, ...stunUnits]) {
+        const tier = unit.tier ?? 2.5;
+        
+        if (tier <= 0.5) {
+            // Elite tier - reduced bonus
+            const tierBonus = 23 - (tier * 8); // T0: +23, T0.5: +19 (was +40/+34)
+            score += tierBonus;
+        } else if (tier <= 1.5) {
+            // Good tier - reduced bonus
+            const tierBonus = 9 - ((tier - 1) * 4); // T1: +9, T1.5: +7 (was +15/+12)
+            score += tierBonus;
+        } else if (tier <= 2) {
+            // Mediocre tier - reduced penalty
+            score -= lenient ? 5 : 14; // (was -10/-25)
+        } else if (tier <= 3) {
+            // Bad tier - significant penalty
+            score -= lenient ? 20 : 60;
+        } else {
+            // Terrible tier (T4+) - near-disqualifying penalty
+            score -= lenient ? 40 : 100;
         }
     }
     
@@ -568,42 +593,67 @@ export function scoreTeamForBoss(team, boss, options = {}) {
         }
     }
 
-    // Anomaly boss composition
-    if (boss.shill === "anomaly") {
-        const hasTitledAnomaly = anomalyUnits.some(isTitled);
-        const hasValidAnomalyComp = hasTitledAnomaly || anomalyUnits.length >= 2;
+    // Anomaly team composition (runs for any anomaly team, not just anomaly-shill bosses)
+    if (anomalyUnits.length > 0) {
+        // Check if ALL anomaly units are on-element (for full bonuses)
+        // If boss has no weaknesses (neutral), treat all elements as "on-element"
+        const allAnomalyOnElement = anomalyUnits.length > 0 && (
+            boss.weaknesses.length === 0 || 
+            anomalyUnits.every(u => boss.weaknesses.includes(getElement(u)))
+        );
+        // Titled anomaly only counts as valid SOLO comp if on-element (or neutral boss)
+        const hasOnElementTitledAnomaly = anomalyUnits.some(u => 
+            isTitled(u) && (boss.weaknesses.length === 0 || boss.weaknesses.includes(getElement(u)))
+        );
+        // Double anomaly is valid if at least one anomaly is on-element (or neutral boss)
+        const hasValidDoubleAnomaly = anomalyUnits.length >= 2 && (
+            boss.weaknesses.length === 0 || 
+            anomalyUnits.some(u => boss.weaknesses.includes(getElement(u)))
+        );
+        const hasValidAnomalyComp = hasOnElementTitledAnomaly || hasValidDoubleAnomaly;
         
         if (hasValidAnomalyComp) {
+            // Base comp bonus for valid anomaly teams
             if (nonDpsUnits.length === 0) {
                 score -= 50;
             } else {
-                score += 10;
+                score += 5; // Reduced base comp bonus
             }
             
             if (anomalyUnits.length >= 2) {
-                // Double anomaly is the preferred composition - bonus!
-                score += 25; // Base bonus for having 2 anomaly DPS
-                
-                const anomalyElements = anomalyUnits.map(getElement);
-                const uniqueElements = new Set(anomalyElements);
-                if (uniqueElements.size >= 2) {
-                    score += 30; // Additional bonus for different elements
+                if (allAnomalyOnElement) {
+                    // Full double anomaly bonus ONLY if both are on-element
+                    score += 15; // Reduced from 25
+                    
+                    const anomalyElements = anomalyUnits.map(getElement);
+                    const uniqueElements = new Set(anomalyElements);
+                    if (uniqueElements.size >= 2) {
+                        score += 20; // Reduced from 30
+                    } else {
+                        score -= 15; // Same element penalty
+                    }
                 } else {
-                    score -= 15;
+                    // At least one anomaly is off-element - penalize the mixed composition
+                    if (boss.weaknesses.length > 0) {
+                        const anyAnomalyMatchesWeakness = anomalyUnits.some(u => 
+                            boss.weaknesses.includes(getElement(u))
+                        );
+                        if (!anyAnomalyMatchesWeakness) {
+                            score -= 40; // Heavy penalty if NO anomaly matches weakness
+                        } else {
+                            // Some match, some don't - moderate penalty for off-element partner
+                            score -= 25;
+                        }
+                    }
                 }
-                
-                const anyAnomalyMatchesWeakness = anomalyUnits.some(u => 
-                    boss.weaknesses.includes(getElement(u))
-                );
-                if (!anyAnomalyMatchesWeakness) {
-                    score -= 30;
-                }
-            } else if (anomalyUnits.length === 1 && hasTitledAnomaly) {
-                // Titled CAN solo, but having 2 anomaly is still better
-                // No bonus here - single anomaly is viable but suboptimal
+            } else if (anomalyUnits.length === 1 && isTitled(anomalyUnits[0])) {
+                // Solo titled anomaly - check element alignment
                 const soloElement = getElement(anomalyUnits[0]);
-                if (!boss.weaknesses.includes(soloElement)) {
-                    score -= 40;
+                if (boss.weaknesses.length === 0 || boss.weaknesses.includes(soloElement)) {
+                    // Solo on-element titled is efficient and focused
+                    score += 30; // Bonus for focused composition
+                } else {
+                    score -= 40; // Off-element solo titled gets penalty
                 }
             }
             
@@ -613,19 +663,20 @@ export function scoreTeamForBoss(team, boss, options = {}) {
             }
             
             // Anomaly teams prefer support/defense over stun
-            // Stun doesn't contribute to anomaly damage buildup
             if (stunUnits.length > 0 && supportUnits.length === 0 && defenseUnits.length === 0) {
-                score -= 40; // Heavy penalty for stun-only support on anomaly
+                score -= 40;
             } else if (stunUnits.length > 0) {
-                score -= 20; // Moderate penalty for stun on anomaly team
+                score -= 20;
             }
             
-            // Strong bonus for support (they enable anomaly DPS)
-            if (supportUnits.length >= 1) {
-                score += 25;
-            }
-            if (defenseUnits.length >= 1) {
-                score += 15;
+            // Support/defense bonuses - reduced and only for fully on-element
+            if (allAnomalyOnElement) {
+                if (supportUnits.length >= 1) {
+                    score += 15; // Reduced from 25
+                }
+                if (defenseUnits.length >= 1) {
+                    score += 10; // Reduced from 15
+                }
             }
         } else {
             // No valid anomaly comp - need on-element DPS as fallback
@@ -645,7 +696,7 @@ export function scoreTeamForBoss(team, boss, options = {}) {
     // Attack teams NEED a stunner - it's fundamental to the playstyle
     // Ideal: stun/attack/support or stun/attack/defense
     // EXCEPTION: Monoshock teams (attacker with anomaly synergy + same-element anomaly)
-    if (boss.shill === "attack" || (!boss.shill && attackers.length > 0)) {
+    if (attackers.length > 0) {
         // Check for Monoshock composition
         const hasAnomalyAttackComp = attackers.some(a => {
             if (!a.synergy?.tags?.includes("anomaly")) return false;
@@ -686,11 +737,26 @@ export function scoreTeamForBoss(team, boss, options = {}) {
         }
     }
     
-    // Rupture teams
-    if (boss.shill === "rupture" || (!boss.shill && ruptureUnits.length > 0)) {
+    // Rupture teams (runs for any rupture team, not just rupture-shill bosses)
+    if (ruptureUnits.length > 0) {
+        // Check if rupture DPS is A-rank (requires stunner unless boss shills rupture)
+        const hasARankRupture = ruptureUnits.some(isARank);
+        const hasSRankRupture = ruptureUnits.some(isSRank);
+        
+        if (hasARankRupture && !hasSRankRupture) {
+            // A-rank rupture NEEDS a stunner (unless boss shills rupture)
+            if (stunUnits.length === 0) {
+                if (boss.shill === "rupture") {
+                    score -= 40; // Penalty but allowed on rupture-shill
+                } else {
+                    return -1; // Disqualify on non-rupture-shill
+                }
+            }
+        }
+        
         // Two valid compositions:
         // 1. stun/rupture/[support|defense] - traditional composition (with bonus)
-        // 2. rupture/2x[support|defense] - double support composition
+        // 2. rupture/2x[support|defense] - double support composition (S-rank only)
         const hasStunComposition = stunUnits.length >= 1 && (supportUnits.length >= 1 || defenseUnits.length >= 1);
         const hasDoubleSupport = supportUnits.length + defenseUnits.length >= 2;
         
@@ -713,15 +779,10 @@ export function scoreTeamForBoss(team, boss, options = {}) {
         }
         
         // For rupture teams, stunners without rupture synergy are suboptimal
-        // Rupture/2xSupport with rupture synergy should beat Stun/Rupture/Support
         for (const unit of stunUnits) {
             const hasRuptureSynergy = unit.synergy?.tags?.includes("rupture");
             if (!hasRuptureSynergy) {
-                if (boss.shill === "rupture") {
-                    score -= 25; // On rupture-shill, non-synergy stun is worse
-                } else {
-                    score -= 15; // On non-rupture-shill, still a penalty
-                }
+                score -= 20; // Non-synergy stun is always suboptimal for rupture
             }
         }
     }
@@ -754,19 +815,31 @@ export function scoreTeamForBoss(team, boss, options = {}) {
                     score += 20; // A-rank on-element still good
                 }
             }
+            
+            // Titled on-element DPS can partially compete with shill mismatch
+            // They're powerful enough to overcome not matching the boss shill
+            if (isTitled(unit) && boss.shill && DPS_ROLES.includes(boss.shill) && !unit.tags.includes(boss.shill)) {
+                score += 30; // Helps titled on-element compete with shill-matching teams
+            }
         } else {
-            // Off-element DPS - significant penalty (reduced in lenient mode)
+            // Neutral off-element DPS - moderate penalty (not as harsh as resistance)
+            // Titled units partially overcome element mismatch due to raw power
             // But if boss has no weaknesses (element-neutral), no penalty
             if (boss.weaknesses.length > 0) {
-                score -= lenient ? 10 : 30;
+                const basePenalty = 20; // Reduced from 30
+                const penalty = isTitled(unit) ? basePenalty / 2 : basePenalty;
+                score -= lenient ? Math.floor(penalty / 3) : penalty;
             }
         }
     }
     
     if (dpsUnits.length > 0 && !dpsMatchesWeakness && boss.weaknesses.length > 0) {
-        // No DPS matches weakness - SEVERE penalty
-        // In elemental weakness game, not hitting weakness with DPS is a major flaw
-        score -= lenient ? 40 : 100;
+        // No DPS matches weakness - penalty (but not as severe as resistance)
+        // Titled DPS can partially overcome this with raw power
+        const hasTitledDPS = dpsUnits.some(isTitled);
+        const basePenalty = 50; // Reduced from 100
+        const penalty = hasTitledDPS ? basePenalty / 2 : basePenalty;
+        score -= lenient ? Math.floor(penalty / 2) : penalty;
     }
     
     // Stun weakness/resistance - stun units deal damage, so element matters
@@ -891,18 +964,10 @@ export function scoreTeamForBoss(team, boss, options = {}) {
             if (primaryDPSType === specialistType) {
                 // Matching specialist - strong bonus
                 // This ensures specialists beat generalists when matched
-                
-                // CRITICAL CHECK: Does the specialist match the BOSS SHILL?
-                // If the boss shills "rupture" but this is an "anomaly" specialist, they are boosting the wrong mechanic.
-                // Even if they match the TEAM, the TEAM is wrong for the BOSS.
-                if (boss.shill && DPS_ROLES.includes(boss.shill) && specialistType !== boss.shill) {
-                    score -= 40; // Penalize specialist for focusing on the wrong mechanic for this boss
+                if (isARank(unit)) {
+                     score += 25; // Reduced from 55 - supports enhance but don't carry
                 } else {
-                    if (isARank(unit)) {
-                         score += 55; // Significantly increased to beat S-Rank Generalists
-                    } else {
-                         score += 65; // E.g., Lucia on rupture team beats Astra on rupture team
-                    }
+                     score += 35; // Reduced from 65 - DPS quality should dominate
                 }
             } else {
                 // Mismatched specialist - severe penalty
@@ -1002,7 +1067,10 @@ export function scoreTeamForBoss(team, boss, options = {}) {
         return -1;
     }
     
-    score += (defensiveAssistCount - boss.assists) * 3;
+    // Only reward extra defensive assists when boss actually demands them
+    if (boss.assists >= 2) {
+        score += (defensiveAssistCount - boss.assists) * 3;
+    }
     
     if (debug) {
         log(`Final score: ${score}`);
