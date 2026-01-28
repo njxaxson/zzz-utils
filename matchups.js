@@ -33,11 +33,18 @@ async function main() {
             filter: null,   // Case-insensitive boss name filter (contains match)
             depth: 20,      // Number of top teams to display per boss
             onlyMine: false, // Use only personal roster units
-            preview: false  // Include preview/unavailable units
+            preview: false, // Include preview/unavailable units
+            debug: false,   // Enable debug logging for scoring
+            units: null,    // Comma-separated list of unit names to include (for debugging)
+            exclude: null   // Comma-separated list of unit names to exclude
         };
         
         for (let i = 0; i < args.length; i++) {
-            if (args[i] === '--filter' && args[i + 1]) {
+            // Check for shorthand depth format: -5, -10, etc.
+            const depthMatch = args[i].match(/^-(\d+)$/);
+            if (depthMatch) {
+                options.depth = parseInt(depthMatch[1], 10);
+            } else if (args[i] === '--filter' && args[i + 1]) {
                 options.filter = args[i + 1].toLowerCase();
                 i++;
             } else if (args[i] === '--depth' && args[i + 1]) {
@@ -47,6 +54,14 @@ async function main() {
                 options.onlyMine = true;
             } else if (args[i] === '--preview') {
                 options.preview = true;
+            } else if (args[i] === '--debug') {
+                options.debug = true;
+            } else if (args[i] === '--units' && args[i + 1]) {
+                options.units = args[i + 1].split(',').map(u => u.trim());
+                i++;
+            } else if ((args[i] === '--exclude' || args[i] === '-x') && args[i + 1]) {
+                options.exclude = args[i + 1].split(',').map(u => u.trim());
+                i++;
             }
         }
         
@@ -61,7 +76,7 @@ async function main() {
 
     const TOP_TEAMS_PER_BOSS = CLI_OPTIONS.depth;
 
-    const EXCLUDED_UNITS = [
+    let EXCLUDED_UNITS = [
         // "Anby",
         // "Anton",
         // "Ben",
@@ -69,12 +84,27 @@ async function main() {
         // "Corin",
         // "Seth"
     ];
+    
+    // Merge command-line excluded units with hardcoded exclusions
+    if (CLI_OPTIONS.exclude && CLI_OPTIONS.exclude.length > 0) {
+        EXCLUDED_UNITS.push(...CLI_OPTIONS.exclude);
+        console.log(`Excluding units: ${CLI_OPTIONS.exclude.join(', ')}`);
+    }
 
     // Optional: Specify a subset of units to use (whitelist)
     // Use one of the following options:
-    const INCLUDED_UNITS = CLI_OPTIONS.onlyMine 
-        ? myUnits.map(u => u.name)                              // Personal roster (from roster.json) - when --only-mine flag is used
-        : allUnits.map(u => u.name);                            // Full roster (all units)
+    let INCLUDED_UNITS;
+    if (CLI_OPTIONS.units) {
+        // Debug mode: use only specified units
+        INCLUDED_UNITS = CLI_OPTIONS.units;
+        console.log(`Debug unit filter: ${INCLUDED_UNITS.join(', ')}`);
+    } else if (CLI_OPTIONS.onlyMine) {
+        // Personal roster (from roster.json) - when --only-mine flag is used
+        INCLUDED_UNITS = myUnits.map(u => u.name);
+    } else {
+        // Full roster (all units)
+        INCLUDED_UNITS = allUnits.map(u => u.name);
+    }
     //const INCLUDED_UNITS = ["Lighter", "Koleda", "Banyue", "Lucy", "Ceasar", "Lucia"];       // Custom list
 
     // Universal units: Can join ANY 2-person team to form a 3-person team
@@ -185,7 +215,7 @@ async function main() {
         const viableTeams = [];
         for (const label of teamLabels) {
             const team = threeCharTeams[label];
-            const score = scoreTeamForBoss(team, boss);
+            const score = scoreTeamForBoss(team, boss, { debug: CLI_OPTIONS.debug });
             if (score > 0) {
                 viableTeams.push({ label, team, score });
             }

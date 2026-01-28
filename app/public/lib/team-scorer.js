@@ -78,10 +78,12 @@ export function hasDefensiveAssist(unit) {
 // SYNERGY SCORING
 // ============================================================================
 
-export function calculateSynergyScore(unit, teammates, boss, lenient = false) {
+export function calculateSynergyScore(unit, teammates, boss, lenient = false, debug = false) {
     let score = 0;
     const synergy = unit.synergy;
     if (!synergy) return 0;
+    
+    const dbg = (msg) => { if (debug) console.log(`      ${unit.name}: ${msg}`); };
     
     // Unit-specific synergies (e.g., Nicole synergizes with Astra)
     // Small bonus to avoid over-coupling issues
@@ -89,16 +91,19 @@ export function calculateSynergyScore(unit, teammates, boss, lenient = false) {
         for (const teammate of teammates) {
             if (synergy.units.includes(teammate.name)) {
                 score += 5;
+                dbg(`unit synergy with ${teammate.name}: +5`);
             }
             if(unitsHaveMutualSynergy(unit, teammate)) {
                 //Additional bonus for mutual synergy, particularly for enabling DPS units 
-                score += isDPS(unit) ? 25 : 5;
+                const bonus = isDPS(unit) ? 25 : 5;
+                score += bonus;
+                dbg(`mutual synergy with ${teammate.name}: +${bonus}`);
             }
         }
     }
     
     if (synergy.tags && synergy.tags.length > 0) {
-        const unitElement = getElement(unit);
+        if (debug) dbg(`synergy.tags = [${synergy.tags.join(', ')}]`);
         
         // Check if this unit has element synergy (like Soukaku's "ice")
         const synergyElements = synergy.tags.filter(tag => ELEMENTS.includes(tag));
@@ -116,9 +121,10 @@ export function calculateSynergyScore(unit, teammates, boss, lenient = false) {
             
             if (!anyTeammateMatchesElement) {
                 // Element synergy unit on team with NO matching element teammates
-                // (e.g., Soukaku on Harumasa team) - this is a complete waste
-                // Should only appear as last resort when forced by other constraints
-                score -= 120;
+                // (e.g., Soukaku on Harumasa team) - dead weight, not penalty
+                // The support just doesn't help with element synergy, but doesn't hurt
+                // Continue processing - unit may have other synergies (unit-specific, etc.)
+                dbg(`element synergy: no matching elements (dead weight, 0)`);
             }
         }
         
@@ -142,23 +148,33 @@ export function calculateSynergyScore(unit, teammates, boss, lenient = false) {
                 if (lenient) {
                     // In lenient mode, ignore this penalty (desperate situations)
                     // No penalty applied
+                    dbg(`subdps without main DPS (lenient): 0`);
                 } else {
                     score -= 100; // Heavy penalty in strict mode
+                    dbg(`subdps without main DPS: -100`);
                 }
             } else {
                 // Has a main DPS teammate - good synergy
                 score += 20;
+                dbg(`subdps has main DPS: +20`);
             }
         }
+        
+        // Track which DPS roles have already given synergy bonus (to prevent double-counting)
+        // E.g., Dialyn with "attack" synergy should only get +30 once, even with 2 attackers
+        const countedDPSRoles = new Set();
         
         for (const teammate of teammates) {
             const matchesAnyPreference = synergy.tags.some(tag => {
                 if (!teammate.tags.includes(tag)) return false;
                 
-                if (DPS_ROLES.includes(tag) && isDPS(teammate)) {
-                    const teammateElement = getElement(teammate);
-                    return unitElement === teammateElement;
+                // DPS role synergy (attack/anomaly/rupture) - only count once per role type
+                // E.g., Dialyn + Orphie + Seed: only +30 for "attack", not +60
+                if (DPS_ROLES.includes(tag)) {
+                    if (countedDPSRoles.has(tag)) return false; // Already counted this role
+                    countedDPSRoles.add(tag);
                 }
+                
                 return true;
             });
             
@@ -177,30 +193,62 @@ export function calculateSynergyScore(unit, teammates, boss, lenient = false) {
                     const isNeutralBoss = boss.weaknesses.length === 0;
                     const effectiveBossWeak = bossWeakToElement || isNeutralBoss;
 
-                    const synergyElement = matchingSynergyElement || synergyElements[0];
+                    // For neutral boss with multi-element synergy (like Yuzuha), check ALL synergy elements
+                    // For boss with weakness, only check the matching element
+                    const elementsToCheck = matchingSynergyElement 
+                        ? [matchingSynergyElement] 
+                        : synergyElements; // Neutral boss: check all synergy elements
                     
-                    // Check if team has element DPS - INCLUDING the unit itself!
-                    const unitIsElementDPS = isDPS(unit) && getElement(unit) === synergyElement;
+                    // Check if team has element DPS matching ANY of the relevant synergy elements
+                    const unitIsElementDPS = isDPS(unit) && elementsToCheck.includes(getElement(unit));
                     const teamHasElementDPS = unitIsElementDPS || teammates.some(t => 
-                        isDPS(t) && getElement(t) === synergyElement
+                        isDPS(t) && elementsToCheck.includes(getElement(t))
                     );
                     
                     if (!effectiveBossWeak || !teamHasElementDPS) {
                         // Element synergy is completely wasted - near-disqualifying
                         // (Unless boss is neutral, then we only care about team matching)
                         score -= 70;
+                        dbg(`element synergy with ${teammate.name} wasted: -70`);
                     } else if (isDPS(teammate)) {
-                        score += 30;
+                        // DPS-to-DPS element synergy: only count once per pair if MUTUAL
+                        // Check if teammate has a reciprocal element synergy with this unit
+                        const teammateElementSynergies = teammate.synergy?.tags?.filter(t => ELEMENTS.includes(t)) || [];
+                        const hasMutualElementSynergy = isDPS(unit) && 
+                            teammateElementSynergies.some(elem => unit.tags.includes(elem));
+                        
+                        if (hasMutualElementSynergy && unit.name > teammate.name) {
+                            // Mutual synergy - skip to avoid double counting (other unit will count)
+                            dbg(`element synergy with ${teammate.name}: SKIP (mutual, alphabetically later)`);
+                        } else {
+                            score += 30;
+                            dbg(`element synergy with ${teammate.name} (DPS): +30`);
+                        }
                     } else {
                         score += 15;
+                        dbg(`element synergy with ${teammate.name} (support): +15`);
                     }
                 } else if (isDPS(teammate)) {
-                    score += 30;
+                    // DPS-to-DPS tag synergy: only count once per pair if MUTUAL
+                    // Check if teammate has a reciprocal tag synergy with this unit
+                    const teammateSynergyTags = teammate.synergy?.tags || [];
+                    const hasMutualTagSynergy = isDPS(unit) && 
+                        teammateSynergyTags.some(tag => unit.tags.includes(tag) && !ELEMENTS.includes(tag));
+                    
+                    if (hasMutualTagSynergy && unit.name > teammate.name) {
+                        // Mutual synergy - skip to avoid double counting (other unit will count)
+                        dbg(`tag synergy with ${teammate.name}: SKIP (mutual, alphabetically later)`);
+                    } else {
+                        score += 30;
+                        dbg(`tag synergy with ${teammate.name} (DPS): +30`);
+                    }
                 } else {
                     score += 15;
+                    dbg(`tag synergy with ${teammate.name} (support): +15`);
                 }
             } else if (isDPS(teammate)) {
                 score -= 20;
+                dbg(`NO tag match with DPS ${teammate.name}: -20`);
             }
         }
     }
@@ -211,9 +259,11 @@ export function calculateSynergyScore(unit, teammates, boss, lenient = false) {
             if (avoidedTeammates.length > 0) {
                 const avoidedDPS = avoidedTeammates.filter(isDPS);
                 if (avoidedDPS.length > 0) {
+                    dbg(`AVOID ${avoidTag} triggered by DPS: DISQUALIFY`);
                     return -999;
                 } else {
                     score -= 35;
+                    dbg(`AVOID ${avoidTag} triggered by non-DPS: -35`);
                 }
             }
         }
@@ -385,13 +435,20 @@ export function scoreTeamForBoss(team, boss, options = {}) {
     const { lenient = false, debug = false } = options;
     // In lenient mode, start with higher base score to offset unavoidable penalties
     let score = lenient ? 200 : 100;
-    const debugReasons = [];
+    const debugLog = [];
     
     const log = (reason, delta = 0) => {
         if (debug) {
-            debugReasons.push({ reason, delta, runningScore: score + delta });
+            debugLog.push({ reason, delta, runningScore: score + delta });
         }
     };
+    
+    const teamLabel = team.map(u => u.name).join(' / ');
+    if (debug) {
+        console.log(`\n${'='.repeat(60)}`);
+        console.log(`SCORING: ${teamLabel}`);
+        console.log(`Base score: ${score}`);
+    }
     
     const dpsUnits = team.filter(isDPS);
     const attackers = team.filter(isAttacker);
@@ -401,6 +458,13 @@ export function scoreTeamForBoss(team, boss, options = {}) {
     const stunUnits = team.filter(isStun);
     const defenseUnits = team.filter(isDefense);
     const nonDpsUnits = team.filter(isNonDPS);
+    
+    if (debug) {
+        console.log(`  DPS: ${dpsUnits.map(u => `${u.name}(T${u.tier})`).join(', ')}`);
+        console.log(`  Anomaly: ${anomalyUnits.map(u => u.name).join(', ') || 'none'}`);
+        console.log(`  Support: ${supportUnits.map(u => u.name).join(', ') || 'none'}`);
+        console.log(`  Stun: ${stunUnits.map(u => u.name).join(', ') || 'none'}`);
+    }
     
     // ANTI check
     if (boss.anti && boss.anti.length > 0) {
@@ -451,26 +515,51 @@ export function scoreTeamForBoss(team, boss, options = {}) {
     }
     
     // TIER scoring for DPS - cliff-based system with big gaps between tiers (full weight)
+    if (debug) console.log(`\n  DPS TIER SCORING:`);
     for (const unit of dpsUnits) {
         const tier = unit.tier ?? 2.5;
         
+        // Check if this attacker is a subdps supporting another attacker (e.g., Orphie)
+        // Subdps attackers get reduced tier when paired with another attacker
+        const isSubDPSAttacker = unit.tags.includes("attack") && 
+                                 unit.synergy?.tags?.includes("subdps");
+        const hasOtherAttacker = attackers.filter(a => a !== unit).length > 0;
+        const isSecondaryAttacker = isSubDPSAttacker && hasOtherAttacker;
+        const tierMultiplier = isSecondaryAttacker ? 0.5 : 1.0;
+        
+        let tierBonus = 0;
         if (tier <= 0.5) {
             // Elite tier - strong bonus (bigger cliff from good tier)
-            const tierBonus = 65 - (tier * 20); // T0: +65, T0.5: +55
+            tierBonus = (65 - (tier * 20)) * tierMultiplier; // T0: +65, T0.5: +55
             score += tierBonus;
         } else if (tier <= 1.5) {
             // Good tier - moderate bonus (significant cliff from elite)
-            const tierBonus = 25 - ((tier - 1) * 10); // T1: +25, T1.5: +20
+            tierBonus = (25 - ((tier - 1) * 10)) * tierMultiplier; // T1: +25, T1.5: +20
             score += tierBonus;
         } else if (tier <= 2) {
             // Mediocre tier - penalty (big cliff from good)
-            score -= lenient ? 15 : 40;
+            tierBonus = -(lenient ? 15 : 40);
+            score += tierBonus;
         } else if (tier <= 3) {
             // Bad tier - near-disqualifying (T3 DPS like Nekomata should rarely appear)
-            score -= lenient ? 40 : 130;
+            tierBonus = -(lenient ? 40 : 130);
+            score += tierBonus;
         } else {
             // Terrible tier - disqualifying
-            score -= lenient ? 60 : 130;
+            tierBonus = -(lenient ? 60 : 130);
+            score += tierBonus;
+        }
+        if (debug) {
+            const multiplierNote = isSecondaryAttacker ? ` (subdps x0.5)` : '';
+            console.log(`    ${unit.name}: T${tier} → ${tierBonus >= 0 ? '+' : ''}${tierBonus}${multiplierNote}`);
+        }
+        
+        // Titled DPS bonus - titled S-ranks are significantly stronger than other units
+        // This creates proper separation between titled and non-titled units
+        if (unit.tags.includes('title')) {
+            const titledBonus = 20;
+            score += titledBonus;
+            if (debug) console.log(`    ${unit.name}: +${titledBonus} (titled unit bonus)`);
         }
     }
     
@@ -542,7 +631,7 @@ export function scoreTeamForBoss(team, boss, options = {}) {
                     score -= 80; // Heavy penalty but allow in desperate situations
                 } else {
                     log('DISQUALIFIED: Non-titled anomaly with non-anomaly DPS');
-                    if (debug) console.log('Team disqualified:', team.map(u => u.name).join('/'), debugReasons);
+                    if (debug) console.log('Team disqualified:', team.map(u => u.name).join('/'));
                     return -1;
                 }
             }
@@ -553,7 +642,7 @@ export function scoreTeamForBoss(team, boss, options = {}) {
                     score -= 100; // Very heavy penalty but allow
                 } else {
                     log('DISQUALIFIED: Solo non-titled anomaly');
-                    if (debug) console.log('Team disqualified:', team.map(u => u.name).join('/'), debugReasons);
+                    if (debug) console.log('Team disqualified:', team.map(u => u.name).join('/'));
                     return -1;
                 }
             }
@@ -595,19 +684,22 @@ export function scoreTeamForBoss(team, boss, options = {}) {
 
     // Anomaly team composition (runs for any anomaly team, not just anomaly-shill bosses)
     if (anomalyUnits.length > 0) {
+        const isNeutralBoss = boss.weaknesses.length === 0;
+        
         // Check if ALL anomaly units are on-element (for full bonuses)
-        // If boss has no weaknesses (neutral), treat all elements as "on-element"
-        const allAnomalyOnElement = anomalyUnits.length > 0 && (
-            boss.weaknesses.length === 0 || 
-            anomalyUnits.every(u => boss.weaknesses.includes(getElement(u)))
-        );
+        // Neutral boss does NOT get element bonuses - must compete on tier/composition
+        const allAnomalyOnElement = anomalyUnits.length > 0 && 
+            !isNeutralBoss &&
+            anomalyUnits.every(u => boss.weaknesses.includes(getElement(u)));
+        
         // Titled anomaly only counts as valid SOLO comp if on-element (or neutral boss)
+        // Neutral boss: teams are VALID but don't get element bonuses
         const hasOnElementTitledAnomaly = anomalyUnits.some(u => 
-            isTitled(u) && (boss.weaknesses.length === 0 || boss.weaknesses.includes(getElement(u)))
+            isTitled(u) && (isNeutralBoss || boss.weaknesses.includes(getElement(u)))
         );
         // Double anomaly is valid if at least one anomaly is on-element (or neutral boss)
         const hasValidDoubleAnomaly = anomalyUnits.length >= 2 && (
-            boss.weaknesses.length === 0 || 
+            isNeutralBoss || 
             anomalyUnits.some(u => boss.weaknesses.includes(getElement(u)))
         );
         const hasValidAnomalyComp = hasOnElementTitledAnomaly || hasValidDoubleAnomaly;
@@ -669,14 +761,13 @@ export function scoreTeamForBoss(team, boss, options = {}) {
                 score -= 20;
             }
             
-            // Support/defense bonuses - reduced and only for fully on-element
-            if (allAnomalyOnElement) {
-                if (supportUnits.length >= 1) {
-                    score += 15; // Reduced from 25
-                }
-                if (defenseUnits.length >= 1) {
-                    score += 10; // Reduced from 15
-                }
+            // Support/defense bonuses - given for valid anomaly comps (not just fully on-element)
+            // This ensures anomaly teams on neutral boss still get support bonus
+            if (supportUnits.length >= 1) {
+                score += 15;
+            }
+            if (defenseUnits.length >= 1) {
+                score += 10;
             }
         } else {
             // No valid anomaly comp - need on-element DPS as fallback
@@ -709,25 +800,53 @@ export function scoreTeamForBoss(team, boss, options = {}) {
 
         if (hasAnomalyAttackComp && anomalyUnits.length > 0) {
             // Monoshock: attacker + anomaly = valid hybrid, no stunner needed
-            log('Anomaly-attack composition - stunner not required', 5);
-            score += 5;
+            log('Anomaly-attack composition - stunner not required', 10);
+            score += 10;
         } else if (stunUnits.length >= 1) {
             if(hasStunlessAttacker && boss.shill !== "stun") {
                 log('Stunless attack unit present - stunner not required', -10);
                 score -= 10;
             } else {
-                log('Attack team with stunner', 15);
-                score += 15;
+                log('Attack team with stunner', 25);
+                score += 25; // Boosted from 15 to match other archetypes
            }
         } else if (hasStunlessAttacker && boss.shill !== "stun") {
-            log('Stunless attack unit present - stunner not required', 5);
-            score += 10;
+            log('Stunless attack unit present - stunner not required', 20);
+            score += 20; // Boosted from 10 to match other archetypes
+            
+            // Ideal stunless composition: stunless attacker + double support (no stunner)
+            // This is YSG's intended playstyle - she doesn't benefit from stunners
+            const supportDefenseCount = supportUnits.length + defenseUnits.length;
+            if (supportDefenseCount >= 2) {
+                log('Ideal stunless composition - double support', 40);
+                score += 40;
+            }
         } else {
             log('Attack team without stunner', -60);
             score -= 60; // Near-disqualifying: normal attack teams need stunner
         }
+        
+        // Double-stun composition for attackers who synergize with stun (e.g., Hugo)
+        // These attackers NEED two stunners - one stunner is suboptimal for them
+        // The bonus must compensate for:
+        //   - Missing support/defense bonus (+20)
+        //   - Missing support contribution bonuses (specialist +35, or generalist +8-10)
+        //   - The actual benefit of having double-stun synergy
+        for (const unit of attackers) {
+            const hasStunSynergy = unit.synergy?.tags?.includes('stun');
+            if (hasStunSynergy) {
+                if (stunUnits.length === 2) {
+                    score += 70; // Fully compensates for missing support + provides double-stun benefit
+                    if (debug) console.log(`    ${unit.name}: +70 (double-stun composition)`);
+                } else if (stunUnits.length === 1) {
+                    score -= 30; // Single stunner is suboptimal for stun-synergy attackers
+                    if (debug) console.log(`    ${unit.name}: -30 (needs double-stun, only has one)`);
+                }
+            }
+        }
+        
         if (supportUnits.length >= 1 || defenseUnits.length >= 1) {
-            score += 10;
+            score += 20; // Boosted from 10 to match other archetypes
         }
         if (attackers.length > 1) {
              const hasSubDPS = attackers.some(u => u.synergy?.tags?.includes("subdps"));
@@ -946,73 +1065,57 @@ export function scoreTeamForBoss(team, boss, options = {}) {
         }
     }
     
-    // Specialist vs Generalist Support/Defense Scoring
-    // Specialists: synergize with exactly ONE DPS type and avoid the other two
-    // Examples: Lucia (rupture), Yuzuha (anomaly), Pan (rupture)
-    // Generalists: synergize with multiple or no specific DPS types
-    // Examples: Astra, Nicole (but Nicole avoids rupture)
+    // Support Contribution Scoring (dead weight approach)
+    // Philosophy: Mismatched supports contribute 0 (dead weight), not negative.
+    // A support that doesn't help is "absence of positive", not a penalty.
     //
-    // Matching specialist should ALWAYS beat generalist for their DPS type
-    // Mismatched specialist should ALWAYS lose to generalist (heavy penalty)
+    // Uses existing synergy.avoid for archetype compatibility:
+    // - If team archetype is in synergy.avoid → dead weight (0 contribution)
+    // - Specialists get +35 when matched, +25 for A-rank
+    // - T0 non-specialist on attack team gets +35 (de-facto specialist since attack has none)
+    // - Other generalists get +8 (small positive contribution)
+    
+    const teamDPSTypes = dpsUnits.map(getDPSType).filter(t => t !== null);
+    const teamArchetype = teamDPSTypes[0] || null; // Primary DPS defines team archetype
+    
+    if (debug) console.log(`\n  SUPPORT CONTRIBUTION SCORING (archetype: ${teamArchetype || 'none'}):`);
     
     for (const unit of [...supportUnits, ...defenseUnits]) {
-        if (isSpecialist(unit)) {
-            const specialistType = getSpecialistType(unit);
-            const teamDPSTypes = dpsUnits.map(getDPSType).filter(t => t !== null);
-            const primaryDPSType = teamDPSTypes[0]; // Assume first DPS defines team type
-            
-            if (primaryDPSType === specialistType) {
-                // Matching specialist - strong bonus
-                // This ensures specialists beat generalists when matched
-                if (isARank(unit)) {
-                     score += 25; // Reduced from 55 - supports enhance but don't carry
-                } else {
-                     score += 35; // Reduced from 65 - DPS quality should dominate
-                }
-            } else {
-                // Mismatched specialist - severe penalty
-                // This ensures specialists lose to generalists when mismatched
-                score -= 80; // E.g., Lucia on attack team loses to Astra on attack team
-            }
+        // Check archetype compatibility via existing synergy.avoid
+        const avoidTags = unit.synergy?.avoid || [];
+        const avoidsTeamArchetype = teamArchetype && avoidTags.includes(teamArchetype);
+        
+        if (avoidsTeamArchetype) {
+            // Dead weight - no contribution, no penalty
+            if (debug) console.log(`    ${unit.name}: 0 (dead weight - avoids ${teamArchetype})`);
+            continue; // Skip to next unit - no further contribution
+        }
+        
+        // Support is compatible with team - determine bonus level
+        if (isSpecialist(unit) && getSpecialistType(unit) === teamArchetype) {
+            // Matching specialist (Yuzuha on anomaly, Lucia on rupture)
+            const bonus = isARank(unit) ? 25 : 35;
+            score += bonus;
+            if (debug) console.log(`    ${unit.name}: +${bonus} (matching specialist)`);
+        } else if (unit.tier <= 0 && teamArchetype === 'attack' && !isSpecialist(unit)) {
+            // T0 non-specialist on attack team = de-facto specialist
+            // Attack has no true specialist, so T0 generalist fills that role
+            score += 35;
+            if (debug) console.log(`    ${unit.name}: +35 (T0 generalist on attack = de-facto specialist)`);
         } else {
-            // Generalist support/defense
-            const hasTagPreferences = unit.synergy?.tags?.length > 0;
-            
-            if (!hasTagPreferences) {
-                // Pure generalist (no tag preferences at all) - e.g., Caesar, Ben
-                // These are flexible but never optimal
-                const teamDPSTypes = dpsUnits.map(getDPSType).filter(t => t !== null);
-                if (teamDPSTypes.length > 0) {
-                    score -= 15; // Small penalty for not being specialized
-                }
-            } else {
-                // Partial generalist (has preferences but not a specialist)
-                // E.g., Nicole (avoids rupture but not a specialist), Astra (no avoid)
-                const teamDPSTypes = dpsUnits.map(getDPSType).filter(t => t !== null);
-                const primaryDPSType = teamDPSTypes[0];
-                
-                // Check if preferences match team DPS
-                const matchesTeamDPS = unit.synergy?.tags?.includes(primaryDPSType);
-                const avoidsTeamDPS = unit.synergy?.avoid?.includes(primaryDPSType);
-                
-                if (avoidsTeamDPS) {
-                    // Generalist that avoids this DPS type - heavy penalty
-                    score -= 60; // E.g., Nicole on rupture team
-                } else if (matchesTeamDPS) {
-                    // Generalist with matching preference - small bonus but still loses to specialist
-                    score += 10; // Less than specialist bonus (40)
-                } else {
-                    // Generalist with non-matching preference - moderate penalty
-                    score -= 25; // E.g., element-focused support on wrong-element team
-                }
-            }
+            // Regular generalist contribution
+            score += 8;
+            if (debug) console.log(`    ${unit.name}: +8 (generalist contribution)`);
         }
     }
     
     // Synergy scoring
+    if (debug) console.log(`\n  SYNERGY SCORING:`);
     for (const unit of team) {
-        const teammates = team.filter(t => t.numericId !== unit.numericId);
-        score += calculateSynergyScore(unit, teammates, boss, lenient);
+        const teammates = team.filter(t => t.name !== unit.name);
+        const synergyScore = calculateSynergyScore(unit, teammates, boss, lenient, debug);
+        score += synergyScore;
+        if (debug) console.log(`    ${unit.name} synergy total: ${synergyScore >= 0 ? '+' : ''}${synergyScore}`);
     }
     
     // DPS mixing penalty
@@ -1073,8 +1176,8 @@ export function scoreTeamForBoss(team, boss, options = {}) {
     }
     
     if (debug) {
-        log(`Final score: ${score}`);
-        return { score, debugReasons };
+        console.log(`\n  FINAL SCORE: ${score}`);
+        console.log(`${'='.repeat(60)}\n`);
     }
     
     return score;
