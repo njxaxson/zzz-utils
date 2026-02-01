@@ -1,6 +1,6 @@
 [
     {
-        "id": "dead-end-butcher",
+        "id": "butcher",
         "name": "Notorious Dead End Butcher",
         "shortName": "Dead End Butcher",
         "weaknesses": ["ice", "ether"],
@@ -11,7 +11,7 @@
         "favored": ["Miyabi", "Vivian"]
     },
     {
-        "id": "corruption-complex",
+        "id": "ucc",
         "name": "Unknown Corruption Complex",
         "shortName": "Corruption Complex",
         "weaknesses": ["electric", "ether"],
@@ -44,7 +44,7 @@
         "favored": ["Evelyn"]
     },
     {
-        "id": "typhon-slugger",
+        "id": "typhon",
         "name": "Typhon Slugger",
         "shortName": "Typhon Slugger",
         "weaknesses": ["electric"],
@@ -55,7 +55,7 @@
         "favored": []
     },
     {
-        "id": "sacrifice-bringer",
+        "id": "sacrifice",
         "name": "Sacrifice Bringer",
         "shortName": "Sacrifice Bringer",
         "weaknesses": ["ice"],
@@ -66,7 +66,7 @@
         "favored": ["Miyabi"]
     },
     {
-        "id": "miasma-priest",
+        "id": "priest",
         "name": "Miasma Priest",
         "shortName": "Miasma Priest",
         "weaknesses": ["ether"],
@@ -77,7 +77,7 @@
         "favored": ["Yixuan"]
     },
     {
-        "id": "miasmic-fiend",
+        "id": "fiend",
         "name": "Miasmic Fiend Unfathomable",
         "shortName": "Miasmic Fiend",
         "weaknesses": ["ether", "physical"],
@@ -99,7 +99,7 @@
         "favored": ["Seed", "SAnby"]
     },
     {
-        "id": "wandering-hunter",
+        "id": "hunter",
         "name": "Wandering Hunter",
         "shortName": "Wandering Hunter",
         "weaknesses": ["fire", "ice"],
@@ -110,7 +110,7 @@
         "favored": ["Yidhari", "Banyue"]
     },
     {
-        "id": "thrall-sobek",
+        "id": "thrall",
         "name": "Thrall & Sobek",
         "shortName": "Thrall & Sobek",
         "weaknesses": ["ice", "physical"],
@@ -121,7 +121,7 @@
         "favored": ["Dialyn", "Ye Shunguong"]
     },
     {
-        "id": "primordial-nightmare",
+        "id": "nightmare",
         "name": "Primordial Nightmare",
         "shortName": "Primordial Nightmare",
         "weaknesses": ["physical"],

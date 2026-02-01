@@ -21,74 +21,118 @@ async function main() {
     const { scoreTeamForBoss } = await import('./app/public/lib/team-scorer.js');
 
     // ============================================================================
-    // CONFIGURATION - Modify these values as needed
+    // COMMAND-LINE ARGUMENTS
     // ============================================================================
 
-    // Specify which 3 bosses to analyze (use exact names from bosses.json)
-    const SELECTED_BOSSES = [
-        "Notorious Dead End Butcher",
-        "Unknown Corruption Complex",
-        //"Notorious Marionettes",
-        "Notorious Pompey",
-        //"Typhon Slugger",
-        //"Sacrifice Bringer",
-        //"Miasma Priest",
-        //"Miasmic Fiend Unfathomable",
-        // "The Defiler",
-        // "Wandering Hunter",
-        // "Thrall & Sobek",
-    ];
+    function parseArgs() {
+        const args = process.argv.slice(2);
+        const options = {
+            bossFilter: null,   // Case-insensitive boss name filter (contains match)
+            depth: 5,           // Number of solution sets to display
+            onlyMine: false,    // Filter to personal roster units
+            preview: false,     // Include preview/unavailable units
+            debug: false,       // Enable debug logging for scoring
+            units: null,        // Comma-separated list of unit names (replaces roster)
+            exclude: null,      // Comma-separated list of unit names to exclude
+            include: null,      // Comma-separated list of unit names that must appear in solution
+            flex: null          // Comma-separated list of flex/universal unit names
+        };
+        
+        for (let i = 0; i < args.length; i++) {
+            // Check for shorthand depth format: -5, -10, etc.
+            const depthMatch = args[i].match(/^-(\d+)$/);
+            if (depthMatch) {
+                options.depth = parseInt(depthMatch[1], 10);
+            } else if (args[i] === '--depth' && args[i + 1]) {
+                options.depth = parseInt(args[i + 1], 10);
+                i++;
+            } else if ((args[i] === '--bosses' || args[i] === '-b') && args[i + 1]) {
+                options.bossFilter = args[i + 1].toLowerCase();
+                i++;
+            } else if (args[i] === '--only-mine' || args[i] === '-m') {
+                options.onlyMine = true;
+            } else if (args[i] === '--preview' || args[i] === '-p') {
+                options.preview = true;
+            } else if (args[i] === '--debug' || args[i] === '-d') {
+                options.debug = true;
+            } else if ((args[i] === '--units' || args[i] === '-u') && args[i + 1]) {
+                options.units = args[i + 1].split(',').map(u => u.trim());
+                i++;
+            } else if ((args[i] === '--exclude' || args[i] === '-x') && args[i + 1]) {
+                options.exclude = args[i + 1].split(',').map(u => u.trim());
+                i++;
+            } else if ((args[i] === '--include' || args[i] === '-i') && args[i + 1]) {
+                options.include = args[i + 1].split(',').map(u => u.trim());
+                i++;
+            } else if ((args[i] === '--flex' || args[i] === '-f') && args[i + 1]) {
+                options.flex = args[i + 1].split(',').map(u => u.trim());
+                i++;
+            }
+        }
+        
+        return options;
+    }
+
+    const CLI = parseArgs();
+    const DEBUG_MATCHUPS = CLI.debug;
+
+    // ============================================================================
+    // CONFIGURATION
+    // ============================================================================
+
+    // Validate boss filter - must match exactly 3 bosses
+    if (!CLI.bossFilter) {
+        console.error("ERROR: Boss filter required. Use --bosses/-b <filter> to specify bosses.");
+        console.log("Example: node deadly-assault.js -b butch,ucc,pomp");
+        console.log("\nAvailable bosses:");
+        bosses.forEach(b => console.log(`  - ${b.name}`));
+        return;
+    }
+
+    // Parse boss filter (comma-separated for multiple filters)
+    const bossFilters = CLI.bossFilter.split(',').map(f => f.trim().toLowerCase());
+    const SELECTED_BOSSES = [];
+    
+    for (const filter of bossFilters) {
+        const matches = bosses.filter(b => 
+            b.name.toLowerCase().includes(filter) ||
+            (b.shortName && b.shortName.toLowerCase().includes(filter)) ||
+            (b.id && b.id.toLowerCase().includes(filter))
+        );
+        for (const match of matches) {
+            if (!SELECTED_BOSSES.includes(match.name)) {
+                SELECTED_BOSSES.push(match.name);
+            }
+        }
+    }
+
+    if (SELECTED_BOSSES.length !== 3) {
+        console.error(`ERROR: Boss filter must match exactly 3 bosses. Found ${SELECTED_BOSSES.length}:`);
+        SELECTED_BOSSES.forEach(name => console.log(`  - ${name}`));
+        if (SELECTED_BOSSES.length < 3) {
+            console.log("\nAvailable bosses:");
+            bosses.forEach(b => console.log(`  - ${b.name}`));
+        }
+        return;
+    }
 
     // Maximum number of team combinations to display
-    const RESULT_LIMIT = 5;
+    const RESULT_LIMIT = CLI.depth;
 
-    // Set to true to show top teams per boss (for debugging)
-    // Can also be enabled via command line: node deadly-assault.js --debug
-    const DEBUG_MATCHUPS_CONFIG = false;
-    const DEBUG_MATCHUPS = DEBUG_MATCHUPS_CONFIG || process.argv.includes('--debug');
+    // Units to exclude from consideration
+    let EXCLUDED_UNITS = [];
+    if (CLI.exclude && CLI.exclude.length > 0) {
+        EXCLUDED_UNITS = CLI.exclude;
+        console.log(`Excluding units: ${EXCLUDED_UNITS.join(', ')}`);
+    }
 
-    // Units to exclude from consideration (not good enough to include)
-    const EXCLUDED_UNITS = [
-        // "Anby",
-        // "Anton",
-        // "Ben",
-        // "Billy",
-        // "Corin",
-        // "Seth"
-    ];
+    // Log include requirement if specified
+    if (CLI.include && CLI.include.length > 0) {
+        console.log(`Solutions must include at least one of: ${CLI.include.join(', ')}`);
+    }
 
-    // Optional: Specify a subset of units to use (whitelist)
-    // If empty/undefined, all units in units.json will be available (minus excluded)
-    // Example: Only A-ranks and standard S-ranks
-    const INCLUDED_UNITS = [
-        // "Anby",
-        // "Anton",
-        // "Ben",
-        // "Billy",
-        // "Corin",
-        // "Grace",
-        // "Koleda",
-        // "Komano",
-        // "Lucy",
-        // "Lycaon",
-        // "Nekomata",
-        // "Nicole",
-        // "Pan Yinhu",
-        // "Piper",
-        // "Pulchra",
-        // "Rina",
-        // "Seth",
-        // "Soldier 11",
-        // "Soukaku",
-    ];
-
-    // Universal units: Can join ANY 2-person team to form a 3-person team,
-    // even if they don't satisfy normal join conditions.
-    // Useful for strong support units with limited join options (e.g., Nicole)
-    const UNIVERSAL_UNITS = [
-        "Nicole",
-        "Astra"
-    ];
+    // Flex/universal units: Can join ANY 2-person team to form a 3-person team
+    const UNIVERSAL_UNITS = CLI.flex || ["Nicole"];
 
     // Developer-only: Additional units not in units.json
     // Useful for testing unreleased characters, characters you don't own, or hypothetical units
@@ -338,10 +382,17 @@ async function main() {
     }
     console.log();
     
-    // Start with base units - filter by roster.json for personal roster, or use all units
-    // const baseUnits = allUnits.filter(u => myRoster.hasOwnProperty(u.name)); // Personal roster
-    const baseUnits = [...allUnits]; // Full roster
-    let availableUnits = [...baseUnits];
+    // Build roster based on CLI options
+    let availableUnits;
+    
+    if (CLI.units && CLI.units.length > 0) {
+        // --units/-u: Use specified units only (replaces full roster)
+        availableUnits = allUnits.filter(u => CLI.units.includes(u.name));
+        console.log(`Unit whitelist: ${CLI.units.join(', ')}`);
+    } else {
+        // Default: use all units
+        availableUnits = [...allUnits];
+    }
     
     // Add developer units if any
     if (DEVELOPER_UNITS && DEVELOPER_UNITS.length > 0) {
@@ -349,18 +400,29 @@ async function main() {
         if (DEBUG_MATCHUPS) console.log(`Developer units added: ${DEVELOPER_UNITS.map(u => u.name).join(", ")}`);
     }
     
-    // Apply whitelist if specified
-    if (INCLUDED_UNITS && INCLUDED_UNITS.length > 0) {
-        availableUnits = availableUnits.filter(u => INCLUDED_UNITS.includes(u.name));
-        if (DEBUG_MATCHUPS) console.log(`Whitelist active: ${INCLUDED_UNITS.length} units specified`);
+    // --only-mine/-m: Filter to personal roster (applied on top of other filters)
+    if (CLI.onlyMine) {
+        const beforeCount = availableUnits.length;
+        availableUnits = availableUnits.filter(u => myRoster.hasOwnProperty(u.name));
+        console.log(`Personal roster filter: ${availableUnits.length} units (from ${beforeCount})`);
     }
     
-    // Apply blacklist
+    // --preview/-p: Filter out unavailable units unless preview flag is set
+    if (!CLI.preview) {
+        const beforeCount = availableUnits.length;
+        availableUnits = availableUnits.filter(u => u.available !== false);
+        const filteredCount = beforeCount - availableUnits.length;
+        if (filteredCount > 0) {
+            console.log(`Filtered out ${filteredCount} preview/unavailable unit(s) (use --preview to include)`);
+        }
+    }
+    
+    // --exclude/-x: Apply blacklist
     availableUnits = availableUnits.filter(u => !EXCLUDED_UNITS.includes(u.name));
     
     if (DEBUG_MATCHUPS) {
-        const whitelistNote = (INCLUDED_UNITS && INCLUDED_UNITS.length > 0) ? " (whitelist mode)" : "";
-        console.log(`Using ${availableUnits.length} units${whitelistNote}\n`);
+        const modeNote = CLI.units ? " (whitelist mode)" : (CLI.onlyMine ? " (personal roster)" : "");
+        console.log(`Using ${availableUnits.length} units${modeNote}\n`);
     }
     
     // Generate all valid teams (includes 2-person and 3-person teams)
@@ -405,7 +467,7 @@ async function main() {
         // First pass: normal scoring
         for (const label of teamLabels) {
             const team = threeCharTeams[label];
-            const score = scoreTeamForBoss(team, boss);
+            const score = scoreTeamForBoss(team, boss, { debug: CLI.debug });
             
             if (score > 0) {
                 viableTeamsByBoss[boss.name].push({ label, team, score });
@@ -417,7 +479,7 @@ async function main() {
             lenientBosses.push(boss.name);
             for (const label of teamLabels) {
                 const team = threeCharTeams[label];
-                const score = scoreTeamForBoss(team, boss, { lenient: true });
+                const score = scoreTeamForBoss(team, boss, { lenient: true, debug: CLI.debug });
                 
                 if (score > 0) {
                     viableTeamsByBoss[boss.name].push({ label, team, score, lenient: true });
@@ -456,6 +518,26 @@ async function main() {
     // Find exclusive combinations
     let combinations = findExclusiveCombinations(viableTeamsByBoss, SELECTED_BOSSES);
     const totalCombos = combinations.length;
+    
+    // --include/-i: Filter to combinations that include at least one required unit
+    if (CLI.include && CLI.include.length > 0) {
+        const beforeIncludeFilter = combinations.length;
+        combinations = combinations.filter(combo => {
+            // Get all units in this solution set
+            const allUnitsInSolution = new Set();
+            for (const assignment of combo.assignments) {
+                for (const unit of assignment.team) {
+                    allUnitsInSolution.add(unit.name);
+                }
+            }
+            // Check if at least one required unit is present
+            return CLI.include.some(requiredUnit => allUnitsInSolution.has(requiredUnit));
+        });
+        const includeFilteredCount = beforeIncludeFilter - combinations.length;
+        if (DEBUG_MATCHUPS && includeFilteredCount > 0) {
+            console.log(`Include filter removed ${includeFilteredCount} combinations`);
+        }
+    }
     
     // Filter out dominated combinations
     // A combo is dominated if we could swap in a team with more Tier 0 units without conflicts
@@ -528,7 +610,7 @@ async function main() {
     
     if (combinations.length > RESULT_LIMIT) {
         console.log(`... and ${combinations.length - RESULT_LIMIT} more combinations.`);
-        console.log(`Increase RESULT_LIMIT to see more.`);
+        console.log(`Use --depth or -N to see more (e.g., -10 for top 10).`);
     }
 }
 

@@ -36,7 +36,8 @@ async function main() {
             preview: false, // Include preview/unavailable units
             debug: false,   // Enable debug logging for scoring
             units: null,    // Comma-separated list of unit names to include (for debugging)
-            exclude: null   // Comma-separated list of unit names to exclude
+            exclude: null,  // Comma-separated list of unit names to exclude
+            include: null   // Comma-separated list of unit names that teams must include
         };
         
         for (let i = 0; i < args.length; i++) {
@@ -44,23 +45,26 @@ async function main() {
             const depthMatch = args[i].match(/^-(\d+)$/);
             if (depthMatch) {
                 options.depth = parseInt(depthMatch[1], 10);
-            } else if (args[i] === '--filter' && args[i + 1]) {
-                options.filter = args[i + 1].toLowerCase();
-                i++;
             } else if (args[i] === '--depth' && args[i + 1]) {
                 options.depth = parseInt(args[i + 1], 10);
                 i++;
-            } else if (args[i] === '--only-mine') {
+            } else if ((args[i] === '--bosses' || args[i] === '-b') && args[i + 1]) {
+                options.filter = args[i + 1].toLowerCase();
+                i++;
+            } else if (args[i] === '--only-mine' || args[i] == '-m') {
                 options.onlyMine = true;
-            } else if (args[i] === '--preview') {
+            } else if (args[i] === '--preview' || args[i] == '-p') {
                 options.preview = true;
-            } else if (args[i] === '--debug') {
+            } else if (args[i] === '--debug' || args[i] == '-d') {
                 options.debug = true;
-            } else if (args[i] === '--units' && args[i + 1]) {
+            } else if ((args[i] === '--units' || args[i] === '-u') && args[i + 1]) {
                 options.units = args[i + 1].split(',').map(u => u.trim());
                 i++;
             } else if ((args[i] === '--exclude' || args[i] === '-x') && args[i + 1]) {
                 options.exclude = args[i + 1].split(',').map(u => u.trim());
+                i++;
+            } else if ((args[i] === '--include' || args[i] === '-i') && args[i + 1]) {
+                options.include = args[i + 1].split(',').map(u => u.trim());
                 i++;
             }
         }
@@ -89,6 +93,11 @@ async function main() {
     if (CLI_OPTIONS.exclude && CLI_OPTIONS.exclude.length > 0) {
         EXCLUDED_UNITS.push(...CLI_OPTIONS.exclude);
         console.log(`Excluding units: ${CLI_OPTIONS.exclude.join(', ')}`);
+    }
+    
+    // Log included units requirement if specified
+    if (CLI_OPTIONS.include && CLI_OPTIONS.include.length > 0) {
+        console.log(`Teams must include at least one of: ${CLI_OPTIONS.include.join(', ')}`);
     }
 
     // Optional: Specify a subset of units to use (whitelist)
@@ -215,6 +224,18 @@ async function main() {
         const viableTeams = [];
         for (const label of teamLabels) {
             const team = threeCharTeams[label];
+            
+            // Skip teams that don't include at least one required unit
+            if (CLI_OPTIONS.include && CLI_OPTIONS.include.length > 0) {
+                const teamUnitNames = team.map(u => u.name);
+                const hasRequiredUnit = CLI_OPTIONS.include.some(requiredUnit => 
+                    teamUnitNames.includes(requiredUnit)
+                );
+                if (!hasRequiredUnit) {
+                    continue; // Skip this team
+                }
+            }
+            
             const score = scoreTeamForBoss(team, boss, { debug: CLI_OPTIONS.debug });
             if (score > 0) {
                 viableTeams.push({ label, team, score });
