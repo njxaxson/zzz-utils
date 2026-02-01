@@ -53,10 +53,14 @@ Dialyn / Yixuan / Lucia
 - Lucia: Rupture SPECIALIST support
 
 ### Ideal Attack Team
-Ye Shunguong / Zhao / Astra (or Dialyn instead of Astra)
+Ye Shunguong / Zhao / Sunna (or Dialyn/YSG/Sunna)
 - YSG: Primary attack DPS (titled, stunless)
-- Zhao: YSG's best-in-slot partner (unique synergy)
-- Astra: Generalist support OR Dialyn for free ultimates
+- Zhao: YSG's best-in-slot partner (unique mutual synergy)
+- Sunna: YSG specialist support (unique mutual synergy, replaces Astra)
+
+Alternative compositions (roughly equal):
+- Dialyn/YSG/Sunna: Stunner for free ultimates (Sunna slightly better than Zhao here - buffs Dialyn)
+- YSG/Zhao/Astra: Still excellent if Sunna unavailable
 
 #### Why YSG + Double Support is So Powerful
 YSG has incredible crit damage multipliers (+240%) with guaranteed crits.
@@ -111,6 +115,29 @@ Comparable output: Miyabi teams (pseudo double-ultimate, lots of defense penetra
 ### Nekomata
 - T3 garbage, should rarely appear in rankings
 - Only "real" use is as emergency enabler for Seed, but not her intended role
+
+### Aria
+- T1 ether anomaly DPS with unique "stun synergy" mechanic
+- Has "stun" in synergy.tags - enables stun/anomaly/support compositions
+- Valid compositions:
+  - stun + Aria + support/defense (unique among non-titled anomaly)
+  - Aria + anomaly + support (traditional double-anomaly)
+- INVALID: Aria + double support (no stunner) - disqualified as solo non-titled anomaly
+- Unlike Miyabi (titled T0), Aria cannot function with double-support composition
+- Scores lower than Miyabi in equivalent stun compositions due to tier gap (T1 vs T0)
+- Future-proofed: Any anomaly with `synergy.tags.includes("stun")` gets same treatment
+- Mutual synergy with Sunna (both list each other)
+- Part of AoD faction with Sunna (future unit Nangong Yu expected to complete the trio)
+
+### Sunna
+- T1 physical support with mutual synergy to YSG and Aria
+- Better than Astra when paired with YSG or Aria (mutual synergy bonus)
+- synergy.tags includes "attack" and "anomaly" - works with Dialyn's attack damage
+- Dead weight on rupture teams (has avoid:rupture tag)
+- Part of AoD faction with Aria
+- YSG's ideal teams now include Sunna:
+  - YSG/Zhao/Sunna (double-support, Sunna replaces Astra)
+  - Dialyn/YSG/Sunna (Sunna slightly better than Zhao when using Dialyn)
 
 
 ## SUPPORT UNIT REFERENCE
@@ -170,12 +197,12 @@ These supports work with attack, anomaly, AND rupture teams.
 
 **Zhao (T0.5)** - YSG Specialist / Good Generalist
 - "Ether Veil Specialist" - YSG is currently the only unit using this mechanic
-- BEST-IN-SLOT for YSG specifically (unique synergy)
+- BEST-IN-SLOT for YSG specifically (unique mutual synergy)
+- When Sunna is available: YSG/Zhao/Sunna is ideal (Sunna replaces Astra)
 - GOOD (not just acceptable) for other attackers and anomaly
 - Provides +1000 ATK, increases general damage output
 - Astra is better than Zhao for non-YSG units
 - BAD for rupture (has avoid:rupture tag)
-- Future unit Aria will also synergize with Zhao's mechanic
 
 **Nicole (T0.5)** - Attack/Anomaly Support, Rupture Excluded
 - Provides 40% defense debuff (ENORMOUS)
@@ -211,6 +238,15 @@ These supports work with attack, anomaly, AND rupture teams.
 - You would NEVER want him with better options available
 - Only use: new accounts with few limited characters
 - Near-disqualifying tier
+
+**Sunna (T1)** - YSG/Aria Specialist
+- Mutual synergy with YSG and Aria (both list each other in synergy.units)
+- BETTER than Astra when paired with YSG or Aria (mutual synergy bonus)
+- For YSG: Sunna replaces Astra in double-support comps (YSG/Zhao/Sunna)
+- When using Dialyn with YSG: Sunna slightly better than Zhao (buffs Dialyn's attack damage)
+- synergy.tags: ["attack", "anomaly"] - works with any attacker or anomaly DPS
+- BAD for rupture (has avoid:rupture tag) - dead weight, 0 contribution
+- Astra remains better generalist for non-YSG/non-Aria units
 
 ### Attack Teams Have No True Specialist
 - Unlike anomaly (Yuzuha) and rupture (Lucia), attack has no dedicated specialist
@@ -350,10 +386,20 @@ This is more severe than just shill mismatch.
 
 ### Anomaly Teams
 - Ideal: double anomaly + specialist support (Yuzuha)
-- Valid: single titled anomaly + specialist support
-- Solo non-titled anomaly is suboptimal
-- Anomaly teams prefer support/defense over stun
-- Having a stunner on anomaly team is a minor penalty
+- Valid: single titled anomaly + support/defense (+ stun OR explicit synergy unit)
+- Valid: stun-synergy anomaly + stunner + support/defense (see below)
+- Solo non-titled anomaly (without stun synergy) is DISQUALIFIED
+- Anomaly teams prefer support/defense over stun (EXCEPT stun-synergy anomaly)
+- Having a stunner on regular anomaly team is a minor penalty
+
+#### Stun-Synergy Anomaly Pattern
+Some anomaly units have "stun" in their synergy.tags (e.g., Aria).
+These units can work in stun/anomaly/support compositions like attack teams:
+- Detection: `unit.synergy?.tags?.includes("stun")` AND unit is anomaly
+- Valid: stun + stun-synergy-anomaly + support/defense
+- INVALID: stun-synergy-anomaly + double support (no stunner) - still disqualified
+- Stun-synergy anomaly teams do NOT receive stunner penalty (stunner is intended)
+- Scores lower than titled anomaly (e.g., Miyabi) due to tier difference, not the mechanic
 
 
 ## ARCHETYPE BONUS BALANCE
@@ -381,6 +427,21 @@ NOT based on boss shill. This allows on-element off-shill teams to get their bon
 - synergy.tags: What this unit synergizes WITH
 - synergy.avoid: What this unit should NOT be paired with
 - "subdps" in tags means unit synergizes with subdps, OR is a subdps (context dependent)
+- "stun" in tags (for anomaly units) enables stun/anomaly/support compositions
+
+### Mutual Synergy Mechanics
+When both units list each other in synergy.units, this creates a "mutual synergy":
+- Base synergy bonus: +5 when unit synergizes with teammate
+- Mutual synergy bonus: Additional +25 when DPS unit has mutual synergy (enables DPS)
+- Non-DPS mutual synergy: Additional +5
+
+Examples of mutual synergy pairs:
+- YSG + Zhao (both list each other - YSG gets +5 + +25 = +30)
+- Aria + Sunna (both list each other - Aria gets +5 + +25 = +30)
+- Seed + Orphie (both list each other - Seed gets +5 + +25 = +30)
+
+Mutual synergy indicates a specifically designed tag-team duo that performs
+significantly better together than either would with generic partners.
 
 ### Specialist Detection
 A specialist has:
@@ -415,3 +476,15 @@ When testing scoring changes, verify these scenarios:
 
 5. Thrall (stun shill):
    - Ben (T4 defense) should NOT appear in top rankings
+
+6. Aria Stun-Synergy Compositions (ether-weak boss):
+   - Stun/Aria/Sunna - Valid, should score well (mutual synergy bonus)
+   - Stun/Aria/Astra - Valid, slightly lower than with Sunna
+   - Aria/Vivian/Yuzuha - Valid double-anomaly
+   - Aria/Astra/Sunna (no stun) - DISQUALIFIED (solo non-titled anomaly)
+   - Stun/Miyabi/support - Should score higher than Stun/Aria/support (T0 vs T1)
+
+7. YSG Teams with Sunna:
+   - YSG/Zhao/Sunna - Very high score (double mutual synergy)
+   - Dialyn/YSG/Sunna - Should score similarly to YSG/Zhao/Sunna
+   - YSG/Zhao/Astra - Should score lower than YSG/Zhao/Sunna

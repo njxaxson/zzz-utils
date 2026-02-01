@@ -54,6 +54,10 @@ export function isTitled(unit) {
     return unit.tags.includes("title");
 }
 
+export function hasStunSynergy(unit) {
+    return unit.synergy?.tags?.includes("stun");
+}
+
 export function isLimited(unit) {
     return unit.limited === true;
 }
@@ -623,7 +627,18 @@ export function scoreTeamForBoss(team, boss, options = {}) {
             }
         }
         
-        if (!hasAnomalyAttackSynergy) {
+        // Check for stun-synergy anomaly exception (e.g., Aria)
+        // These anomaly units can work in stun/anomaly/support compositions like attack teams
+        const hasStunSynergyAnomalyComp = nonTitledAnomalyUnits.some(hasStunSynergy) && stunUnits.length >= 1;
+        
+        if (hasStunSynergyAnomalyComp) {
+            // Valid stun-synergy anomaly composition
+            // Give reduced composition bonus (tier difference handles Miyabi > Aria)
+            log('Stun-synergy anomaly with stunner', 15);
+            score += 15;
+        }
+        
+        if (!hasAnomalyAttackSynergy && !hasStunSynergyAnomalyComp) {
             if (nonAnomalyDPS.length > 0) {
                 // Non-titled anomaly with non-anomaly DPS - normally invalid
                 if (lenient) {
@@ -755,11 +770,18 @@ export function scoreTeamForBoss(team, boss, options = {}) {
             }
             
             // Anomaly teams prefer support/defense over stun
-            if (stunUnits.length > 0 && supportUnits.length === 0 && defenseUnits.length === 0) {
-                score -= 40;
-            } else if (stunUnits.length > 0) {
-                score -= 20;
+            // EXCEPTION: Stun-synergy anomaly units (like Aria) WANT a stunner
+            const hasStunSynergyAnomalyUnit = anomalyUnits.some(hasStunSynergy);
+            
+            if (stunUnits.length > 0 && !hasStunSynergyAnomalyUnit) {
+                // Regular anomaly team with stunner - suboptimal
+                if (supportUnits.length === 0 && defenseUnits.length === 0) {
+                    score -= 40;
+                } else {
+                    score -= 20;
+                }
             }
+            // If hasStunSynergyAnomalyUnit && stunUnits.length > 0: no penalty (intended composition)
             
             // Support/defense bonuses - given for valid anomaly comps (not just fully on-element)
             // This ensures anomaly teams on neutral boss still get support bonus
@@ -833,8 +855,7 @@ export function scoreTeamForBoss(team, boss, options = {}) {
         //   - Missing support contribution bonuses (specialist +35, or generalist +8-10)
         //   - The actual benefit of having double-stun synergy
         for (const unit of attackers) {
-            const hasStunSynergy = unit.synergy?.tags?.includes('stun');
-            if (hasStunSynergy) {
+            if (hasStunSynergy(unit)) {
                 if (stunUnits.length === 2) {
                     score += 70; // Fully compensates for missing support + provides double-stun benefit
                     if (debug) console.log(`    ${unit.name}: +70 (double-stun composition)`);
@@ -1124,12 +1145,12 @@ export function scoreTeamForBoss(team, boss, options = {}) {
     // Double stun penalty
     // Two stunners without synergy is wasteful - you'd rather have support/defense
     if (stunUnits.length >= 2) {
-        let hasStunSynergy = false;
+        let doubleStunJustified = false;
         
         // Check for specific stun synergy:
         // 1. Explicit unit synergy (one stunner lists the other in synergy.units)
         // 2. Explicit tag synergy for 'stun' (one stunner lists 'stun' in synergy.tags)
-        // 3. DPS unit explicitly requests 'stun' synergy (rare, but possible)
+        // 3. DPS unit explicitly requests 'stun' synergy (e.g., Hugo, Aria)
         
         for (let i = 0; i < stunUnits.length; i++) {
             for (let j = i + 1; j < stunUnits.length; j++) {
@@ -1138,28 +1159,28 @@ export function scoreTeamForBoss(team, boss, options = {}) {
                 
                 // Check named synergy
                 if (s1.synergy?.units?.includes(s2.name) || s2.synergy?.units?.includes(s1.name)) {
-                    hasStunSynergy = true;
+                    doubleStunJustified = true;
                     break;
                 }
                 
                 // Check specific 'stun' tag synergy
                 // We do NOT count elemental tags here because sharing an element doesn't justify double stun
-                if (s1.synergy?.tags?.includes('stun') || s2.synergy?.tags?.includes('stun')) {
-                     hasStunSynergy = true;
+                if (hasStunSynergy(s1) || hasStunSynergy(s2)) {
+                     doubleStunJustified = true;
                      break;
                 }
             }
-            if (hasStunSynergy) break;
+            if (doubleStunJustified) break;
             
             for (const dps of dpsUnits) {
-                if (dps.synergy?.tags?.includes("stun")) {
-                    hasStunSynergy = true;
+                if (hasStunSynergy(dps)) {
+                    doubleStunJustified = true;
                     break;
                 }
             }
         }
         
-        if (!hasStunSynergy) {
+        if (!doubleStunJustified) {
             score -= 150; // Heavy penalty - double stun without synergy is inefficient and should be disqualified
         }
     }

@@ -36,7 +36,7 @@
         "tags": ["anomaly", "ether", "aod", "assist:defensive"],
         "join": ["attack", "support"],
         "available": false,
-        "synergy": { "units": [], "tags": ["attack", "stun"], "avoid": [] }
+        "synergy": { "units": ["Sunna"], "tags": ["stun"], "avoid": [] }
     },
     {
         "id": "astra",
