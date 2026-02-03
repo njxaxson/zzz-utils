@@ -131,6 +131,18 @@ async function main() {
         assists: 0
     };
     bosses.push(NEUTRAL_BOSS);
+    bosses.push(
+        {
+            "id": "solo",
+            "name": "Discordant Solo",
+            "shortName": "Discordant Solo",
+            "weaknesses": ["ether"],
+            "resistances": ["ice", "fire"],
+            "shill": null,
+            "anti": ["rupture"],
+            "assists": 0,
+            "favored": ["Aria"]
+        });
 
     // ============================================================================
     // MAIN EXECUTION

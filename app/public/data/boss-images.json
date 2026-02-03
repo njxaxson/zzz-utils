@@ -1,17 +1,17 @@
 {
     "bosses": {
-        "dead-end-butcher": "butcher.webp",
-        "corruption-complex": "ucc.webp",
+        "butcher": "butcher.webp",
+        "ucc": "ucc.webp",
         "marionettes": "marionette.webp",
         "pompey": "pompey.webp",
-        "typhon-slugger": "typhon.webp",
-        "sacrifice-bringer": "bringer.webp",
-        "miasma-priest": "priest.webp",
-        "miasmic-fiend": "fiend.webp",
+        "typhon": "typhon.webp",
+        "bringer": "bringer.webp",
+        "priest": "priest.webp",
+        "fiend": "fiend.webp",
         "defiler": "defiler.webp",
-        "wandering-hunter": "hunter.webp",
-        "thrall-sobek": "thrall.webp",
-        "primordial-nightmare" : "nightmare.webp"
+        "hunter": "hunter.webp",
+        "thrall": "thrall.webp",
+        "nightmare" : "nightmare.webp"
     }
 }
 

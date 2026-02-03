@@ -55,7 +55,7 @@
         "favored": []
     },
     {
-        "id": "sacrifice",
+        "id": "bringer",
         "name": "Sacrifice Bringer",
         "shortName": "Sacrifice Bringer",
         "weaknesses": ["ice"],
@@ -130,6 +130,6 @@
         "anti": ["rupture", "anomaly"],
         "assists": 0,
         "favored": ["Ye Shunguong"]
-    }
+    } 
 ]
 
