@@ -130,6 +130,18 @@
         "anti": ["rupture", "anomaly"],
         "assists": 0,
         "favored": ["Ye Shunguong"]
-    } 
+    },
+    {
+        "id": "solo",
+        "name": "Discordant Solo",
+        "shortName": "Discordant Solo",
+        "weaknesses": ["ether"],
+        "resistances": ["ice", "fire"],
+        "shill": null,
+        "anti": ["rupture"],
+        "assists": 0,
+        "favored": ["Aria"],
+        "available": false
+    }
 ]
 

@@ -11,7 +11,8 @@
         "defiler": "defiler.webp",
         "hunter": "hunter.webp",
         "thrall": "thrall.webp",
-        "nightmare" : "nightmare.webp"
+        "nightmare" : "nightmare.webp",
+        "solo" : "solo.webp"
     }
 }
 

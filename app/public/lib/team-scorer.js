@@ -629,12 +629,33 @@ export function scoreTeamForBoss(team, boss, options = {}) {
         
         // Check for stun-synergy anomaly exception (e.g., Aria)
         // These anomaly units can work in stun/anomaly/support compositions like attack teams
-        const hasStunSynergyAnomalyComp = nonTitledAnomalyUnits.some(hasStunSynergy) && stunUnits.length >= 1;
+        // OR with explicit unit synergy (e.g., Aria/Sunna/Yuzuha)
+        const stunSynergyAnomalyUnits = nonTitledAnomalyUnits.filter(hasStunSynergy);
+        let hasStunSynergyAnomalyComp = false;
+        
+        if (stunSynergyAnomalyUnits.length > 0) {
+            const hasStunner = stunUnits.length >= 1;
+            
+            // Check for explicit unit synergy with the stun-synergy anomaly
+            let hasExplicitSynergy = false;
+            for (const anomaly of stunSynergyAnomalyUnits) {
+                for (const teammate of team.filter(t => t !== anomaly)) {
+                    if (anomaly.synergy?.units?.includes(teammate.name) || 
+                        teammate.synergy?.units?.includes(anomaly.name)) {
+                        hasExplicitSynergy = true;
+                        break;
+                    }
+                }
+                if (hasExplicitSynergy) break;
+            }
+            
+            hasStunSynergyAnomalyComp = hasStunner || hasExplicitSynergy;
+        }
         
         if (hasStunSynergyAnomalyComp) {
             // Valid stun-synergy anomaly composition
             // Give reduced composition bonus (tier difference handles Miyabi > Aria)
-            log('Stun-synergy anomaly with stunner', 15);
+            log('Stun-synergy anomaly composition', 15);
             score += 15;
         }
         

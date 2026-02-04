@@ -168,7 +168,11 @@ function loadFromStorage() {
         // Decode the bosses from URL
         const sharedBosses = decodeBosses(bossesParam, allBosses);
         if (sharedBosses) {
-            selectedBosses = sharedBosses;
+            // Filter out unavailable bosses
+            selectedBosses = sharedBosses.filter(id => {
+                const boss = allBosses.find(b => b.id === id);
+                return boss && boss.available !== false;
+            });
         } else {
             console.warn('Failed to decode shared bosses, starting with none selected');
             selectedBosses = [];
@@ -229,9 +233,11 @@ function loadPageFromStorage() {
             const data = JSON.parse(pageSaved);
             
             if (data.selectedBosses) {
-                selectedBosses = data.selectedBosses.filter(id => 
-                    allBosses.some(b => b.id === id)
-                );
+                // Filter out unavailable bosses and bosses that no longer exist
+                selectedBosses = data.selectedBosses.filter(id => {
+                    const boss = allBosses.find(b => b.id === id);
+                    return boss && boss.available !== false;
+                });
             }
         }
     } catch (e) {
@@ -321,7 +327,9 @@ function createUnitCard(unit) {
 function renderBossSection() {
     const container = document.getElementById('boss-grid');
     if (!container) return;
-    container.innerHTML = allBosses.map(boss => createBossCard(boss)).join('');
+    // Filter out bosses with available=false
+    const availableBosses = allBosses.filter(boss => boss.available !== false);
+    container.innerHTML = availableBosses.map(boss => createBossCard(boss)).join('');
 }
 
 function createBossCard(boss) {
@@ -774,7 +782,10 @@ function runOptimization() {
 function calculateOptimalTeams() {
     const availableUnits = getAvailableUnits();
     const universalUnitNames = getUniversalUnits();
-    const selectedBossObjects = selectedBosses.map(id => allBosses.find(b => b.id === id));
+    // Filter out unavailable bosses (shouldn't happen, but safety check)
+    const selectedBossObjects = selectedBosses
+        .map(id => allBosses.find(b => b.id === id))
+        .filter(boss => boss && boss.available !== false);
     const selectedBossNames = selectedBossObjects.map(b => b.name);
     
     // DEBUG: Log available units

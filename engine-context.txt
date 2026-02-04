@@ -121,12 +121,12 @@ Comparable output: Miyabi teams (pseudo double-ultimate, lots of defense penetra
 - Has "stun" in synergy.tags - enables stun/anomaly/support compositions
 - Valid compositions:
   - stun + Aria + support/defense (unique among non-titled anomaly)
+  - Aria + explicit synergy unit + support (e.g., Aria/Sunna/Yuzuha)
   - Aria + anomaly + support (traditional double-anomaly)
-- INVALID: Aria + double support (no stunner) - disqualified as solo non-titled anomaly
-- Unlike Miyabi (titled T0), Aria cannot function with double-support composition
-- Scores lower than Miyabi in equivalent stun compositions due to tier gap (T1 vs T0)
+- INVALID: Aria + double support WITHOUT stunner or explicit synergy (e.g., Aria/Astra/Nicole)
+- Scores lower than Miyabi in equivalent compositions due to tier gap (T1 vs T0)
 - Future-proofed: Any anomaly with `synergy.tags.includes("stun")` gets same treatment
-- Mutual synergy with Sunna (both list each other)
+- Mutual synergy with Sunna (both list each other) - enables Aria/Sunna/support compositions
 - Part of AoD faction with Sunna (future unit Nangong Yu expected to complete the trio)
 
 ### Sunna
@@ -394,10 +394,11 @@ This is more severe than just shill mismatch.
 
 #### Stun-Synergy Anomaly Pattern
 Some anomaly units have "stun" in their synergy.tags (e.g., Aria).
-These units can work in stun/anomaly/support compositions like attack teams:
+These units can work in compositions similar to titled anomaly (like Miyabi):
 - Detection: `unit.synergy?.tags?.includes("stun")` AND unit is anomaly
 - Valid: stun + stun-synergy-anomaly + support/defense
-- INVALID: stun-synergy-anomaly + double support (no stunner) - still disqualified
+- Valid: stun-synergy-anomaly + explicit unit synergy + support (e.g., Aria/Sunna/Yuzuha)
+- INVALID: stun-synergy-anomaly + double support WITHOUT stunner or explicit synergy
 - Stun-synergy anomaly teams do NOT receive stunner penalty (stunner is intended)
 - Scores lower than titled anomaly (e.g., Miyabi) due to tier difference, not the mechanic
 
@@ -481,7 +482,8 @@ When testing scoring changes, verify these scenarios:
    - Stun/Aria/Sunna - Valid, should score well (mutual synergy bonus)
    - Stun/Aria/Astra - Valid, slightly lower than with Sunna
    - Aria/Vivian/Yuzuha - Valid double-anomaly
-   - Aria/Astra/Sunna (no stun) - DISQUALIFIED (solo non-titled anomaly)
+   - Aria/Sunna/Yuzuha - Valid (explicit synergy with Sunna enables double-support)
+   - Aria/Astra/Nicole (no stun, no explicit synergy) - DISQUALIFIED
    - Stun/Miyabi/support - Should score higher than Stun/Aria/support (T0 vs T1)
 
 7. YSG Teams with Sunna:
