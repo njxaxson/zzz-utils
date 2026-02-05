@@ -205,7 +205,8 @@ async function main() {
     if (CLI_OPTIONS.filter) {
         filteredBosses = bosses.filter(b => 
             b.name.toLowerCase().includes(CLI_OPTIONS.filter) ||
-            (b.shortName && b.shortName.toLowerCase().includes(CLI_OPTIONS.filter))
+            (b.shortName && b.shortName.toLowerCase().includes(CLI_OPTIONS.filter)) ||
+            (b.id && b.id.toLowerCase().includes(CLI_OPTIONS.filter))
         );
         console.log(`Boss filter: "${CLI_OPTIONS.filter}" (${filteredBosses.length} matches)\n`);
     }

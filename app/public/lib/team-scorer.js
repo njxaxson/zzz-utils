@@ -391,13 +391,19 @@ export function calculateDPSMixingPenalty(team) {
     if (dpsTypes.has("attack") && dpsTypes.has("anomaly")) {
         let hasValidSynergy = false;
         
+        // Monoshock requires ALL THREE team members to share the same element
+        // Check if attacker has anomaly synergy + same-element anomaly + same-element third
         for (const attacker of attackers) {
             if (attacker.synergy?.tags?.includes("anomaly")) {
                 const attackerElement = getElement(attacker);
                 for (const anomaly of anomalyUnits) {
                     if (getElement(anomaly) === attackerElement) {
-                        hasValidSynergy = true;
-                        break;
+                        // Found matching attacker+anomaly, now check third unit
+                        const thirdUnit = team.find(u => !isAttacker(u) && !isAnomaly(u));
+                        if (thirdUnit && getElement(thirdUnit) === attackerElement) {
+                            hasValidSynergy = true;
+                            break;
+                        }
                     }
                 }
             }
@@ -405,13 +411,18 @@ export function calculateDPSMixingPenalty(team) {
         }
         
         if (!hasValidSynergy) {
+            // Also check reverse: anomaly with attack synergy
             for (const anomaly of anomalyUnits) {
                 if (anomaly.synergy?.tags?.includes("attack")) {
                     const anomalyElement = getElement(anomaly);
                     for (const attacker of attackers) {
                         if (getElement(attacker) === anomalyElement) {
-                            hasValidSynergy = true;
-                            break;
+                            // Found matching anomaly+attacker, now check third unit
+                            const thirdUnit = team.find(u => !isAttacker(u) && !isAnomaly(u));
+                            if (thirdUnit && getElement(thirdUnit) === anomalyElement) {
+                                hasValidSynergy = true;
+                                break;
+                            }
                         }
                     }
                 }
@@ -606,23 +617,25 @@ export function scoreTeamForBoss(team, boss, options = {}) {
     const nonAnomalyDPS = dpsUnits.filter(u => !u.tags.includes("anomaly"));
     
     if (nonTitledAnomalyUnits.length > 0 && anomalyUnits.length < 2) {
-        // Check for Monoshock exception: attacker with anomaly+element synergy paired with same-element anomaly
-        // Example: Harumasa (attack, electric, synergy: anomaly+electric) + Grace (anomaly, electric)
+        // Check for Monoshock exception: ALL THREE team members must share the same element
+        // Example: Harumasa (attack, electric) + Grace (anomaly, electric) + Rina (support, electric)
         let hasAnomalyAttackSynergy = false;
         
         for (const attacker of attackers) {
             if (attacker.synergy?.tags?.includes("anomaly")) {
                 const attackerElement = getElement(attacker);
-                // Check for matching element synergy (e.g., Harumasa's "electric" in synergy.tags)
-                const hasSynergyElement = attacker.synergy.tags.some(t => ELEMENTS.includes(t));
                 const matchingAnomalies = nonTitledAnomalyUnits.filter(a => getElement(a) === attackerElement);
                 
-                if (matchingAnomalies.length > 0 && (hasSynergyElement || !hasSynergyElement)) {
-                    // Attacker has anomaly synergy AND there's a same-element anomaly unit
-                    hasAnomalyAttackSynergy = true;
-                    log(`Anomaly-attack synergy: ${attacker.name} + ${matchingAnomalies[0].name}`, 10);
-                    score += 10; // Small bonus for valid Monoshock composition
-                    break;
+                if (matchingAnomalies.length > 0) {
+                    // Check that the third team member is also the same element
+                    const thirdUnit = team.find(u => !isAttacker(u) && !isAnomaly(u));
+                    if (thirdUnit && getElement(thirdUnit) === attackerElement) {
+                        // All three units share the same element - valid Monoshock
+                        hasAnomalyAttackSynergy = true;
+                        log(`Monoshock (all ${attackerElement}): ${attacker.name} + ${matchingAnomalies[0].name} + ${thirdUnit.name}`, 10);
+                        score += 10; // Small bonus for valid Monoshock composition
+                        break;
+                    }
                 }
             }
         }
@@ -791,10 +804,24 @@ export function scoreTeamForBoss(team, boss, options = {}) {
             }
             
             // Anomaly teams prefer support/defense over stun
-            // EXCEPTION: Stun-synergy anomaly units (like Aria) WANT a stunner
+            // EXCEPTION 1: Stun-synergy anomaly units (like Aria) WANT a stunner
+            // EXCEPTION 2: Monoshock compositions (attacker with anomaly synergy + same-element anomaly)
+            //              can work with OR without a stunner - it's a hybrid team, not pure anomaly
             const hasStunSynergyAnomalyUnit = anomalyUnits.some(hasStunSynergy);
             
-            if (stunUnits.length > 0 && !hasStunSynergyAnomalyUnit) {
+            // Check for Monoshock composition (attacker with anomaly synergy + same-element anomaly + same-element third)
+            // ALL THREE team members must share the same element (e.g., Grace/Harumasa/Rina all electric)
+            const hasMonoshockComp = attackers.some(a => {
+                if (!a.synergy?.tags?.includes("anomaly")) return false;
+                const attackerElement = getElement(a);
+                const hasMatchingAnomaly = anomalyUnits.some(an => getElement(an) === attackerElement);
+                if (!hasMatchingAnomaly) return false;
+                // Check that the third team member is also the same element
+                const thirdUnit = team.find(u => !isAttacker(u) && !isAnomaly(u));
+                return thirdUnit && getElement(thirdUnit) === attackerElement;
+            });
+            
+            if (stunUnits.length > 0 && !hasStunSynergyAnomalyUnit && !hasMonoshockComp) {
                 // Regular anomaly team with stunner - suboptimal
                 if (supportUnits.length === 0 && defenseUnits.length === 0) {
                     score -= 40;
@@ -803,6 +830,7 @@ export function scoreTeamForBoss(team, boss, options = {}) {
                 }
             }
             // If hasStunSynergyAnomalyUnit && stunUnits.length > 0: no penalty (intended composition)
+            // If hasMonoshockComp && stunUnits.length > 0: no penalty (hybrid team can use stunner)
             
             // Support/defense bonuses - given for valid anomaly comps (not just fully on-element)
             // This ensures anomaly teams on neutral boss still get support bonus
@@ -831,20 +859,34 @@ export function scoreTeamForBoss(team, boss, options = {}) {
     // Ideal: stun/attack/support or stun/attack/defense
     // EXCEPTION: Monoshock teams (attacker with anomaly synergy + same-element anomaly)
     if (attackers.length > 0) {
-        // Check for Monoshock composition
+        // Check for Monoshock composition (all three team members must share the same element)
         const hasAnomalyAttackComp = attackers.some(a => {
             if (!a.synergy?.tags?.includes("anomaly")) return false;
             const attackerElement = getElement(a);
-            return anomalyUnits.some(an => getElement(an) === attackerElement);
+            const hasMatchingAnomaly = anomalyUnits.some(an => getElement(an) === attackerElement);
+            if (!hasMatchingAnomaly) return false;
+            // Check that the third team member is also the same element
+            const thirdUnit = team.find(u => !isAttacker(u) && !isAnomaly(u));
+            return thirdUnit && getElement(thirdUnit) === attackerElement;
         });
         
         // Check for Stunless composition (e.g. Ye Shunguong)
         const hasStunlessAttacker = attackers.some(a => a.synergy?.tags?.includes("stunless"));
 
         if (hasAnomalyAttackComp && anomalyUnits.length > 0) {
-            // Monoshock: attacker + anomaly = valid hybrid, no stunner needed
-            log('Anomaly-attack composition - stunner not required', 10);
+            // Monoshock: attacker + anomaly = valid hybrid
+            // Can work WITH a stunner (Stun/Anomaly/Attack) or WITHOUT (Anomaly/Attack/Support)
+            log('Anomaly-attack composition (monoshock)', 10);
             score += 10;
+            
+            // If monoshock has a stunner (Stun/Anomaly/Attack), the anomaly acts as "support"
+            // for the attacker by providing shock buildup. Give bonus to partially compensate
+            // for missing traditional support bonuses - but not fully, since supports like Rina
+            // with element synergy contribute more to the anomaly/attack hybridization
+            if (stunUnits.length >= 1) {
+                log('Monoshock with stunner - anomaly as pseudo-support', 55);
+                score += 55;
+            }
         } else if (stunUnits.length >= 1) {
             if(hasStunlessAttacker && boss.shill !== "stun") {
                 log('Stunless attack unit present - stunner not required', -10);
