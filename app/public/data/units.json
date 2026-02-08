@@ -385,7 +385,6 @@
         "tier": 1.0,
         "tags": ["support", "physical", "aod", "assist:defensive"],
         "join": ["attack", "aod"],
-        "available": false,
         "synergy": { "units": ["Ye Shunguong", "Aria"], "tags": ["attack", "anomaly"], "avoid": ["rupture"] }
     },
     {
