@@ -34,8 +34,7 @@
         "limited": true,
         "tier": 1.0,
         "tags": ["anomaly", "ether", "aod", "assist:defensive"],
-        "join": ["attack", "support"],
-        "available": false,
+        "join": ["stun", "support"],
         "synergy": { "units": ["Sunna"], "tags": ["stun"], "avoid": [] }
     },
     {
@@ -425,7 +424,7 @@
         "tier" : 0.0,
         "tags" : ["attack", "physical", "yunkui", "title", "assist:defensive"],
         "join" : ["support", "defense"],
-        "synergy": { "units": ["Zhao"], "tags": ["stunless"], "avoid": [] }
+        "synergy": { "units": ["Zhao", "Sunna"], "tags": ["stunless"], "avoid": [] }
     },
     {
         "id": "yidhari",

@@ -63,7 +63,8 @@
         "shill": "anomaly",
         "anti": [],
         "assists": 0,
-        "favored": ["Miyabi"]
+        "favored": ["Miyabi"],
+        "shillIntensity": 2
     },
     {
         "id": "priest",
@@ -126,22 +127,22 @@
         "shortName": "Primordial Nightmare",
         "weaknesses": ["physical"],
         "resistances": ["ice", "ether"],
-        "shill": null,
+        "shill": "attack",
         "anti": ["rupture", "anomaly"],
         "assists": 0,
         "favored": ["Ye Shunguong"]
     },
     {
-        "id": "solo",
+        "id": "vesper",
         "name": "Discordant Solo",
         "shortName": "Discordant Solo",
         "weaknesses": ["ether"],
         "resistances": ["ice", "fire"],
-        "shill": null,
+        "shill": "anomaly",
         "anti": ["rupture"],
         "assists": 0,
-        "favored": ["Aria"],
-        "available": false
+        "favored": ["Aria", "Sunna"],
+        "shillIntensity": 2
     }
 ]
 

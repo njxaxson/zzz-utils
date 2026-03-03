@@ -40,6 +40,44 @@ When boss has no weaknesses (neutral):
 - Teams compete purely on tier and composition quality
 - Anomaly teams don't get "all on-element" treatment
 
+### Shill Intensity
+
+Not all boss shills are created equal. Some bosses have fight mechanics that make
+their shill dramatically more impactful than the standard +15/-10/-35 suggests.
+
+**Boss-side parameter:** `shillIntensity` (default: 1, implicit for most bosses)
+
+**Current effect:** Amplifies the favored unit bonus. At intensity 2, each favored
+unit is worth significantly more than the default +25. This captures boss-specific
+mechanics (like Discordant Solo's Ether Veil stacking) that make certain units
+disproportionately valuable against specific bosses.
+
+**Diminishing returns:** When multiple favored units appear on the same team at high
+shill intensity, the compounding should not be too aggressive. The first favored unit
+gets the full amplified bonus; additional favored units receive a reduced multiplier
+to prevent runaway score inflation.
+
+**Future extensibility:** The parameter is designed to also support amplifying the
+shill match/mismatch penalties (+15/-10/-35) in the future, but currently only affects
+favored bonuses.
+
+**Bosses with non-default shill intensity:**
+- **Discordant Solo** (`shillIntensity: 2`): Sunna's Ether Veil stacking mechanic
+  makes her irreplaceable (see Boss-Specific Knowledge below)
+- **Sacrifice Bringer** (`shillIntensity: 2`): This boss is one of the few that is 
+  vulnerable to the Freeze status effect, so as an ice-anomaly unit Miyabi can easily
+  paralyze this boss (literally) and prevent them from acting. This makes the fight 
+  trivial when using Miyabi. 
+
+### Titled T0 "Brute Force" Principle
+
+Titled T0 units (YSG, Yixuan, Miyabi) are powerful enough to overcome most
+disadvantages unless there is an explicit resistance. They can "brute force" fights
+that aren't specifically designed to counter them. For example, against Discordant
+Solo, Yixuan is knocked out by anti-rupture and Miyabi by ice resistance, but YSG
+(physical) can still compete despite being off-element and off-shill purely through
+raw power.
+
 ---
 
 ## Team Composition Patterns
@@ -85,6 +123,7 @@ YSG has a unique "stunless" tag because she gets stun damage multipliers FOR FRE
 **Ideal:** double anomaly + specialist support (Yuzuha)
 **Valid:** titled anomaly + support/defense + (stun OR explicit synergy partner)
 **Valid:** stun-synergy anomaly + stunner + support
+**Valid:** anomaly/support/support (with explicit synergy - see below)
 
 **Key Rules:**
 - Solo non-titled anomaly without stun synergy = DISQUALIFIED
@@ -99,6 +138,23 @@ Some anomaly units have `synergy.tags.includes("stun")` (e.g., Aria). These unit
 - Do NOT receive the normal stunner penalty
 - Can also use explicit unit synergy to enable double-support (e.g., Aria/Sunna/Yuzuha)
 - Score lower than titled anomaly due to tier difference, not the mechanic
+- **Important:** When stun-synergy anomaly compositions qualify (via stunner OR
+  explicit unit synergy), they should ALSO qualify for the full anomaly composition
+  bonuses (base comp bonus, support bonus, etc.) - i.e., they should be treated as
+  a valid anomaly comp, not just "not disqualified."
+
+**Anomaly/Support/Support Pattern (Explicit Synergy):**
+Any non-subdps anomaly unit that has an explicit synergy partner on the team can
+use the anomaly/support/support composition pattern. This generalizes the Aria
+pattern to any anomaly DPS with named synergy connections.
+- Valid: Aria/Sunna/Yuzuha (Aria ↔ Sunna mutual synergy enables this)
+- Invalid: Alice/Astra/Yuzuha (Alice has no explicit synergy.units → cannot use
+  this pattern; Alice must use double-anomaly comp instead)
+- Invalid: Vivian/Astra/Nicole (subdps cannot carry as primary DPS)
+- Invalid: Burnice/Lucy/Caesar (subdps cannot carry)
+- Invalid: Grace/Rina/Astra (subdps cannot carry)
+- The explicit synergy requirement prevents every anomaly unit from using this
+  pattern; only those with genuine named partnerships qualify
 
 ### Invalid Compositions
 
@@ -136,12 +192,18 @@ Some anomaly units have `synergy.tags.includes("stun")` (e.g., Aria). These unit
 - Single stunner is suboptimal (-30)
 - Double stun with Hugo gets +70 (compensates for missing support)
 
-**Aria** - Stun-Synergy Anomaly
+**Aria** - Stun-Synergy Anomaly (AoD Faction)
 - Has `synergy.tags: ["stun"]` despite being anomaly
 - Enables stun/anomaly/support compositions
 - Mutual synergy with Sunna (both list each other)
 - Valid: Stun/Aria/Astra, Aria/Sunna/Yuzuha
 - Invalid: Aria/Astra/Nicole (no stun, no explicit synergy)
+- **Unique playstyle:** Aria plays like an attacker despite being anomaly - she wants
+  stun windows to unload powerful attacks, rather than relying on disorder reactions
+  like most anomaly units. Her stun-synergy tag reflects this attacker-like playstyle.
+- When Nangong Yu (upcoming AoD ether stunner) is released, the best-in-slot for
+  Aria will be Nangong/Aria/Sunna (stun/anomaly/support - the standard stun-synergy
+  anomaly pattern). Until then, Aria/Sunna/Yuzuha is her best team.
 
 **Seed** - Requires Second Attacker
 - Has `synergy.tags: ["attack"]` and `join: ["attack"]`
@@ -167,8 +229,8 @@ When subdps attacker (Orphie) pairs with another attacker, the subdps gets 50% t
 
 **Conditional/Partial Supports:**
 - **Zhao** - YSG specialist via mutual synergy; good generalist for attack/anomaly; BAD for rupture (avoid tag)
-- **Nicole** - 40% defense debuff (huge); BAD for rupture (defense debuff useless); ether synergy with Vivian
-- **Sunna** - YSG/Aria specialist via mutual synergy; BAD for rupture (avoid tag)
+- **Nicole** - 40% defense debuff (huge); BAD for rupture (defense debuff useless); ether synergy with Vivian. **Known issue (future work):** Nicole's defense debuff is less valuable against bosses with already-low defense (e.g., anti-rupture bosses like Primordial Nightmare and Discordant Solo). The algorithm currently has no mechanism to express this; needs a new boss-side property (e.g., `lowDefense`) and a unit-side tag to reduce her contribution on such fights.
+- **Sunna** - YSG/Aria specialist via mutual synergy; BAD for rupture (avoid tag). Also has unique Ether Veil mechanics that make her irreplaceable against certain bosses (see Boss-Specific Knowledge).
 - **Rina** - Electric specialist; defense penetration generally useful for attack and anomaly teams; useless for rupture. Relatively high ultimate damage for a support unit. 
 - **Soukaku** - Ice specialist ONLY; useless without ice DPS. Very high anomaly buildup for a support unit; is practically a pseudo-anomaly unit. 
 
@@ -178,6 +240,82 @@ When subdps attacker (Orphie) pairs with another attacker, the subdps gets 50% t
 - **Lucy** - Small ATK buff (+600); slight fire synergy
 
 **Note:** Attack archetype has no true specialist. T0 generalists (Astra) serve as de-facto specialists for attack teams and receive the +35 specialist bonus.
+
+**Favored Support Contribution (High Shill Intensity):**
+On bosses with `shillIntensity > 1`, a support that is boss-favored AND synergizes
+with the team's DPS archetype should receive an enhanced support contribution bonus
+(pseudo-specialist for that fight). This captures fight-specific mechanics where a
+support is uniquely valuable against a particular boss without changing their global
+specialist classification. For example, Sunna isn't a global anomaly specialist (she
+also synergizes with attack), but against Discordant Solo she IS the fight-specialist
+due to Ether Veil stacking.
+
+---
+
+## Faction Synergy Notes
+
+Some factions are built to be internally synergistic; others are not. This affects
+how mutual synergy and team construction should be evaluated.
+
+**Highly Synergistic Factions:**
+- **Angels of Delusion (AoD)** - The most explicitly synergistic faction. Members
+  (Aria, Sunna, and upcoming Nangong Yu) strongly prefer being with each other.
+  The faction is designed around a new approach to anomaly team construction where
+  Aria doesn't depend on double-anomaly DPS (similar to Miyabi in this regard).
+  Nangong Yu will be an ether stunner designed for anomaly teams, completing the
+  stun/anomaly/support archetype for AoD.
+- **Obol** - Synergistic (Seed/Orphie mutual synergy, Trigger integration)
+- **Section 6** - Originally built to be very synergistic
+- **Pubsec** - Originally built to be very synergistic
+
+**Anti-Synergistic Factions:**
+- **Mockingbird** - Hugo and Vivian don't help each other at all
+
+**Nangong Yu (Upcoming AoD Member):**
+- Ether stunner designed for anomaly teams
+- Expected best-in-slot: Nangong/Aria/Sunna (stun/anomaly/support)
+- May also pair well with Miyabi and other anomaly primary DPS
+- Nangong+Sunna may serve as a "wheelchair" stunner+support duo that slots with
+  various attackers and primary-dps anomaly agents
+- Not yet in units.json; no preview data available
+
+---
+
+## Boss-Specific Knowledge
+
+### Discordant Solo (Vesper)
+- **Weaknesses:** ether | **Resistances:** ice, fire | **Shill:** anomaly | **Anti:** rupture
+- **Shill Intensity:** 2 (one of only two bosses with non-default intensity)
+- **Favored:** Aria, Sunna
+
+**Ether Veil Mechanic:** Several units can create Ether Veils (Lucia, Yidhari, Zhao,
+Sunna), but most can only create or extend one at a time - by the time it wears off,
+so does the associated debuff. Sunna is unique: she *recreates* the Ether Veil each
+time, allowing stacking debuffs that drastically increase Discordant Solo's
+vulnerability. This boss fight was designed to require Sunna.
+
+**Team Rankings (target ordering):**
+- With Aria: **Aria/Sunna/Yuzuha** is the clear #1 team
+- Without Aria: **Alice/Vivian/Sunna** ≈ **YSG/Sunna/Zhao** (roughly equal, both
+  narrowly ahead of Alice/Vivian/Yuzuha)
+- Alice and Yanagi are roughly interchangeable in the anomaly DPS slot (both off-element,
+  same tier, neither resisted). Alice is slightly better but the difference is not
+  material for scoring purposes.
+- Narrowed viable pool: only Discordant Solo and Primordial Nightmare resist two
+  elements, making team construction unusually restrictive
+
+**Why Yuzuha alone isn't enough:** Yuzuha is still excellent here (and belongs on the
+Aria team), but Sunna's Ether Veil stacking provides boss-specific debuffs that
+Yuzuha cannot replicate. The ideal Aria team brings BOTH supports.
+
+### Sacrifice Bringer
+- **Weaknesses:** ice | **Resistances:** physical | **Shill:** anomaly
+- **Shill Intensity:** 2
+- **Favored:** Miyabi
+
+Without Miyabi, this boss is quite difficult. With her the fight is trivially easy 
+(as explained why earlier in this document). Extra Miyabi-dominance in scoring is
+intentional and correct.
 
 ---
 
@@ -209,6 +347,27 @@ Current mutual synergy pairs:
 - Aria ↔ Sunna
 - Seed ↔ Orphie
 - SAnby ↔ Orphie
+
+### Boss Data Object
+
+```json
+{
+  "id": "solo",
+  "name": "Discordant Solo",
+  "weaknesses": ["ether"],
+  "resistances": ["ice", "fire"],
+  "shill": "anomaly",
+  "anti": ["rupture"],
+  "assists": 0,
+  "favored": ["Aria", "Sunna"],
+  "shillIntensity": 2
+}
+```
+
+- `shillIntensity` (optional, default 1): Amplifies favored unit bonuses. Higher
+  values mean the boss fight is more heavily skewed toward its favored units.
+  Currently only affects favored bonus; designed to be extensible to also amplify
+  shill match/mismatch penalties in the future.
 
 ### Specialist Detection
 
@@ -248,6 +407,7 @@ Key scenarios that exercise distinct algorithm paths:
 ### Support Contribution Paths
 - Matching specialist (+35)
 - T0 generalist on attack team (de-facto specialist +35)
+- Boss-favored support on high-intensity boss (enhanced contribution, pseudo-specialist)
 - Dead weight (avoid tag matches team archetype = 0)
 - Regular generalist (+8)
 
@@ -256,6 +416,10 @@ Key scenarios that exercise distinct algorithm paths:
 - Subdps without main DPS (-100, or ignored in lenient)
 - Element synergy wasted (-70)
 - Avoid tag triggered by DPS = Disqualified (-999)
+
+### Shill Intensity Paths
+- shillIntensity > 1: amplified favored bonus (with diminishing returns for multiple)
+- Boss-favored support + synergizes with team archetype + shillIntensity > 1: enhanced contribution
 
 ### Tier Scoring
 - DPS tier: T0/T0.5 elite (+65/+55), T1/T1.5 good (+25/+20), T2+ penalized

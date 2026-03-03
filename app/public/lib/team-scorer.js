@@ -520,11 +520,19 @@ export function scoreTeamForBoss(team, boss, options = {}) {
         }
     }
     
-    // Favored units
+    // Favored units (amplified by shillIntensity)
+    const shillIntensity = boss.shillIntensity ?? 1;
     if (boss.favored && boss.favored.length > 0) {
+        let favoredCount = 0;
         for (const unit of team) {
             if (boss.favored.includes(unit.name)) {
-                score += 25;
+                favoredCount++;
+                const multiplier = favoredCount === 1
+                    ? shillIntensity
+                    : 1 + (shillIntensity - 1) * 0.5;
+                const bonus = Math.round(25 * multiplier);
+                score += bonus;
+                if (debug) console.log(`  Favored: ${unit.name} +${bonus} (intensity ${shillIntensity}, #${favoredCount})`);
             }
         }
     }
@@ -616,6 +624,10 @@ export function scoreTeamForBoss(team, boss, options = {}) {
     const nonTitledAnomalyUnits = anomalyUnits.filter(u => !isTitled(u));
     const nonAnomalyDPS = dpsUnits.filter(u => !u.tags.includes("anomaly"));
     
+    // Flags for solo anomaly composition validity - hoisted so anomaly comp section can use them
+    let hasStunSynergyAnomalyComp = false;
+    let hasExplicitSynergyAnomalyComp = false;
+    
     if (nonTitledAnomalyUnits.length > 0 && anomalyUnits.length < 2) {
         // Check for Monoshock exception: ALL THREE team members must share the same element
         // Example: Harumasa (attack, electric) + Grace (anomaly, electric) + Rina (support, electric)
@@ -644,12 +656,10 @@ export function scoreTeamForBoss(team, boss, options = {}) {
         // These anomaly units can work in stun/anomaly/support compositions like attack teams
         // OR with explicit unit synergy (e.g., Aria/Sunna/Yuzuha)
         const stunSynergyAnomalyUnits = nonTitledAnomalyUnits.filter(hasStunSynergy);
-        let hasStunSynergyAnomalyComp = false;
         
         if (stunSynergyAnomalyUnits.length > 0) {
             const hasStunner = stunUnits.length >= 1;
             
-            // Check for explicit unit synergy with the stun-synergy anomaly
             let hasExplicitSynergy = false;
             for (const anomaly of stunSynergyAnomalyUnits) {
                 for (const teammate of team.filter(t => t !== anomaly)) {
@@ -665,14 +675,34 @@ export function scoreTeamForBoss(team, boss, options = {}) {
             hasStunSynergyAnomalyComp = hasStunner || hasExplicitSynergy;
         }
         
+        // Explicit synergy anomaly/support/support pattern (generalized)
+        // Non-subdps anomaly with explicit unit synergy partner can use double-support composition
+        // This enables patterns like Aria/Sunna/Yuzuha and future similar compositions
+        if (!hasStunSynergyAnomalyComp) {
+            const nonSubdpsAnomalyUnits = nonTitledAnomalyUnits.filter(u => 
+                !u.synergy?.tags?.includes("subdps")
+            );
+            for (const anomaly of nonSubdpsAnomalyUnits) {
+                for (const teammate of team.filter(t => t !== anomaly)) {
+                    if (anomaly.synergy?.units?.includes(teammate.name) || 
+                        teammate.synergy?.units?.includes(anomaly.name)) {
+                        hasExplicitSynergyAnomalyComp = true;
+                        break;
+                    }
+                }
+                if (hasExplicitSynergyAnomalyComp) break;
+            }
+        }
+        
         if (hasStunSynergyAnomalyComp) {
-            // Valid stun-synergy anomaly composition
-            // Give reduced composition bonus (tier difference handles Miyabi > Aria)
             log('Stun-synergy anomaly composition', 15);
+            score += 15;
+        } else if (hasExplicitSynergyAnomalyComp) {
+            log('Explicit synergy anomaly/support/support', 15);
             score += 15;
         }
         
-        if (!hasAnomalyAttackSynergy && !hasStunSynergyAnomalyComp) {
+        if (!hasAnomalyAttackSynergy && !hasStunSynergyAnomalyComp && !hasExplicitSynergyAnomalyComp) {
             if (nonAnomalyDPS.length > 0) {
                 // Non-titled anomaly with non-anomaly DPS - normally invalid
                 if (lenient) {
@@ -751,7 +781,12 @@ export function scoreTeamForBoss(team, boss, options = {}) {
             isNeutralBoss || 
             anomalyUnits.some(u => boss.weaknesses.includes(getElement(u)))
         );
-        const hasValidAnomalyComp = hasOnElementTitledAnomaly || hasValidDoubleAnomaly;
+        // Stun-synergy anomaly and explicit-synergy anomaly compositions also qualify
+        // for full anomaly comp bonuses (base comp, support bonus, etc.)
+        const hasValidSoloSynergyAnomaly = (hasStunSynergyAnomalyComp || hasExplicitSynergyAnomalyComp) && (
+            isNeutralBoss || anomalyUnits.some(u => boss.weaknesses.includes(getElement(u)))
+        );
+        const hasValidAnomalyComp = hasOnElementTitledAnomaly || hasValidDoubleAnomaly || hasValidSoloSynergyAnomaly;
         
         if (hasValidAnomalyComp) {
             // Base comp bonus for valid anomaly teams
@@ -1186,6 +1221,12 @@ export function scoreTeamForBoss(team, boss, options = {}) {
             // Attack has no true specialist, so T0 generalist fills that role
             score += 35;
             if (debug) console.log(`    ${unit.name}: +35 (T0 generalist on attack = de-facto specialist)`);
+        } else if (shillIntensity > 1 && boss.favored?.includes(unit.name) && 
+                   unit.synergy?.tags?.includes(teamArchetype)) {
+            // Boss-favored support on high shill intensity boss, synergizing with team archetype
+            // Acts as a pseudo-specialist for this specific fight
+            score += 25;
+            if (debug) console.log(`    ${unit.name}: +25 (favored pseudo-specialist, intensity ${shillIntensity})`);
         } else {
             // Regular generalist contribution
             score += 8;
