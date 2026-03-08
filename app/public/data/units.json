@@ -35,7 +35,7 @@
         "tier": 1.0,
         "tags": ["anomaly", "ether", "aod", "assist:defensive"],
         "join": ["stun", "support"],
-        "synergy": { "units": ["Sunna"], "tags": ["stun"], "avoid": [] }
+        "synergy": { "units": ["Sunna", "Nangong"], "tags": ["stun"], "avoid": [] }
     },
     {
         "id": "astra",
@@ -94,6 +94,17 @@
         "tags": ["defense", "physical", "calydon", "assist:defensive"],
         "join": ["calydon", "assist:defensive"],
         "synergy": { "units": [], "tags": [], "avoid": [] }
+    },
+    {
+        "id": "cissia",
+        "name": "Cissia",
+        "rank": "S",
+        "limited": true,
+        "tier": 1.5,
+        "tags": ["attack", "electric", "pubsec", "assist:defensive"],
+        "join": ["stun", "electric"],
+        "available": false,
+        "synergy": { "units": ["Seed"], "tags": [], "avoid": [] }
     },
     {
         "id": "corin",
@@ -253,6 +264,17 @@
         "synergy": { "units": [], "tags": [], "avoid": [] }
     },
     {
+        "id": "nangong",
+        "name": "Nangong",
+        "rank": "S",
+        "limited": true,
+        "tier": 0.5,
+        "tags": ["stun", "ether", "aod", "assist:defensive"],
+        "join": ["anomaly", "aod"],
+        "available": false,
+        "synergy": { "units": ["Aria", "Sunna"], "tags": ["anomaly"], "avoid": [] }
+    },
+    {
         "id": "nekomata",
         "name": "Nekomata",
         "rank": "S",
@@ -346,7 +368,7 @@
         "tier": 0.5,
         "tags": ["attack", "electric", "obol", "assist:defensive"],
         "join": ["attack"],
-        "synergy": { "units": ["Orphie"], "tags": ["attack", "obol"], "avoid": [] }
+        "synergy": { "units": ["Orphie", "Cissia"], "tags": ["attack", "obol"], "avoid": [] }
     },
     {
         "id": "seth",
@@ -384,7 +406,7 @@
         "tier": 1.0,
         "tags": ["support", "physical", "aod", "assist:defensive"],
         "join": ["attack", "aod"],
-        "synergy": { "units": ["Ye Shunguong", "Aria"], "tags": ["attack", "anomaly"], "avoid": ["rupture"] }
+        "synergy": { "units": ["Ye Shunguong", "Aria", "Nangong"], "tags": ["attack", "anomaly"], "avoid": ["rupture"] }
     },
     {
         "id": "trigger",

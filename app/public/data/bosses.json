@@ -140,7 +140,7 @@
         "resistances": ["ice", "fire"],
         "shill": "anomaly",
         "anti": ["rupture"],
-        "assists": 0,
+        "assists": 2,
         "favored": ["Aria", "Sunna"],
         "shillIntensity": 2
     }
