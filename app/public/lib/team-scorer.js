@@ -349,7 +349,7 @@ export function calculateDPSMixingPenalty(team) {
     
     const dpsTypes = new Set(dpsUnits.map(getDPSType).filter(t => t !== null));
     
-    // Double attack without synergy - heavily penalize
+    // Double attack without synergy - disqualify unless one is subdps
     if (attackers.length >= 2) {
         let hasSynergy = false;
         for (let i = 0; i < attackers.length; i++) {
@@ -361,11 +361,13 @@ export function calculateDPSMixingPenalty(team) {
             }
         }
         if (!hasSynergy) {
-            penalty -= 200; // Attack teams want stun/attack/support, not 2x attack. Heavy penalty to disqualify unless huge synergy elsewhere
+            const hasSubdps = attackers.some(u => u.synergy?.tags?.includes("subdps"));
+            if (!hasSubdps) return -999;
+            penalty -= 200;
         }
     }
     
-    // Double rupture without synergy - heavily penalize
+    // Double rupture without synergy - disqualify unless one is subdps
     if (ruptureUnits.length >= 2) {
         let hasSynergy = false;
         for (let i = 0; i < ruptureUnits.length; i++) {
@@ -377,7 +379,9 @@ export function calculateDPSMixingPenalty(team) {
             }
         }
         if (!hasSynergy) {
-            penalty -= 200; // Rupture teams want stun/rupture/support or rupture/2x support. Heavy penalty.
+            const hasSubdps = ruptureUnits.some(u => u.synergy?.tags?.includes("subdps"));
+            if (!hasSubdps) return -999;
+            penalty -= 200;
         }
     }
     

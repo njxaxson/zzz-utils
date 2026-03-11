@@ -20,9 +20,11 @@ import {
 // CONSTANTS
 // ============================================================================
 
-const RESULT_LIMIT = 5;
+const COMBINATION_LIMIT = 25;
+const DISPLAY_LIMIT = 5;
 const MIN_UNITS_REQUIRED = 9;
 const BOSSES_REQUIRED = 3;
+const ELEMENTS = ['fire', 'ice', 'electric', 'physical', 'ether'];
 const PAGE_STORAGE_KEY = 'zzz-deadly-assault';     // Page-specific settings
 
 // ============================================================================
@@ -36,6 +38,10 @@ let selectedBosses = [];
 
 // Shared bosses mode - when true, localStorage is NOT used for page settings
 let sharedBossesMode = false;
+
+// Results
+let showVariations = false;
+let lastResults = null;
 
 // ============================================================================
 // DATA LOADING
@@ -91,7 +97,8 @@ function savePageToStorage() {
     }
     
     const data = {
-        selectedBosses
+        selectedBosses,
+        showVariations
     };
     localStorage.setItem(PAGE_STORAGE_KEY, JSON.stringify(data));
 }
@@ -104,11 +111,13 @@ function loadPageFromStorage() {
             const data = JSON.parse(pageSaved);
             
             if (data.selectedBosses) {
-                // Filter out unavailable bosses and bosses that no longer exist
                 selectedBosses = data.selectedBosses.filter(id => {
                     const boss = allBosses.find(b => b.id === id);
                     return boss && boss.available !== false;
                 });
+            }
+            if (typeof data.showVariations === 'boolean') {
+                showVariations = data.showVariations;
             }
         }
     } catch (e) {
@@ -196,6 +205,14 @@ function getElementIcon(element) {
 function setupEventListeners() {
     document.getElementById('boss-grid').addEventListener('click', handleBossClick);
     document.getElementById('run-btn').addEventListener('click', runOptimization);
+    
+    document.getElementById('da-variations-checkbox').addEventListener('change', (e) => {
+        showVariations = e.target.checked;
+        savePageToStorage();
+        if (lastResults) {
+            displayResults(lastResults, false);
+        }
+    });
 }
 
 function handleBossClick(e) {
@@ -440,25 +457,30 @@ function calculateOptimalTeams() {
         console.groupEnd();
     }
     
-    // Find exclusive combinations
+    // Variations mode: standard score-sorted combinations
     const combinations = findExclusiveCombinations(viableTeamsByBoss, selectedBossNames);
-    
-    // DEBUG: Log final results
-    console.log('🏆 Final Results:');
-    console.log(`   Total exclusive combinations found: ${combinations.length}`);
-    if (combinations.length > 0) {
-        console.log('   Top combinations:');
-        combinations.slice(0, 3).forEach((combo, i) => {
-            console.log(`   #${i + 1} (score: ${combo.totalScore}):`);
-            combo.assignments.forEach(a => {
-                console.log(`      ${a.boss}: ${a.label} (${a.score})`);
-            });
-        });
+
+    // Diverse mode: preprocess to ensure each DPS bucket has a representative
+    // in the top-20 window, then post-filter to keep only unique global strategies
+    const diverseTeamsByBoss = {};
+    for (const bossName of selectedBossNames) {
+        diverseTeamsByBoss[bossName] = ensureDpsDiversity(viableTeamsByBoss[bossName]);
     }
+    const diversePool = findExclusiveCombinations(diverseTeamsByBoss, selectedBossNames);
+    const diverseResults = filterDiverseStrategies(diversePool, DISPLAY_LIMIT);
+
+    console.log(`Combinations: ${combinations.length}, Diverse strategies: ${diverseResults.length}`);
+    diverseResults.forEach((combo, i) => {
+        const detail = combo.assignments.map(a =>
+            `${a.boss}: ${a.label} [${teamDpsFingerprint(a.team)}]`
+        ).join(', ');
+        console.log(`  #${i + 1} (score: ${combo.totalScore}): ${detail}`);
+    });
     console.groupEnd();
     
     return {
-        combinations: combinations.slice(0, RESULT_LIMIT),
+        combinations: combinations.slice(0, COMBINATION_LIMIT),
+        diverseResults,
         bosses: selectedBossObjects,
         totalFound: combinations.length
     };
@@ -472,11 +494,110 @@ function calculateOptimalTeams() {
 let currentResultIndex = 0;
 let totalResults = 0;
 
-function displayResults(results) {
+function teamDpsFingerprint(team) {
+    return team
+        .filter(u => {
+            const dpsRole = u.tags.find(t => ['attack', 'anomaly', 'rupture'].includes(t));
+            const isSubdps = u.synergy && u.synergy.tags && u.synergy.tags.includes('subdps');
+            return dpsRole && !isSubdps;
+        })
+        .map(u => {
+            const role = u.tags.find(t => ['attack', 'anomaly', 'rupture'].includes(t));
+            const element = u.tags.find(t => ELEMENTS.includes(t));
+            const tier = u.tier < 2 ? 'hi' : 'lo';
+            return `${role}:${element}:${tier}`;
+        })
+        .sort()
+        .join('|');
+}
+
+function ensureDpsDiversity(teams) {
+    const buckets = new Map();
+    for (const entry of teams) {
+        const key = teamDpsFingerprint(entry.team);
+        if (!buckets.has(key)) buckets.set(key, []);
+        buckets.get(key).push(entry);
+    }
+
+    const reps = [...buckets.values()]
+        .map(bucket => bucket[0])
+        .sort((a, b) => b.score - a.score);
+
+    const repSet = new Set(reps);
+    const remaining = teams.filter(t => !repSet.has(t));
+
+    return [...reps, ...remaining];
+}
+
+function filterDiverseStrategies(combinations, limit) {
+    const sorted = [...combinations].sort((a, b) => b.totalScore - a.totalScore);
+    const results = [];
+    const resultFps = [];
+
+    if (sorted.length === 0) return [];
+    const topScore = sorted[0].totalScore;
+    const scoreFloor = topScore * 0.5;
+
+    results.push(sorted[0]);
+    resultFps.push(sorted[0].assignments.map(a => teamDpsFingerprint(a.team)));
+
+    while (results.length < limit) {
+        let bestCombo = null;
+        let bestMinDiffs = 0;
+        let bestSumDiffs = 0;
+        let bestScore = -Infinity;
+
+        for (const combo of sorted) {
+            if (results.includes(combo)) continue;
+            if (combo.totalScore < scoreFloor) continue;
+            const fps = combo.assignments.map(a => teamDpsFingerprint(a.team));
+
+            let minDiffs = Infinity;
+            let sumDiffs = 0;
+            for (const prevFp of resultFps) {
+                let diffs = 0;
+                for (let i = 0; i < fps.length; i++) {
+                    if (fps[i] !== prevFp[i]) diffs++;
+                }
+                minDiffs = Math.min(minDiffs, diffs);
+                sumDiffs += diffs;
+            }
+
+            if (minDiffs > bestMinDiffs ||
+                (minDiffs === bestMinDiffs && sumDiffs > bestSumDiffs) ||
+                (minDiffs === bestMinDiffs && sumDiffs === bestSumDiffs && combo.totalScore > bestScore)) {
+                bestMinDiffs = minDiffs;
+                bestSumDiffs = sumDiffs;
+                bestScore = combo.totalScore;
+                bestCombo = combo;
+            }
+        }
+
+        if (!bestCombo || bestMinDiffs < 1) break;
+        results.push(bestCombo);
+        resultFps.push(bestCombo.assignments.map(a => teamDpsFingerprint(a.team)));
+    }
+
+    return results;
+}
+
+function displayResults(results, scroll = true) {
+    lastResults = results;
     const container = document.getElementById('results-container');
     const section = document.getElementById('results-section');
+
+    // Update checkbox state
+    const checkbox = document.getElementById('da-variations-checkbox');
+    if (checkbox) checkbox.checked = showVariations;
+
+    let combos;
+    if (showVariations) {
+        combos = results.combinations.slice(0, DISPLAY_LIMIT + 5);
+    } else {
+        combos = results.diverseResults || [];
+    }
     
-    if (results.combinations.length === 0) {
+    if (combos.length === 0) {
         container.innerHTML = `
             <div class="no-results">
                 <p>No valid team combinations found.</p>
@@ -484,10 +605,10 @@ function displayResults(results) {
             </div>
         `;
     } else {
-        totalResults = results.combinations.length;
+        totalResults = combos.length;
         currentResultIndex = 0;
         
-        const slidesHtml = results.combinations.map((combo, index) => 
+        const slidesHtml = combos.map((combo, index) => 
             createResultSlide(combo, index, results.bosses)
         ).join('');
         
@@ -506,7 +627,7 @@ function displayResults(results) {
                 </button>
             </div>
             <div class="carousel-indicators">
-                ${results.combinations.map((_, i) => 
+                ${combos.map((_, i) => 
                     `<button class="carousel-dot ${i === 0 ? 'active' : ''}" onclick="goToResult(${i})" aria-label="Go to result ${i + 1}"></button>`
                 ).join('')}
             </div>
@@ -517,7 +638,7 @@ function displayResults(results) {
     }
     
     section.style.display = 'block';
-    section.scrollIntoView({ behavior: 'smooth' });
+    if (scroll) section.scrollIntoView({ behavior: 'smooth' });
 }
 
 function prevResult() {
