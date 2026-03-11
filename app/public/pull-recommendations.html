@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ZZZ Deadly Assault Team Builder</title>
+    <title>ZZZ Pull Recommendations</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="stylesheet" href="style.css">
     <!-- Pako compression library for roster sharing -->
@@ -14,11 +14,8 @@
         <div id="header-container"></div>
 
         <main>
-            <!-- Boss Selection Section -->
-            <section class="boss-selection-section">
-                <h3>Select 3 Bosses</h3>
-                <p class="section-description">Choose the three Deadly Assault bosses you want to build teams for.</p>
-                <div class="boss-grid" id="boss-grid"></div>
+            <section class="pull-intro-section">
+                <p class="section-description">Analyze your roster to find the highest-impact limited S-rank characters to pull next. Recommendations are based on gaps in DPS archetype coverage, support ecosystem, stunner availability, and team synergies.</p>
             </section>
 
             <div id="roster-container"></div>
@@ -26,13 +23,16 @@
             <!-- Validation & Run -->
             <section class="action-section">
                 <div id="validation-errors" class="validation-errors" style="display: none;"></div>
-                <button id="run-btn" class="run-btn">Find Optimal Teams</button>
+                <button id="run-btn" class="run-btn">Analyze Roster</button>
             </section>
 
             <!-- Results Section -->
             <section class="results-section" id="results-section" style="display: none;">
-                <h3>Recommended Team Allocations</h3>
-                <div id="results-container"></div>
+                <div id="roster-assessment"></div>
+                <div class="results-header">
+                    <h3>Recommended Pulls</h3>
+                </div>
+                <div id="recommendations-list"></div>
             </section>
         </main>
 
@@ -41,8 +41,8 @@
 
     <script type="module">
         import { loadSharedComponents } from './lib/components.js';
-        loadSharedComponents('deadly-assault');
+        loadSharedComponents('pull-recommendations');
     </script>
-    <script type="module" src="deadly-assault.js"></script>
+    <script type="module" src="pull-recommendations.js"></script>
 </body>
 </html>

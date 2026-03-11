@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZZZ Team Recommendations</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="stylesheet" href="style.css">
+    <!-- Pako compression library for roster sharing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+</head>
+<body>
+    <div class="container extra-wide">
+        <div id="header-container"></div>
+
+        <main>
+            <!-- Boss Configuration Section -->
+            <section class="boss-config-section">
+                <h3>Boss Configuration</h3>
+                <p class="section-description">Configure a custom boss matchup to find the best teams against it.</p>
+
+                <div class="boss-config-grid">
+                    <!-- Weaknesses -->
+                    <div class="config-group">
+                        <label class="config-label">Weaknesses</label>
+                        <div class="element-toggles" id="weakness-toggles">
+                            <button type="button" class="element-toggle fire" data-element="fire">Fire</button>
+                            <button type="button" class="element-toggle ice" data-element="ice">Ice</button>
+                            <button type="button" class="element-toggle electric" data-element="electric">Electric</button>
+                            <button type="button" class="element-toggle physical" data-element="physical">Physical</button>
+                            <button type="button" class="element-toggle ether" data-element="ether">Ether</button>
+                        </div>
+                        <div class="config-hint">Elements the boss is weak to. Teams with matching DPS get a bonus.</div>
+                    </div>
+
+                    <!-- Resistances -->
+                    <div class="config-group">
+                        <label class="config-label">Resistances</label>
+                        <div class="element-toggles" id="resistance-toggles">
+                            <button type="button" class="element-toggle fire" data-element="fire">Fire</button>
+                            <button type="button" class="element-toggle ice" data-element="ice">Ice</button>
+                            <button type="button" class="element-toggle electric" data-element="electric">Electric</button>
+                            <button type="button" class="element-toggle physical" data-element="physical">Physical</button>
+                            <button type="button" class="element-toggle ether" data-element="ether">Ether</button>
+                        </div>
+                        <div class="config-hint">Elements the boss resists. Teams with resisted DPS are disqualified.</div>
+                    </div>
+
+                    <!-- Recommended Archetypes -->
+                    <div class="config-group">
+                        <label class="config-label">Recommended Archetypes</label>
+                        <div class="archetype-toggles" id="archetype-toggles">
+                            <button type="button" class="archetype-toggle" data-archetype="attack">Attack</button>
+                            <button type="button" class="archetype-toggle" data-archetype="anomaly">Anomaly</button>
+                            <button type="button" class="archetype-toggle" data-archetype="rupture">Rupture</button>
+                        </div>
+                        <div class="config-hint">Select none for a neutral boss. Selected archetypes are favored; deselected ones are penalized.</div>
+                    </div>
+                </div>
+            </section>
+
+            <div id="roster-container"></div>
+
+            <!-- Validation & Run -->
+            <section class="action-section">
+                <div id="validation-errors" class="validation-errors" style="display: none;"></div>
+                <button id="run-btn" class="run-btn">Find Best Teams</button>
+            </section>
+
+            <!-- Results Section -->
+            <section class="results-section" id="results-section" style="display: none;">
+                <div class="results-header">
+                    <h3>Top Teams</h3>
+                    <div class="results-count-toggle">
+                        <span class="results-count" id="results-count"></span>
+                        <label class="variations-checkbox">
+                            <input type="checkbox" id="show-variations">
+                            <span>Show variations</span>
+                        </label>
+                        <div class="button-group result-limit-toggle" id="result-limit-toggle">
+                            <button type="button" class="filter-btn active" data-value="5">Top 5</button>
+                            <button type="button" class="filter-btn" data-value="10">Top 10</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="recommendations-list" id="recommendations-list"></div>
+            </section>
+        </main>
+
+        <div id="footer-container"></div>
+    </div>
+
+    <script type="module">
+        import { loadSharedComponents } from './lib/components.js';
+        loadSharedComponents('team-recommendations');
+    </script>
+    <script type="module" src="team-recommendations.js"></script>
+</body>
+</html>

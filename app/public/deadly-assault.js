@@ -4,22 +4,17 @@
  */
 
 import { 
-    getTeams, 
-    sortTeamByRole, 
-    getTeamLabel,
-    extendTeamsWithUniversalUnits,
-    findExclusiveCombinations 
+    getTeams, sortTeamByRole, getTeamLabel,
+    extendTeamsWithUniversalUnits, findExclusiveCombinations 
 } from './lib/team-builder.js';
 import { scoreTeamForBoss } from './lib/team-scorer.js';
 import { 
-    decodeRoster, 
-    getRosterFromUrl, 
-    decodeBosses,
-    getBossesFromUrl,
-    generateShareUrlWithBosses, 
-    copyToClipboard 
+    decodeBosses, getBossesFromUrl, generateShareUrlWithBosses 
 } from './lib/roster-share.js';
-import { addLongPressListener } from './lib/touch-utils.js';
+import { 
+    initRoster, getUnitStates, getAllUnits,
+    getInitials, getUnitElement, getCharacterImageUrl, getUniversalUnitNames
+} from './lib/roster-ui.js';
 
 // ============================================================================
 // CONSTANTS
@@ -28,29 +23,17 @@ import { addLongPressListener } from './lib/touch-utils.js';
 const RESULT_LIMIT = 5;
 const MIN_UNITS_REQUIRED = 9;
 const BOSSES_REQUIRED = 3;
-const ROSTER_STORAGE_KEY = 'zzz-roster';           // Shared with team-builder page
 const PAGE_STORAGE_KEY = 'zzz-deadly-assault';     // Page-specific settings
 
 // ============================================================================
 // STATE
 // ============================================================================
 
-let allUnits = [];
 let allBosses = [];
-let characterImages = {};
 let bossImages = {};
-
-// Unit states: { unitId: { owned: boolean, excluded: boolean, universal: boolean } }
-let unitStates = {};
 
 // Selected boss IDs
 let selectedBosses = [];
-
-// Roster section collapse state
-let rosterOpen = true;
-
-// Shared roster mode - when true, localStorage is NOT used for roster
-let sharedRosterMode = false;
 
 // Shared bosses mode - when true, localStorage is NOT used for page settings
 let sharedBossesMode = false;
@@ -61,60 +44,50 @@ let sharedBossesMode = false;
 
 async function loadData() {
     try {
-        const [unitsResponse, bossesResponse, imagesResponse, bossImagesResponse] = await Promise.all([
-            fetch('./data/units.json'),
+        const [bossesResponse, bossImagesResponse] = await Promise.all([
             fetch('./data/bosses.json'),
-            fetch('./data/character-images.json'),
             fetch('./data/boss-images.json')
         ]);
-        
-        allUnits = await unitsResponse.json();
         allBosses = await bossesResponse.json();
-        characterImages = await imagesResponse.json();
         bossImages = await bossImagesResponse.json();
+
+        await initRoster({
+            containerSelector: '#roster-container',
+            pageUrl: 'deadly-assault.html',
+            onStateChange: () => savePageToStorage(),
+            shareUrlGenerator: (unitStates, allUnits) => generateShareUrlWithBosses(unitStates, allUnits, selectedBosses)
+        });
         
-        initializeUnitStates();
-        loadFromStorage();
-        renderUI();
+        loadBossState();
+        renderPageUI();
     } catch (error) {
         console.error('Failed to load data:', error);
         showError('Failed to load game data. Please refresh the page.');
     }
 }
 
-function initializeUnitStates() {
-    for (const unit of allUnits) {
-        if (!unitStates[unit.id]) {
-            // Unavailable units are always not owned
-            const isAvailable = unit.available !== false;
-            // Default: Limited S-ranks are NOT owned, others ARE owned (only if available)
-            const defaultOwned = isAvailable && (unit.rank === 'A' || (unit.rank === 'S' && !unit.limited));
-            // Default: Nicole is universal (flex), others are not (only if available)
-            const defaultUniversal = isAvailable && unit.id === 'nicole';
-            unitStates[unit.id] = {
-                owned: defaultOwned,
-                universal: defaultUniversal
-            };
+function loadBossState() {
+    const bossesParam = getBossesFromUrl();
+    if (bossesParam !== null) {
+        sharedBossesMode = true;
+        const sharedBosses = decodeBosses(bossesParam, allBosses);
+        if (sharedBosses) {
+            selectedBosses = sharedBosses.filter(id => {
+                const boss = allBosses.find(b => b.id === id);
+                return boss && boss.available !== false;
+            });
+        } else {
+            selectedBosses = [];
         }
+    } else {
+        sharedBossesMode = false;
+        loadPageFromStorage();
     }
 }
 
 // ============================================================================
 // LOCAL STORAGE
 // ============================================================================
-
-function saveRosterToStorage() {
-    // Do NOT save to localStorage when viewing a shared roster
-    if (sharedRosterMode) {
-        return;
-    }
-    
-    const data = {
-        unitStates,
-        rosterOpen
-    };
-    localStorage.setItem(ROSTER_STORAGE_KEY, JSON.stringify(data));
-}
 
 function savePageToStorage() {
     // Do NOT save to localStorage when viewing shared bosses
@@ -126,103 +99,6 @@ function savePageToStorage() {
         selectedBosses
     };
     localStorage.setItem(PAGE_STORAGE_KEY, JSON.stringify(data));
-}
-
-function saveToStorage() {
-    saveRosterToStorage();
-    savePageToStorage();
-}
-
-function loadFromStorage() {
-    // Check for shared roster in URL parameter first
-    const rosterParam = getRosterFromUrl();
-    if (rosterParam !== null) {
-        sharedRosterMode = true;
-        
-        // Decode the roster from URL
-        const sharedStates = decodeRoster(rosterParam, allUnits);
-        if (sharedStates) {
-            // Apply the shared roster states
-            for (const unitId in sharedStates) {
-                if (unitStates[unitId]) {
-                    unitStates[unitId] = sharedStates[unitId];
-                }
-            }
-        } else {
-            console.warn('Failed to decode shared roster, falling back to defaults');
-        }
-        
-        // Show the shared roster banner
-        showSharedRosterBanner();
-    } else {
-        // Normal mode: load roster from localStorage
-        sharedRosterMode = false;
-        loadRosterFromLocalStorage();
-    }
-    
-    // Check for shared bosses in URL parameter
-    const bossesParam = getBossesFromUrl();
-    if (bossesParam !== null) {
-        sharedBossesMode = true;
-        
-        // Decode the bosses from URL
-        const sharedBosses = decodeBosses(bossesParam, allBosses);
-        if (sharedBosses) {
-            // Filter out unavailable bosses
-            selectedBosses = sharedBosses.filter(id => {
-                const boss = allBosses.find(b => b.id === id);
-                return boss && boss.available !== false;
-            });
-        } else {
-            console.warn('Failed to decode shared bosses, starting with none selected');
-            selectedBosses = [];
-        }
-    } else {
-        // Normal mode: load page settings from localStorage
-        sharedBossesMode = false;
-        loadPageFromStorage();
-    }
-}
-
-function loadRosterFromLocalStorage() {
-    // Load roster (shared with team-builder page)
-    try {
-        const saved = localStorage.getItem(ROSTER_STORAGE_KEY);
-        if (saved) {
-            const data = JSON.parse(saved);
-            
-            if (data.unitStates) {
-                for (const unitId in data.unitStates) {
-                    if (unitStates[unitId]) {
-                        unitStates[unitId] = { ...unitStates[unitId], ...data.unitStates[unitId] };
-                    }
-                }
-            }
-            
-            if (typeof data.rosterOpen === 'boolean') {
-                rosterOpen = data.rosterOpen;
-            }
-        }
-        
-        // Migration: check if old storage has data we should use
-        const oldSaved = localStorage.getItem(PAGE_STORAGE_KEY);
-        if (oldSaved && !saved) {
-            const oldData = JSON.parse(oldSaved);
-            if (oldData.unitStates) {
-                for (const unitId in oldData.unitStates) {
-                    if (unitStates[unitId]) {
-                        unitStates[unitId] = { ...unitStates[unitId], ...oldData.unitStates[unitId] };
-                    }
-                }
-            }
-            if (typeof oldData.rosterOpen === 'boolean') {
-                rosterOpen = oldData.rosterOpen;
-            }
-            saveRosterToStorage();
-        }
-    } catch (e) {
-        console.warn('Failed to load roster state:', e);
-    }
 }
 
 function loadPageFromStorage() {
@@ -245,83 +121,13 @@ function loadPageFromStorage() {
     }
 }
 
-function showSharedRosterBanner() {
-    const banner = document.getElementById('shared-roster-banner');
-    if (banner) {
-        banner.style.display = 'flex';
-    }
-}
-
 // ============================================================================
 // UI RENDERING
 // ============================================================================
 
-function renderUI() {
-    renderUnitSections();
+function renderPageUI() {
     renderBossSection();
-    updateCounts();
-    applySectionStates();
     setupEventListeners();
-}
-
-function renderUnitSections() {
-    const limitedS = allUnits.filter(u => u.rank === 'S' && u.limited);
-    const standardS = allUnits.filter(u => u.rank === 'S' && !u.limited);
-    const aRank = allUnits.filter(u => u.rank === 'A');
-    
-    renderUnitGrid('limited-s-grid', limitedS);
-    renderUnitGrid('standard-s-grid', standardS);
-    renderUnitGrid('a-rank-grid', aRank);
-}
-
-function renderUnitGrid(containerId, units) {
-    const container = document.getElementById(containerId);
-    container.innerHTML = units.map(unit => createUnitCard(unit)).join('');
-    
-    // Attach long press listeners for mobile context menu simulation
-    container.querySelectorAll('.unit-card').forEach(card => {
-        addLongPressListener(card, (e) => {
-            // Dispatch a contextmenu event that bubbles
-            const event = new MouseEvent('contextmenu', {
-                bubbles: true,
-                cancelable: true,
-                view: window
-            });
-            card.dispatchEvent(event);
-        });
-    });
-}
-
-function createUnitCard(unit) {
-    const state = unitStates[unit.id];
-    const initials = getInitials(unit.name);
-    const element = getUnitElement(unit);
-    const imageUrl = getCharacterImageUrl(unit.id);
-    const isAvailable = unit.available !== false;
-    
-    const classes = ['unit-card'];
-    classes.push(`element-${element}`);
-    if (!isAvailable) classes.push('unavailable');
-    if (!state.owned) classes.push('not-owned');
-    if (state.universal) classes.push('universal');
-    
-    // Use image if available, fallback to initials
-    const avatarHtml = imageUrl 
-        ? `<img class="unit-avatar" src="${imageUrl}" alt="${unit.name}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="unit-initials" style="display:none">${initials}</span>`
-        : `<span class="unit-initials">${initials}</span>`;
-    
-    const titleText = !isAvailable ? `${unit.name} (Unavailable)` : `${unit.name}${state.universal ? ' (Flex)' : ''}`;
-    
-    return `
-        <button type="button" class="${classes.join(' ')}" 
-                data-unit-id="${unit.id}" 
-                data-element="${element}"
-                title="${titleText}">
-            ${avatarHtml}
-            <span class="unit-name">${unit.name}</span>
-            ${state.universal ? '<span class="flex-badge">FLEX</span>' : ''}
-        </button>
-    `;
 }
 
 function renderBossSection() {
@@ -376,24 +182,6 @@ function getWeaknessGradientClass(weaknesses) {
     return `weakness-${sorted[0]}-${sorted[1]}`;
 }
 
-function getInitials(name) {
-    return name.split(' ')
-        .filter(word => word.length > 0)
-        .map(word => word[0].toUpperCase())
-        .slice(0, 2)
-        .join('');
-}
-
-function getUnitElement(unit) {
-    const elements = ['fire', 'ice', 'electric', 'physical', 'ether'];
-    return unit.tags.find(tag => elements.includes(tag)) || 'unknown';
-}
-
-function getCharacterImageUrl(unitId) {
-    // characterImages is now a simple map of unitId -> local path
-    return characterImages[unitId] || null;
-}
-
 function getElementIcon(element) {
     const icons = {
         fire: '🔥',
@@ -405,210 +193,13 @@ function getElementIcon(element) {
     return `<span class="element-icon element-${element}" title="${element}">${icons[element] || '?'}</span>`;
 }
 
-function updateCounts() {
-    updateCategoryCount('limited-s', u => u.rank === 'S' && u.limited);
-    updateCategoryCount('standard-s', u => u.rank === 'S' && !u.limited);
-    updateCategoryCount('a-rank', u => u.rank === 'A');
-}
-
-function updateCategoryCount(category, filterFn) {
-    const units = allUnits.filter(filterFn);
-    // Only count available units for the total
-    const availableUnits = units.filter(u => u.available !== false);
-    const owned = availableUnits.filter(u => unitStates[u.id].owned).length;
-    const total = availableUnits.length;
-    
-    const countEl = document.getElementById(`${category}-count`);
-    if (countEl) {
-        countEl.textContent = `${owned}/${total}`;
-    }
-}
-
-function applySectionStates() {
-    const rosterSection = document.getElementById('roster-section');
-    if (rosterSection) {
-        rosterSection.open = rosterOpen;
-    }
-}
-
 // ============================================================================
 // EVENT HANDLING
 // ============================================================================
 
 function setupEventListeners() {
-    // Unit card interactions (left click to toggle owned, right click for flex/universal)
-    document.querySelectorAll('.unit-grid').forEach(grid => {
-        grid.addEventListener('click', handleUnitClick);
-        grid.addEventListener('contextmenu', handleUnitRightClick);
-    });
-    
-    // Boss card interactions
     document.getElementById('boss-grid').addEventListener('click', handleBossClick);
-    
-    // Subsection actions (All / None)
-    document.querySelectorAll('.subtle-btn').forEach(btn => {
-        btn.addEventListener('click', handleCategoryAction);
-    });
-    
-    // Roster section toggle tracking
-    const rosterSection = document.getElementById('roster-section');
-    if (rosterSection) {
-        rosterSection.addEventListener('toggle', handleRosterToggle);
-    }
-    
-    // Run button
     document.getElementById('run-btn').addEventListener('click', runOptimization);
-    
-    // Share button
-    const shareBtn = document.getElementById('share-roster-btn');
-    if (shareBtn) {
-        shareBtn.addEventListener('click', handleShareClick);
-    }
-
-    // Mode Toggle (Mobile)
-    document.querySelectorAll('.mode-toggle-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            document.querySelectorAll('.mode-toggle-btn').forEach(b => b.classList.remove('active'));
-            e.target.classList.add('active');
-        });
-    });
-}
-
-// ============================================================================
-// SHARE FUNCTIONALITY
-// ============================================================================
-
-async function handleShareClick(e) {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    const btn = document.getElementById('share-roster-btn');
-    
-    // Generate the share URL (includes both roster AND bosses)
-    const shareUrl = generateShareUrlWithBosses(unitStates, allUnits, selectedBosses);
-    
-    // Copy to clipboard
-    const success = await copyToClipboard(shareUrl);
-    
-    if (success) {
-        // Show success state on button
-        btn.classList.add('copied');
-        const textEl = btn.querySelector('.share-text');
-        const originalText = textEl.textContent;
-        textEl.textContent = 'Copied!';
-        
-        // Show toast
-        showToast('Share link copied to clipboard!');
-        
-        // Reset button after delay
-        setTimeout(() => {
-            btn.classList.remove('copied');
-            textEl.textContent = originalText;
-        }, 2000);
-    } else {
-        showToast('Failed to copy link. Try again.', true);
-    }
-}
-
-function showToast(message, isError = false) {
-    // Remove any existing toast
-    const existingToast = document.querySelector('.share-toast');
-    if (existingToast) {
-        existingToast.remove();
-    }
-    
-    // Create toast element
-    const toast = document.createElement('div');
-    toast.className = 'share-toast' + (isError ? ' error' : '');
-    toast.textContent = message;
-    document.body.appendChild(toast);
-    
-    // Trigger animation
-    requestAnimationFrame(() => {
-        toast.classList.add('visible');
-    });
-    
-    // Remove after delay
-    setTimeout(() => {
-        toast.classList.remove('visible');
-        setTimeout(() => toast.remove(), 300);
-    }, 3000);
-}
-
-function handleUnitClick(e) {
-    const card = e.target.closest('.unit-card');
-    if (!card) return;
-    
-    // Ignore clicks on unavailable units
-    if (card.classList.contains('unavailable')) return;
-    
-    // Check if we are in "Mark Flex" mode (Mobile only)
-    const flexBtn = document.querySelector('.mode-toggle-btn[data-mode="flex"]');
-    // Check if button exists, is active, and is visible (container not hidden)
-    const isFlexMode = flexBtn && 
-                       flexBtn.classList.contains('active') && 
-                       getComputedStyle(document.getElementById('mode-toggle-container')).display !== 'none';
-
-    if (isFlexMode) {
-        handleUnitRightClick(e);
-        return;
-    }
-
-    const unitId = card.dataset.unitId;
-    const state = unitStates[unitId];
-    
-    // Left click: toggle owned
-    // Right click is handled by context menu event
-    state.owned = !state.owned;
-    if (!state.owned) {
-        state.universal = false;
-    }
-    
-    updateUnitCard(card, unitId);
-    updateCounts();
-    saveToStorage();
-}
-
-function handleUnitRightClick(e) {
-    e.preventDefault();
-    const card = e.target.closest('.unit-card');
-    if (!card) return;
-    
-    // Ignore right-clicks on unavailable units
-    if (card.classList.contains('unavailable')) return;
-    
-    const unitId = card.dataset.unitId;
-    const state = unitStates[unitId];
-    
-    // Only toggle universal if owned
-    if (state.owned) {
-        state.universal = !state.universal;
-        updateUnitCard(card, unitId);
-        saveToStorage();
-    }
-}
-
-function updateUnitCard(card, unitId) {
-    const state = unitStates[unitId];
-    const unit = allUnits.find(u => u.id === unitId);
-    
-    // Update card classes
-    card.classList.toggle('not-owned', !state.owned);
-    card.classList.toggle('universal', state.universal);
-    
-    // Update flex badge
-    const existingBadge = card.querySelector('.flex-badge');
-    if (state.universal && !existingBadge) {
-        const badge = document.createElement('span');
-        badge.className = 'flex-badge';
-        badge.textContent = 'FLEX';
-        card.appendChild(badge);
-    } else if (!state.universal && existingBadge) {
-        existingBadge.remove();
-    }
-    
-    // Update title
-    card.title = unit ? `${unit.name}${state.universal ? ' (Flex)' : ''}` : '';
 }
 
 function handleBossClick(e) {
@@ -639,54 +230,7 @@ function handleBossClick(e) {
         card.setAttribute('aria-pressed', 'true');
     }
     
-    saveToStorage();
-}
-
-function handleCategoryAction(e) {
-    const btn = e.target;
-    const category = btn.dataset.category;
-    const isSelectAll = btn.classList.contains('select-all');
-    
-    let filterFn;
-    switch (category) {
-        case 'limited-s':
-            filterFn = u => u.rank === 'S' && u.limited;
-            break;
-        case 'standard-s':
-            filterFn = u => u.rank === 'S' && !u.limited;
-            break;
-        case 'a-rank':
-            filterFn = u => u.rank === 'A';
-            break;
-    }
-    
-    const units = allUnits.filter(filterFn);
-    for (const unit of units) {
-        // Skip unavailable units - they cannot be owned
-        if (unit.available === false) continue;
-        
-        unitStates[unit.id].owned = isSelectAll;
-        if (!isSelectAll) {
-            unitStates[unit.id].universal = false;
-        }
-    }
-    
-    // Re-render the affected grid
-    const gridId = `${category}-grid`;
-    renderUnitGrid(gridId, units);
-    
-    // Re-attach click handlers
-    const grid = document.getElementById(gridId);
-    grid.addEventListener('click', handleUnitClick);
-    grid.addEventListener('contextmenu', handleUnitRightClick);
-    
-    updateCounts();
-    saveToStorage();
-}
-
-function handleRosterToggle(e) {
-    rosterOpen = e.target.open;
-    saveToStorage();
+    savePageToStorage();
 }
 
 // ============================================================================
@@ -732,23 +276,16 @@ function showError(message) {
 // ============================================================================
 
 function getAvailableUnits() {
+    const allUnits = getAllUnits();
+    const unitStates = getUnitStates();
     return allUnits.filter(unit => {
         const state = unitStates[unit.id];
         return state.owned;
     }).map(unit => ({
         ...unit,
-        // Reset numericId - will be assigned by getTeams
         numericId: undefined
     }));
 }
-
-function getUniversalUnits() {
-    return allUnits.filter(unit => {
-        const state = unitStates[unit.id];
-        return state.owned && state.universal;
-    }).map(u => u.name);
-}
-
 
 function runOptimization() {
     // Validate
@@ -781,7 +318,7 @@ function runOptimization() {
 
 function calculateOptimalTeams() {
     const availableUnits = getAvailableUnits();
-    const universalUnitNames = getUniversalUnits();
+    const universalUnitNames = getUniversalUnitNames();
     // Filter out unavailable bosses (shouldn't happen, but safety check)
     const selectedBossObjects = selectedBosses
         .map(id => allBosses.find(b => b.id === id))

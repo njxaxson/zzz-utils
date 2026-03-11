@@ -6,20 +6,14 @@
 import { getTeams, sortTeamByRole, getTeamLabel } from './lib/team-builder.js';
 import { scoreTeamForBoss, isDPS, isStun, isSupport, isDefense, getElement, ELEMENTS, DPS_ROLES } from './lib/team-scorer.js';
 import { 
-    encodeRoster, 
-    decodeRoster, 
-    getRosterFromUrl, 
-    isSharedRosterMode, 
-    generateShareUrl, 
-    copyToClipboard 
-} from './lib/roster-share.js';
-import { addLongPressListener } from './lib/touch-utils.js';
+    initRoster, getUnitStates, getAllUnits, getCharacterImages,
+    getInitials, getUnitElement, getCharacterImageUrl
+} from './lib/roster-ui.js';
 
 // ============================================================================
 // CONSTANTS
 // ============================================================================
 
-const ROSTER_STORAGE_KEY = 'zzz-roster';
 const FILTERS_STORAGE_KEY = 'zzz-team-builder-filters';
 const MIN_TEAMS_TO_SHOW = 6;
 
@@ -47,18 +41,8 @@ function teamHasMatchingDPS(team, targetElement, targetDpsType) {
 // STATE
 // ============================================================================
 
-let allUnits = [];
-let characterImages = {};
-
-// Unit states: { unitId: { owned: boolean, universal: boolean } }
-let unitStates = {};
-
 // Section collapse states
-let rosterOpen = true;
 let filtersOpen = true;
-
-// Shared roster mode - when true, localStorage is NOT used
-let sharedRosterMode = false;
 
 // Filter state
 let filters = {
@@ -81,37 +65,16 @@ let filteredTeams = [];
 
 async function loadData() {
     try {
-        const [unitsResponse, imagesResponse] = await Promise.all([
-            fetch('./data/units.json'),
-            fetch('./data/character-images.json')
-        ]);
-        
-        allUnits = await unitsResponse.json();
-        characterImages = await imagesResponse.json();
-        
-        initializeUnitStates();
-        loadFromStorage();
-        renderUI();
+        await initRoster({
+            containerSelector: '#roster-container',
+            pageUrl: 'team-builder.html',
+            onStateChange: () => saveFiltersToStorage()
+        });
+        loadFiltersFromStorage();
+        renderPageUI();
     } catch (error) {
         console.error('Failed to load data:', error);
         showError('Failed to load game data. Please refresh the page.');
-    }
-}
-
-function initializeUnitStates() {
-    for (const unit of allUnits) {
-        if (!unitStates[unit.id]) {
-            // Unavailable units are always not owned
-            const isAvailable = unit.available !== false;
-            // Default: Limited S-ranks are NOT owned, others ARE owned (only if available)
-            const defaultOwned = isAvailable && (unit.rank === 'A' || (unit.rank === 'S' && !unit.limited));
-            // Default: Nicole is universal (flex), others are not (only if available)
-            const defaultUniversal = isAvailable && unit.id === 'nicole';
-            unitStates[unit.id] = {
-                owned: defaultOwned,
-                universal: defaultUniversal
-            };
-        }
     }
 }
 
@@ -119,114 +82,23 @@ function initializeUnitStates() {
 // LOCAL STORAGE
 // ============================================================================
 
-function saveRosterToStorage() {
-    // Do NOT save to localStorage when viewing a shared roster
-    if (sharedRosterMode) {
-        return;
-    }
-    
-    const data = {
-        unitStates,
-        rosterOpen,
-        filtersOpen
-    };
-    localStorage.setItem(ROSTER_STORAGE_KEY, JSON.stringify(data));
-}
-
 function saveFiltersToStorage() {
-    localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(filters));
-}
-
-function loadFromStorage() {
-    // Check for shared roster in URL parameter first
-    const rosterParam = getRosterFromUrl();
-    if (rosterParam !== null) {
-        sharedRosterMode = true;
-        
-        // Decode the roster from URL
-        const sharedStates = decodeRoster(rosterParam, allUnits);
-        if (sharedStates) {
-            // Apply the shared roster states
-            for (const unitId in sharedStates) {
-                if (unitStates[unitId]) {
-                    unitStates[unitId] = sharedStates[unitId];
-                }
-            }
-        } else {
-            console.warn('Failed to decode shared roster, falling back to defaults');
-        }
-        
-        // Show the shared roster banner
-        showSharedRosterBanner();
-        
-        // Still load filters from localStorage (those are personal preference)
-        loadFiltersFromStorage();
-        return;
-    }
-    
-    // Normal mode: load from localStorage
-    sharedRosterMode = false;
-    
-    // Load roster (shared with other pages)
-    try {
-        const saved = localStorage.getItem(ROSTER_STORAGE_KEY);
-        if (saved) {
-            const data = JSON.parse(saved);
-            
-            if (data.unitStates) {
-                for (const unitId in data.unitStates) {
-                    if (unitStates[unitId]) {
-                        unitStates[unitId] = { ...unitStates[unitId], ...data.unitStates[unitId] };
-                    }
-                }
-            }
-            
-            if (typeof data.rosterOpen === 'boolean') {
-                rosterOpen = data.rosterOpen;
-            }
-            
-            if (typeof data.filtersOpen === 'boolean') {
-                filtersOpen = data.filtersOpen;
-            }
-        }
-        
-        // Migration: check if old storage key has data we should use
-        const oldSaved = localStorage.getItem('zzz-deadly-assault');
-        if (oldSaved && !saved) {
-            const oldData = JSON.parse(oldSaved);
-            if (oldData.unitStates) {
-                for (const unitId in oldData.unitStates) {
-                    if (unitStates[unitId]) {
-                        unitStates[unitId] = { ...unitStates[unitId], ...oldData.unitStates[unitId] };
-                    }
-                }
-            }
-            saveRosterToStorage();
-        }
-    } catch (e) {
-        console.warn('Failed to load roster state:', e);
-    }
-    
-    loadFiltersFromStorage();
+    localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify({ ...filters, filtersOpen }));
 }
 
 function loadFiltersFromStorage() {
-    // Load filters (page-specific)
     try {
         const savedFilters = localStorage.getItem(FILTERS_STORAGE_KEY);
         if (savedFilters) {
-            const loadedFilters = JSON.parse(savedFilters);
-            filters = { ...filters, ...loadedFilters };
+            const data = JSON.parse(savedFilters);
+            if (typeof data.filtersOpen === 'boolean') {
+                filtersOpen = data.filtersOpen;
+            }
+            const { filtersOpen: _, ...filterData } = data;
+            filters = { ...filters, ...filterData };
         }
     } catch (e) {
         console.warn('Failed to load filter state:', e);
-    }
-}
-
-function showSharedRosterBanner() {
-    const banner = document.getElementById('shared-roster-banner');
-    if (banner) {
-        banner.style.display = 'flex';
     }
 }
 
@@ -234,80 +106,19 @@ function showSharedRosterBanner() {
 // UI RENDERING
 // ============================================================================
 
-function renderUI() {
-    renderUnitSections();
+function renderPageUI() {
     renderMustIncludeDropdown();
     renderExcludeDropdown();
-    updateCounts();
     applySectionStates();
     applyFilterStates();
     setupEventListeners();
-}
-
-function renderUnitSections() {
-    const limitedS = allUnits.filter(u => u.rank === 'S' && u.limited);
-    const standardS = allUnits.filter(u => u.rank === 'S' && !u.limited);
-    const aRank = allUnits.filter(u => u.rank === 'A');
-    
-    renderUnitGrid('limited-s-grid', limitedS);
-    renderUnitGrid('standard-s-grid', standardS);
-    renderUnitGrid('a-rank-grid', aRank);
-}
-
-function renderUnitGrid(containerId, units) {
-    const container = document.getElementById(containerId);
-    container.innerHTML = units.map(unit => createUnitCard(unit)).join('');
-    
-    // Attach long press listeners for mobile context menu simulation
-    container.querySelectorAll('.unit-card').forEach(card => {
-        addLongPressListener(card, (e) => {
-            // Dispatch a contextmenu event that bubbles
-            const event = new MouseEvent('contextmenu', {
-                bubbles: true,
-                cancelable: true,
-                view: window
-            });
-            card.dispatchEvent(event);
-        });
-    });
-}
-
-function createUnitCard(unit) {
-    const state = unitStates[unit.id];
-    const initials = getInitials(unit.name);
-    const element = getUnitElement(unit);
-    const imageUrl = getCharacterImageUrl(unit.id);
-    const isAvailable = unit.available !== false;
-    
-    const classes = ['unit-card'];
-    classes.push(`element-${element}`);
-    if (!isAvailable) classes.push('unavailable');
-    if (!state.owned) classes.push('not-owned');
-    if (state.universal) classes.push('universal');
-    
-    const avatarHtml = imageUrl 
-        ? `<img class="unit-avatar" src="${imageUrl}" alt="${unit.name}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="unit-initials" style="display:none">${initials}</span>`
-        : `<span class="unit-initials">${initials}</span>`;
-    
-    const titleText = !isAvailable ? `${unit.name} (Unavailable)` : `${unit.name}${state.universal ? ' (Flex)' : ''}`;
-    
-    return `
-        <button type="button" class="${classes.join(' ')}" 
-                data-unit-id="${unit.id}" 
-                data-element="${element}"
-                title="${titleText}">
-            ${avatarHtml}
-            <span class="unit-name">${unit.name}</span>
-            ${state.universal ? '<span class="flex-badge">FLEX</span>' : ''}
-        </button>
-    `;
 }
 
 function renderMustIncludeDropdown() {
     const menu = document.getElementById('must-include-menu');
     const itemsContainer = menu.querySelector('.dropdown-items');
     // Only show available units in the dropdown
-    const availableUnits = allUnits.filter(u => u.available !== false);
+    const availableUnits = getAllUnits().filter(u => u.available !== false);
     itemsContainer.innerHTML = availableUnits
         .sort((a, b) => a.name.localeCompare(b.name))
         .map(unit => {
@@ -326,7 +137,7 @@ function renderExcludeDropdown() {
     const menu = document.getElementById('exclude-menu');
     const itemsContainer = menu.querySelector('.dropdown-items');
     // Only show available units in the dropdown
-    const availableUnits = allUnits.filter(u => u.available !== false);
+    const availableUnits = getAllUnits().filter(u => u.available !== false);
     itemsContainer.innerHTML = availableUnits
         .sort((a, b) => a.name.localeCompare(b.name))
         .map(unit => {
@@ -341,48 +152,7 @@ function renderExcludeDropdown() {
         }).join('');
 }
 
-function getInitials(name) {
-    return name.split(' ')
-        .filter(word => word.length > 0)
-        .map(word => word[0].toUpperCase())
-        .slice(0, 2)
-        .join('');
-}
-
-function getUnitElement(unit) {
-    const elements = ['fire', 'ice', 'electric', 'physical', 'ether'];
-    return unit.tags.find(tag => elements.includes(tag)) || 'unknown';
-}
-
-function getCharacterImageUrl(unitId) {
-    return characterImages[unitId] || null;
-}
-
-function updateCounts() {
-    updateCategoryCount('limited-s', u => u.rank === 'S' && u.limited);
-    updateCategoryCount('standard-s', u => u.rank === 'S' && !u.limited);
-    updateCategoryCount('a-rank', u => u.rank === 'A');
-}
-
-function updateCategoryCount(category, filterFn) {
-    const units = allUnits.filter(filterFn);
-    // Only count available units for the total
-    const availableUnits = units.filter(u => u.available !== false);
-    const owned = availableUnits.filter(u => unitStates[u.id].owned).length;
-    const total = availableUnits.length;
-    
-    const countEl = document.getElementById(`${category}-count`);
-    if (countEl) {
-        countEl.textContent = `${owned}/${total}`;
-    }
-}
-
 function applySectionStates() {
-    const rosterSection = document.getElementById('roster-section');
-    if (rosterSection) {
-        rosterSection.open = rosterOpen;
-    }
-    
     const filterSection = document.getElementById('filter-section');
     if (filterSection) {
         filterSection.open = filtersOpen;
@@ -435,6 +205,7 @@ function applyFilterStates() {
     // Must Include dropdown
     const mustIncludeDropdown = document.querySelector('[data-filter="must-include"]');
     if (mustIncludeDropdown) {
+        const allUnits = getAllUnits();
         const names = filters.mustInclude.map(id => {
             const unit = allUnits.find(u => u.id === id);
             return unit ? unit.name : id;
@@ -445,6 +216,7 @@ function applyFilterStates() {
     // Exclude dropdown
     const excludeDropdown = document.querySelector('[data-filter="exclude"]');
     if (excludeDropdown) {
+        const allUnits = getAllUnits();
         const names = filters.exclude.map(id => {
             const unit = allUnits.find(u => u.id === id);
             return unit ? unit.name : id;
@@ -469,24 +241,6 @@ function updateDropdownText(dropdown, selected, defaultText) {
 // ============================================================================
 
 function setupEventListeners() {
-    // Unit card interactions
-    document.querySelectorAll('.unit-grid').forEach(grid => {
-        grid.addEventListener('click', handleUnitClick);
-        grid.addEventListener('contextmenu', handleUnitRightClick);
-    });
-    
-    // Subsection actions (All / None)
-    document.querySelectorAll('.subtle-btn').forEach(btn => {
-        btn.addEventListener('click', handleCategoryAction);
-    });
-    
-    // Roster section toggle tracking
-    const rosterSection = document.getElementById('roster-section');
-    if (rosterSection) {
-        rosterSection.addEventListener('toggle', handleRosterToggle);
-    }
-    
-    // Filter section toggle tracking
     const filterSection = document.getElementById('filter-section');
     if (filterSection) {
         filterSection.addEventListener('toggle', handleFilterToggle);
@@ -557,208 +311,16 @@ function setupEventListeners() {
         });
     });
     
-    // Action buttons
     document.getElementById('build-btn').addEventListener('click', buildTeams);
     document.getElementById('clear-filters-btn').addEventListener('click', clearFilters);
     
-    // Share button
-    const shareBtn = document.getElementById('share-roster-btn');
-    if (shareBtn) {
-        shareBtn.addEventListener('click', handleShareClick);
-    }
-    
-    // Pagination
     document.getElementById('prev-page').addEventListener('click', () => changePage(-1));
     document.getElementById('next-page').addEventListener('click', () => changePage(1));
-
-    // Mode Toggle (Mobile)
-    document.querySelectorAll('.mode-toggle-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            document.querySelectorAll('.mode-toggle-btn').forEach(b => b.classList.remove('active'));
-            e.target.classList.add('active');
-        });
-    });
-}
-
-// ============================================================================
-// SHARE FUNCTIONALITY
-// ============================================================================
-
-async function handleShareClick(e) {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    const btn = document.getElementById('share-roster-btn');
-    
-    // Generate the share URL
-    const shareUrl = generateShareUrl(unitStates, allUnits);
-    
-    // Copy to clipboard
-    const success = await copyToClipboard(shareUrl);
-    
-    if (success) {
-        // Show success state on button
-        btn.classList.add('copied');
-        const textEl = btn.querySelector('.share-text');
-        const originalText = textEl.textContent;
-        textEl.textContent = 'Copied!';
-        
-        // Show toast
-        showToast('Share link copied to clipboard!');
-        
-        // Reset button after delay
-        setTimeout(() => {
-            btn.classList.remove('copied');
-            textEl.textContent = originalText;
-        }, 2000);
-    } else {
-        showToast('Failed to copy link. Try again.', true);
-    }
-}
-
-function showToast(message, isError = false) {
-    // Remove any existing toast
-    const existingToast = document.querySelector('.share-toast');
-    if (existingToast) {
-        existingToast.remove();
-    }
-    
-    // Create toast element
-    const toast = document.createElement('div');
-    toast.className = 'share-toast' + (isError ? ' error' : '');
-    toast.textContent = message;
-    document.body.appendChild(toast);
-    
-    // Trigger animation
-    requestAnimationFrame(() => {
-        toast.classList.add('visible');
-    });
-    
-    // Remove after delay
-    setTimeout(() => {
-        toast.classList.remove('visible');
-        setTimeout(() => toast.remove(), 300);
-    }, 3000);
-}
-
-function handleUnitClick(e) {
-    const card = e.target.closest('.unit-card');
-    if (!card) return;
-    
-    // Ignore clicks on unavailable units
-    if (card.classList.contains('unavailable')) return;
-    
-    // Check if we are in "Mark Flex" mode (Mobile only)
-    const flexBtn = document.querySelector('.mode-toggle-btn[data-mode="flex"]');
-    // Check if button exists, is active, and is visible (container not hidden)
-    const isFlexMode = flexBtn && 
-                       flexBtn.classList.contains('active') && 
-                       getComputedStyle(document.getElementById('mode-toggle-container')).display !== 'none';
-
-    if (isFlexMode) {
-        handleUnitRightClick(e);
-        return;
-    }
-
-    const unitId = card.dataset.unitId;
-    const state = unitStates[unitId];
-    
-    state.owned = !state.owned;
-    if (!state.owned) {
-        state.universal = false;
-    }
-    
-    updateUnitCard(card, unitId);
-    updateCounts();
-    saveRosterToStorage();
-}
-
-function handleUnitRightClick(e) {
-    e.preventDefault();
-    const card = e.target.closest('.unit-card');
-    if (!card) return;
-    
-    // Ignore right-clicks on unavailable units
-    if (card.classList.contains('unavailable')) return;
-    
-    const unitId = card.dataset.unitId;
-    const state = unitStates[unitId];
-    
-    if (state.owned) {
-        state.universal = !state.universal;
-        updateUnitCard(card, unitId);
-        saveRosterToStorage();
-    }
-}
-
-function updateUnitCard(card, unitId) {
-    const state = unitStates[unitId];
-    const unit = allUnits.find(u => u.id === unitId);
-    
-    card.classList.toggle('not-owned', !state.owned);
-    card.classList.toggle('universal', state.universal);
-    
-    const existingBadge = card.querySelector('.flex-badge');
-    if (state.universal && !existingBadge) {
-        const badge = document.createElement('span');
-        badge.className = 'flex-badge';
-        badge.textContent = 'FLEX';
-        card.appendChild(badge);
-    } else if (!state.universal && existingBadge) {
-        existingBadge.remove();
-    }
-    
-    card.title = unit ? `${unit.name}${state.universal ? ' (Flex)' : ''}` : '';
-}
-
-function handleCategoryAction(e) {
-    const btn = e.target;
-    const category = btn.dataset.category;
-    const isSelectAll = btn.classList.contains('select-all');
-    
-    let filterFn;
-    switch (category) {
-        case 'limited-s':
-            filterFn = u => u.rank === 'S' && u.limited;
-            break;
-        case 'standard-s':
-            filterFn = u => u.rank === 'S' && !u.limited;
-            break;
-        case 'a-rank':
-            filterFn = u => u.rank === 'A';
-            break;
-    }
-    
-    const units = allUnits.filter(filterFn);
-    for (const unit of units) {
-        // Skip unavailable units - they cannot be owned
-        if (unit.available === false) continue;
-        
-        unitStates[unit.id].owned = isSelectAll;
-        if (!isSelectAll) {
-            unitStates[unit.id].universal = false;
-        }
-    }
-    
-    const gridId = `${category}-grid`;
-    renderUnitGrid(gridId, units);
-    
-    const grid = document.getElementById(gridId);
-    grid.addEventListener('click', handleUnitClick);
-    grid.addEventListener('contextmenu', handleUnitRightClick);
-    
-    updateCounts();
-    saveRosterToStorage();
-}
-
-function handleRosterToggle(e) {
-    rosterOpen = e.target.open;
-    saveRosterToStorage();
 }
 
 function handleFilterToggle(e) {
     filtersOpen = e.target.open;
-    saveRosterToStorage();
+    saveFiltersToStorage();
 }
 
 function toggleDropdown(dropdown) {
@@ -867,6 +429,7 @@ function handleDropdownChange(dropdown) {
             break;
         case 'must-include':
             filters.mustInclude = values;
+            const allUnits = getAllUnits();
             const mustIncludeNames = values.map(id => {
                 const unit = allUnits.find(u => u.id === id);
                 return unit ? unit.name : id;
@@ -875,8 +438,9 @@ function handleDropdownChange(dropdown) {
             break;
         case 'exclude':
             filters.exclude = values;
+            const allUnitsExclude = getAllUnits();
             const excludeNames = values.map(id => {
-                const unit = allUnits.find(u => u.id === id);
+                const unit = allUnitsExclude.find(u => u.id === id);
                 return unit ? unit.name : id;
             });
             updateDropdownText(dropdown, excludeNames, 'No exclusions');
@@ -990,6 +554,8 @@ function buildTeams() {
 }
 
 function getAvailableUnits() {
+    const allUnits = getAllUnits();
+    const unitStates = getUnitStates();
     return allUnits.filter(unit => {
         const state = unitStates[unit.id];
         return state.owned;
