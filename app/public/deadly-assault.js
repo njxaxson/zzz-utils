@@ -5,7 +5,7 @@
 
 import { 
     getTeams, sortTeamByRole, getTeamLabel,
-    extendTeamsWithUniversalUnits, findExclusiveCombinations 
+    extendTeamsWithUniversalUnits, findExclusiveCombinations, teamsOverlap 
 } from './lib/team-builder.js';
 import { scoreTeamForBoss } from './lib/team-scorer.js';
 import { 
@@ -25,6 +25,7 @@ const DISPLAY_LIMIT = 5;
 const MIN_UNITS_REQUIRED = 9;
 const BOSSES_REQUIRED = 3;
 const ELEMENTS = ['fire', 'ice', 'electric', 'physical', 'ether'];
+const PER_BOSS_FLOOR_RATIO = 0.5;
 const PAGE_STORAGE_KEY = 'zzz-deadly-assault';     // Page-specific settings
 
 // ============================================================================
@@ -460,21 +461,18 @@ function calculateOptimalTeams() {
     // Variations mode: standard score-sorted combinations
     const combinations = findExclusiveCombinations(viableTeamsByBoss, selectedBossNames);
 
-    // Diverse mode: preprocess to ensure each DPS bucket has a representative
-    // in the top-20 window, then post-filter to keep only unique global strategies
-    const diverseTeamsByBoss = {};
-    for (const bossName of selectedBossNames) {
-        diverseTeamsByBoss[bossName] = ensureDpsDiversity(viableTeamsByBoss[bossName]);
-    }
-    const diversePool = findExclusiveCombinations(diverseTeamsByBoss, selectedBossNames);
-    const diverseResults = filterDiverseStrategies(diversePool, DISPLAY_LIMIT);
+    // Diverse mode: DPS assignment is the first-class decision
+    const diverseResults = findDiverseStrategies(
+        viableTeamsByBoss, selectedBossNames, DISPLAY_LIMIT
+    );
 
     console.log(`Combinations: ${combinations.length}, Diverse strategies: ${diverseResults.length}`);
     diverseResults.forEach((combo, i) => {
-        const detail = combo.assignments.map(a =>
-            `${a.boss}: ${a.label} [${teamDpsFingerprint(a.team)}]`
-        ).join(', ');
-        console.log(`  #${i + 1} (score: ${combo.totalScore}): ${detail}`);
+        const detail = combo.assignments.map(a => {
+            const fp = teamDpsFingerprint(a.team);
+            return `${a.boss}: ${a.label} (${a.score.toFixed(0)}) [${fp}]`;
+        }).join(', ');
+        console.log(`  #${i + 1} (total: ${combo.totalScore.toFixed(0)}): ${detail}`);
     });
     console.groupEnd();
     
@@ -511,74 +509,120 @@ function teamDpsFingerprint(team) {
         .join('|');
 }
 
-function ensureDpsDiversity(teams) {
-    const buckets = new Map();
-    for (const entry of teams) {
-        const key = teamDpsFingerprint(entry.team);
-        if (!buckets.has(key)) buckets.set(key, []);
-        buckets.get(key).push(entry);
+function findDiverseStrategies(viableTeamsByBoss, bossNames, limit) {
+    const BUCKET_CAP = 15;
+
+    // Phase 1: Group each boss's teams into DPS buckets
+    const bucketsByBoss = {};
+    for (const bossName of bossNames) {
+        const buckets = new Map();
+        for (const entry of viableTeamsByBoss[bossName]) {
+            const fp = teamDpsFingerprint(entry.team);
+            if (!buckets.has(fp)) buckets.set(fp, []);
+            const bucket = buckets.get(fp);
+            if (bucket.length < BUCKET_CAP) bucket.push(entry);
+        }
+        bucketsByBoss[bossName] = buckets;
     }
 
-    const reps = [...buckets.values()]
-        .map(bucket => bucket[0])
-        .sort((a, b) => b.score - a.score);
+    const bucketKeys = bossNames.map(bn => [...bucketsByBoss[bn].keys()]);
 
-    const repSet = new Set(reps);
-    const remaining = teams.filter(t => !repSet.has(t));
+    // Phase 2: Enumerate all DPS assignment triples,
+    // find the best non-overlapping realization for each
+    const strategies = [];
 
-    return [...reps, ...remaining];
-}
+    for (const fp0 of bucketKeys[0]) {
+        const teams0 = bucketsByBoss[bossNames[0]].get(fp0);
+        for (const fp1 of bucketKeys[1]) {
+            const teams1 = bucketsByBoss[bossNames[1]].get(fp1);
+            for (const fp2 of bucketKeys[2]) {
+                const teams2 = bucketsByBoss[bossNames[2]].get(fp2);
 
-function filterDiverseStrategies(combinations, limit) {
-    const sorted = [...combinations].sort((a, b) => b.totalScore - a.totalScore);
-    const results = [];
-    const resultFps = [];
+                let bestScore = -1;
+                let bestTriple = null;
 
-    if (sorted.length === 0) return [];
-    const topScore = sorted[0].totalScore;
-    const scoreFloor = topScore * 0.5;
+                for (const t0 of teams0) {
+                    for (const t1 of teams1) {
+                        if (teamsOverlap(t0.team, t1.team)) continue;
+                        for (const t2 of teams2) {
+                            if (teamsOverlap(t0.team, t2.team)) continue;
+                            if (teamsOverlap(t1.team, t2.team)) continue;
+                            const total = t0.score + t1.score + t2.score;
+                            if (total > bestScore) {
+                                bestScore = total;
+                                bestTriple = [t0, t1, t2];
+                            }
+                        }
+                    }
+                }
 
-    results.push(sorted[0]);
-    resultFps.push(sorted[0].assignments.map(a => teamDpsFingerprint(a.team)));
+                if (bestTriple) {
+                    strategies.push({
+                        totalScore: bestScore,
+                        dpsKey: `${fp0}||${fp1}||${fp2}`,
+                        assignments: bossNames.map((bn, i) => ({
+                            boss: bn,
+                            team: bestTriple[i].team,
+                            label: bestTriple[i].label,
+                            score: bestTriple[i].score
+                        }))
+                    });
+                }
+            }
+        }
+    }
 
-    while (results.length < limit) {
-        let bestCombo = null;
-        let bestMinDiffs = 0;
-        let bestSumDiffs = 0;
-        let bestScore = -Infinity;
+    // Phase 3: Greedy diversity-aware selection
+    strategies.sort((a, b) => b.totalScore - a.totalScore);
+    if (strategies.length === 0) return [];
 
-        for (const combo of sorted) {
-            if (results.includes(combo)) continue;
-            if (combo.totalScore < scoreFloor) continue;
-            const fps = combo.assignments.map(a => teamDpsFingerprint(a.team));
+    const best = strategies[0];
+    const avgBossScore = best.totalScore / bossNames.length;
+    const perBossFloor = avgBossScore * PER_BOSS_FLOOR_RATIO;
+
+    const selected = [best];
+
+    const candidates = [];
+    for (let i = 1; i < strategies.length; i++) {
+        if (strategies[i].assignments.every(a => a.score >= perBossFloor)) {
+            candidates.push(strategies[i]);
+        }
+    }
+
+    console.log(`Diversity selection: ${strategies.length} total strategies, ${candidates.length} above per-boss floor (${perBossFloor.toFixed(0)})`);
+
+    while (selected.length < limit && candidates.length > 0) {
+        let bestIdx = -1;
+        let bestMinDiffs = -1;
+        let bestCandidateScore = -1;
+
+        for (let i = 0; i < candidates.length; i++) {
+            const candidateFps = candidates[i].dpsKey.split('||');
 
             let minDiffs = Infinity;
-            let sumDiffs = 0;
-            for (const prevFp of resultFps) {
+            for (const sel of selected) {
+                const selFps = sel.dpsKey.split('||');
                 let diffs = 0;
-                for (let i = 0; i < fps.length; i++) {
-                    if (fps[i] !== prevFp[i]) diffs++;
+                for (let j = 0; j < selFps.length; j++) {
+                    if (candidateFps[j] !== selFps[j]) diffs++;
                 }
                 minDiffs = Math.min(minDiffs, diffs);
-                sumDiffs += diffs;
             }
 
             if (minDiffs > bestMinDiffs ||
-                (minDiffs === bestMinDiffs && sumDiffs > bestSumDiffs) ||
-                (minDiffs === bestMinDiffs && sumDiffs === bestSumDiffs && combo.totalScore > bestScore)) {
+                (minDiffs === bestMinDiffs && candidates[i].totalScore > bestCandidateScore)) {
+                bestIdx = i;
                 bestMinDiffs = minDiffs;
-                bestSumDiffs = sumDiffs;
-                bestScore = combo.totalScore;
-                bestCombo = combo;
+                bestCandidateScore = candidates[i].totalScore;
             }
         }
 
-        if (!bestCombo || bestMinDiffs < 1) break;
-        results.push(bestCombo);
-        resultFps.push(bestCombo.assignments.map(a => teamDpsFingerprint(a.team)));
+        if (bestIdx === -1) break;
+        selected.push(candidates[bestIdx]);
+        candidates.splice(bestIdx, 1);
     }
 
-    return results;
+    return selected;
 }
 
 function displayResults(results, scroll = true) {

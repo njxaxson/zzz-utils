@@ -759,7 +759,7 @@ export function scoreTeamForBoss(team, boss, options = {}) {
                  score -= 100;
              } else {
                  log('DISQUALIFIED: Invalid solo titled anomaly comp');
-                 if (debug) console.log('Team disqualified:', team.map(u => u.name).join('/'), debugReasons);
+                 if (debug) console.log('Team disqualified:', team.map(u => u.name).join('/'), 'Invalid solo titled anomaly comp');
                  return -1;
              }
         }
@@ -775,22 +775,19 @@ export function scoreTeamForBoss(team, boss, options = {}) {
             !isNeutralBoss &&
             anomalyUnits.every(u => boss.weaknesses.includes(getElement(u)));
         
-        // Titled anomaly only counts as valid SOLO comp if on-element (or neutral boss)
-        // Neutral boss: teams are VALID but don't get element bonuses
-        const hasOnElementTitledAnomaly = anomalyUnits.some(u => 
-            isTitled(u) && (isNeutralBoss || boss.weaknesses.includes(getElement(u)))
+        // Titled anomaly is valid as long as their element isn't RESISTED
+        // Off-element (not weak, not resisted) is viable but won't get weakness bonuses
+        const hasValidTitledAnomaly = anomalyUnits.some(u => 
+            isTitled(u) && !boss.resistances.includes(getElement(u))
         );
-        // Double anomaly is valid if at least one anomaly is on-element (or neutral boss)
-        const hasValidDoubleAnomaly = anomalyUnits.length >= 2 && (
-            isNeutralBoss || 
-            anomalyUnits.some(u => boss.weaknesses.includes(getElement(u)))
-        );
+        // Double anomaly is valid if at least one anomaly is not resisted
+        const hasValidDoubleAnomaly = anomalyUnits.length >= 2 &&
+            anomalyUnits.some(u => !boss.resistances.includes(getElement(u)));
         // Stun-synergy anomaly and explicit-synergy anomaly compositions also qualify
-        // for full anomaly comp bonuses (base comp, support bonus, etc.)
-        const hasValidSoloSynergyAnomaly = (hasStunSynergyAnomalyComp || hasExplicitSynergyAnomalyComp) && (
-            isNeutralBoss || anomalyUnits.some(u => boss.weaknesses.includes(getElement(u)))
-        );
-        const hasValidAnomalyComp = hasOnElementTitledAnomaly || hasValidDoubleAnomaly || hasValidSoloSynergyAnomaly;
+        // as long as at least one anomaly is not resisted
+        const hasValidSoloSynergyAnomaly = (hasStunSynergyAnomalyComp || hasExplicitSynergyAnomalyComp) &&
+            anomalyUnits.some(u => !boss.resistances.includes(getElement(u)));
+        const hasValidAnomalyComp = hasValidTitledAnomaly || hasValidDoubleAnomaly || hasValidSoloSynergyAnomaly;
         
         if (hasValidAnomalyComp) {
             // Base comp bonus for valid anomaly teams
@@ -813,28 +810,24 @@ export function scoreTeamForBoss(team, boss, options = {}) {
                         score -= 15; // Same element penalty
                     }
                 } else {
-                    // At least one anomaly is off-element - penalize the mixed composition
+                    // At least one anomaly is off-element
                     if (boss.weaknesses.length > 0) {
                         const anyAnomalyMatchesWeakness = anomalyUnits.some(u => 
                             boss.weaknesses.includes(getElement(u))
                         );
-                        if (!anyAnomalyMatchesWeakness) {
-                            score -= 40; // Heavy penalty if NO anomaly matches weakness
-                        } else {
-                            // Some match, some don't - moderate penalty for off-element partner
-                            score -= 25;
+                        if (anyAnomalyMatchesWeakness) {
+                            score -= 25; // Some match, some don't - moderate penalty for off-element partner
                         }
+                        // If none match weakness: no bonus, no penalty (off-element but not resisted)
                     }
                 }
             } else if (anomalyUnits.length === 1 && isTitled(anomalyUnits[0])) {
-                // Solo titled anomaly - check element alignment
+                // Solo titled anomaly - bonus only if on-element
                 const soloElement = getElement(anomalyUnits[0]);
-                if (boss.weaknesses.length === 0 || boss.weaknesses.includes(soloElement)) {
-                    // Solo on-element titled is efficient and focused
-                    score += 30; // Bonus for focused composition
-                } else {
-                    score -= 40; // Off-element solo titled gets penalty
+                if (boss.weaknesses.includes(soloElement)) {
+                    score += 30; // Bonus for on-element focused composition
                 }
+                // Off-element but not resisted: valid, no bonus, no penalty
             }
             
             const nonAnomalyDPSInComp = dpsUnits.filter(u => !u.tags.includes("anomaly"));
