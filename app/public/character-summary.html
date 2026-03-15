@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZZZ Character Summary</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .summary-count {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-top: 1rem;
+        }
+
+        .summary-count .count-num {
+            color: var(--accent-secondary);
+            font-weight: 600;
+        }
+
+        .character-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        /* Card shell */
+        .char-card {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+            transition: border-color 0.15s, transform 0.15s;
+            min-height: 145px;
+        }
+
+        .char-card:hover {
+            border-color: var(--accent-primary);
+            transform: translateY(-2px);
+        }
+
+        /* Header row */
+        .char-card-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .char-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 6px;
+            object-fit: cover;
+            border: 2px solid var(--border-color);
+            flex-shrink: 0;
+        }
+
+        .char-card.element-fire .char-avatar { border-color: var(--element-fire); }
+        .char-card.element-ice .char-avatar { border-color: var(--element-ice); }
+        .char-card.element-electric .char-avatar { border-color: var(--element-electric); }
+        .char-card.element-physical .char-avatar { border-color: var(--element-physical); }
+        .char-card.element-ether .char-avatar { border-color: var(--element-ether); }
+
+        .char-identity { flex: 1; min-width: 0; }
+
+        .char-name-row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .char-name {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            letter-spacing: 0.04em;
+            margin: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Titled badge */
+        .titled-badge {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.55rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            padding: 0.1rem 0.4rem;
+            border-radius: 3px;
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            color: var(--bg-primary);
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        /* Titled card gets a subtle glow on hover */
+        .char-card.titled:hover {
+            box-shadow: 0 0 12px rgba(0, 212, 170, 0.25);
+        }
+
+        .char-subtitle {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+            margin-top: 0.15rem;
+        }
+
+        .char-subtitle .rank-s { color: var(--accent-primary); font-weight: 700; }
+        .char-subtitle .rank-a { color: var(--element-ether); font-weight: 700; }
+
+        /* Tier indicator — plain text, no border/background */
+        .tier-indicator {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--text-secondary);
+            flex-shrink: 0;
+            text-align: center;
+            letter-spacing: 0.02em;
+        }
+
+        .tier-indicator.tier-elite { color: var(--text-primary); }
+        .tier-indicator.tier-top   { color: var(--text-primary); }
+        .tier-indicator.tier-good  { color: var(--text-secondary); }
+        .tier-indicator.tier-mid   { color: var(--text-muted); }
+        .tier-indicator.tier-low   { color: var(--text-muted); }
+
+        /* Body */
+        .char-card-body {
+            padding: 0.75rem 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.6rem;
+        }
+
+        /* Tags row */
+        .char-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.4rem;
+        }
+
+        .char-tag {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.15rem 0.5rem;
+            border-radius: 3px;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+        }
+
+        .char-tag.element-fire { color: var(--element-fire-light); border-color: var(--element-fire); }
+        .char-tag.element-ice { color: var(--element-ice-light); border-color: var(--element-ice); }
+        .char-tag.element-electric { color: var(--element-electric-light); border-color: var(--element-electric); }
+        .char-tag.element-physical { color: var(--element-physical-light); border-color: var(--element-physical); }
+        .char-tag.element-ether { color: var(--element-ether-light); border-color: var(--element-ether); }
+
+        /* Additional ability: compact stat-line */
+        .char-ability-line {
+            display: flex;
+            align-items: baseline;
+            gap: 0.4rem;
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .ability-label {
+            font-weight: 600;
+            color: var(--accent-secondary);
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .ability-reqs {
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .ability-reqs .req {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        /* Synergy body text */
+        .char-synergy {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+
+        .char-synergy .unit-ref {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .char-synergy strong {
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+
+        /* Roster toggle — sized to match .dropdown-toggle */
+        .roster-toggle {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            cursor: pointer;
+            user-select: none;
+            padding: 0.7rem 1rem;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            transition: border-color 0.15s;
+        }
+
+        .roster-toggle:hover { border-color: var(--accent-primary); }
+
+        .roster-toggle input { display: none; }
+
+        .toggle-track {
+            position: relative;
+            width: 36px;
+            height: 20px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            transition: background 0.2s, border-color 0.2s;
+            flex-shrink: 0;
+        }
+
+        .toggle-thumb {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 14px;
+            height: 14px;
+            background: var(--text-muted);
+            border-radius: 50%;
+            transition: transform 0.2s, background 0.2s;
+        }
+
+        .roster-toggle input:checked ~ .toggle-track {
+            background: var(--accent-primary);
+            border-color: var(--accent-primary);
+        }
+
+        .roster-toggle input:checked ~ .toggle-track .toggle-thumb {
+            transform: translateX(16px);
+            background: var(--bg-primary);
+        }
+
+        .roster-toggle input:disabled ~ .toggle-track {
+            opacity: 0.4;
+        }
+
+        .roster-toggle input:disabled ~ .toggle-label {
+            opacity: 0.5;
+        }
+
+        .toggle-label {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 1rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        /* States */
+        .no-results-msg, .loading-msg {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 3rem 1rem;
+        }
+        .no-results-msg { color: var(--text-muted); }
+        .loading-msg { color: var(--text-secondary); }
+
+        @media (max-width: 768px) {
+            .character-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container extra-wide">
+        <div id="header-container"></div>
+
+        <main>
+            <details class="collapsible-filter" id="filter-section" open>
+                <summary class="filter-header">
+                    <h3>Filters</h3>
+                    <span class="filter-toggle-hint">Filter by rank, element, role, or faction.</span>
+                </summary>
+
+                <div class="filters-grid">
+                    <div class="filter-group">
+                        <label class="filter-label">Rank</label>
+                        <div class="multi-dropdown" data-filter="rank">
+                            <button type="button" class="dropdown-toggle">
+                                <span class="dropdown-text">Any Rank</span>
+                                <span class="dropdown-arrow">▼</span>
+                            </button>
+                            <div class="dropdown-menu">
+                                <label class="dropdown-item"><input type="checkbox" value="limited-s"> <span>Limited S</span></label>
+                                <label class="dropdown-item"><input type="checkbox" value="standard-s"> <span>Standard S</span></label>
+                                <label class="dropdown-item"><input type="checkbox" value="a-rank"> <span>A-Rank</span></label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="filter-group">
+                        <label class="filter-label">Element</label>
+                        <div class="multi-dropdown" data-filter="element">
+                            <button type="button" class="dropdown-toggle">
+                                <span class="dropdown-text">Any Element</span>
+                                <span class="dropdown-arrow">▼</span>
+                            </button>
+                            <div class="dropdown-menu">
+                                <label class="dropdown-item"><input type="checkbox" value="fire"> <span class="element-tag fire">Fire</span></label>
+                                <label class="dropdown-item"><input type="checkbox" value="ice"> <span class="element-tag ice">Ice</span></label>
+                                <label class="dropdown-item"><input type="checkbox" value="electric"> <span class="element-tag electric">Electric</span></label>
+                                <label class="dropdown-item"><input type="checkbox" value="physical"> <span class="element-tag physical">Physical</span></label>
+                                <label class="dropdown-item"><input type="checkbox" value="ether"> <span class="element-tag ether">Ether</span></label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="filter-group">
+                        <label class="filter-label">Role</label>
+                        <div class="multi-dropdown" data-filter="role">
+                            <button type="button" class="dropdown-toggle">
+                                <span class="dropdown-text">Any Role</span>
+                                <span class="dropdown-arrow">▼</span>
+                            </button>
+                            <div class="dropdown-menu">
+                                <label class="dropdown-item"><input type="checkbox" value="attack"> <span>Attack</span></label>
+                                <label class="dropdown-item"><input type="checkbox" value="stun"> <span>Stun</span></label>
+                                <label class="dropdown-item"><input type="checkbox" value="anomaly"> <span>Anomaly</span></label>
+                                <label class="dropdown-item"><input type="checkbox" value="support"> <span>Support</span></label>
+                                <label class="dropdown-item"><input type="checkbox" value="defense"> <span>Defense</span></label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="filter-group">
+                        <label class="filter-label">Tier</label>
+                        <div class="multi-dropdown" data-filter="tier">
+                            <button type="button" class="dropdown-toggle">
+                                <span class="dropdown-text">Any Tier</span>
+                                <span class="dropdown-arrow">▼</span>
+                            </button>
+                            <div class="dropdown-menu" id="tier-menu"></div>
+                        </div>
+                    </div>
+
+                    <div class="filter-group filter-group-wide">
+                        <label class="filter-label">Faction</label>
+                        <div class="multi-dropdown multi-dropdown-wide" data-filter="faction">
+                            <button type="button" class="dropdown-toggle">
+                                <span class="dropdown-text">Any Faction</span>
+                                <span class="dropdown-arrow">▼</span>
+                            </button>
+                            <div class="dropdown-menu" id="faction-menu"></div>
+                        </div>
+                    </div>
+
+                    <div class="filter-group">
+                        <label class="filter-label">My Roster</label>
+                        <label class="roster-toggle">
+                            <input type="checkbox" id="owned-toggle">
+                            <span class="toggle-track">
+                                <span class="toggle-thumb"></span>
+                            </span>
+                            <span class="toggle-label" id="owned-hint">Owned only</span>
+                        </label>
+                    </div>
+                </div>
+            </details>
+
+            <div class="summary-count" id="summary-count"></div>
+
+            <div class="character-grid" id="character-grid">
+                <div class="loading-msg">Loading character data...</div>
+            </div>
+        </main>
+
+        <div id="footer-container"></div>
+    </div>
+
+    <script type="module">
+        import { loadSharedComponents } from './lib/components.js';
+        loadSharedComponents('character-summary');
+    </script>
+    <script type="module" src="character-summary.js"></script>
+</body>
+</html>
