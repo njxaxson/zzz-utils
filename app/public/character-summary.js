@@ -29,22 +29,16 @@ const FACTION_MAP = {
 let ownedUnitIds = new Set();
 
 document.addEventListener('DOMContentLoaded', async () => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const useFakeData = urlParams.get('data') === 'fake';
-    const dataUrl = useFakeData ? './data/units-fake.json' : './data/units.json';
-
     try {
-        const response = await fetch(dataUrl);
+        const response = await fetch('./data/units.json');
         allUnits = await response.json();
         loadRoster();
         loadFilters();
-        sanitizeFilters();
         populateFactionFilters();
         populateTierFilters();
         applyFiltersToUI();
         setupEventListeners();
         renderGrid();
-        if (useFakeData) document.title += ' (FAKE DATA)';
     } catch (error) {
         console.error('Failed to load data:', error);
         document.getElementById('character-grid').innerHTML =
@@ -105,22 +99,6 @@ function loadFilters() {
     }
 }
 
-function sanitizeFilters() {
-    // Factions: remove any that are not in the current dataset
-    const availableFactions = new Set(allUnits.map(u => u.faction).filter(Boolean));
-    if (filters.faction && filters.faction.length > 0) {
-        filters.faction = filters.faction.filter(f => availableFactions.has(f));
-    }
-    
-    // Tiers: remove any that are not in the current dataset (converted to string)
-    const availableTiers = new Set(allUnits.map(u => u.tier !== undefined ? String(u.tier) : '').filter(Boolean));
-    if (filters.tier && filters.tier.length > 0) {
-        filters.tier = filters.tier.filter(t => availableTiers.has(t));
-    }
-    
-    // Save the sanitized version
-    saveFilters();
-}
 
 function applyFiltersToUI() {
     // Multi-dropdowns
@@ -319,8 +297,6 @@ function buildAbilityLine(unit) {
     if (!unit.join) return '';
 
     const reqs = unit.join.map(j => {
-        if (j === 'same_faction') return unit.faction || 'Same Faction';
-        if (j === 'same_element') return cap(getElement(unit));
         if (FACTION_MAP[j]) return FACTION_MAP[j];
         if (j === 'assist:defensive') return 'Defensive Assist';
         if (j === 'assist:evasive') return 'Evasive Assist';

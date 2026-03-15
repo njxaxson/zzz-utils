@@ -44,12 +44,8 @@ let _options = {
 export async function initRoster(opts = {}) {
     _options = { ..._options, ...opts };
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const useFakeData = urlParams.get('data') === 'fake';
-    const unitsUrl = useFakeData ? './data/units-fake.json' : './data/units.json';
-
     const [unitsResponse, templateResponse] = await Promise.all([
-        fetch(unitsUrl),
+        fetch('./data/units.json'),
         fetch('components/roster.html')
     ]);
 
