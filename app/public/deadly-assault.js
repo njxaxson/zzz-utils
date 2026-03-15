@@ -30,7 +30,6 @@ const PAGE_STORAGE_KEY = 'zzz-deadly-assault';     // Page-specific settings
 // ============================================================================
 
 let allBosses = [];
-let bossImages = {};
 
 // Selected boss IDs
 let selectedBosses = [];
@@ -44,12 +43,8 @@ let sharedBossesMode = false;
 
 async function loadData() {
     try {
-        const [bossesResponse, bossImagesResponse] = await Promise.all([
-            fetch('./data/bosses.json'),
-            fetch('./data/boss-images.json')
-        ]);
+        const bossesResponse = await fetch('./data/bosses.json');
         allBosses = await bossesResponse.json();
-        bossImages = await bossImagesResponse.json();
 
         await initRoster({
             containerSelector: '#roster-container',
@@ -162,10 +157,11 @@ function createBossCard(boss) {
 }
 
 function getBossImageUrl(bossId) {
-    if (!bossImages.bosses || !bossImages.bosses[bossId]) {
+    const boss = allBosses.find(b => b.id === bossId);
+    if (!boss || !boss.image) {
         return null;
     }
-    return `./assets/bosses/${bossImages.bosses[bossId]}`;
+    return boss.image;
 }
 
 function getWeaknessGradientClass(weaknesses) {

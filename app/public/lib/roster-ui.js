@@ -15,7 +15,6 @@ const ROSTER_STORAGE_KEY = 'zzz-roster';
 const ELEMENTS = ['fire', 'ice', 'electric', 'physical', 'ether'];
 
 let allUnits = [];
-let characterImages = {};
 let unitStates = {};
 let rosterOpen = true;
 let sharedRosterMode = false;
@@ -45,14 +44,12 @@ let _options = {
 export async function initRoster(opts = {}) {
     _options = { ..._options, ...opts };
 
-    const [unitsResponse, imagesResponse, templateResponse] = await Promise.all([
+    const [unitsResponse, templateResponse] = await Promise.all([
         fetch('./data/units.json'),
-        fetch('./data/character-images.json'),
         fetch('components/roster.html')
     ]);
 
     allUnits = await unitsResponse.json();
-    characterImages = await imagesResponse.json();
 
     const container = document.querySelector(_options.containerSelector);
     if (!container) {
@@ -83,7 +80,6 @@ export async function initRoster(opts = {}) {
 
 export function getUnitStates() { return unitStates; }
 export function getAllUnits() { return allUnits; }
-export function getCharacterImages() { return characterImages; }
 export function isSharedMode() { return sharedRosterMode; }
 
 export function getOwnedUnits() {
@@ -109,7 +105,8 @@ export function getUnitElement(unit) {
 }
 
 export function getCharacterImageUrl(unitId) {
-    return characterImages[unitId] || null;
+    const unit = allUnits.find(u => u.id === unitId);
+    return (unit && unit.image) || null;
 }
 
 // ============================================================================

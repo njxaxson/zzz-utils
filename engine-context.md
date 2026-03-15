@@ -376,6 +376,7 @@ intentional and correct.
 {
   "id": "aria",
   "name": "Aria",
+  "image": "./assets/characters/aria.webp",
   "rank": "S",
   "limited": true,
   "tier": 1.0,
@@ -388,6 +389,7 @@ intentional and correct.
 
 - `id` - Unique identifier for the unit
 - `name` - Display name
+- `image` - URL or relative path to the unit's portrait image (used directly by the UI without modification)
 - `rank` - `"S"` or `"A"` (S-rank units are inherently stronger and rarer than A-rank)
 - `limited` - Whether the unit is limited (only available during specific gacha banners)
 - `tier` - Numeric tier ranking (T0 = best, T4 = worst); source of truth for scoring
@@ -429,6 +431,7 @@ Current mutual synergy pairs:
 {
   "id": "vesper",
   "name": "Discordant Solo",
+  "image": "./assets/bosses/solo.webp",
   "weaknesses": ["ether"],
   "resistances": ["ice", "fire"],
   "shill": "anomaly",
@@ -439,6 +442,7 @@ Current mutual synergy pairs:
 }
 ```
 
+- `image` - URL or relative path to the boss's portrait image (used directly by the UI without modification)
 - `shillIntensity` (optional, default 1): Amplifies favored unit bonuses. Higher
   values mean the boss fight is more heavily skewed toward its favored units.
   Currently only affects favored bonus; designed to be extensible to also amplify

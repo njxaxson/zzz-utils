@@ -6,7 +6,7 @@
 import { getTeams, sortTeamByRole, getTeamLabel } from './lib/team-builder.js';
 import { scoreTeamForBoss, isDPS, isStun, isSupport, isDefense, getElement, ELEMENTS, DPS_ROLES } from './lib/team-scorer.js';
 import { 
-    initRoster, getUnitStates, getAllUnits, getCharacterImages,
+    initRoster, getUnitStates, getAllUnits,
     getInitials, getUnitElement, getCharacterImageUrl
 } from './lib/roster-ui.js';
 
