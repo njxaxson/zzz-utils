@@ -1,0 +1,1208 @@
+[
+  {
+    "id": "fake_1",
+    "name": "Esme",
+    "rank": "S",
+    "limited": true,
+    "tier": 0,
+    "faction": "Solar Flare",
+    "tags": [
+      "attack",
+      "physical",
+      "assist:defensive",
+      "title"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=101000281_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [
+        "support"
+      ],
+      "avoid": []
+    },
+    "join": [
+      "Solar Flare",
+      "support"
+    ]
+  },
+  {
+    "id": "fake_2",
+    "name": "Neon",
+    "rank": "S",
+    "limited": true,
+    "tier": 0,
+    "faction": "Cyber Samurai",
+    "tags": [
+      "anomaly",
+      "fire",
+      "assist:defensive",
+      "title"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=101070051_s2_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [
+        "support"
+      ],
+      "avoid": []
+    },
+    "join": [
+      "Cyber Samurai",
+      "fire"
+    ]
+  },
+  {
+    "id": "fake_3",
+    "name": "Flux",
+    "rank": "S",
+    "limited": true,
+    "tier": 0,
+    "faction": "Plasma Pirates",
+    "tags": [
+      "rupture",
+      "electric",
+      "assist:defensive",
+      "title"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=101010011_s2_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [
+        "support"
+      ],
+      "avoid": []
+    },
+    "join": [
+      "electric",
+      "support"
+    ]
+  },
+  {
+    "id": "fake_4",
+    "name": "Vince",
+    "rank": "S",
+    "limited": true,
+    "tier": 1,
+    "faction": "Shadow Syndicate",
+    "tags": [
+      "attack",
+      "ice",
+      "assist:evasive"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=101430021_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [],
+      "avoid": []
+    },
+    "join": [
+      "ice",
+      "stun"
+    ]
+  },
+  {
+    "id": "fake_5",
+    "name": "Tess",
+    "rank": "S",
+    "limited": true,
+    "tier": 0.5,
+    "faction": "Shadow Syndicate",
+    "tags": [
+      "stun",
+      "electric",
+      "assist:evasive"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=101020161_s2_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [
+        "electric"
+      ],
+      "avoid": []
+    },
+    "join": [
+      "Shadow Syndicate",
+      "electric"
+    ]
+  },
+  {
+    "id": "fake_6",
+    "name": "Zumi",
+    "rank": "S",
+    "limited": false,
+    "tier": 1,
+    "faction": "Shadow Syndicate",
+    "tags": [
+      "attack",
+      "ether",
+      "assist:evasive"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=101000401_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [],
+      "avoid": []
+    },
+    "join": [
+      "Shadow Syndicate",
+      "ether"
+    ]
+  },
+  {
+    "id": "fake_7",
+    "name": "Volt",
+    "rank": "S",
+    "limited": false,
+    "tier": 1.5,
+    "faction": "Shadow Syndicate",
+    "tags": [
+      "anomaly",
+      "ether",
+      "assist:evasive",
+      "subdps"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=101020181_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [
+        "anomaly"
+      ],
+      "avoid": []
+    },
+    "join": [
+      "Shadow Syndicate",
+      "ether"
+    ]
+  },
+  {
+    "id": "fake_8",
+    "name": "Mina",
+    "rank": "S",
+    "limited": true,
+    "tier": 0.5,
+    "faction": "Shadow Syndicate",
+    "tags": [
+      "anomaly",
+      "physical",
+      "assist:defensive",
+      "stunless"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=101450071_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [],
+      "avoid": []
+    },
+    "join": [
+      "physical",
+      "anomaly"
+    ]
+  },
+  {
+    "id": "fake_9",
+    "name": "Rico",
+    "rank": "A",
+    "limited": false,
+    "tier": 3,
+    "faction": "Iron Legion",
+    "tags": [
+      "stun",
+      "ether",
+      "assist:evasive"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=101000341_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [
+        "ether"
+      ],
+      "avoid": []
+    },
+    "join": [
+      "ether",
+      "attack"
+    ]
+  },
+  {
+    "id": "fake_10",
+    "name": "Sia",
+    "rank": "A",
+    "limited": false,
+    "tier": 1.5,
+    "faction": "Iron Legion",
+    "tags": [
+      "attack",
+      "ice",
+      "assist:defensive"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=101020091_s2_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [],
+      "avoid": []
+    },
+    "join": [
+      "Iron Legion",
+      "assist:defensive"
+    ]
+  },
+  {
+    "id": "fake_11",
+    "name": "Ross",
+    "rank": "S",
+    "limited": true,
+    "tier": 1.5,
+    "faction": "Iron Legion",
+    "tags": [
+      "support",
+      "electric",
+      "assist:defensive"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=101800111_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [],
+      "avoid": []
+    },
+    "join": [
+      "Iron Legion",
+      "attack"
+    ]
+  },
+  {
+    "id": "fake_12",
+    "name": "Rian",
+    "rank": "S",
+    "limited": true,
+    "tier": 0.5,
+    "faction": "Iron Legion",
+    "tags": [
+      "stun",
+      "electric",
+      "assist:evasive"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=101000361_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [],
+      "avoid": []
+    },
+    "join": [
+      "electric",
+      "attack"
+    ]
+  },
+  {
+    "id": "fake_13",
+    "name": "Finn",
+    "rank": "S",
+    "limited": true,
+    "tier": 1.5,
+    "faction": "Iron Legion",
+    "tags": [
+      "anomaly",
+      "electric",
+      "assist:evasive",
+      "subdps"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=101010011_s3_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [
+        "anomaly"
+      ],
+      "avoid": []
+    },
+    "join": [
+      "Iron Legion",
+      "electric"
+    ]
+  },
+  {
+    "id": "fake_14",
+    "name": "Kian",
+    "rank": "S",
+    "limited": true,
+    "tier": 0,
+    "faction": "Crystal Vanguard",
+    "tags": [
+      "attack",
+      "physical",
+      "assist:evasive"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=101030131_s2_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [],
+      "avoid": []
+    },
+    "join": [
+      "physical",
+      "stun"
+    ]
+  },
+  {
+    "id": "fake_15",
+    "name": "Reed",
+    "rank": "A",
+    "limited": false,
+    "tier": 1.5,
+    "faction": "Crystal Vanguard",
+    "tags": [
+      "attack",
+      "fire",
+      "assist:evasive"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=101010031_s2_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [
+        "stun"
+      ],
+      "avoid": []
+    },
+    "join": [
+      "Crystal Vanguard",
+      "stun"
+    ]
+  },
+  {
+    "id": "fake_16",
+    "name": "Storm",
+    "rank": "S",
+    "limited": true,
+    "tier": 0.5,
+    "faction": "Crystal Vanguard",
+    "tags": [
+      "anomaly",
+      "fire",
+      "assist:evasive"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=101460031_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [],
+      "avoid": [
+        "stun"
+      ]
+    },
+    "join": [
+      "fire",
+      "anomaly"
+    ]
+  },
+  {
+    "id": "fake_17",
+    "name": "Gela",
+    "rank": "A",
+    "limited": false,
+    "tier": 2,
+    "faction": "Crystal Vanguard",
+    "tags": [
+      "anomaly",
+      "electric",
+      "assist:evasive"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=101450011_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [
+        "anomaly"
+      ],
+      "avoid": []
+    },
+    "join": [
+      "electric",
+      "anomaly"
+    ]
+  },
+  {
+    "id": "fake_18",
+    "name": "Cipher",
+    "rank": "S",
+    "limited": true,
+    "tier": 1,
+    "faction": "Void Walkers",
+    "tags": [
+      "rupture",
+      "physical",
+      "assist:defensive"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=101070151_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [],
+      "avoid": []
+    },
+    "join": [
+      "Void Walkers",
+      "support"
+    ]
+  },
+  {
+    "id": "fake_19",
+    "name": "Spark",
+    "rank": "S",
+    "limited": true,
+    "tier": 0.5,
+    "faction": "Void Walkers",
+    "tags": [
+      "defense",
+      "ice",
+      "assist:evasive"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=101040121_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [],
+      "avoid": []
+    },
+    "join": [
+      "Void Walkers",
+      "support"
+    ]
+  },
+  {
+    "id": "fake_20",
+    "name": "Jett",
+    "rank": "S",
+    "limited": true,
+    "tier": 0.5,
+    "faction": "Void Walkers",
+    "tags": [
+      "anomaly",
+      "ice",
+      "assist:evasive",
+      "subdps",
+      "stunless"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=101070131_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [
+        "anomaly"
+      ],
+      "avoid": []
+    },
+    "join": [
+      "Void Walkers",
+      "assist:evasive"
+    ]
+  },
+  {
+    "id": "fake_21",
+    "name": "Clea",
+    "rank": "S",
+    "limited": true,
+    "tier": 1.5,
+    "faction": "Void Walkers",
+    "tags": [
+      "attack",
+      "fire",
+      "assist:evasive",
+      "subdps"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=101040031_s3_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [
+        "stun"
+      ],
+      "avoid": []
+    },
+    "join": [
+      "Void Walkers",
+      "assist:evasive"
+    ]
+  },
+  {
+    "id": "fake_22",
+    "name": "Jon",
+    "rank": "S",
+    "limited": true,
+    "tier": 1,
+    "faction": "Solar Flare",
+    "tags": [
+      "defense",
+      "fire",
+      "assist:defensive"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=101050141_s2_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [],
+      "avoid": []
+    },
+    "join": [
+      "Solar Flare",
+      "support"
+    ]
+  },
+  {
+    "id": "fake_23",
+    "name": "Nora",
+    "rank": "S",
+    "limited": true,
+    "tier": 0.5,
+    "faction": "Solar Flare",
+    "tags": [
+      "attack",
+      "ether",
+      "assist:defensive",
+      "subdps"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=101010081_s2_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [],
+      "avoid": []
+    },
+    "join": [
+      "Solar Flare",
+      "ether"
+    ]
+  },
+  {
+    "id": "fake_24",
+    "name": "Nola",
+    "rank": "S",
+    "limited": true,
+    "tier": 1,
+    "faction": "Solar Flare",
+    "tags": [
+      "rupture",
+      "electric",
+      "assist:evasive"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=101460021_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [],
+      "avoid": []
+    },
+    "join": [
+      "Solar Flare",
+      "assist:evasive"
+    ]
+  },
+  {
+    "id": "fake_25",
+    "name": "Eda",
+    "rank": "S",
+    "limited": false,
+    "tier": 2,
+    "faction": "Solar Flare",
+    "tags": [
+      "defense",
+      "electric",
+      "assist:defensive"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=101010121_s3_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [],
+      "avoid": []
+    },
+    "join": [
+      "Solar Flare",
+      "support"
+    ]
+  },
+  {
+    "id": "fake_26",
+    "name": "Roy",
+    "rank": "A",
+    "limited": false,
+    "tier": 3,
+    "faction": "Nebula Corp",
+    "tags": [
+      "support",
+      "fire",
+      "assist:defensive"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=101000241_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [],
+      "avoid": []
+    },
+    "join": [
+      "Nebula Corp",
+      "attack"
+    ]
+  },
+  {
+    "id": "fake_27",
+    "name": "Eris",
+    "rank": "A",
+    "limited": false,
+    "tier": 2.5,
+    "faction": "Nebula Corp",
+    "tags": [
+      "attack",
+      "electric",
+      "assist:evasive"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=101000191_s2_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [
+        "stun"
+      ],
+      "avoid": []
+    },
+    "join": [
+      "stun",
+      "support"
+    ]
+  },
+  {
+    "id": "fake_28",
+    "name": "Keri",
+    "rank": "S",
+    "limited": true,
+    "tier": 1,
+    "faction": "Nebula Corp",
+    "tags": [
+      "anomaly",
+      "electric",
+      "assist:defensive",
+      "subdps"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=101000081_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [
+        "anomaly"
+      ],
+      "avoid": []
+    },
+    "join": [
+      "Nebula Corp",
+      "anomaly"
+    ]
+  },
+  {
+    "id": "fake_29",
+    "name": "Elsa",
+    "rank": "A",
+    "limited": false,
+    "tier": 1.5,
+    "faction": "Nebula Corp",
+    "tags": [
+      "stun",
+      "ice",
+      "assist:defensive"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=101460161_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [],
+      "avoid": []
+    },
+    "join": [
+      "Nebula Corp",
+      "ice"
+    ]
+  },
+  {
+    "id": "fake_30",
+    "name": "Mela",
+    "rank": "A",
+    "limited": false,
+    "tier": 2.5,
+    "faction": "Quantum Architects",
+    "tags": [
+      "defense",
+      "physical",
+      "assist:evasive"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=101030161_s2_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [
+        "physical"
+      ],
+      "avoid": []
+    },
+    "join": [
+      "attack",
+      "support"
+    ]
+  },
+  {
+    "id": "fake_31",
+    "name": "Bela",
+    "rank": "A",
+    "limited": false,
+    "tier": 3.5,
+    "faction": "Quantum Architects",
+    "tags": [
+      "rupture",
+      "ice",
+      "assist:evasive"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=101020071_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [],
+      "avoid": []
+    },
+    "join": [
+      "Quantum Architects",
+      "assist:evasive"
+    ]
+  },
+  {
+    "id": "fake_32",
+    "name": "Brea",
+    "rank": "S",
+    "limited": false,
+    "tier": 1,
+    "faction": "Quantum Architects",
+    "tags": [
+      "rupture",
+      "fire",
+      "assist:evasive"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=101000021_s2_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [
+        "fire"
+      ],
+      "avoid": []
+    },
+    "join": [
+      "Quantum Architects",
+      "fire"
+    ]
+  },
+  {
+    "id": "fake_33",
+    "name": "Axel",
+    "rank": "S",
+    "limited": true,
+    "tier": 1,
+    "faction": "Echo Division",
+    "tags": [
+      "anomaly",
+      "physical",
+      "assist:evasive",
+      "subdps",
+      "stunless"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=101000011_s2_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [],
+      "avoid": []
+    },
+    "join": [
+      "Echo Division",
+      "physical"
+    ]
+  },
+  {
+    "id": "fake_34",
+    "name": "Rook",
+    "rank": "S",
+    "limited": true,
+    "tier": 0.5,
+    "faction": "Echo Division",
+    "tags": [
+      "attack",
+      "ether",
+      "assist:evasive"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=101000381_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [
+        "ether"
+      ],
+      "avoid": []
+    },
+    "join": [
+      "Echo Division",
+      "stun"
+    ]
+  },
+  {
+    "id": "fake_35",
+    "name": "Jela",
+    "rank": "S",
+    "limited": false,
+    "tier": 1.5,
+    "faction": "Echo Division",
+    "tags": [
+      "support",
+      "physical",
+      "assist:defensive"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=101000241_s2_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [],
+      "avoid": []
+    },
+    "join": [
+      "Echo Division",
+      "physical"
+    ]
+  },
+  {
+    "id": "fake_36",
+    "name": "Zane",
+    "rank": "S",
+    "limited": true,
+    "tier": 1,
+    "faction": "Lunar Watch",
+    "tags": [
+      "rupture",
+      "physical",
+      "assist:defensive"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=101000011_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [
+        "physical"
+      ],
+      "avoid": []
+    },
+    "join": [
+      "Lunar Watch",
+      "physical"
+    ]
+  },
+  {
+    "id": "fake_37",
+    "name": "Elian",
+    "rank": "S",
+    "limited": false,
+    "tier": 2,
+    "faction": "Lunar Watch",
+    "tags": [
+      "stun",
+      "ice",
+      "assist:defensive"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=101020141_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [
+        "ice"
+      ],
+      "avoid": []
+    },
+    "join": [
+      "attack",
+      "support"
+    ]
+  },
+  {
+    "id": "fake_38",
+    "name": "Vance",
+    "rank": "S",
+    "limited": true,
+    "tier": 0.5,
+    "faction": "Lunar Watch",
+    "tags": [
+      "support",
+      "fire",
+      "assist:defensive"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=101000141_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [],
+      "avoid": []
+    },
+    "join": [
+      "fire",
+      "attack"
+    ]
+  },
+  {
+    "id": "fake_39",
+    "name": "Orson",
+    "rank": "S",
+    "limited": true,
+    "tier": 1,
+    "faction": "Terra Guardians",
+    "tags": [
+      "rupture",
+      "ice",
+      "assist:defensive"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=101050101_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [],
+      "avoid": []
+    },
+    "join": [
+      "Terra Guardians",
+      "ice"
+    ]
+  },
+  {
+    "id": "fake_40",
+    "name": "Marc",
+    "rank": "S",
+    "limited": true,
+    "tier": 0.5,
+    "faction": "Terra Guardians",
+    "tags": [
+      "support",
+      "ether",
+      "assist:defensive"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=101050021_s2_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [
+        "ether"
+      ],
+      "avoid": []
+    },
+    "join": [
+      "Terra Guardians",
+      "ether"
+    ]
+  },
+  {
+    "id": "fake_41",
+    "name": "Cole",
+    "rank": "S",
+    "limited": true,
+    "tier": 1,
+    "faction": "Terra Guardians",
+    "tags": [
+      "defense",
+      "fire",
+      "assist:evasive"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=101030151_s2_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [],
+      "avoid": []
+    },
+    "join": [
+      "Terra Guardians",
+      "support"
+    ]
+  },
+  {
+    "id": "fake_42",
+    "name": "Trace",
+    "rank": "S",
+    "limited": true,
+    "tier": 1.5,
+    "faction": "Cyber Samurai",
+    "tags": [
+      "stun",
+      "fire",
+      "assist:defensive"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=101100041_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [],
+      "avoid": []
+    },
+    "join": [
+      "attack",
+      "support"
+    ]
+  },
+  {
+    "id": "fake_43",
+    "name": "Val",
+    "rank": "A",
+    "limited": false,
+    "tier": 4,
+    "faction": "Cyber Samurai",
+    "tags": [
+      "defense",
+      "ether",
+      "assist:defensive"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=101000221_s2_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [],
+      "avoid": []
+    },
+    "join": [
+      "ether",
+      "support"
+    ]
+  },
+  {
+    "id": "fake_44",
+    "name": "Troy",
+    "rank": "A",
+    "limited": false,
+    "tier": 1,
+    "faction": "Cyber Samurai",
+    "tags": [
+      "anomaly",
+      "fire",
+      "assist:defensive"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=2000000017_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [
+        "anomaly"
+      ],
+      "avoid": []
+    },
+    "join": [
+      "Cyber Samurai",
+      "fire"
+    ]
+  },
+  {
+    "id": "fake_45",
+    "name": "Katy",
+    "rank": "S",
+    "limited": true,
+    "tier": 0.5,
+    "faction": "Neon Knights",
+    "tags": [
+      "rupture",
+      "ether",
+      "assist:evasive"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=2009000003_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [],
+      "avoid": []
+    },
+    "join": [
+      "Neon Knights",
+      "ether"
+    ]
+  },
+  {
+    "id": "fake_46",
+    "name": "Neve",
+    "rank": "S",
+    "limited": true,
+    "tier": 0.5,
+    "faction": "Neon Knights",
+    "tags": [
+      "stun",
+      "ether",
+      "assist:defensive"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=101050091_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [],
+      "avoid": []
+    },
+    "join": [
+      "Neon Knights",
+      "attack"
+    ]
+  },
+  {
+    "id": "fake_47",
+    "name": "Vera",
+    "rank": "S",
+    "limited": true,
+    "tier": 0,
+    "faction": "Plasma Pirates",
+    "tags": [
+      "anomaly",
+      "ice",
+      "assist:evasive"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=101040111_s2_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [],
+      "avoid": []
+    },
+    "join": [
+      "Plasma Pirates",
+      "anomaly"
+    ]
+  },
+  {
+    "id": "fake_48",
+    "name": "Rory",
+    "rank": "S",
+    "limited": true,
+    "tier": 1,
+    "faction": "Plasma Pirates",
+    "tags": [
+      "attack",
+      "ice",
+      "assist:defensive"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=101030221_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [],
+      "avoid": []
+    },
+    "join": [
+      "Plasma Pirates",
+      "assist:defensive"
+    ]
+  },
+  {
+    "id": "fake_49",
+    "name": "Lana",
+    "rank": "A",
+    "limited": false,
+    "tier": 2,
+    "faction": "Chrono Keepers",
+    "tags": [
+      "attack",
+      "electric",
+      "assist:defensive",
+      "subdps"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=101010041_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [],
+      "avoid": []
+    },
+    "join": [
+      "Chrono Keepers",
+      "electric"
+    ]
+  },
+  {
+    "id": "fake_50",
+    "name": "Van",
+    "rank": "A",
+    "limited": false,
+    "tier": 2,
+    "faction": "Chrono Keepers",
+    "tags": [
+      "support",
+      "physical",
+      "assist:evasive"
+    ],
+    "image": "https://anothereden.wiki/thumb.php?f=101010041_s2_rank5_command.png&width=128",
+    "synergy": {
+      "units": [],
+      "tags": [],
+      "avoid": []
+    },
+    "join": [
+      "Chrono Keepers",
+      "physical"
+    ]
+  }
+]

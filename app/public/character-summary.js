@@ -7,7 +7,7 @@ const FILTERS_STORAGE_KEY = 'zzz-char-summary-filters';
 const ROSTER_STORAGE_KEY = 'zzz-roster';
 
 const ELEMENTS = ['fire', 'ice', 'electric', 'physical', 'ether'];
-const ROLES = ['attack', 'stun', 'anomaly', 'support', 'defense'];
+const ROLES = ['attack', 'stun', 'anomaly', 'support', 'defense', 'rupture'];
 
 const FACTION_MAP = {
     'spookshack': 'Spook Shack',
@@ -38,6 +38,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         allUnits = await response.json();
         loadRoster();
         loadFilters();
+        sanitizeFilters();
         populateFactionFilters();
         populateTierFilters();
         applyFiltersToUI();
@@ -102,6 +103,23 @@ function loadFilters() {
     } catch (e) {
         console.warn('Failed to load filters:', e);
     }
+}
+
+function sanitizeFilters() {
+    // Factions: remove any that are not in the current dataset
+    const availableFactions = new Set(allUnits.map(u => u.faction).filter(Boolean));
+    if (filters.faction && filters.faction.length > 0) {
+        filters.faction = filters.faction.filter(f => availableFactions.has(f));
+    }
+    
+    // Tiers: remove any that are not in the current dataset (converted to string)
+    const availableTiers = new Set(allUnits.map(u => u.tier !== undefined ? String(u.tier) : '').filter(Boolean));
+    if (filters.tier && filters.tier.length > 0) {
+        filters.tier = filters.tier.filter(t => availableTiers.has(t));
+    }
+    
+    // Save the sanitized version
+    saveFilters();
 }
 
 function applyFiltersToUI() {
@@ -173,6 +191,25 @@ function setupEventListeners() {
             renderGrid();
         });
     }
+
+    const clearBtn = document.getElementById('clear-filters');
+    if (clearBtn) {
+        clearBtn.addEventListener('click', clearAllFilters);
+    }
+}
+
+function clearAllFilters() {
+    filters = { rank: [], element: [], role: [], faction: [], tier: [], owned: false };
+    document.querySelectorAll('.multi-dropdown input[type="checkbox"]').forEach(cb => cb.checked = false);
+    document.querySelectorAll('.multi-dropdown').forEach(dropdown => {
+        const key = dropdown.dataset.filter;
+        const label = key === 'tier' ? 'Any Tier' : `Any ${cap(key)}`;
+        dropdown.querySelector('.dropdown-text').textContent = label;
+    });
+    const toggle = document.getElementById('owned-toggle');
+    if (toggle) toggle.checked = false;
+    saveFilters();
+    renderGrid();
 }
 
 function onFilterChange(dropdown) {

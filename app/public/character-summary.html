@@ -279,6 +279,28 @@
             color: var(--text-secondary);
         }
 
+        /* Clear filters button */
+        .clear-filters-btn {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            padding: 0.7rem 1rem;
+            background: transparent;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: color 0.15s, border-color 0.15s;
+            width: 100%;
+        }
+
+        .clear-filters-btn:hover {
+            color: var(--accent-primary);
+            border-color: var(--accent-primary);
+        }
+
         /* States */
         .no-results-msg, .loading-msg {
             grid-column: 1 / -1;
@@ -350,6 +372,7 @@
                                 <label class="dropdown-item"><input type="checkbox" value="anomaly"> <span>Anomaly</span></label>
                                 <label class="dropdown-item"><input type="checkbox" value="support"> <span>Support</span></label>
                                 <label class="dropdown-item"><input type="checkbox" value="defense"> <span>Defense</span></label>
+                                <label class="dropdown-item"><input type="checkbox" value="rupture"> <span>Rupture</span></label>
                             </div>
                         </div>
                     </div>
@@ -385,6 +408,11 @@
                             </span>
                             <span class="toggle-label" id="owned-hint">Owned only</span>
                         </label>
+                    </div>
+
+                    <div class="filter-group">
+                        <label class="filter-label">&nbsp;</label>
+                        <button type="button" class="clear-filters-btn" id="clear-filters">Clear Filters</button>
                     </div>
                 </div>
             </details>
