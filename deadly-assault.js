@@ -19,6 +19,7 @@ async function main() {
         findExclusiveCombinations
     } = await import('./app/public/lib/team-builder.js');
     const { scoreTeamForBoss } = await import('./app/public/lib/team-scorer.js');
+    const { inflateSync } = await import('node:zlib');
 
     // ============================================================================
     // COMMAND-LINE ARGUMENTS
@@ -35,7 +36,8 @@ async function main() {
             units: null,        // Comma-separated list of unit names (replaces roster)
             exclude: null,      // Comma-separated list of unit names to exclude
             include: null,      // Comma-separated list of unit names that must appear in solution
-            flex: null          // Comma-separated list of flex/universal unit names
+            flex: null,         // Comma-separated list of flex/universal unit names
+            query: null         // Full query string from share URL (-q)
         };
         
         for (let i = 0; i < args.length; i++) {
@@ -67,6 +69,9 @@ async function main() {
             } else if ((args[i] === '--flex' || args[i] === '-f') && args[i + 1]) {
                 options.flex = args[i + 1].split(',').map(u => u.trim());
                 i++;
+            } else if ((args[i] === '--query' || args[i] === '-q') && args[i + 1]) {
+                options.query = args[i + 1];
+                i++;
             }
         }
         
@@ -75,6 +80,94 @@ async function main() {
 
     const CLI = parseArgs();
     const DEBUG_MATCHUPS = CLI.debug;
+
+    // ============================================================================
+    // SHARE URL DECODING
+    // ============================================================================
+
+    function base64UrlDecodeNode(str) {
+        let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
+        while (base64.length % 4) base64 += '=';
+        return Buffer.from(base64, 'base64');
+    }
+
+    function decodeRosterFromParam(encoded) {
+        let deltaString;
+        try {
+            if (encoded.startsWith('u_')) {
+                deltaString = base64UrlDecodeNode(encoded.slice(2)).toString('utf8');
+            } else {
+                deltaString = inflateSync(base64UrlDecodeNode(encoded)).toString('utf8');
+            }
+        } catch (e) {
+            console.error('Failed to decode roster from share URL:', e.message);
+            process.exit(1);
+        }
+
+        const [ownedLimitedStr, notOwnedOthersStr, universalStr] = deltaString.split('|');
+        const ownedLimited = new Set(ownedLimitedStr ? ownedLimitedStr.split(',').filter(Boolean) : []);
+        const notOwnedOthers = new Set(notOwnedOthersStr ? notOwnedOthersStr.split(',').filter(Boolean) : []);
+        const universalSet = new Set(universalStr ? universalStr.split(',').filter(Boolean) : []);
+
+        const owned = [];
+        const universal = [];
+        for (const unit of allUnits) {
+            const defaultOwned = unit.rank === 'A' || (unit.rank === 'S' && !unit.limited);
+            let isOwned = defaultOwned;
+            if (ownedLimited.has(unit.id)) isOwned = true;
+            if (notOwnedOthers.has(unit.id)) isOwned = false;
+
+            if (isOwned) owned.push(unit.name);
+
+            const defaultUniversal = unit.id === 'nicole';
+            let isUniversal = defaultUniversal;
+            if (universalSet.has(unit.id)) isUniversal = true;
+
+            if (isOwned && isUniversal) universal.push(unit.name);
+        }
+
+        return { owned, universal };
+    }
+
+    function decodeShareUrl(input) {
+        const queryStart = input.indexOf('?');
+        const qs = queryStart >= 0 ? input.substring(queryStart + 1) : input;
+        const params = new URLSearchParams(qs);
+        const result = { units: null, universal: [], bosses: null };
+
+        const rosterParam = params.get('roster');
+        if (rosterParam) {
+            const decoded = decodeRosterFromParam(rosterParam);
+            result.units = decoded.owned;
+            result.universal = decoded.universal;
+        }
+
+        const bossesParam = params.get('bosses');
+        if (bossesParam) {
+            result.bosses = bossesParam.split(',').filter(Boolean);
+        }
+
+        return result;
+    }
+
+    if (CLI.query) {
+        if (CLI.units) {
+            console.error('Error: --query (-q) and --units (-u) are mutually exclusive.');
+            process.exit(1);
+        }
+        const decoded = decodeShareUrl(CLI.query);
+        if (decoded.units) {
+            CLI.units = decoded.units;
+            console.log(`Share URL roster: ${decoded.units.length} owned units`);
+        }
+        if (decoded.universal && decoded.universal.length > 0 && !CLI.flex) {
+            CLI.flex = decoded.universal;
+            console.log(`Share URL flex units: ${decoded.universal.join(', ')}`);
+        }
+        if (decoded.bosses && !CLI.bossFilter) {
+            CLI.bossFilter = decoded.bosses.join(',');
+        }
+    }
 
     // ============================================================================
     // CONFIGURATION

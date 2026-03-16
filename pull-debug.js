@@ -13,6 +13,8 @@
  *   node pull-debug.js +Orphie      Add Orphie to roster
  *   node pull-debug.js -m +Astra    Personal roster, but also add Astra
  *   node pull-debug.js -m -Evelyn   Personal roster, but remove Evelyn
+ *   node pull-debug.js -q "?roster=eJwN..."  Roster from share URL query string
+ *   node pull-debug.js -q "?roster=eJwN..." +Orphie  Share URL roster with overrides
  */
 
 async function main() {
@@ -22,6 +24,7 @@ async function main() {
         analyze, tierToQuality, qualityLabel, getBestTier, getUnitElement,
         isSubdps, capitalize, DPS_ARCHETYPES, ELEMENTS
     } = await import('./app/public/lib/pull-engine.js');
+    const { inflateSync } = await import('node:zlib');
 
     // ========================================================================
     // PARSE ARGUMENTS
@@ -33,6 +36,7 @@ async function main() {
         debug: false,
         onlyMine: false,
         units: null,
+        query: null,
         additions: [],
         removals: []
     };
@@ -53,10 +57,68 @@ async function main() {
         } else if ((arg === '-u' || arg === '--units') && args[i + 1]) {
             options.units = args[i + 1].split(',').map(u => u.trim());
             i++;
+        } else if ((arg === '-q' || arg === '--query') && args[i + 1]) {
+            options.query = args[i + 1];
+            i++;
         } else if (arg.startsWith('+')) {
             options.additions.push(arg.slice(1));
         } else if (arg.startsWith('-') && arg.length > 2) {
             options.removals.push(arg.slice(1));
+        }
+    }
+
+    // ========================================================================
+    // SHARE URL DECODING
+    // ========================================================================
+
+    function base64UrlDecodeNode(str) {
+        let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
+        while (base64.length % 4) base64 += '=';
+        return Buffer.from(base64, 'base64');
+    }
+
+    function decodeRosterFromParam(encoded) {
+        let deltaString;
+        try {
+            if (encoded.startsWith('u_')) {
+                deltaString = base64UrlDecodeNode(encoded.slice(2)).toString('utf8');
+            } else {
+                deltaString = inflateSync(base64UrlDecodeNode(encoded)).toString('utf8');
+            }
+        } catch (e) {
+            console.error('Failed to decode roster from share URL:', e.message);
+            process.exit(1);
+        }
+
+        const [ownedLimitedStr, notOwnedOthersStr] = deltaString.split('|');
+        const ownedLimited = new Set(ownedLimitedStr ? ownedLimitedStr.split(',').filter(Boolean) : []);
+        const notOwnedOthers = new Set(notOwnedOthersStr ? notOwnedOthersStr.split(',').filter(Boolean) : []);
+
+        const owned = [];
+        for (const unit of allUnits) {
+            const defaultOwned = unit.rank === 'A' || (unit.rank === 'S' && !unit.limited);
+            let isOwned = defaultOwned;
+            if (ownedLimited.has(unit.id)) isOwned = true;
+            if (notOwnedOthers.has(unit.id)) isOwned = false;
+            if (isOwned) owned.push(unit.name);
+        }
+
+        return owned;
+    }
+
+    if (options.query) {
+        if (options.units) {
+            console.error('Error: --query (-q) and --units (-u) are mutually exclusive.');
+            process.exit(1);
+        }
+        const queryStart = options.query.indexOf('?');
+        const qs = queryStart >= 0 ? options.query.substring(queryStart + 1) : options.query;
+        const params = new URLSearchParams(qs);
+
+        const rosterParam = params.get('roster');
+        if (rosterParam) {
+            options.units = decodeRosterFromParam(rosterParam);
+            console.log(`Share URL roster: ${options.units.length} owned units`);
         }
     }
 
@@ -125,7 +187,7 @@ async function main() {
 
     console.log('===== Pull Recommendations Debug =====\n');
 
-    const mode = options.units ? 'specific units' : options.onlyMine ? 'personal roster' : 'full roster';
+    const mode = options.query ? 'share URL' : options.units ? 'specific units' : options.onlyMine ? 'personal roster' : 'full roster';
     console.log(`Mode: ${mode}  |  Depth: ${options.depth}  |  Debug: ${options.debug}`);
     if (options.additions.length) console.log(`Added: ${options.additions.join(', ')}`);
     if (options.removals.length) console.log(`Removed: ${options.removals.join(', ')}`);
