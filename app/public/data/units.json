@@ -335,7 +335,7 @@
         "synergy": { "units": ["Seed","SAnby"], "tags": ["attack","subdps"], "avoid": [] }
     },
     {
-        "id": "pan-yinhu",
+        "id": "pan",
         "name": "Pan Yinhu",
         "image": "./assets/characters/pan-yinhu.webp",
         "rank": "A",
@@ -437,7 +437,7 @@
         "tier": 1.0,
         "tags": ["support", "ice", "section6", "assist:defensive"],
         "join": ["ice", "section6"],
-        "synergy": { "units": ["Miyabi"], "tags": ["ice"], "avoid": [] }
+        "synergy": { "units": ["Miyabi", "Yuzuha"], "tags": ["ice"], "avoid": ["fire", "electric", "physical", "ether"] }
     },
     {
         "id": "sunna",

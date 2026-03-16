@@ -495,7 +495,7 @@ Key scenarios that exercise distinct algorithm paths:
 ### Synergy Scoring Paths
 - Mutual synergy bonus (DPS +30, non-DPS +10)
 - Subdps without main DPS (-100, or ignored in lenient)
-- Element synergy wasted (-70)
+- Element synergy off-element (no bonus, no penalty)
 - Avoid tag triggered by DPS = Disqualified (-999)
 
 ### Shill Intensity Paths

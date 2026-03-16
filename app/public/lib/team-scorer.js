@@ -110,8 +110,10 @@ export function calculateSynergyScore(unit, teammates, boss, lenient = false, de
         if (debug) dbg(`synergy.tags = [${synergy.tags.join(', ')}]`);
         
         // Check if this unit has element synergy (like Soukaku's "ice")
+        // Units with ALL elements (like Yuzuha) are element-agnostic — they support any element
         const synergyElements = synergy.tags.filter(tag => ELEMENTS.includes(tag));
-        const hasElementSynergy = synergyElements.length > 0;
+        const isUniversalElementSynergy = synergyElements.length >= ELEMENTS.length;
+        const hasElementSynergy = synergyElements.length > 0 && !isUniversalElementSynergy;
         
         // Check if this unit has subdps synergy (like Burnice, Grace, Vivian, Orphie)
         const hasSubDPSSynergy = synergy.tags.includes("subdps");
@@ -183,22 +185,19 @@ export function calculateSynergyScore(unit, teammates, boss, lenient = false, de
             });
             
             if (matchesAnyPreference) {
-                // Check if this is an element synergy (e.g., Soukaku's "ice")
-                const isElementSynergy = synergyElements.length > 0;
-                
-                if (isElementSynergy) {
+                if (hasElementSynergy) {
                     // Element synergy supports (like Soukaku) need TWO conditions:
                     // 1. Boss must be weak to that element (OR boss is neutral/global)
                     // 2. Team must have a DPS of that element
-                    // For multi-element synergy (like Yuzuha), check if ANY synergy element matches
+                    // Universal element units (like Yuzuha) bypass this — they support any element
                     const matchingSynergyElement = synergyElements.find(elem => boss.weaknesses.includes(elem));
                     const bossWeakToElement = matchingSynergyElement !== undefined;
                     // If boss has no specific weaknesses (neutral/global), treat as weak to element
                     const isNeutralBoss = boss.weaknesses.length === 0;
                     const effectiveBossWeak = bossWeakToElement || isNeutralBoss;
 
-                    // For neutral boss with multi-element synergy (like Yuzuha), check ALL synergy elements
-                    // For boss with weakness, only check the matching element
+                    // For neutral boss: check all synergy elements
+                    // For boss with weakness: only check the matching element
                     const elementsToCheck = matchingSynergyElement 
                         ? [matchingSynergyElement] 
                         : synergyElements; // Neutral boss: check all synergy elements
@@ -210,10 +209,7 @@ export function calculateSynergyScore(unit, teammates, boss, lenient = false, de
                     );
                     
                     if (!effectiveBossWeak || !teamHasElementDPS) {
-                        // Element synergy is completely wasted - near-disqualifying
-                        // (Unless boss is neutral, then we only care about team matching)
-                        score -= 70;
-                        dbg(`element synergy with ${teammate.name} wasted: -70`);
+                        dbg(`element synergy with ${teammate.name}: off-element, no bonus`);
                     } else if (isDPS(teammate)) {
                         // DPS-to-DPS element synergy: only count once per pair if MUTUAL
                         // Check if teammate has a reciprocal element synergy with this unit
