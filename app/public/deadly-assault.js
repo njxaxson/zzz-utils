@@ -8,6 +8,7 @@ import {
     extendTeamsWithUniversalUnits, findExclusiveCombinations, teamsOverlap 
 } from './lib/team-builder.js';
 import { scoreTeamForBoss } from './lib/team-scorer.js';
+import { createStrengthLabelHtml } from './lib/strength-rating.js';
 import { 
     decodeBosses, getBossesFromUrl, generateShareUrlWithBosses 
 } from './lib/roster-share.js';
@@ -26,6 +27,7 @@ const MIN_UNITS_REQUIRED = 9;
 const BOSSES_REQUIRED = 3;
 const ELEMENTS = ['fire', 'ice', 'electric', 'physical', 'ether'];
 const PER_BOSS_FLOOR_RATIO = 0.5;
+const MIN_RESULTS_BEFORE_FLOOR = 3;
 const PAGE_STORAGE_KEY = 'zzz-deadly-assault';     // Page-specific settings
 
 // ============================================================================
@@ -459,12 +461,40 @@ function calculateOptimalTeams() {
     }
     
     // Variations mode: standard score-sorted combinations
-    const combinations = findExclusiveCombinations(viableTeamsByBoss, selectedBossNames);
+    let combinations = findExclusiveCombinations(viableTeamsByBoss, selectedBossNames);
 
     // Diverse mode: DPS assignment is the first-class decision
-    const diverseResults = findDiverseStrategies(
+    let diverseResults = findDiverseStrategies(
         viableTeamsByBoss, selectedBossNames, DISPLAY_LIMIT
     );
+
+    // Fallback: if no non-overlapping triples found, retry all bosses in lenient mode
+    if (combinations.length === 0 && diverseResults.length === 0) {
+        console.log('⚠️ No non-overlapping combinations found — retrying all bosses in lenient mode...');
+        for (const boss of selectedBossObjects) {
+            for (const label of teamLabels) {
+                const team = threeCharTeams[label];
+                const score = scoreTeamForBoss(team, boss, { lenient: true });
+                if (score <= 0) continue;
+
+                const existing = viableTeamsByBoss[boss.name].find(t => t.label === label);
+                if (existing) {
+                    if (score > existing.score) existing.score = score;
+                    existing.lenient = true;
+                } else {
+                    viableTeamsByBoss[boss.name].push({ label, team, score, lenient: true });
+                }
+            }
+            viableTeamsByBoss[boss.name].sort((a, b) => b.score - a.score);
+            console.log(`   ${boss.name}: ${viableTeamsByBoss[boss.name].length} viable teams (after lenient)`);
+        }
+
+        combinations = findExclusiveCombinations(viableTeamsByBoss, selectedBossNames);
+        diverseResults = findDiverseStrategies(
+            viableTeamsByBoss, selectedBossNames, DISPLAY_LIMIT
+        );
+        console.log(`After lenient retry — Combinations: ${combinations.length}, Diverse: ${diverseResults.length}`);
+    }
 
     console.log(`Combinations: ${combinations.length}, Diverse strategies: ${diverseResults.length}`);
     diverseResults.forEach((combo, i) => {
@@ -476,11 +506,16 @@ function calculateOptimalTeams() {
     });
     console.groupEnd();
     
+    const lenientBosses = selectedBossObjects
+        .filter(b => viableTeamsByBoss[b.name].some(t => t.lenient))
+        .map(b => b.shortName || b.name);
+
     return {
         combinations: combinations.slice(0, COMBINATION_LIMIT),
         diverseResults,
         bosses: selectedBossObjects,
-        totalFound: combinations.length
+        totalFound: combinations.length,
+        lenientBosses
     };
 }
 
@@ -492,35 +527,42 @@ function calculateOptimalTeams() {
 let currentResultIndex = 0;
 let totalResults = 0;
 
+function isPrimaryDps(u) {
+    const dpsRole = u.tags.find(t => ['attack', 'anomaly', 'rupture'].includes(t));
+    const isSubdps = u.synergy && u.synergy.tags && u.synergy.tags.includes('subdps');
+    return dpsRole && !isSubdps;
+}
+
+function unitFingerprint(u) {
+    const role = u.tags.find(t => ['attack', 'anomaly', 'rupture'].includes(t));
+    const element = u.tags.find(t => ELEMENTS.includes(t));
+    const tier = u.tier < 2 ? 'hi' : 'lo';
+    return `${role}:${element}:${tier}`;
+}
+
+function getTeamDpsBuckets(team) {
+    return team.filter(isPrimaryDps).map(u => unitFingerprint(u));
+}
+
 function teamDpsFingerprint(team) {
-    return team
-        .filter(u => {
-            const dpsRole = u.tags.find(t => ['attack', 'anomaly', 'rupture'].includes(t));
-            const isSubdps = u.synergy && u.synergy.tags && u.synergy.tags.includes('subdps');
-            return dpsRole && !isSubdps;
-        })
-        .map(u => {
-            const role = u.tags.find(t => ['attack', 'anomaly', 'rupture'].includes(t));
-            const element = u.tags.find(t => ELEMENTS.includes(t));
-            const tier = u.tier < 2 ? 'hi' : 'lo';
-            return `${role}:${element}:${tier}`;
-        })
-        .sort()
-        .join('|');
+    return getTeamDpsBuckets(team).sort().join('|');
 }
 
 function findDiverseStrategies(viableTeamsByBoss, bossNames, limit) {
     const BUCKET_CAP = 15;
 
-    // Phase 1: Group each boss's teams into DPS buckets
+    // Phase 1: Group each boss's teams into DPS buckets (per individual DPS)
     const bucketsByBoss = {};
     for (const bossName of bossNames) {
         const buckets = new Map();
         for (const entry of viableTeamsByBoss[bossName]) {
-            const fp = teamDpsFingerprint(entry.team);
-            if (!buckets.has(fp)) buckets.set(fp, []);
-            const bucket = buckets.get(fp);
-            if (bucket.length < BUCKET_CAP) bucket.push(entry);
+            const fps = getTeamDpsBuckets(entry.team);
+            for (const fp of fps) {
+                if (!fp) continue;
+                if (!buckets.has(fp)) buckets.set(fp, []);
+                const bucket = buckets.get(fp);
+                if (bucket.length < BUCKET_CAP) bucket.push(entry);
+            }
         }
         bucketsByBoss[bossName] = buckets;
     }
@@ -564,7 +606,8 @@ function findDiverseStrategies(viableTeamsByBoss, bossNames, limit) {
                             boss: bn,
                             team: bestTriple[i].team,
                             label: bestTriple[i].label,
-                            score: bestTriple[i].score
+                            score: bestTriple[i].score,
+                            lenient: !!bestTriple[i].lenient
                         }))
                     });
                 }
@@ -582,18 +625,24 @@ function findDiverseStrategies(viableTeamsByBoss, bossNames, limit) {
 
     const selected = [best];
 
-    const candidates = [];
-    for (let i = 1; i < strategies.length; i++) {
-        if (strategies[i].assignments.every(a => a.score >= perBossFloor)) {
-            candidates.push(strategies[i]);
-        }
-    }
+    const allCandidates = strategies.slice(1);
 
-    console.log(`Diversity selection: ${strategies.length} total strategies, ${candidates.length} above per-boss floor (${perBossFloor.toFixed(0)})`);
+    const seenDpsPerBoss = bossNames.map(() => new Set());
+    best.dpsKey.split('||').forEach((fp, i) => seenDpsPerBoss[i].add(fp));
 
-    while (selected.length < limit && candidates.length > 0) {
+    console.log(`Diversity selection: ${strategies.length} total strategies, per-boss floor ${perBossFloor.toFixed(0)} (enforced after ${MIN_RESULTS_BEFORE_FLOOR} results)`);
+
+    while (selected.length < limit && allCandidates.length > 0) {
+        const enforceFloor = selected.length >= MIN_RESULTS_BEFORE_FLOOR;
+        const candidates = enforceFloor
+            ? allCandidates.filter(s => s.assignments.every(a => a.score >= perBossFloor))
+            : allCandidates;
+
+        if (candidates.length === 0) break;
+
         let bestIdx = -1;
         let bestMinDiffs = -1;
+        let bestNewMatchups = -1;
         let bestCandidateScore = -1;
 
         for (let i = 0; i < candidates.length; i++) {
@@ -609,17 +658,26 @@ function findDiverseStrategies(viableTeamsByBoss, bossNames, limit) {
                 minDiffs = Math.min(minDiffs, diffs);
             }
 
+            let newMatchups = 0;
+            for (let j = 0; j < candidateFps.length; j++) {
+                if (!seenDpsPerBoss[j].has(candidateFps[j])) newMatchups++;
+            }
+
             if (minDiffs > bestMinDiffs ||
-                (minDiffs === bestMinDiffs && candidates[i].totalScore > bestCandidateScore)) {
+                (minDiffs === bestMinDiffs && newMatchups > bestNewMatchups) ||
+                (minDiffs === bestMinDiffs && newMatchups === bestNewMatchups && candidates[i].totalScore > bestCandidateScore)) {
                 bestIdx = i;
                 bestMinDiffs = minDiffs;
+                bestNewMatchups = newMatchups;
                 bestCandidateScore = candidates[i].totalScore;
             }
         }
 
         if (bestIdx === -1) break;
-        selected.push(candidates[bestIdx]);
-        candidates.splice(bestIdx, 1);
+        const chosen = candidates[bestIdx];
+        selected.push(chosen);
+        chosen.dpsKey.split('||').forEach((fp, i) => seenDpsPerBoss[i].add(fp));
+        allCandidates.splice(allCandidates.indexOf(chosen), 1);
     }
 
     return selected;
@@ -655,8 +713,12 @@ function displayResults(results, scroll = true) {
         const slidesHtml = combos.map((combo, index) => 
             createResultSlide(combo, index, results.bosses)
         ).join('');
+
+        const lenientNotice = results.lenientBosses && results.lenientBosses.length > 0
+            ? `<div class="lenient-notice">* Limited roster — using lenient scoring for ${results.lenientBosses.join(', ')}.</div>`
+            : '';
         
-        container.innerHTML = `
+        container.innerHTML = `${lenientNotice}
             <div class="carousel">
                 <button class="carousel-btn carousel-prev" onclick="prevResult()" aria-label="Previous result">
                     <span>‹</span>
@@ -741,6 +803,7 @@ function createResultSlide(combo, index, bosses) {
                 <div class="result-team-stack">
                     ${teamHtml}
                 </div>
+                ${createStrengthLabelHtml(assignment.score, assignment.team, { lenient: assignment.lenient })}
             </div>
         `;
     }).join('');

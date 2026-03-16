@@ -186,9 +186,9 @@ export function findExclusiveCombinations(viableTeamsByBoss, bossNames) {
                     rankSum,
                     maxRank,
                     assignments: [
-                        { boss: bossNames[0], team: t0.team, label: t0.label, score: t0.score, rank: t0.rank },
-                        { boss: bossNames[1], team: t1.team, label: t1.label, score: t1.score, rank: t1.rank },
-                        { boss: bossNames[2], team: t2.team, label: t2.label, score: t2.score, rank: t2.rank }
+                        { boss: bossNames[0], team: t0.team, label: t0.label, score: t0.score, rank: t0.rank, lenient: !!t0.lenient },
+                        { boss: bossNames[1], team: t1.team, label: t1.label, score: t1.score, rank: t1.rank, lenient: !!t1.lenient },
+                        { boss: bossNames[2], team: t2.team, label: t2.label, score: t2.score, rank: t2.rank, lenient: !!t2.lenient }
                     ]
                 });
             }

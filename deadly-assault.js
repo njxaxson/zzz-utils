@@ -664,8 +664,47 @@ async function main() {
     }
     
     if (combinations.length === 0) {
-        console.log("No valid combinations found. Try different bosses or expand your unit pool.");
-        return;
+        console.log('⚠️ No non-overlapping combinations found — retrying all bosses in lenient mode...');
+        for (const boss of selectedBossObjects) {
+            for (const label of teamLabels) {
+                const team = threeCharTeams[label];
+                const score = scoreTeamForBoss(team, boss, { lenient: true, debug: CLI.debug });
+                if (score <= 0) continue;
+
+                const existing = viableTeamsByBoss[boss.name].find(t => t.label === label);
+                if (existing) {
+                    if (score > existing.score) existing.score = score;
+                    existing.lenient = true;
+                } else {
+                    viableTeamsByBoss[boss.name].push({ label, team, score, lenient: true });
+                }
+            }
+            viableTeamsByBoss[boss.name].sort((a, b) => b.score - a.score);
+            console.log(`   ${boss.name}: ${viableTeamsByBoss[boss.name].length} viable teams (after lenient)`);
+        }
+
+        combinations = findExclusiveCombinations(viableTeamsByBoss, SELECTED_BOSSES);
+        const lenientDominated = totalCombos;
+        combinations = combinations.filter(combo => {
+            const result = isDominatedCombination(combo, viableTeamsByBoss, availableUnits);
+            combo.dominanceCheck = result;
+            return !result.dominated;
+        });
+        for (const combo of combinations) {
+            const check = checkTier0Utilization(combo, availableUnits, SELECTED_BOSSES, bosses);
+            combo.sanityCheck = check;
+            combo.priority += check.warnings.length * 1000;
+        }
+        combinations.sort((a, b) => {
+            if (a.priority !== b.priority) return a.priority - b.priority;
+            return b.totalScore - a.totalScore;
+        });
+
+        console.log(`After lenient retry — ${combinations.length} valid allocations`);
+        if (combinations.length === 0) {
+            console.log("No valid combinations found even in lenient mode. Try different bosses or expand your unit pool.");
+            return;
+        }
     }
     
     // Display results

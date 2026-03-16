@@ -8,6 +8,7 @@
 import { readFile } from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { inflateSync } from 'zlib';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = join(__dirname, 'app','public', 'data');
@@ -21,6 +22,7 @@ import { scoreTeamForBoss } from './app/public/lib/team-scorer.js';
 const DISPLAY_LIMIT = 5;
 const ELEMENTS = ['fire', 'ice', 'electric', 'physical', 'ether'];
 const PER_BOSS_FLOOR_RATIO = 0.5;
+const MIN_RESULTS_BEFORE_FLOOR = 3;
 const BUCKET_CAP = 15;
 
 // ============================================================================
@@ -32,15 +34,82 @@ async function loadJson(path) {
     return JSON.parse(raw);
 }
 
-async function loadData() {
-    const units = await loadJson(join(DATA_DIR, 'units.json'));
+function base64UrlDecodeNode(str) {
+    let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
+    while (base64.length % 4) base64 += '=';
+    return Buffer.from(base64, 'base64');
+}
+
+function decodeRosterFromParam(encoded, allUnits) {
+    let deltaString;
+    try {
+        if (encoded.startsWith('u_')) {
+            deltaString = base64UrlDecodeNode(encoded.slice(2)).toString('utf8');
+        } else {
+            deltaString = inflateSync(base64UrlDecodeNode(encoded)).toString('utf8');
+        }
+    } catch (e) {
+        console.error('Failed to decode roster from share URL:', e.message);
+        process.exit(1);
+    }
+
+    const [ownedLimitedStr, notOwnedOthersStr, universalStr] = deltaString.split('|');
+    const ownedLimited = new Set(ownedLimitedStr ? ownedLimitedStr.split(',').filter(Boolean) : []);
+    const notOwnedOthers = new Set(notOwnedOthersStr ? notOwnedOthersStr.split(',').filter(Boolean) : []);
+    const universalSet = new Set(universalStr ? universalStr.split(',').filter(Boolean) : []);
+
+    const owned = [];
+    const universal = [];
+    for (const unit of allUnits) {
+        const defaultOwned = unit.rank === 'A' || (unit.rank === 'S' && !unit.limited);
+        let isOwned = defaultOwned;
+        if (ownedLimited.has(unit.id)) isOwned = true;
+        if (notOwnedOthers.has(unit.id)) isOwned = false;
+        if (isOwned) owned.push(unit);
+        if (isOwned && universalSet.has(unit.id)) universal.push(unit.name);
+    }
+    return { owned, universal };
+}
+
+function decodeShareUrl(input, allUnits) {
+    const queryStart = input.indexOf('?');
+    const qs = queryStart >= 0 ? input.substring(queryStart + 1) : input;
+    const params = new URLSearchParams(qs);
+    const result = { units: null, universal: [], bosses: null };
+
+    const rosterParam = params.get('roster');
+    if (rosterParam) {
+        const decoded = decodeRosterFromParam(rosterParam, allUnits);
+        result.units = decoded.owned;
+        result.universal = decoded.universal;
+    }
+
+    const bossesParam = params.get('bosses');
+    if (bossesParam) {
+        result.bosses = bossesParam.split(',').filter(Boolean);
+    }
+
+    return result;
+}
+
+async function loadData(query) {
+    const allUnits = await loadJson(join(DATA_DIR, 'units.json'));
     const bosses = await loadJson(join(DATA_DIR, 'bosses.json'));
+
+    if (query) {
+        const decoded = decodeShareUrl(query, allUnits);
+        console.log(`Share URL roster: ${decoded.units.length} owned units`);
+        if (decoded.universal.length > 0) {
+            console.log(`Share URL flex units: ${decoded.universal.join(', ')}`);
+        }
+        return { units: decoded.units, bosses, queryBosses: decoded.bosses };
+    }
+
     const roster = await loadJson(join(__dirname, 'roster.json'));
-
     const rosterNames = new Set(Object.keys(roster));
-    const ownedUnits = units.filter(u => rosterNames.has(u.name));
+    const ownedUnits = allUnits.filter(u => rosterNames.has(u.name));
 
-    return { units: ownedUnits, bosses, roster };
+    return { units: ownedUnits, bosses, queryBosses: null };
 }
 
 // ============================================================================
@@ -143,16 +212,22 @@ function findDiverseStrategies(viableTeamsByBoss, bossNames, limit) {
 
     const selected = [best];
 
-    const candidates = [];
-    for (let i = 1; i < strategies.length; i++) {
-        if (strategies[i].assignments.every(a => a.score >= perBossFloor)) {
-            candidates.push(strategies[i]);
-        }
-    }
+    const allCandidates = strategies.slice(1);
 
-    while (selected.length < limit && candidates.length > 0) {
+    const seenDpsPerBoss = bossNames.map(() => new Set());
+    best.dpsKey.split('||').forEach((fp, i) => seenDpsPerBoss[i].add(fp));
+
+    while (selected.length < limit && allCandidates.length > 0) {
+        const enforceFloor = selected.length >= MIN_RESULTS_BEFORE_FLOOR;
+        const candidates = enforceFloor
+            ? allCandidates.filter(s => s.assignments.every(a => a.score >= perBossFloor))
+            : allCandidates;
+
+        if (candidates.length === 0) break;
+
         let bestIdx = -1;
         let bestMinDiffs = -1;
+        let bestNewMatchups = -1;
         let bestCandidateScore = -1;
 
         for (let i = 0; i < candidates.length; i++) {
@@ -168,20 +243,29 @@ function findDiverseStrategies(viableTeamsByBoss, bossNames, limit) {
                 minDiffs = Math.min(minDiffs, diffs);
             }
 
+            let newMatchups = 0;
+            for (let j = 0; j < candidateFps.length; j++) {
+                if (!seenDpsPerBoss[j].has(candidateFps[j])) newMatchups++;
+            }
+
             if (minDiffs > bestMinDiffs ||
-                (minDiffs === bestMinDiffs && candidates[i].totalScore > bestCandidateScore)) {
+                (minDiffs === bestMinDiffs && newMatchups > bestNewMatchups) ||
+                (minDiffs === bestMinDiffs && newMatchups === bestNewMatchups && candidates[i].totalScore > bestCandidateScore)) {
                 bestIdx = i;
                 bestMinDiffs = minDiffs;
+                bestNewMatchups = newMatchups;
                 bestCandidateScore = candidates[i].totalScore;
             }
         }
 
         if (bestIdx === -1) break;
-        selected.push(candidates[bestIdx]);
-        candidates.splice(bestIdx, 1);
+        const chosen = candidates[bestIdx];
+        selected.push(chosen);
+        chosen.dpsKey.split('||').forEach((fp, i) => seenDpsPerBoss[i].add(fp));
+        allCandidates.splice(allCandidates.indexOf(chosen), 1);
     }
 
-    return { selected, totalStrategies: strategies.length, candidateCount: candidates.length + selected.length - 1, perBossFloor };
+    return { selected, totalStrategies: strategies.length, candidateCount: allCandidates.length + selected.length - 1, perBossFloor };
 }
 
 const KEY_DPS_NAMES = ['Miyabi', 'Alice', 'Ye Shunguong', 'Yixuan', 'Harumasa', 'Evelyn', 'Komano', 'Vivian'];
@@ -266,8 +350,33 @@ function calculateOptimalTeams(ownedUnits, allBosses, bossIds, debugMode = false
         }
     }
 
-    const { selected, totalStrategies, candidateCount, perBossFloor } =
+    let { selected, totalStrategies, candidateCount, perBossFloor } =
         findDiverseStrategies(viableTeamsByBoss, selectedBossNames, DISPLAY_LIMIT);
+
+    if (selected.length === 0) {
+        console.log('\n⚠️ No non-overlapping combinations found — retrying all bosses in lenient mode...');
+        for (const boss of selectedBossObjects) {
+            for (const label of teamLabels) {
+                const team = threeCharTeams[label];
+                const score = scoreTeamForBoss(team, boss, { lenient: true });
+                if (score <= 0) continue;
+
+                const existing = viableTeamsByBoss[boss.name].find(t => t.label === label);
+                if (existing) {
+                    if (score > existing.score) existing.score = score;
+                    existing.lenient = true;
+                } else {
+                    viableTeamsByBoss[boss.name].push({ label, team, score, lenient: true });
+                }
+            }
+            viableTeamsByBoss[boss.name].sort((a, b) => b.score - a.score);
+            console.log(`   ${boss.shortName}: ${viableTeamsByBoss[boss.name].length} viable teams (after lenient)`);
+        }
+
+        ({ selected, totalStrategies, candidateCount, perBossFloor } =
+            findDiverseStrategies(viableTeamsByBoss, selectedBossNames, DISPLAY_LIMIT));
+        console.log(`After lenient retry — Strategies: ${totalStrategies}, Results: ${selected.length}`);
+    }
 
     return {
         diverseResults: selected,
@@ -339,15 +448,27 @@ const TEST_CASES = {
 async function main() {
     const args = process.argv.slice(2);
 
-    const { units, bosses } = await loadData();
-    console.log(`Loaded ${units.length} owned units`);
-
     const debugMode = args.includes('--debug');
-    const filteredArgs = args.filter(a => a !== '--debug');
+    let query = null;
+    const filteredArgs = [];
+    for (let i = 0; i < args.length; i++) {
+        if (args[i] === '--debug') continue;
+        if ((args[i] === '-q' || args[i] === '--query') && args[i + 1]) {
+            query = args[i + 1];
+            i++;
+        } else {
+            filteredArgs.push(args[i]);
+        }
+    }
+
+    const { units, bosses, queryBosses } = await loadData(query);
+    console.log(`Loaded ${units.length} owned units`);
 
     let casesToRun = [];
 
-    if (filteredArgs.length === 0 || filteredArgs[0]?.toUpperCase() === 'ALL') {
+    if (queryBosses && filteredArgs.length === 0) {
+        casesToRun = [['Query', queryBosses]];
+    } else if (filteredArgs.length === 0 || filteredArgs[0]?.toUpperCase() === 'ALL') {
         casesToRun = Object.entries(TEST_CASES);
     } else if (filteredArgs.length === 1 && TEST_CASES[filteredArgs[0].toUpperCase()]) {
         casesToRun = [[filteredArgs[0].toUpperCase(), TEST_CASES[filteredArgs[0].toUpperCase()]]];
@@ -356,6 +477,7 @@ async function main() {
     } else {
         console.log('Usage: node da-test.js [A|B|C|ALL] [--debug]');
         console.log('       node da-test.js <boss1> <boss2> <boss3> [--debug]');
+        console.log('       node da-test.js -q "<share-url-query>" [--debug]');
         console.log('\nTest cases:');
         for (const [key, ids] of Object.entries(TEST_CASES)) {
             console.log(`  ${key}: ${ids.join(', ')}`);
