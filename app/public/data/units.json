@@ -146,7 +146,7 @@
         "limited": true,
         "tier": 1.5,
         "tags": ["attack", "ice", "victoria", "assist:defensive"],
-        "join": ["ice", "victoria"],
+        "join": ["ice", "victoria", "stun"],
         "synergy": { "units": [], "tags": [], "avoid": [] }
     },
     {
