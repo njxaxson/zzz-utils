@@ -1,4 +1,4 @@
-import { getElement, isSRank, isLimited, isARank } from './lib/team-scorer.js';
+import { getElement, isSRank, isLimited, isARank } from '../common/team-scorer.js';
 
 let allUnits = [];
 let filters = { rank: [], element: [], role: [], faction: [], tier: [], owned: false };
@@ -272,12 +272,17 @@ function buildCard(unit) {
     const abilityHtml = buildAbilityLine(unit);
     const synergyHtml = buildSynergyLine(unit);
     const titledBadge = isTitled ? '<span class="titled-badge">VH/GM</span>' : '';
+    const isPreview = unit.available === false;
 
     const img = unit.image || './assets/placeholder.png';
 
+    const avatarHtml = isPreview
+        ? `<div class="char-avatar-wrap"><img class="char-avatar" src="${img}" alt="${unit.name}" onerror="this.src='./assets/placeholder.png'"><span class="avatar-preview-badge">Preview</span></div>`
+        : `<img class="char-avatar" src="${img}" alt="${unit.name}" onerror="this.src='./assets/placeholder.png'">`;
+
     return `<div class="char-card element-${element}${isTitled ? ' titled' : ''}">
     <div class="char-card-header">
-        <img class="char-avatar" src="${img}" alt="${unit.name}" onerror="this.src='./assets/placeholder.png'">
+        ${avatarHtml}
         <div class="char-identity">
             <div class="char-name-row">
                 <h4 class="char-name">${unit.name}</h4>

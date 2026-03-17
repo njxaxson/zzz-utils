@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ZZZ Character Summary</title>
-    <link rel="icon" type="image/svg+xml" href="favicon.svg">
-    <link rel="stylesheet" href="style.css">
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+    <link rel="stylesheet" href="styles/style.css">
     <style>
         .summary-count {
             font-family: 'Rajdhani', sans-serif;
@@ -49,6 +49,26 @@
             padding: 0.75rem 1rem;
             background: var(--bg-secondary);
             border-bottom: 1px solid var(--border-color);
+        }
+
+        .char-avatar-wrap {
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        .avatar-preview-badge {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            font-size: 0.5rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            padding: 1px 4px;
+            border-radius: 3px;
+            background: var(--accent-secondary);
+            color: var(--bg-primary);
+            line-height: 1.2;
         }
 
         .char-avatar {
@@ -428,9 +448,9 @@
     </div>
 
     <script type="module">
-        import { loadSharedComponents } from './lib/components.js';
+        import { loadSharedComponents } from './lib/common/components.js';
         loadSharedComponents('character-summary');
     </script>
-    <script type="module" src="character-summary.js"></script>
+    <script type="module" src="lib/pages/character-summary.js"></script>
 </body>
 </html>
