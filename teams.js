@@ -15,7 +15,7 @@ import { getTeams } from './app/public/lib/common/team-builder.js';
 const options = parseArgs({
     name: 'teams.js',
     description: 'Generates valid team combinations with customizable filters.',
-    options: ['depth', 'onlyMine', 'preview', 'debug', 'units', 'exclude', 'include', 'flex', 'query'],
+    options: ['depth', 'onlyMine', 'preview', 'debug', 'units', 'exclude', 'include', 'flex', 'query', 'flat'],
     examples: [
         '  node teams.js                     Full roster with hardcoded filters',
         '  node teams.js -m                  Personal roster only',
@@ -39,6 +39,12 @@ async function main() {
             //     "tags" : ["defense", "ether", "pubsec"],
             //     "join" : ["attack", "ether", "pubsec"]
             // },
+            {
+                "name" : "Promeia",
+                "rank" : "S",
+                "tags" : ["anomaly", "ice", "krampus"],
+                "join" : ["stun", "defense"]
+            },
         ]
     });
 
@@ -59,9 +65,9 @@ async function main() {
         let valid = true;
 
         valid = valid && (team.length == 3);
-        valid = valid && team.some(unit => unit.rank == "S");
-        valid = valid && (team.some(unit =>
-            (unit.tags.includes("attack") || unit.tags.includes("anomaly") || unit.tags.includes("rupture"))));
+        // valid = valid && team.some(unit => unit.rank == "S");
+        // valid = valid && (team.some(unit =>
+        //     (unit.tags.includes("attack") || unit.tags.includes("anomaly") || unit.tags.includes("rupture"))));
 
         valid = valid && !team.some(unit => [
             "Anby",
@@ -73,14 +79,13 @@ async function main() {
         ].indexOf(unit.name) != -1);
 
         //valid = valid && team.every(unit => unit.tags.includes("fire"));
-        //valid = valid && team.every(unit => unit.tags.includes("ice"));
+        valid = valid && team.every(unit => unit.tags.includes("ice"));
         //valid = valid && team.every(unit => unit.tags.includes("electric"));
         //valid = valid && team.every(unit => unit.tags.includes("physical"));
         //valid = valid && team.every(unit => unit.tags.includes("ether"));
-        //valid = valid && team.some(unit => unit.name == "Ye Shunguong");
+        valid = valid && team.some(unit => unit.name == "Promeia");
         //valid = valid && team.filter(unit => unit.tags.includes("stun")).length >= 1;
-        valid = valid && team.every(unit => unit.rank == "S");
-        valid = valid && team.some(unit => unit.tags.includes("title"));
+        //valid = valid && team.some(unit => unit.tags.includes("title"));
 
         // valid = valid
         //     && (team.every(unit => unit.tags.includes("fire"))
@@ -89,21 +94,26 @@ async function main() {
         //     ||  team.every(unit => unit.tags.includes("ether"))
         //     ||  team.every(unit => unit.tags.includes("physical")));
 
-        valid = valid
-            && (team.filter(unit => unit.tags.includes("fire")    ).length >= 2
-            ||  team.filter(unit => unit.tags.includes("ice")     ).length >= 2
-            ||  team.filter(unit => unit.tags.includes("electric")).length >= 2
-            ||  team.filter(unit => unit.tags.includes("ether")   ).length >= 2
-            ||  team.filter(unit => unit.tags.includes("physical")).length >= 2);
+        // valid = valid
+        //     && (team.filter(unit => unit.tags.includes("fire")    ).length >= 2
+        //     ||  team.filter(unit => unit.tags.includes("ice")     ).length >= 2
+        //     ||  team.filter(unit => unit.tags.includes("electric")).length >= 2
+        //     ||  team.filter(unit => unit.tags.includes("ether")   ).length >= 2
+        //     ||  team.filter(unit => unit.tags.includes("physical")).length >= 2);
 
         if (valid) {
             roster_map.set(label, team);
         }
     });
 
-    console.log("Total possible teams:         " + Object.keys(teams).length);
-    console.log("Filtered teams per criteria:  " + roster_map.size);
-    [...roster_map.keys()].forEach(label => console.log("  " + label));
+    if (options.flat) {
+        const flatLabels = [...roster_map.keys()].map(label => label.replace(/ \/ /g, '/'));
+        console.log('"' + flatLabels.join(',') + '"');
+    } else {
+        console.log("Total possible teams:         " + Object.keys(teams).length);
+        console.log("Filtered teams per criteria:  " + roster_map.size);
+        [...roster_map.keys()].forEach(label => console.log("  " + label));
+    }
 }
 
 main().catch(console.error);
