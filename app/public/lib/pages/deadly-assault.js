@@ -5,24 +5,32 @@
 
 import { 
     getTeams, sortTeamByRole, getTeamLabel,
-    extendTeamsWithUniversalUnits, findExclusiveCombinations 
-} from './lib/team-builder.js';
-import { scoreTeamForBoss } from './lib/team-scorer.js';
+    extendTeamsWithUniversalUnits, findExclusiveCombinations, teamsOverlap 
+} from '../common/team-builder.js';
+import { scoreTeamForBoss } from '../common/team-scorer.js';
+import { createStrengthLabelHtml } from '../common/strength-rating.js';
 import { 
     decodeBosses, getBossesFromUrl, generateShareUrlWithBosses 
-} from './lib/roster-share.js';
+} from '../common/roster-share.js';
 import { 
     initRoster, getUnitStates, getAllUnits,
     getInitials, getUnitElement, getCharacterImageUrl, getUniversalUnitNames
-} from './lib/roster-ui.js';
+} from '../common/roster-ui.js';
+import {
+    isPrimaryDps, unitFingerprint, getTeamDpsBuckets, teamDpsFingerprint,
+    findDiverseStrategies as findDiverseStrategiesCore,
+    DEFAULT_PER_BOSS_FLOOR_RATIO, DEFAULT_MIN_RESULTS_BEFORE_FLOOR
+} from '../common/dps-buckets.js';
 
 // ============================================================================
 // CONSTANTS
 // ============================================================================
 
-const RESULT_LIMIT = 5;
+const COMBINATION_LIMIT = 25;
+const DISPLAY_LIMIT = 5;
 const MIN_UNITS_REQUIRED = 9;
 const BOSSES_REQUIRED = 3;
+const ELEMENTS = ['fire', 'ice', 'electric', 'physical', 'ether'];
 const PAGE_STORAGE_KEY = 'zzz-deadly-assault';     // Page-specific settings
 
 // ============================================================================
@@ -36,6 +44,10 @@ let selectedBosses = [];
 
 // Shared bosses mode - when true, localStorage is NOT used for page settings
 let sharedBossesMode = false;
+
+// Results
+let showVariations = false;
+let lastResults = null;
 
 // ============================================================================
 // DATA LOADING
@@ -91,7 +103,8 @@ function savePageToStorage() {
     }
     
     const data = {
-        selectedBosses
+        selectedBosses,
+        showVariations
     };
     localStorage.setItem(PAGE_STORAGE_KEY, JSON.stringify(data));
 }
@@ -104,11 +117,13 @@ function loadPageFromStorage() {
             const data = JSON.parse(pageSaved);
             
             if (data.selectedBosses) {
-                // Filter out unavailable bosses and bosses that no longer exist
                 selectedBosses = data.selectedBosses.filter(id => {
                     const boss = allBosses.find(b => b.id === id);
                     return boss && boss.available !== false;
                 });
+            }
+            if (typeof data.showVariations === 'boolean') {
+                showVariations = data.showVariations;
             }
         }
     } catch (e) {
@@ -196,6 +211,14 @@ function getElementIcon(element) {
 function setupEventListeners() {
     document.getElementById('boss-grid').addEventListener('click', handleBossClick);
     document.getElementById('run-btn').addEventListener('click', runOptimization);
+    
+    document.getElementById('da-variations-checkbox').addEventListener('change', (e) => {
+        showVariations = e.target.checked;
+        savePageToStorage();
+        if (lastResults) {
+            displayResults(lastResults, false);
+        }
+    });
 }
 
 function handleBossClick(e) {
@@ -440,27 +463,62 @@ function calculateOptimalTeams() {
         console.groupEnd();
     }
     
-    // Find exclusive combinations
-    const combinations = findExclusiveCombinations(viableTeamsByBoss, selectedBossNames);
-    
-    // DEBUG: Log final results
-    console.log('🏆 Final Results:');
-    console.log(`   Total exclusive combinations found: ${combinations.length}`);
-    if (combinations.length > 0) {
-        console.log('   Top combinations:');
-        combinations.slice(0, 3).forEach((combo, i) => {
-            console.log(`   #${i + 1} (score: ${combo.totalScore}):`);
-            combo.assignments.forEach(a => {
-                console.log(`      ${a.boss}: ${a.label} (${a.score})`);
-            });
-        });
+    // Variations mode: standard score-sorted combinations
+    let combinations = findExclusiveCombinations(viableTeamsByBoss, selectedBossNames);
+
+    // Diverse mode: DPS assignment is the first-class decision
+    let diverseResults = findDiverseStrategies(
+        viableTeamsByBoss, selectedBossNames, DISPLAY_LIMIT
+    );
+
+    // Fallback: if no non-overlapping triples found, retry all bosses in lenient mode
+    if (combinations.length === 0 && diverseResults.length === 0) {
+        console.log('⚠️ No non-overlapping combinations found — retrying all bosses in lenient mode...');
+        for (const boss of selectedBossObjects) {
+            for (const label of teamLabels) {
+                const team = threeCharTeams[label];
+                const score = scoreTeamForBoss(team, boss, { lenient: true });
+                if (score <= 0) continue;
+
+                const existing = viableTeamsByBoss[boss.name].find(t => t.label === label);
+                if (existing) {
+                    if (score > existing.score) existing.score = score;
+                    existing.lenient = true;
+                } else {
+                    viableTeamsByBoss[boss.name].push({ label, team, score, lenient: true });
+                }
+            }
+            viableTeamsByBoss[boss.name].sort((a, b) => b.score - a.score);
+            console.log(`   ${boss.name}: ${viableTeamsByBoss[boss.name].length} viable teams (after lenient)`);
+        }
+
+        combinations = findExclusiveCombinations(viableTeamsByBoss, selectedBossNames);
+        diverseResults = findDiverseStrategies(
+            viableTeamsByBoss, selectedBossNames, DISPLAY_LIMIT
+        );
+        console.log(`After lenient retry — Combinations: ${combinations.length}, Diverse: ${diverseResults.length}`);
     }
+
+    console.log(`Combinations: ${combinations.length}, Diverse strategies: ${diverseResults.length}`);
+    diverseResults.forEach((combo, i) => {
+        const detail = combo.assignments.map(a => {
+            const fp = teamDpsFingerprint(a.team);
+            return `${a.boss}: ${a.label} (${a.score.toFixed(0)}) [${fp}]`;
+        }).join(', ');
+        console.log(`  #${i + 1} (total: ${combo.totalScore.toFixed(0)}): ${detail}`);
+    });
     console.groupEnd();
     
+    const lenientBosses = selectedBossObjects
+        .filter(b => viableTeamsByBoss[b.name].some(t => t.lenient))
+        .map(b => b.shortName || b.name);
+
     return {
-        combinations: combinations.slice(0, RESULT_LIMIT),
+        combinations: combinations.slice(0, COMBINATION_LIMIT),
+        diverseResults,
         bosses: selectedBossObjects,
-        totalFound: combinations.length
+        totalFound: combinations.length,
+        lenientBosses
     };
 }
 
@@ -472,11 +530,29 @@ function calculateOptimalTeams() {
 let currentResultIndex = 0;
 let totalResults = 0;
 
-function displayResults(results) {
+function findDiverseStrategies(viableTeamsByBoss, bossNames, limit) {
+    const result = findDiverseStrategiesCore(viableTeamsByBoss, bossNames, limit);
+    console.log(`Diversity selection: ${result.totalStrategies} total strategies, per-boss floor ${result.perBossFloor.toFixed(0)} (enforced after ${DEFAULT_MIN_RESULTS_BEFORE_FLOOR} results)`);
+    return result.selected;
+}
+
+function displayResults(results, scroll = true) {
+    lastResults = results;
     const container = document.getElementById('results-container');
     const section = document.getElementById('results-section');
+
+    // Update checkbox state
+    const checkbox = document.getElementById('da-variations-checkbox');
+    if (checkbox) checkbox.checked = showVariations;
+
+    let combos;
+    if (showVariations) {
+        combos = results.combinations.slice(0, DISPLAY_LIMIT + 5);
+    } else {
+        combos = results.diverseResults || [];
+    }
     
-    if (results.combinations.length === 0) {
+    if (combos.length === 0) {
         container.innerHTML = `
             <div class="no-results">
                 <p>No valid team combinations found.</p>
@@ -484,14 +560,18 @@ function displayResults(results) {
             </div>
         `;
     } else {
-        totalResults = results.combinations.length;
+        totalResults = combos.length;
         currentResultIndex = 0;
         
-        const slidesHtml = results.combinations.map((combo, index) => 
+        const slidesHtml = combos.map((combo, index) => 
             createResultSlide(combo, index, results.bosses)
         ).join('');
+
+        const lenientNotice = results.lenientBosses && results.lenientBosses.length > 0
+            ? `<div class="lenient-notice">* Limited roster — using lenient scoring for ${results.lenientBosses.join(', ')}.</div>`
+            : '';
         
-        container.innerHTML = `
+        container.innerHTML = `${lenientNotice}
             <div class="carousel">
                 <button class="carousel-btn carousel-prev" onclick="prevResult()" aria-label="Previous result">
                     <span>‹</span>
@@ -506,7 +586,7 @@ function displayResults(results) {
                 </button>
             </div>
             <div class="carousel-indicators">
-                ${results.combinations.map((_, i) => 
+                ${combos.map((_, i) => 
                     `<button class="carousel-dot ${i === 0 ? 'active' : ''}" onclick="goToResult(${i})" aria-label="Go to result ${i + 1}"></button>`
                 ).join('')}
             </div>
@@ -517,7 +597,7 @@ function displayResults(results) {
     }
     
     section.style.display = 'block';
-    section.scrollIntoView({ behavior: 'smooth' });
+    if (scroll) section.scrollIntoView({ behavior: 'smooth' });
 }
 
 function prevResult() {
@@ -576,6 +656,7 @@ function createResultSlide(combo, index, bosses) {
                 <div class="result-team-stack">
                     ${teamHtml}
                 </div>
+                ${createStrengthLabelHtml(assignment.score, assignment.team, { lenient: assignment.lenient })}
             </div>
         `;
     }).join('');

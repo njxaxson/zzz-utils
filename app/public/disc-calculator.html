@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ZZZ Disc Calculator</title>
-    <link rel="icon" type="image/svg+xml" href="favicon.svg">
-    <link rel="stylesheet" href="style.css">
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+    <link rel="stylesheet" href="styles/style.css">
 </head>
 <body>
     <div class="container">
@@ -131,10 +131,10 @@
     </div>
 
     <script type="module">
-        import { loadSharedComponents } from './lib/components.js';
+        import { loadSharedComponents } from './lib/common/components.js';
         loadSharedComponents('disc-calculator');
     </script>
-    <script type="module" src="disc-calculator.js"></script>
+    <script type="module" src="lib/pages/disc-calculator.js"></script>
 </body>
 </html>
 

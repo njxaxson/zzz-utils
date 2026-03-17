@@ -110,8 +110,10 @@ export function calculateSynergyScore(unit, teammates, boss, lenient = false, de
         if (debug) dbg(`synergy.tags = [${synergy.tags.join(', ')}]`);
         
         // Check if this unit has element synergy (like Soukaku's "ice")
+        // Units with ALL elements (like Yuzuha) are element-agnostic — they support any element
         const synergyElements = synergy.tags.filter(tag => ELEMENTS.includes(tag));
-        const hasElementSynergy = synergyElements.length > 0;
+        const isUniversalElementSynergy = synergyElements.length >= ELEMENTS.length;
+        const hasElementSynergy = synergyElements.length > 0 && !isUniversalElementSynergy;
         
         // Check if this unit has subdps synergy (like Burnice, Grace, Vivian, Orphie)
         const hasSubDPSSynergy = synergy.tags.includes("subdps");
@@ -169,13 +171,23 @@ export function calculateSynergyScore(unit, teammates, boss, lenient = false, de
         const countedDPSRoles = new Set();
         
         for (const teammate of teammates) {
+            let matchBlockedByDedup = false;
+            
             const matchesAnyPreference = synergy.tags.some(tag => {
+                // Universal element synergy (like Yuzuha) means "works with any element"
+                // Don't let individual element tags produce additional generic matches;
+                // the non-element tags (e.g. "anomaly") already capture the real synergy
+                if (isUniversalElementSynergy && ELEMENTS.includes(tag)) return false;
+                
                 if (!teammate.tags.includes(tag)) return false;
                 
                 // DPS role synergy (attack/anomaly/rupture) - only count once per role type
                 // E.g., Dialyn + Orphie + Seed: only +30 for "attack", not +60
                 if (DPS_ROLES.includes(tag)) {
-                    if (countedDPSRoles.has(tag)) return false; // Already counted this role
+                    if (countedDPSRoles.has(tag)) {
+                        matchBlockedByDedup = true;
+                        return false;
+                    }
                     countedDPSRoles.add(tag);
                 }
                 
@@ -183,22 +195,19 @@ export function calculateSynergyScore(unit, teammates, boss, lenient = false, de
             });
             
             if (matchesAnyPreference) {
-                // Check if this is an element synergy (e.g., Soukaku's "ice")
-                const isElementSynergy = synergyElements.length > 0;
-                
-                if (isElementSynergy) {
+                if (hasElementSynergy) {
                     // Element synergy supports (like Soukaku) need TWO conditions:
                     // 1. Boss must be weak to that element (OR boss is neutral/global)
                     // 2. Team must have a DPS of that element
-                    // For multi-element synergy (like Yuzuha), check if ANY synergy element matches
+                    // Universal element units (like Yuzuha) bypass this — they support any element
                     const matchingSynergyElement = synergyElements.find(elem => boss.weaknesses.includes(elem));
                     const bossWeakToElement = matchingSynergyElement !== undefined;
                     // If boss has no specific weaknesses (neutral/global), treat as weak to element
                     const isNeutralBoss = boss.weaknesses.length === 0;
                     const effectiveBossWeak = bossWeakToElement || isNeutralBoss;
 
-                    // For neutral boss with multi-element synergy (like Yuzuha), check ALL synergy elements
-                    // For boss with weakness, only check the matching element
+                    // For neutral boss: check all synergy elements
+                    // For boss with weakness: only check the matching element
                     const elementsToCheck = matchingSynergyElement 
                         ? [matchingSynergyElement] 
                         : synergyElements; // Neutral boss: check all synergy elements
@@ -210,10 +219,7 @@ export function calculateSynergyScore(unit, teammates, boss, lenient = false, de
                     );
                     
                     if (!effectiveBossWeak || !teamHasElementDPS) {
-                        // Element synergy is completely wasted - near-disqualifying
-                        // (Unless boss is neutral, then we only care about team matching)
-                        score -= 70;
-                        dbg(`element synergy with ${teammate.name} wasted: -70`);
+                        dbg(`element synergy with ${teammate.name}: off-element, no bonus`);
                     } else if (isDPS(teammate)) {
                         // DPS-to-DPS element synergy: only count once per pair if MUTUAL
                         // Check if teammate has a reciprocal element synergy with this unit
@@ -250,7 +256,7 @@ export function calculateSynergyScore(unit, teammates, boss, lenient = false, de
                     score += 15;
                     dbg(`tag synergy with ${teammate.name} (support): +15`);
                 }
-            } else if (isDPS(teammate)) {
+            } else if (isDPS(teammate) && !matchBlockedByDedup) {
                 score -= 20;
                 dbg(`NO tag match with DPS ${teammate.name}: -20`);
             }
@@ -349,7 +355,7 @@ export function calculateDPSMixingPenalty(team) {
     
     const dpsTypes = new Set(dpsUnits.map(getDPSType).filter(t => t !== null));
     
-    // Double attack without synergy - heavily penalize
+    // Double attack without synergy - disqualify unless one is subdps
     if (attackers.length >= 2) {
         let hasSynergy = false;
         for (let i = 0; i < attackers.length; i++) {
@@ -361,11 +367,13 @@ export function calculateDPSMixingPenalty(team) {
             }
         }
         if (!hasSynergy) {
-            penalty -= 200; // Attack teams want stun/attack/support, not 2x attack. Heavy penalty to disqualify unless huge synergy elsewhere
+            const hasSubdps = attackers.some(u => u.synergy?.tags?.includes("subdps"));
+            if (!hasSubdps) return -999;
+            penalty -= 200;
         }
     }
     
-    // Double rupture without synergy - heavily penalize
+    // Double rupture without synergy - disqualify unless one is subdps
     if (ruptureUnits.length >= 2) {
         let hasSynergy = false;
         for (let i = 0; i < ruptureUnits.length; i++) {
@@ -377,7 +385,9 @@ export function calculateDPSMixingPenalty(team) {
             }
         }
         if (!hasSynergy) {
-            penalty -= 200; // Rupture teams want stun/rupture/support or rupture/2x support. Heavy penalty.
+            const hasSubdps = ruptureUnits.some(u => u.synergy?.tags?.includes("subdps"));
+            if (!hasSubdps) return -999;
+            penalty -= 200;
         }
     }
     
@@ -542,13 +552,18 @@ export function scoreTeamForBoss(team, boss, options = {}) {
     for (const unit of dpsUnits) {
         const tier = unit.tier ?? 2.5;
         
-        // Check if this attacker is a subdps supporting another attacker (e.g., Orphie)
-        // Subdps attackers get reduced tier when paired with another attacker
+        // Subdps units get reduced tier when paired with another DPS of the same type
+        // Attack subdps (Orphie) with another attacker, or anomaly subdps (Vivian,
+        // Burnice, Grace) with another anomaly unit — the subdps enhances, not carries
         const isSubDPSAttacker = unit.tags.includes("attack") && 
                                  unit.synergy?.tags?.includes("subdps");
         const hasOtherAttacker = attackers.filter(a => a !== unit).length > 0;
         const isSecondaryAttacker = isSubDPSAttacker && hasOtherAttacker;
-        const tierMultiplier = isSecondaryAttacker ? 0.5 : 1.0;
+        const isSubDPSAnomaly = unit.tags.includes("anomaly") && 
+                                unit.synergy?.tags?.includes("subdps");
+        const hasOtherAnomaly = anomalyUnits.filter(a => a !== unit).length > 0;
+        const isSecondaryAnomaly = isSubDPSAnomaly && hasOtherAnomaly;
+        const tierMultiplier = (isSecondaryAttacker || isSecondaryAnomaly) ? 0.5 : 1.0;
         
         let tierBonus = 0;
         if (tier <= 0.5) {
@@ -573,7 +588,7 @@ export function scoreTeamForBoss(team, boss, options = {}) {
             score += tierBonus;
         }
         if (debug) {
-            const multiplierNote = isSecondaryAttacker ? ` (subdps x0.5)` : '';
+            const multiplierNote = (isSecondaryAttacker || isSecondaryAnomaly) ? ` (subdps x0.5)` : '';
             console.log(`    ${unit.name}: T${tier} → ${tierBonus >= 0 ? '+' : ''}${tierBonus}${multiplierNote}`);
         }
         
@@ -755,7 +770,7 @@ export function scoreTeamForBoss(team, boss, options = {}) {
                  score -= 100;
              } else {
                  log('DISQUALIFIED: Invalid solo titled anomaly comp');
-                 if (debug) console.log('Team disqualified:', team.map(u => u.name).join('/'), debugReasons);
+                 if (debug) console.log('Team disqualified:', team.map(u => u.name).join('/'), 'Invalid solo titled anomaly comp');
                  return -1;
              }
         }
@@ -771,22 +786,19 @@ export function scoreTeamForBoss(team, boss, options = {}) {
             !isNeutralBoss &&
             anomalyUnits.every(u => boss.weaknesses.includes(getElement(u)));
         
-        // Titled anomaly only counts as valid SOLO comp if on-element (or neutral boss)
-        // Neutral boss: teams are VALID but don't get element bonuses
-        const hasOnElementTitledAnomaly = anomalyUnits.some(u => 
-            isTitled(u) && (isNeutralBoss || boss.weaknesses.includes(getElement(u)))
+        // Titled anomaly is valid as long as their element isn't RESISTED
+        // Off-element (not weak, not resisted) is viable but won't get weakness bonuses
+        const hasValidTitledAnomaly = anomalyUnits.some(u => 
+            isTitled(u) && !boss.resistances.includes(getElement(u))
         );
-        // Double anomaly is valid if at least one anomaly is on-element (or neutral boss)
-        const hasValidDoubleAnomaly = anomalyUnits.length >= 2 && (
-            isNeutralBoss || 
-            anomalyUnits.some(u => boss.weaknesses.includes(getElement(u)))
-        );
+        // Double anomaly is valid if at least one anomaly is not resisted
+        const hasValidDoubleAnomaly = anomalyUnits.length >= 2 &&
+            anomalyUnits.some(u => !boss.resistances.includes(getElement(u)));
         // Stun-synergy anomaly and explicit-synergy anomaly compositions also qualify
-        // for full anomaly comp bonuses (base comp, support bonus, etc.)
-        const hasValidSoloSynergyAnomaly = (hasStunSynergyAnomalyComp || hasExplicitSynergyAnomalyComp) && (
-            isNeutralBoss || anomalyUnits.some(u => boss.weaknesses.includes(getElement(u)))
-        );
-        const hasValidAnomalyComp = hasOnElementTitledAnomaly || hasValidDoubleAnomaly || hasValidSoloSynergyAnomaly;
+        // as long as at least one anomaly is not resisted
+        const hasValidSoloSynergyAnomaly = (hasStunSynergyAnomalyComp || hasExplicitSynergyAnomalyComp) &&
+            anomalyUnits.some(u => !boss.resistances.includes(getElement(u)));
+        const hasValidAnomalyComp = hasValidTitledAnomaly || hasValidDoubleAnomaly || hasValidSoloSynergyAnomaly;
         
         if (hasValidAnomalyComp) {
             // Base comp bonus for valid anomaly teams
@@ -809,28 +821,24 @@ export function scoreTeamForBoss(team, boss, options = {}) {
                         score -= 15; // Same element penalty
                     }
                 } else {
-                    // At least one anomaly is off-element - penalize the mixed composition
+                    // At least one anomaly is off-element
                     if (boss.weaknesses.length > 0) {
                         const anyAnomalyMatchesWeakness = anomalyUnits.some(u => 
                             boss.weaknesses.includes(getElement(u))
                         );
-                        if (!anyAnomalyMatchesWeakness) {
-                            score -= 40; // Heavy penalty if NO anomaly matches weakness
-                        } else {
-                            // Some match, some don't - moderate penalty for off-element partner
-                            score -= 25;
+                        if (anyAnomalyMatchesWeakness) {
+                            score -= 25; // Some match, some don't - moderate penalty for off-element partner
                         }
+                        // If none match weakness: no bonus, no penalty (off-element but not resisted)
                     }
                 }
             } else if (anomalyUnits.length === 1 && isTitled(anomalyUnits[0])) {
-                // Solo titled anomaly - check element alignment
+                // Solo titled anomaly - bonus only if on-element
                 const soloElement = getElement(anomalyUnits[0]);
-                if (boss.weaknesses.length === 0 || boss.weaknesses.includes(soloElement)) {
-                    // Solo on-element titled is efficient and focused
-                    score += 30; // Bonus for focused composition
-                } else {
-                    score -= 40; // Off-element solo titled gets penalty
+                if (boss.weaknesses.includes(soloElement)) {
+                    score += 30; // Bonus for on-element focused composition
                 }
+                // Off-element but not resisted: valid, no bonus, no penalty
             }
             
             const nonAnomalyDPSInComp = dpsUnits.filter(u => !u.tags.includes("anomaly"));

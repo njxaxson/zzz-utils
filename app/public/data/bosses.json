@@ -129,7 +129,7 @@
         "resistances": ["electric"],
         "shill": "stun",
         "anti": ["anomaly"],
-        "assists": 3,
+        "assists": 2,
         "favored": ["Dialyn", "Ye Shunguong"]
     },
     {

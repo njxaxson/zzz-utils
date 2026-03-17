@@ -13,28 +13,22 @@
  * @returns {Object} Map of team label strings to team arrays
  */
 export function getTeams(units) {
-    // Assign unique ids using powers of 2 for easy combination tracking
-    for (let i = 0, n = units.length; i < n; i++) {
-        units[i].numericId = 2 ** i;
-    }
-    
     let permutations = {};
     
-    // Find all valid team combinations
     for (const unitA of units) {
         for (const unitB of units) {
-            if (unitA.numericId == unitB.numericId) continue;
+            if (unitA.id === unitB.id) continue;
             
             let ab = unitA.join.some(tag => unitB.tags.includes(tag));
             if (ab) {
                 let ba = unitB.join.some(tag => unitA.tags.includes(tag));
                 if (ba) {
-                    // If mutual, a pair team is sufficient
-                    permutations[unitA.numericId + unitB.numericId] = [unitA, unitB];
+                    const key = [unitA.id, unitB.id].sort().join('|');
+                    permutations[key] = [unitA, unitB];
                 }
                 
                 for (const unitC of units) {
-                    if (unitA.numericId == unitC.numericId || unitB.numericId == unitC.numericId) continue;
+                    if (unitA.id === unitC.id || unitB.id === unitC.id) continue;
                     
                     let ac = unitA.join.some(tag => unitC.tags.includes(tag));
                     let bc = unitB.join.some(tag => unitC.tags.includes(tag));
@@ -46,14 +40,14 @@ export function getTeams(units) {
                     let c = ca || cb;
                     
                     if (a && b && c) {
-                        permutations[unitA.numericId + unitB.numericId + unitC.numericId] = [unitA, unitB, unitC];
+                        const key = [unitA.id, unitB.id, unitC.id].sort().join('|');
+                        permutations[key] = [unitA, unitB, unitC];
                     }
                 }
             }
         }
     }
 
-    // Sort individual teams conventionally by role
     let teams = {};
     
     for (const id in permutations) {
@@ -92,12 +86,12 @@ export function getTeamLabel(team) {
 }
 
 /**
- * Checks if two teams share any units (based on numericId assigned by getTeams)
+ * Checks if two teams share any units (based on unit.id)
  */
 export function teamsOverlap(team1, team2) {
-    const ids1 = new Set(team1.map(u => u.numericId));
+    const ids1 = new Set(team1.map(u => u.id));
     for (const unit of team2) {
-        if (ids1.has(unit.numericId)) return true;
+        if (ids1.has(unit.id)) return true;
     }
     return false;
 }
@@ -116,11 +110,10 @@ export function extendTeamsWithUniversalUnits(twoCharTeams, threeCharTeams, univ
     
     for (const label in twoCharTeams) {
         const team = twoCharTeams[label];
-        const teamUnitIds = new Set(team.map(u => u.numericId));
+        const teamUnitIds = new Set(team.map(u => u.id));
         
         for (const universalUnit of universalUnits) {
-            // Skip if this unit is already on the team
-            if (teamUnitIds.has(universalUnit.numericId)) continue;
+            if (teamUnitIds.has(universalUnit.id)) continue;
             
             // Create extended team with proper role-based sorting
             const extendedTeam = [...team, universalUnit];
@@ -186,9 +179,9 @@ export function findExclusiveCombinations(viableTeamsByBoss, bossNames) {
                     rankSum,
                     maxRank,
                     assignments: [
-                        { boss: bossNames[0], team: t0.team, label: t0.label, score: t0.score, rank: t0.rank },
-                        { boss: bossNames[1], team: t1.team, label: t1.label, score: t1.score, rank: t1.rank },
-                        { boss: bossNames[2], team: t2.team, label: t2.label, score: t2.score, rank: t2.rank }
+                        { boss: bossNames[0], team: t0.team, label: t0.label, score: t0.score, rank: t0.rank, lenient: !!t0.lenient },
+                        { boss: bossNames[1], team: t1.team, label: t1.label, score: t1.score, rank: t1.rank, lenient: !!t1.lenient },
+                        { boss: bossNames[2], team: t2.team, label: t2.label, score: t2.score, rank: t2.rank, lenient: !!t2.lenient }
                     ]
                 });
             }

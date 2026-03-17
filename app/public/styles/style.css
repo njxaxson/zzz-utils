@@ -2347,6 +2347,36 @@ button#simulate-btn:disabled,
     text-align: center;
 }
 
+/* Strength rating label */
+.strength-label {
+    display: inline-block;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 0.15rem 0.5rem;
+    border-radius: 3px;
+    text-align: center;
+}
+
+.strength-excellent { color: #00e676; background: rgba(0, 230, 118, 0.12); }
+.strength-good      { color: #00d4aa; background: rgba(0, 212, 170, 0.12); }
+.strength-fair  { color: #ffca28; background: rgba(255, 202, 40, 0.12); }
+.strength-tough { color: #ff9800; background: rgba(255, 152, 0, 0.12); }
+.strength-risky { color: #ff5252; background: rgba(255, 82, 82, 0.12); }
+
+/* Strength label in recommendation rows */
+.recommendation-strength {
+    min-width: 4rem;
+    flex-shrink: 0;
+    text-align: center;
+}
+
+/* Strength label in DA result columns */
+.result-column .strength-label {
+    margin-top: 0.3rem;
+}
+
 /* Carousel mobile responsiveness - use fluid sizing */
 @media (max-width: 900px) {
     .result-columns {
@@ -2930,6 +2960,10 @@ button#simulate-btn:disabled,
     .recommendation-score {
         font-size: 0.75rem;
         margin-left: auto;
+    }
+
+    .recommendation-strength {
+        order: 4;
     }
 
     .recommendation-team .result-unit-card {

@@ -2,110 +2,42 @@
  * Pull Recommendations Debug Script
  * 
  * Runs the pull recommendation engine from the command line for debugging.
- * 
- * Usage:
- *   node pull-debug.js              Full roster, top 5 recommendations
- *   node pull-debug.js -10          Show top 10 recommendations
- *   node pull-debug.js -d 10        Verbose debug + top 10
- *   node pull-debug.js -m           Personal roster (from roster.json)
- *   node pull-debug.js -u "Miyabi,Astra,Nicole,Anby,Billy"   Specific units only
- *   node pull-debug.js -Miyabi      Remove Miyabi from roster
- *   node pull-debug.js +Orphie      Add Orphie to roster
- *   node pull-debug.js -m +Astra    Personal roster, but also add Astra
- *   node pull-debug.js -m -Evelyn   Personal roster, but remove Evelyn
  */
 
+import { parseArgs } from './lib/cli.js';
+import { loadUnits, loadRoster } from './lib/data.js';
+import { applyShareUrl } from './lib/share-url.js';
+import { resolveOptions } from './lib/unit-resolver.js';
+import { buildUnitStates } from './lib/roster-builder.js';
+import {
+    analyze, tierToQuality, qualityLabel, getBestTier, getUnitElement,
+    isSubdps, capitalize, DPS_ARCHETYPES, ELEMENTS
+} from './app/public/lib/common/pull-engine.js';
+
+const options = parseArgs({
+    name: 'pull-debug.js',
+    description: 'Runs the pull recommendation engine for roster analysis and debugging.',
+    examples: [
+        '  node pull-debug.js                   Full roster, top 5 recommendations',
+        '  node pull-debug.js -10                Show top 10 recommendations',
+        '  node pull-debug.js -d -10             Verbose debug + top 10',
+        '  node pull-debug.js -m                 Personal roster (from roster.json)',
+        '  node pull-debug.js -u "Miyabi,Astra,Nicole,Anby,Billy"   Specific units',
+        '  node pull-debug.js -Miyabi            Remove Miyabi from roster',
+        '  node pull-debug.js +Orphie            Add Orphie to roster',
+        '  node pull-debug.js -m +Astra          Personal roster + add Astra',
+        '  node pull-debug.js -q "?roster=eJwN..."  Roster from share URL'
+    ].join('\n')
+});
+
 async function main() {
-    const { default: allUnits } = await import('./app/public/data/units.json', { with: { type: 'json' } });
-    const { default: myRoster } = await import('./roster.json', { with: { type: 'json' } });
-    const {
-        analyze, tierToQuality, qualityLabel, getBestTier, getUnitElement,
-        isSubdps, capitalize, DPS_ARCHETYPES, ELEMENTS
-    } = await import('./app/public/lib/pull-engine.js');
+    const allUnits = await loadUnits();
+    const roster = await loadRoster();
 
-    // ========================================================================
-    // PARSE ARGUMENTS
-    // ========================================================================
+    applyShareUrl(options, allUnits);
+    resolveOptions(options, allUnits);
 
-    const args = process.argv.slice(2);
-    const options = {
-        depth: 5,
-        debug: false,
-        onlyMine: false,
-        units: null,
-        additions: [],
-        removals: []
-    };
-
-    for (let i = 0; i < args.length; i++) {
-        const arg = args[i];
-        const depthMatch = arg.match(/^-(\d+)$/);
-        if (depthMatch) {
-            options.depth = parseInt(depthMatch[1], 10);
-        } else if (arg === '-d' || arg === '--debug') {
-            options.debug = true;
-            if (args[i + 1] && /^\d+$/.test(args[i + 1])) {
-                options.depth = parseInt(args[i + 1], 10);
-                i++;
-            }
-        } else if (arg === '-m' || arg === '--only-mine') {
-            options.onlyMine = true;
-        } else if ((arg === '-u' || arg === '--units') && args[i + 1]) {
-            options.units = args[i + 1].split(',').map(u => u.trim());
-            i++;
-        } else if (arg.startsWith('+')) {
-            options.additions.push(arg.slice(1));
-        } else if (arg.startsWith('-') && arg.length > 2) {
-            options.removals.push(arg.slice(1));
-        }
-    }
-
-    // ========================================================================
-    // BUILD ROSTER STATE
-    // ========================================================================
-
-    const LOCKED = ['nicole', 'anby', 'billy'];
-
-    const unitStates = {};
-    for (const unit of allUnits) {
-        const isAvailable = unit.available !== false;
-        let owned;
-
-        if (options.units) {
-            owned = options.units.some(n => n.toLowerCase() === unit.name.toLowerCase());
-        } else if (options.onlyMine) {
-            owned = myRoster.hasOwnProperty(unit.name);
-        } else {
-            owned = isAvailable && (unit.rank === 'A' || (unit.rank === 'S' && !unit.limited));
-        }
-
-        if (LOCKED.includes(unit.id)) owned = true;
-
-        unitStates[unit.id] = { owned };
-    }
-
-    for (const name of options.additions) {
-        const unit = allUnits.find(u => u.name.toLowerCase() === name.toLowerCase());
-        if (unit) {
-            unitStates[unit.id].owned = true;
-        } else {
-            console.warn(`WARNING: Unknown unit "${name}" in + override`);
-        }
-    }
-    for (const name of options.removals) {
-        const unit = allUnits.find(u => u.name.toLowerCase() === name.toLowerCase());
-        if (unit) {
-            if (LOCKED.includes(unit.id)) {
-                console.warn(`WARNING: Cannot remove locked starter "${name}"`);
-            } else {
-                unitStates[unit.id].owned = false;
-            }
-        } else {
-            console.warn(`WARNING: Unknown unit "${name}" in - override`);
-        }
-    }
-
-    const ownedUnits = allUnits.filter(u => unitStates[u.id].owned);
+    const { unitStates, ownedUnits } = buildUnitStates(allUnits, options, roster);
 
     // ========================================================================
     // RUN ANALYSIS
@@ -125,7 +57,7 @@ async function main() {
 
     console.log('===== Pull Recommendations Debug =====\n');
 
-    const mode = options.units ? 'specific units' : options.onlyMine ? 'personal roster' : 'full roster';
+    const mode = options.query ? 'share URL' : options.units ? 'specific units' : options.onlyMine ? 'personal roster' : 'full roster';
     console.log(`Mode: ${mode}  |  Depth: ${options.depth}  |  Debug: ${options.debug}`);
     if (options.additions.length) console.log(`Added: ${options.additions.join(', ')}`);
     if (options.removals.length) console.log(`Removed: ${options.removals.join(', ')}`);

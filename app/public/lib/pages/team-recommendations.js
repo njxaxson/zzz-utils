@@ -9,12 +9,13 @@ import {
     sortTeamByRole, 
     getTeamLabel,
     extendTeamsWithUniversalUnits
-} from './lib/team-builder.js';
-import { scoreTeamForBoss } from './lib/team-scorer.js';
+} from '../common/team-builder.js';
+import { scoreTeamForBoss } from '../common/team-scorer.js';
+import { createStrengthLabelHtml } from '../common/strength-rating.js';
 import { 
     initRoster, getUnitStates, getAllUnits,
     getInitials, getUnitElement, getCharacterImageUrl, getUniversalUnitNames
-} from './lib/roster-ui.js';
+} from '../common/roster-ui.js';
 
 // ============================================================================
 // CONSTANTS
@@ -476,6 +477,9 @@ function createResultRow(entry, index) {
             <div class="recommendation-rank">#${index + 1}</div>
             <div class="recommendation-team">
                 ${teamHtml}
+            </div>
+            <div class="recommendation-strength">
+                ${createStrengthLabelHtml(entry.score, entry.team)}
             </div>
             <div class="recommendation-score">${Math.round(entry.score)}</div>
         </div>
