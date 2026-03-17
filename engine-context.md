@@ -376,6 +376,7 @@ intentional and correct.
 {
   "id": "aria",
   "name": "Aria",
+  "aliases": ["..."],
   "image": "./assets/characters/aria.webp",
   "rank": "S",
   "limited": true,
@@ -389,6 +390,7 @@ intentional and correct.
 
 - `id` - Unique identifier for the unit
 - `name` - Display name
+- `aliases` - (optional) Array of common abbreviations or alternate names (e.g., `"S11"` for Soldier 11, `"YSG"` for Ye Shunguong). Used by CLI tools for fuzzy unit name matching alongside the `id` and `name` fields.
 - `image` - URL or relative path to the unit's portrait image (used directly by the UI without modification)
 - `rank` - `"S"` or `"A"` (S-rank units are inherently stronger and rarer than A-rank)
 - `limited` - Whether the unit is limited (only available during specific gacha banners)
@@ -507,6 +509,18 @@ Key scenarios that exercise distinct algorithm paths:
 - Support/stun tier: ~35% weight of DPS
 - Titled bonus: +20 additional
 - Subdps attacker with other attacker: 50% tier multiplier
+
+## DPS Bucketing and Diversity Selection
+
+When optimizing 3 teams for Deadly Assault's 3 bosses, the top results by raw score tend to be near-identical — often the same DPS units with minor support or stunner variations. Showing the player five "options" that only differ by swapping one support for another is not useful.
+
+What matters most to a player choosing DA teams is *which DPS units go where*. A result that assigns Miyabi to Boss 1, YSG to Boss 2, and Harumasa to Boss 3 represents a fundamentally different strategy from one using Alice, Yixuan, and Evelyn — even if both score similarly. Support and stunner variations within the same DPS assignment are less strategically important.
+
+To address this, results are grouped by which type of DPS is assigned to each boss — considering the DPS role, element, and power tier. The algorithm then selects one representative from each distinct DPS assignment pattern, preferring the highest-scoring realization. This surfaces meaningfully different strategic options rather than minor variations of the same strategy.
+
+The webapp provides a toggle between this diversity-aware view (default) and the raw score-sorted view. The diversity view answers "what are my fundamentally different options?", while the variations view answers "what are the absolute best-scoring assignments regardless of redundancy?"
+
+---
 
 ## Scoring Results Scale
 While not definitive, these boundaries tend to give a rough picture of team quality:

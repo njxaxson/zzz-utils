@@ -44,6 +44,7 @@
     {
         "id": "astra",
         "name": "Astra",
+        "aliases": ["Yao", "AY"],
         "image": "./assets/characters/astra.webp",
         "rank": "S",
         "limited": true,
@@ -152,6 +153,7 @@
     {
         "id": "evelyn",
         "name": "Evelyn",
+        "aliases": ["Eve"],
         "image": "./assets/characters/evelyn.webp",
         "rank": "S",
         "limited": true,
@@ -174,6 +176,7 @@
     {
         "id": "harumasa",
         "name": "Harumasa",
+        "aliases": ["Haru"],
         "image": "./assets/characters/harumasa.webp",
         "rank": "S",
         "limited": true,
@@ -196,6 +199,7 @@
     {
         "id": "jane-doe",
         "name": "Jane Doe",
+        "aliases": ["JD"],
         "image": "./assets/characters/jane-doe.webp",
         "rank": "S",
         "limited": true,
@@ -207,6 +211,7 @@
     {
         "id": "ju-fufu",
         "name": "Ju Fufu",
+        "aliases": ["JF"],
         "image": "./assets/characters/ju-fufu.webp",
         "rank": "S",
         "limited": true,
@@ -229,6 +234,7 @@
     {
         "id": "komano",
         "name": "Komano",
+        "aliases": ["Manato"],
         "image": "./assets/characters/komano.webp",
         "rank": "A",
         "tier": 1.0,
@@ -293,6 +299,7 @@
     {
         "id": "nangong",
         "name": "Nangong",
+        "aliases": ["Yu", "NY"],
         "image": "./assets/characters/nangong.webp",
         "rank": "S",
         "limited": true,
@@ -326,6 +333,7 @@
     {
         "id": "orphie",
         "name": "Orphie",
+        "aliases": ["Magus", "OM", "O&M"],
         "image": "./assets/characters/orphie.webp",
         "rank": "S",
         "limited": true,
@@ -337,6 +345,7 @@
     {
         "id": "pan",
         "name": "Pan Yinhu",
+        "aliases": ["PY"],
         "image": "./assets/characters/pan-yinhu.webp",
         "rank": "A",
         "tier": 1.0,
@@ -400,6 +409,7 @@
     {
         "id": "seed",
         "name": "Seed",
+        "aliases": ["Flora"],
         "image": "./assets/characters/seed.webp",
         "rank": "S",
         "limited": true,
@@ -421,6 +431,7 @@
     {
         "id": "soldier-11",
         "name": "Soldier 11",
+        "aliases": ["S11", "Harin"],
         "image": "./assets/characters/soldier-11.webp",
         "rank": "S",
         "limited": false,
@@ -464,6 +475,7 @@
     {
         "id": "vivian",
         "name": "Vivian",
+        "aliases": ["Viv"],
         "image": "./assets/characters/vivian.webp",
         "rank": "S",
         "limited": true,
@@ -486,6 +498,7 @@
     {
         "id" : "ysg",
         "name" : "Ye Shunguong",
+        "aliases": ["YSG"],
         "image": "./assets/characters/ysg.webp",
         "rank" : "S",
         "limited" : true,
@@ -519,6 +532,7 @@
     {
         "id": "yuzuha",
         "name": "Yuzuha",
+        "aliases": ["Yuzu"],
         "image": "./assets/characters/yuzuha.webp",
         "rank": "S",
         "limited": true,
@@ -541,6 +555,7 @@
     {
         "id": "zhu-yuan",
         "name": "Zhu Yuan",
+        "aliases": ["ZY"],
         "image": "./assets/characters/zhu-yuan.webp",
         "rank": "S",
         "limited": true,

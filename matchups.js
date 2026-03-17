@@ -8,9 +8,11 @@
 import { parseArgs } from './lib/cli.js';
 import { loadAllData } from './lib/data.js';
 import { applyShareUrl } from './lib/share-url.js';
+import { resolveOptions } from './lib/unit-resolver.js';
 import { buildAvailableUnits } from './lib/roster-builder.js';
 import { filterBosses } from './lib/boss-filter.js';
 import { buildTeams } from './lib/team-pipeline.js';
+import { parseTeams } from './lib/team-parser.js';
 import { scoreTeamForBoss } from './app/public/lib/common/team-scorer.js';
 
 const options = parseArgs({
@@ -29,13 +31,9 @@ const options = parseArgs({
 async function main() {
     const { units: allUnits, bosses, roster } = await loadAllData();
     applyShareUrl(options, allUnits);
+    resolveOptions(options, allUnits);
 
     const myUnits = allUnits.filter(u => roster.hasOwnProperty(u.name));
-    const { availableUnits, universalUnits } = buildAvailableUnits(allUnits, options, roster);
-
-    if (options.include && options.include.length > 0) {
-        console.log(`Teams must include at least one of: ${options.include.join(', ')}`);
-    }
 
     const NEUTRAL_BOSS = {
         name: 'Synthetic Neutral Boss',
@@ -55,21 +53,39 @@ async function main() {
     console.log("===== Team Matchups - All Bosses =====\n");
     console.log(`Full roster: ${allUnits.length} characters\n`);
 
-    if (options.units || options.onlyMine) {
-        console.log(`Whitelist active: ${availableUnits.length} units`);
-    }
-    console.log(`Using ${availableUnits.length} units\n`);
+    let teamEntries;
 
-    const { threeCharTeams, teamLabels, extendedCount, universalUnitObjects } = buildTeams(availableUnits, universalUnits);
+    if (options.teams) {
+        const { teams: parsedTeams, warnings } = parseTeams(options.teams, allUnits, { preview: options.preview });
+        for (const w of warnings) console.warn(`WARNING: ${w}`);
+        teamEntries = parsedTeams;
+        console.log(`Explicit teams: ${teamEntries.length}\n`);
+    } else {
+        const { availableUnits, universalUnits } = buildAvailableUnits(allUnits, options, roster);
 
-    if (universalUnitObjects.length > 0) {
-        console.log(`Universal units: ${universalUnitObjects.map(u => u.name).join(", ")}`);
-        if (extendedCount > 0) {
-            console.log(`Extended ${extendedCount} teams using universal units`);
+        if (options.include && options.include.length > 0) {
+            console.log(`Teams must include at least one of: ${options.include.join(', ')}`);
         }
+
+        if (options.units || options.onlyMine) {
+            console.log(`Whitelist active: ${availableUnits.length} units`);
+        }
+        console.log(`Using ${availableUnits.length} units\n`);
+
+        const { threeCharTeams, teamLabels, extendedCount, universalUnitObjects } = buildTeams(availableUnits, universalUnits);
+
+        if (universalUnitObjects.length > 0) {
+            console.log(`Universal units: ${universalUnitObjects.map(u => u.name).join(", ")}`);
+            if (extendedCount > 0) {
+                console.log(`Extended ${extendedCount} teams using universal units`);
+            }
+        }
+
+        console.log(`Total 3-character teams: ${teamLabels.length}\n`);
+
+        teamEntries = teamLabels.map(label => ({ label, team: threeCharTeams[label] }));
     }
 
-    console.log(`Total 3-character teams: ${teamLabels.length}\n`);
     console.log("=".repeat(60) + "\n");
 
     // Filter bosses
@@ -92,12 +108,9 @@ async function main() {
         console.log(boss.name);
         console.log(`  Weak: ${weakStr} | Resist: ${resistStr} | Shill: ${shillStr} | Anti: ${antiStr} | Assists: ${boss.assists}`);
 
-        // Score all teams for this boss
         const viableTeams = [];
-        for (const label of teamLabels) {
-            const team = threeCharTeams[label];
-
-            if (options.include && options.include.length > 0) {
+        for (const { label, team } of teamEntries) {
+            if (!options.teams && options.include && options.include.length > 0) {
                 const teamUnitNames = team.map(u => u.name);
                 if (!options.include.some(req => teamUnitNames.includes(req))) {
                     continue;

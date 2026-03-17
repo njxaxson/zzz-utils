@@ -8,6 +8,7 @@
 import { parseArgs } from './lib/cli.js';
 import { loadUnits, loadRoster } from './lib/data.js';
 import { applyShareUrl } from './lib/share-url.js';
+import { resolveOptions } from './lib/unit-resolver.js';
 import { buildAvailableUnits } from './lib/roster-builder.js';
 import { getTeams } from './app/public/lib/common/team-builder.js';
 
@@ -27,6 +28,7 @@ async function main() {
     const roster = await loadRoster();
 
     applyShareUrl(options, allUnits);
+    resolveOptions(options, allUnits);
 
     const { availableUnits } = buildAvailableUnits(allUnits, options, roster, {
         extraUnits: [

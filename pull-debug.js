@@ -7,6 +7,7 @@
 import { parseArgs } from './lib/cli.js';
 import { loadUnits, loadRoster } from './lib/data.js';
 import { applyShareUrl } from './lib/share-url.js';
+import { resolveOptions } from './lib/unit-resolver.js';
 import { buildUnitStates } from './lib/roster-builder.js';
 import {
     analyze, tierToQuality, qualityLabel, getBestTier, getUnitElement,
@@ -34,6 +35,7 @@ async function main() {
     const roster = await loadRoster();
 
     applyShareUrl(options, allUnits);
+    resolveOptions(options, allUnits);
 
     const { unitStates, ownedUnits } = buildUnitStates(allUnits, options, roster);
 

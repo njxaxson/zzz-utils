@@ -39,25 +39,27 @@ function parseFile(filepath) {
 }
 
 // ---------------------------------------------------------------------------
-// LIS-based mover detection
+// Mover detection (score-group aware)
 //
-// Identifies teams that genuinely changed their relative ordering, as opposed
-// to teams whose absolute index shifted because some *other* team moved.
+// Identifies teams that genuinely changed their relative ordering, ignoring
+// shuffles within groups of teams that share the same score (tie groups).
 //
-// Approach: compute the Longest Increasing Subsequence (LIS) of baseline
-// positions when teams are arranged in modified order.  Teams in the LIS
-// maintained their relative order ("stable backbone").  A team is a genuine
-// mover if removing it does NOT decrease the LIS length — meaning it was
-// never part of any maximum-length stable backbone.
+// Approach: assign each team a "score-group position" in baseline order so
+// that all teams with the same score share one position.  Compute the
+// Longest Non-Decreasing Subsequence (LNDS) of these group positions when
+// teams are arranged in modified order.  Teams in the LNDS maintained their
+// relative inter-group order ("stable backbone").  A team is a genuine mover
+// if removing it does NOT decrease the LNDS length — meaning it was never
+// part of any maximum-length stable backbone.
 // ---------------------------------------------------------------------------
 
-function lisLength(arr) {
+function lndsLength(arr) {
     const tails = [];
     for (const x of arr) {
         let lo = 0, hi = tails.length;
         while (lo < hi) {
             const mid = (lo + hi) >> 1;
-            if (tails[mid] < x) lo = mid + 1;
+            if (tails[mid] <= x) lo = mid + 1;
             else hi = mid;
         }
         tails[lo] = x;
@@ -65,17 +67,29 @@ function lisLength(arr) {
     return tails.length;
 }
 
+function scoreGroupPositions(teams) {
+    const positions = new Map();
+    let groupIdx = 0;
+    for (let i = 0; i < teams.length; i++) {
+        if (i > 0 && teams[i].score !== teams[i - 1].score) {
+            groupIdx++;
+        }
+        positions.set(teams[i].name, groupIdx);
+    }
+    return positions;
+}
+
 function findMovers(baselineCommon, modifiedCommon) {
     if (modifiedCommon.length <= 1) return new Set();
 
-    const bPos = new Map(baselineCommon.map((t, i) => [t.name, i]));
-    const seq = modifiedCommon.map(t => bPos.get(t.name));
-    const fullLen = lisLength(seq);
+    const bGroupPos = scoreGroupPositions(baselineCommon);
+    const seq = modifiedCommon.map(t => bGroupPos.get(t.name));
+    const fullLen = lndsLength(seq);
 
     const movers = new Set();
     for (let i = 0; i < seq.length; i++) {
         const reduced = seq.filter((_, j) => j !== i);
-        if (lisLength(reduced) >= fullLen) {
+        if (lndsLength(reduced) >= fullLen) {
             movers.add(modifiedCommon[i].name);
         }
     }
@@ -105,8 +119,8 @@ function compareBoss(baselineTeams, modifiedTeams) {
     const baselineCommon = baselineTeams.filter(t => modifiedByName.has(t.name));
     const modifiedCommon = modifiedTeams.filter(t => baselineByName.has(t.name));
 
-    const bCommonPos = new Map(baselineCommon.map((t, i) => [t.name, i]));
-    const mCommonPos = new Map(modifiedCommon.map((t, i) => [t.name, i]));
+    const bCommonPos = scoreGroupPositions(baselineCommon);
+    const mCommonPos = scoreGroupPositions(modifiedCommon);
 
     const movers = findMovers(baselineCommon, modifiedCommon);
 

@@ -8,11 +8,13 @@
 import { parseArgs } from './lib/cli.js';
 import { loadAllData } from './lib/data.js';
 import { applyShareUrl } from './lib/share-url.js';
+import { resolveOptions } from './lib/unit-resolver.js';
 import { buildAvailableUnits } from './lib/roster-builder.js';
 import { filterBosses } from './lib/boss-filter.js';
 import { buildTeams } from './lib/team-pipeline.js';
+import { parseTeams } from './lib/team-parser.js';
 import { scoreTeamForBoss } from './app/public/lib/common/team-scorer.js';
-import { findExclusiveCombinations } from './app/public/lib/common/team-builder.js';
+import { findExclusiveCombinations, teamsOverlap } from './app/public/lib/common/team-builder.js';
 
 const options = parseArgs({
     name: 'deadly-assault.js',
@@ -25,9 +27,89 @@ const options = parseArgs({
     ].join('\n')
 });
 
+/**
+ * Score explicit teams against bosses and try all C(N,3)*3! arrangements.
+ */
+function evaluateExplicitTeams(teamEntries, selectedBossObjects, options) {
+    const bossNames = selectedBossObjects.map(b => b.name);
+
+    const scoredByBoss = {};
+    for (const boss of selectedBossObjects) {
+        scoredByBoss[boss.name] = [];
+        for (const { label, team } of teamEntries) {
+            const score = scoreTeamForBoss(team, boss, { debug: options.debug });
+            if (score > 0) {
+                scoredByBoss[boss.name].push({ label, team, score });
+            }
+        }
+        scoredByBoss[boss.name].sort((a, b) => b.score - a.score);
+    }
+
+    const PERMS = [[0,1,2],[0,2,1],[1,0,2],[1,2,0],[2,0,1],[2,1,0]];
+    const combinations = [];
+
+    const n = teamEntries.length;
+    const indices = teamEntries.map((_, i) => i);
+
+    function* chooseCombos(arr, k) {
+        if (k === 0) { yield []; return; }
+        for (let i = 0; i <= arr.length - k; i++) {
+            for (const rest of chooseCombos(arr.slice(i + 1), k - 1)) {
+                yield [arr[i], ...rest];
+            }
+        }
+    }
+
+    const teamCount = Math.min(n, 3);
+    if (teamCount < 3) {
+        console.error(`ERROR: Need at least 3 teams for Deadly Assault, got ${n}`);
+        return [];
+    }
+
+    for (const combo of chooseCombos(indices, 3)) {
+        const three = combo.map(i => teamEntries[i]);
+
+        if (teamsOverlap(three[0].team, three[1].team)) continue;
+        if (teamsOverlap(three[0].team, three[2].team)) continue;
+        if (teamsOverlap(three[1].team, three[2].team)) continue;
+
+        for (const perm of PERMS) {
+            const assignments = perm.map((teamIdx, bossIdx) => {
+                const entry = three[teamIdx];
+                const boss = selectedBossObjects[bossIdx];
+                const bossScored = scoredByBoss[boss.name].find(s => s.label === entry.label);
+                const score = bossScored ? bossScored.score : scoreTeamForBoss(entry.team, boss, { debug: options.debug });
+                return {
+                    boss: boss.name,
+                    team: entry.team,
+                    label: entry.label,
+                    score,
+                    rank: 0,
+                    lenient: false
+                };
+            });
+
+            if (assignments.some(a => a.score <= 0)) continue;
+
+            const totalScore = assignments.reduce((s, a) => s + a.score, 0);
+            combinations.push({
+                totalScore,
+                priority: 0,
+                rankSum: 0,
+                maxRank: 0,
+                assignments
+            });
+        }
+    }
+
+    combinations.sort((a, b) => b.totalScore - a.totalScore);
+    return combinations;
+}
+
 async function main() {
     const { units: allUnits, bosses, roster } = await loadAllData();
     applyShareUrl(options, allUnits);
+    resolveOptions(options, allUnits);
 
     // ============================================================================
     // BOSS SELECTION
@@ -59,6 +141,58 @@ async function main() {
     // ============================================================================
 
     const DEBUG = options.debug;
+
+    const selectedBossObjects = [];
+    for (const bossName of SELECTED_BOSSES) {
+        const boss = bosses.find(b => b.name === bossName);
+        if (!boss) {
+            console.error(`ERROR: Boss "${bossName}" not found in bosses.json`);
+            return;
+        }
+        selectedBossObjects.push(boss);
+    }
+
+    // Explicit teams mode: skip normal pipeline
+    if (options.teams) {
+        console.log("===== Deadly Assault Team Builder =====\n");
+        console.log("Selected Bosses:");
+        for (const boss of selectedBossObjects) {
+            console.log(`  - ${boss.name}`);
+        }
+        console.log();
+
+        const { teams: parsedTeams, warnings } = parseTeams(options.teams, allUnits, { preview: options.preview });
+        for (const w of warnings) console.warn(`WARNING: ${w}`);
+
+        console.log(`Explicit teams: ${parsedTeams.length}`);
+        for (const { label } of parsedTeams) console.log(`  - ${label}`);
+        console.log();
+
+        const combinations = evaluateExplicitTeams(parsedTeams, selectedBossObjects, options);
+
+        if (combinations.length === 0) {
+            console.log('No valid non-overlapping assignments found for the given teams.');
+            return;
+        }
+
+        const displayCount = Math.min(options.depth, combinations.length);
+        console.log(`===== Top ${displayCount} Team Allocations =====\n`);
+
+        for (let i = 0; i < displayCount; i++) {
+            const combo = combinations[i];
+            console.log(`Combination #${i + 1} (Total: ${combo.totalScore.toFixed(0)})`);
+            for (const assignment of combo.assignments) {
+                const shortBoss = assignment.boss.replace("Notorious ", "").substring(0, 20).padEnd(20);
+                console.log(`  ${shortBoss}: ${assignment.label} (${assignment.score})`);
+            }
+            console.log();
+        }
+
+        if (combinations.length > options.depth) {
+            console.log(`... and ${combinations.length - options.depth} more combinations.`);
+        }
+        return;
+    }
 
     // Developer-only: Additional units not in units.json
     const DEVELOPER_UNITS = [];
@@ -205,16 +339,6 @@ async function main() {
     // ============================================================================
 
     console.log("===== Deadly Assault Team Builder =====\n");
-
-    const selectedBossObjects = [];
-    for (const bossName of SELECTED_BOSSES) {
-        const boss = bosses.find(b => b.name === bossName);
-        if (!boss) {
-            console.error(`ERROR: Boss "${bossName}" not found in bosses.json`);
-            return;
-        }
-        selectedBossObjects.push(boss);
-    }
 
     console.log("Selected Bosses:");
     for (const boss of selectedBossObjects) {
