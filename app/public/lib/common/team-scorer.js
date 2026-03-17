@@ -171,13 +171,23 @@ export function calculateSynergyScore(unit, teammates, boss, lenient = false, de
         const countedDPSRoles = new Set();
         
         for (const teammate of teammates) {
+            let matchBlockedByDedup = false;
+            
             const matchesAnyPreference = synergy.tags.some(tag => {
+                // Universal element synergy (like Yuzuha) means "works with any element"
+                // Don't let individual element tags produce additional generic matches;
+                // the non-element tags (e.g. "anomaly") already capture the real synergy
+                if (isUniversalElementSynergy && ELEMENTS.includes(tag)) return false;
+                
                 if (!teammate.tags.includes(tag)) return false;
                 
                 // DPS role synergy (attack/anomaly/rupture) - only count once per role type
                 // E.g., Dialyn + Orphie + Seed: only +30 for "attack", not +60
                 if (DPS_ROLES.includes(tag)) {
-                    if (countedDPSRoles.has(tag)) return false; // Already counted this role
+                    if (countedDPSRoles.has(tag)) {
+                        matchBlockedByDedup = true;
+                        return false;
+                    }
                     countedDPSRoles.add(tag);
                 }
                 
@@ -246,7 +256,7 @@ export function calculateSynergyScore(unit, teammates, boss, lenient = false, de
                     score += 15;
                     dbg(`tag synergy with ${teammate.name} (support): +15`);
                 }
-            } else if (isDPS(teammate)) {
+            } else if (isDPS(teammate) && !matchBlockedByDedup) {
                 score -= 20;
                 dbg(`NO tag match with DPS ${teammate.name}: -20`);
             }
@@ -542,13 +552,18 @@ export function scoreTeamForBoss(team, boss, options = {}) {
     for (const unit of dpsUnits) {
         const tier = unit.tier ?? 2.5;
         
-        // Check if this attacker is a subdps supporting another attacker (e.g., Orphie)
-        // Subdps attackers get reduced tier when paired with another attacker
+        // Subdps units get reduced tier when paired with another DPS of the same type
+        // Attack subdps (Orphie) with another attacker, or anomaly subdps (Vivian,
+        // Burnice, Grace) with another anomaly unit — the subdps enhances, not carries
         const isSubDPSAttacker = unit.tags.includes("attack") && 
                                  unit.synergy?.tags?.includes("subdps");
         const hasOtherAttacker = attackers.filter(a => a !== unit).length > 0;
         const isSecondaryAttacker = isSubDPSAttacker && hasOtherAttacker;
-        const tierMultiplier = isSecondaryAttacker ? 0.5 : 1.0;
+        const isSubDPSAnomaly = unit.tags.includes("anomaly") && 
+                                unit.synergy?.tags?.includes("subdps");
+        const hasOtherAnomaly = anomalyUnits.filter(a => a !== unit).length > 0;
+        const isSecondaryAnomaly = isSubDPSAnomaly && hasOtherAnomaly;
+        const tierMultiplier = (isSecondaryAttacker || isSecondaryAnomaly) ? 0.5 : 1.0;
         
         let tierBonus = 0;
         if (tier <= 0.5) {
@@ -573,7 +588,7 @@ export function scoreTeamForBoss(team, boss, options = {}) {
             score += tierBonus;
         }
         if (debug) {
-            const multiplierNote = isSecondaryAttacker ? ` (subdps x0.5)` : '';
+            const multiplierNote = (isSecondaryAttacker || isSecondaryAnomaly) ? ` (subdps x0.5)` : '';
             console.log(`    ${unit.name}: T${tier} → ${tierBonus >= 0 ? '+' : ''}${tierBonus}${multiplierNote}`);
         }
         
