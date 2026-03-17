@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ZZZ Deadly Assault Team Builder</title>
-    <link rel="icon" type="image/svg+xml" href="favicon.svg">
-    <link rel="stylesheet" href="style.css">
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+    <link rel="stylesheet" href="styles/style.css">
     <!-- Pako compression library for roster sharing -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
 </head>
@@ -46,9 +46,9 @@
     </div>
 
     <script type="module">
-        import { loadSharedComponents } from './lib/components.js';
+        import { loadSharedComponents } from './lib/common/components.js';
         loadSharedComponents('deadly-assault');
     </script>
-    <script type="module" src="deadly-assault.js"></script>
+    <script type="module" src="lib/pages/deadly-assault.js"></script>
 </body>
 </html>

@@ -358,8 +358,8 @@ Testing roster defined in `roster.json`.
 |----|----|
 | `app/public/deadly-assault.js` | Main page logic, diversity filter functions, display logic |
 | `app/public/deadly-assault.html` | Checkbox markup in results-header |
-| `app/public/lib/team-builder.js` | `findExclusiveCombinations` — TOP_N=20, priority formula, overlap checking |
-| `app/public/lib/team-scorer.js` | `scoreTeamForBoss`, `calculateDPSMixingPenalty` (double-rupture fix) |
+| `app/public/lib/common/team-builder.js` | `findExclusiveCombinations` — TOP_N=20, priority formula, overlap checking |
+| `app/public/lib/common/team-scorer.js` | `scoreTeamForBoss`, `calculateDPSMixingPenalty` (double-rupture fix) |
 | `app/public/team-recommendations.js` | Simpler single-boss `filterUniqueDps` for reference |
 | `engine-context.md` | Team composition rules, scoring guidelines, unit mechanics |
 | `app/public/data/units.json` | Unit definitions (tags, tier, synergy, join conditions) |

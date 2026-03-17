@@ -16,8 +16,8 @@ const DATA_DIR = join(__dirname, 'app','public', 'data');
 import {
     getTeams, sortTeamByRole, getTeamLabel,
     extendTeamsWithUniversalUnits, teamsOverlap
-} from './app/public/lib/team-builder.js';
-import { scoreTeamForBoss } from './app/public/lib/team-scorer.js';
+} from './app/public/lib/common/team-builder.js';
+import { scoreTeamForBoss } from './app/public/lib/common/team-scorer.js';
 
 const DISPLAY_LIMIT = 5;
 const ELEMENTS = ['fire', 'ice', 'electric', 'physical', 'ether'];

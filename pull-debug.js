@@ -23,7 +23,7 @@ async function main() {
     const {
         analyze, tierToQuality, qualityLabel, getBestTier, getUnitElement,
         isSubdps, capitalize, DPS_ARCHETYPES, ELEMENTS
-    } = await import('./app/public/lib/pull-engine.js');
+    } = await import('./app/public/lib/common/pull-engine.js');
     const { inflateSync } = await import('node:zlib');
 
     // ========================================================================

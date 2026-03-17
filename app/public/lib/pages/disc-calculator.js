@@ -3,7 +3,7 @@
  * Calculates the average number of discs needed to get a target configuration
  */
 
-import { CustomDropdown } from './lib/custom-dropdown.js';
+import { CustomDropdown } from '../common/custom-dropdown.js';
 
 // ============================================================================
 // DISC DATA CONSTANTS

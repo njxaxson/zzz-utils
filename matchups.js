@@ -10,8 +10,8 @@ async function main() {
     const { default: allUnits } = await import('./app/public/data/units.json', { with: { type: 'json' } });
     const { default: bosses } = await import('./app/public/data/bosses.json', { with: { type: 'json' } });
     const { default: myRoster } = await import('./roster.json', { with: { type: 'json' } });
-    const { getTeams, sortTeamByRole, getTeamLabel, extendTeamsWithUniversalUnits } = await import('./app/public/lib/team-builder.js');
-    const { scoreTeamForBoss } = await import('./app/public/lib/team-scorer.js');
+    const { getTeams, sortTeamByRole, getTeamLabel, extendTeamsWithUniversalUnits } = await import('./app/public/lib/common/team-builder.js');
+    const { scoreTeamForBoss } = await import('./app/public/lib/common/team-scorer.js');
     const { inflateSync } = await import('node:zlib');
 
     // ============================================================================

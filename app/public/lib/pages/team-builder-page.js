@@ -3,12 +3,12 @@
  * Generates and filters team combinations based on user roster and filters
  */
 
-import { getTeams, sortTeamByRole, getTeamLabel } from './lib/team-builder.js';
-import { scoreTeamForBoss, isDPS, isStun, isSupport, isDefense, getElement, ELEMENTS, DPS_ROLES } from './lib/team-scorer.js';
+import { getTeams, sortTeamByRole, getTeamLabel } from '../common/team-builder.js';
+import { scoreTeamForBoss, isDPS, isStun, isSupport, isDefense, getElement, ELEMENTS, DPS_ROLES } from '../common/team-scorer.js';
 import { 
     initRoster, getUnitStates, getAllUnits,
     getInitials, getUnitElement, getCharacterImageUrl
-} from './lib/roster-ui.js';
+} from '../common/roster-ui.js';
 
 // ============================================================================
 // CONSTANTS

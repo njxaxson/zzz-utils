@@ -17,8 +17,8 @@ async function main() {
         teamsOverlap,
         extendTeamsWithUniversalUnits,
         findExclusiveCombinations
-    } = await import('./app/public/lib/team-builder.js');
-    const { scoreTeamForBoss } = await import('./app/public/lib/team-scorer.js');
+    } = await import('./app/public/lib/common/team-builder.js');
+    const { scoreTeamForBoss } = await import('./app/public/lib/common/team-scorer.js');
     const { inflateSync } = await import('node:zlib');
 
     // ============================================================================

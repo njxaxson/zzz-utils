@@ -3,7 +3,7 @@
  * A styled, accessible dropdown replacement for native select elements
  * 
  * Usage:
- *   import { CustomDropdown } from './lib/custom-dropdown.js';
+ *   import { CustomDropdown } from './lib/common/custom-dropdown.js';
  *   
  *   const dropdown = new CustomDropdown({
  *     container: document.getElementById('my-container'),

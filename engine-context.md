@@ -1,7 +1,7 @@
 # Team Scoring Engine Context
 
 This file provides domain knowledge for the ZZZ team scoring algorithm.
-Reference when modifying `app/public/lib/team-scorer.js`.
+Reference when modifying `app/public/lib/common/team-scorer.js`.
 
 **Important:** `app/public/data/units.json` is the source of truth for tier rankings.
 This file captures gameplay mechanics and algorithm design decisions only. Also, although this document outlines some actual scoring numbers, this documenty exists for conceptual background purposes and is not intended to cover implementation details. So therefore any scoring numbers are simply illustrative and may actually differ in the latest implementation of the algorithm.  

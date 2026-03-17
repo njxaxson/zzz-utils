@@ -6,9 +6,9 @@
 import {
     initRoster, getUnitStates, getAllUnits,
     getInitials, getCharacterImageUrl
-} from './lib/roster-ui.js';
+} from '../common/roster-ui.js';
 
-import { analyze, getUnitElement } from './lib/pull-engine.js';
+import { analyze, getUnitElement } from '../common/pull-engine.js';
 
 // ============================================================================
 // DATA LOADING

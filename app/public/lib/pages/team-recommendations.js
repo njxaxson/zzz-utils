@@ -9,13 +9,13 @@ import {
     sortTeamByRole, 
     getTeamLabel,
     extendTeamsWithUniversalUnits
-} from './lib/team-builder.js';
-import { scoreTeamForBoss } from './lib/team-scorer.js';
-import { createStrengthLabelHtml } from './lib/strength-rating.js';
+} from '../common/team-builder.js';
+import { scoreTeamForBoss } from '../common/team-scorer.js';
+import { createStrengthLabelHtml } from '../common/strength-rating.js';
 import { 
     initRoster, getUnitStates, getAllUnits,
     getInitials, getUnitElement, getCharacterImageUrl, getUniversalUnitNames
-} from './lib/roster-ui.js';
+} from '../common/roster-ui.js';
 
 // ============================================================================
 // CONSTANTS

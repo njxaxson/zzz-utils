@@ -8,7 +8,7 @@ async function main() {
     // Dynamic imports for ES modules
     const { default: allUnits } = await import('./app/public/data/units.json', { with: { type: 'json' } });
     const { default: myRoster } = await import('./roster.json', { with: { type: 'json' } });
-    const { getTeams } = await import('./app/public/lib/team-builder.js');
+    const { getTeams } = await import('./app/public/lib/common/team-builder.js');
 
     // Filter to personal roster (or use allUnits for full roster)
     const units = allUnits.filter(u => myRoster.hasOwnProperty(u.name));

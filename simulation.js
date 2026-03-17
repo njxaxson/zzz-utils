@@ -1,7 +1,7 @@
 /**
  * ZZZ Gacha Simulator - Command Line Interface
  * 
- * Uses shared simulation logic from app/public/lib/gacha-core.js
+ * Uses shared simulation logic from app/public/lib/common/gacha-core.js
  * 
  * Usage: node simulation.js
  * 
@@ -15,7 +15,7 @@ async function main() {
         toLabel,
         toPercentage,
         runBatchSimulation
-    } = await import('./app/public/lib/gacha-core.js');
+    } = await import('./app/public/lib/common/gacha-core.js');
 
     // ============================================================================
     // CONFIGURATION - Edit these values

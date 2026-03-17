@@ -12,9 +12,9 @@ import {
     toLabel,
     toPercentage,
     runBatchSimulation
-} from './lib/gacha-core.js';
+} from '../common/gacha-core.js';
 
-import { replaceSelect } from './lib/custom-dropdown.js';
+import { replaceSelect } from '../common/custom-dropdown.js';
 
 // DOM Elements
 const polychromeInput = document.getElementById('polychrome');
