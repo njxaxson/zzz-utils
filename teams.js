@@ -2,72 +2,73 @@
  * Team Builder for Zenless Zone Zero
  * 
  * Generates valid team combinations based on unit join conditions.
+ * Edit the filter section below to customize results.
  */
 
+import { parseArgs } from './lib/cli.js';
+import { loadUnits, loadRoster } from './lib/data.js';
+import { applyShareUrl } from './lib/share-url.js';
+import { buildAvailableUnits } from './lib/roster-builder.js';
+import { getTeams } from './app/public/lib/common/team-builder.js';
+
+const options = parseArgs({
+    name: 'teams.js',
+    description: 'Generates valid team combinations with customizable filters.',
+    options: ['depth', 'onlyMine', 'preview', 'debug', 'units', 'exclude', 'include', 'flex', 'query'],
+    examples: [
+        '  node teams.js                     Full roster with hardcoded filters',
+        '  node teams.js -m                  Personal roster only',
+        '  node teams.js -u "Miyabi,Astra,Nicole"   Specific units'
+    ].join('\n')
+});
+
 async function main() {
-    // Dynamic imports for ES modules
-    const { default: allUnits } = await import('./app/public/data/units.json', { with: { type: 'json' } });
-    const { default: myRoster } = await import('./roster.json', { with: { type: 'json' } });
-    const { getTeams } = await import('./app/public/lib/common/team-builder.js');
+    const allUnits = await loadUnits();
+    const roster = await loadRoster();
 
-    // Filter to personal roster (or use allUnits for full roster)
-    const units = allUnits.filter(u => myRoster.hasOwnProperty(u.name));
-    // const units = [...allUnits]; // Uncomment to use full roster
+    applyShareUrl(options, allUnits);
 
-    // Developer-only: Add unreleased/hypothetical units for testing
-    // units.push({
-    //         "name" : "Estelle",
-    //         "rank" : "S",
-    //         "tags" : ["defense", "ether", "pubsec"],
-    //         "join" : ["attack", "ether", "pubsec"]
-    //     });
-    units.push({
-            "name" : "Ye Shunguong",
-            "rank" : "S",
-            "tags" : ["attack", "physical", "yunkui", "title"],
-            "join" : ["support", "defense"]
-        });
-    units.push({
-            "name" : "Zhao",
-            "rank" : "S",
-            "tags" : ["defense", "ice", "krampus"],
-            "join" : ["attack", "anomaly", "rupture"]
-        });
+    const { availableUnits } = buildAvailableUnits(allUnits, options, roster, {
+        extraUnits: [
+            // Developer-only: Add unreleased/hypothetical units for testing
+            // {
+            //     "name" : "Estelle",
+            //     "rank" : "S",
+            //     "tags" : ["defense", "ether", "pubsec"],
+            //     "join" : ["attack", "ether", "pubsec"]
+            // },
+        ]
+    });
 
-
-    const padding = Math.max(...units.map(unit => unit.name.length)) - 1; 
-
-    //now sort the list of teams by their team-name-as-string, so that we can iterate in order
-    const teams = getTeams(units);
+    const teams = getTeams(availableUnits);
     var labels = [];
-    for(let label in teams) {
+    for (let label in teams) {
         labels.push(label);
     }
     labels.sort();
 
-    //OK, teams are sorted and ready for final filtering 
-    const roster = new Map();
+    // ============================================================================
+    // FILTERING — Edit this section to customize results
+    // ============================================================================
+
+    const roster_map = new Map();
     labels.forEach(label => {
         var team = teams[label];
         let valid = true;
-          
-        //Basic filtering options:
-        valid = valid && (team.length == 3); //filter out pairs for now
-        valid = valid && team.some(unit => unit.rank == "S"); //filter out teams with no S rank
-        valid = valid && (team.some(unit => 
-            (unit.tags.includes("attack") || unit.tags.includes("anomaly") || unit.tags.includes("rupture")))); //filter out teams that have no DPS unit
 
-        //Filter out certain A-rank units, since they are not good enough to include: 
+        valid = valid && (team.length == 3);
+        valid = valid && team.some(unit => unit.rank == "S");
+        valid = valid && (team.some(unit =>
+            (unit.tags.includes("attack") || unit.tags.includes("anomaly") || unit.tags.includes("rupture"))));
+
         valid = valid && !team.some(unit => [
-            "Anby", 
+            "Anby",
             "Anton",
-            "Ben", 
+            "Ben",
             "Billy",
             "Corin",
             "Seth"
-        ].indexOf(unit.name) != -1); 
-        
-        //More customized filter options:
+        ].indexOf(unit.name) != -1);
 
         //valid = valid && team.every(unit => unit.tags.includes("fire"));
         //valid = valid && team.every(unit => unit.tags.includes("ice"));
@@ -79,28 +80,28 @@ async function main() {
         valid = valid && team.every(unit => unit.rank == "S");
         valid = valid && team.some(unit => unit.tags.includes("title"));
 
-        // valid = valid 
+        // valid = valid
         //     && (team.every(unit => unit.tags.includes("fire"))
         //     ||  team.every(unit => unit.tags.includes("ice"))
         //     ||  team.every(unit => unit.tags.includes("electric"))
         //     ||  team.every(unit => unit.tags.includes("ether"))
         //     ||  team.every(unit => unit.tags.includes("physical")));
 
-        valid = valid 
+        valid = valid
             && (team.filter(unit => unit.tags.includes("fire")    ).length >= 2
             ||  team.filter(unit => unit.tags.includes("ice")     ).length >= 2
             ||  team.filter(unit => unit.tags.includes("electric")).length >= 2
             ||  team.filter(unit => unit.tags.includes("ether")   ).length >= 2
             ||  team.filter(unit => unit.tags.includes("physical")).length >= 2);
 
-        if(valid) {
-            roster.set(label, team);
-        }   
+        if (valid) {
+            roster_map.set(label, team);
+        }
     });
 
     console.log("Total possible teams:         " + Object.keys(teams).length);
-    console.log("Filtered teams per criteria:  " + roster.size);
-    [...roster.keys()].forEach(label => console.log("  " + label));
+    console.log("Filtered teams per criteria:  " + roster_map.size);
+    [...roster_map.keys()].forEach(label => console.log("  " + label));
 }
 
 main().catch(console.error);

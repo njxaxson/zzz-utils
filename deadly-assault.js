@@ -5,176 +5,35 @@
  * ensuring no unit overlap and matching teams to boss requirements.
  */
 
+import { parseArgs } from './lib/cli.js';
+import { loadAllData } from './lib/data.js';
+import { applyShareUrl } from './lib/share-url.js';
+import { buildAvailableUnits } from './lib/roster-builder.js';
+import { filterBosses } from './lib/boss-filter.js';
+import { buildTeams } from './lib/team-pipeline.js';
+import { scoreTeamForBoss } from './app/public/lib/common/team-scorer.js';
+import { findExclusiveCombinations } from './app/public/lib/common/team-builder.js';
+
+const options = parseArgs({
+    name: 'deadly-assault.js',
+    description: 'Finds optimal non-overlapping team allocations for 3 DA bosses.',
+    examples: [
+        '  node deadly-assault.js -b butch,ucc,pomp       3 bosses by partial name',
+        '  node deadly-assault.js -b defiler,hunter,solo   Another combo',
+        '  node deadly-assault.js -m -b butch,ucc,pomp     Personal roster',
+        '  node deadly-assault.js -q "?roster=..." -10     Share URL, top 10'
+    ].join('\n')
+});
+
 async function main() {
-    // Dynamic imports for ES modules
-    const { default: allUnits } = await import('./app/public/data/units.json', { with: { type: 'json' } });
-    const { default: bosses } = await import('./app/public/data/bosses.json', { with: { type: 'json' } });
-    const { default: myRoster } = await import('./roster.json', { with: { type: 'json' } });
-    const { 
-        getTeams, 
-        sortTeamByRole, 
-        getTeamLabel,
-        teamsOverlap,
-        extendTeamsWithUniversalUnits,
-        findExclusiveCombinations
-    } = await import('./app/public/lib/common/team-builder.js');
-    const { scoreTeamForBoss } = await import('./app/public/lib/common/team-scorer.js');
-    const { inflateSync } = await import('node:zlib');
+    const { units: allUnits, bosses, roster } = await loadAllData();
+    applyShareUrl(options, allUnits);
 
     // ============================================================================
-    // COMMAND-LINE ARGUMENTS
+    // BOSS SELECTION
     // ============================================================================
 
-    function parseArgs() {
-        const args = process.argv.slice(2);
-        const options = {
-            bossFilter: null,   // Case-insensitive boss name filter (contains match)
-            depth: 5,           // Number of solution sets to display
-            onlyMine: false,    // Filter to personal roster units
-            preview: false,     // Include preview/unavailable units
-            debug: false,       // Enable debug logging for scoring
-            units: null,        // Comma-separated list of unit names (replaces roster)
-            exclude: null,      // Comma-separated list of unit names to exclude
-            include: null,      // Comma-separated list of unit names that must appear in solution
-            flex: null,         // Comma-separated list of flex/universal unit names
-            query: null         // Full query string from share URL (-q)
-        };
-        
-        for (let i = 0; i < args.length; i++) {
-            // Check for shorthand depth format: -5, -10, etc.
-            const depthMatch = args[i].match(/^-(\d+)$/);
-            if (depthMatch) {
-                options.depth = parseInt(depthMatch[1], 10);
-            } else if (args[i] === '--depth' && args[i + 1]) {
-                options.depth = parseInt(args[i + 1], 10);
-                i++;
-            } else if ((args[i] === '--bosses' || args[i] === '-b') && args[i + 1]) {
-                options.bossFilter = args[i + 1].toLowerCase();
-                i++;
-            } else if (args[i] === '--only-mine' || args[i] === '-m') {
-                options.onlyMine = true;
-            } else if (args[i] === '--preview' || args[i] === '-p') {
-                options.preview = true;
-            } else if (args[i] === '--debug' || args[i] === '-d') {
-                options.debug = true;
-            } else if ((args[i] === '--units' || args[i] === '-u') && args[i + 1]) {
-                options.units = args[i + 1].split(',').map(u => u.trim());
-                i++;
-            } else if ((args[i] === '--exclude' || args[i] === '-x') && args[i + 1]) {
-                options.exclude = args[i + 1].split(',').map(u => u.trim());
-                i++;
-            } else if ((args[i] === '--include' || args[i] === '-i') && args[i + 1]) {
-                options.include = args[i + 1].split(',').map(u => u.trim());
-                i++;
-            } else if ((args[i] === '--flex' || args[i] === '-f') && args[i + 1]) {
-                options.flex = args[i + 1].split(',').map(u => u.trim());
-                i++;
-            } else if ((args[i] === '--query' || args[i] === '-q') && args[i + 1]) {
-                options.query = args[i + 1];
-                i++;
-            }
-        }
-        
-        return options;
-    }
-
-    const CLI = parseArgs();
-    const DEBUG_MATCHUPS = CLI.debug;
-
-    // ============================================================================
-    // SHARE URL DECODING
-    // ============================================================================
-
-    function base64UrlDecodeNode(str) {
-        let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
-        while (base64.length % 4) base64 += '=';
-        return Buffer.from(base64, 'base64');
-    }
-
-    function decodeRosterFromParam(encoded) {
-        let deltaString;
-        try {
-            if (encoded.startsWith('u_')) {
-                deltaString = base64UrlDecodeNode(encoded.slice(2)).toString('utf8');
-            } else {
-                deltaString = inflateSync(base64UrlDecodeNode(encoded)).toString('utf8');
-            }
-        } catch (e) {
-            console.error('Failed to decode roster from share URL:', e.message);
-            process.exit(1);
-        }
-
-        const [ownedLimitedStr, notOwnedOthersStr, universalStr] = deltaString.split('|');
-        const ownedLimited = new Set(ownedLimitedStr ? ownedLimitedStr.split(',').filter(Boolean) : []);
-        const notOwnedOthers = new Set(notOwnedOthersStr ? notOwnedOthersStr.split(',').filter(Boolean) : []);
-        const universalSet = new Set(universalStr ? universalStr.split(',').filter(Boolean) : []);
-
-        const owned = [];
-        const universal = [];
-        for (const unit of allUnits) {
-            const defaultOwned = unit.rank === 'A' || (unit.rank === 'S' && !unit.limited);
-            let isOwned = defaultOwned;
-            if (ownedLimited.has(unit.id)) isOwned = true;
-            if (notOwnedOthers.has(unit.id)) isOwned = false;
-
-            if (isOwned) owned.push(unit.name);
-
-            const defaultUniversal = unit.id === 'nicole';
-            let isUniversal = defaultUniversal;
-            if (universalSet.has(unit.id)) isUniversal = true;
-
-            if (isOwned && isUniversal) universal.push(unit.name);
-        }
-
-        return { owned, universal };
-    }
-
-    function decodeShareUrl(input) {
-        const queryStart = input.indexOf('?');
-        const qs = queryStart >= 0 ? input.substring(queryStart + 1) : input;
-        const params = new URLSearchParams(qs);
-        const result = { units: null, universal: [], bosses: null };
-
-        const rosterParam = params.get('roster');
-        if (rosterParam) {
-            const decoded = decodeRosterFromParam(rosterParam);
-            result.units = decoded.owned;
-            result.universal = decoded.universal;
-        }
-
-        const bossesParam = params.get('bosses');
-        if (bossesParam) {
-            result.bosses = bossesParam.split(',').filter(Boolean);
-        }
-
-        return result;
-    }
-
-    if (CLI.query) {
-        if (CLI.units) {
-            console.error('Error: --query (-q) and --units (-u) are mutually exclusive.');
-            process.exit(1);
-        }
-        const decoded = decodeShareUrl(CLI.query);
-        if (decoded.units) {
-            CLI.units = decoded.units;
-            console.log(`Share URL roster: ${decoded.units.length} owned units`);
-        }
-        if (decoded.universal && decoded.universal.length > 0 && !CLI.flex) {
-            CLI.flex = decoded.universal;
-            console.log(`Share URL flex units: ${decoded.universal.join(', ')}`);
-        }
-        if (decoded.bosses && !CLI.bossFilter) {
-            CLI.bossFilter = decoded.bosses.join(',');
-        }
-    }
-
-    // ============================================================================
-    // CONFIGURATION
-    // ============================================================================
-
-    // Validate boss filter - must match exactly 3 bosses
-    if (!CLI.bossFilter) {
+    if (!options.bosses && !options.queryBosses) {
         console.error("ERROR: Boss filter required. Use --bosses/-b <filter> to specify bosses.");
         console.log("Example: node deadly-assault.js -b butch,ucc,pomp");
         console.log("\nAvailable bosses:");
@@ -182,22 +41,8 @@ async function main() {
         return;
     }
 
-    // Parse boss filter (comma-separated for multiple filters)
-    const bossFilters = CLI.bossFilter.split(',').map(f => f.trim().toLowerCase());
-    const SELECTED_BOSSES = [];
-    
-    for (const filter of bossFilters) {
-        const matches = bosses.filter(b => 
-            b.name.toLowerCase().includes(filter) ||
-            (b.shortName && b.shortName.toLowerCase().includes(filter)) ||
-            (b.id && b.id.toLowerCase().includes(filter))
-        );
-        for (const match of matches) {
-            if (!SELECTED_BOSSES.includes(match.name)) {
-                SELECTED_BOSSES.push(match.name);
-            }
-        }
-    }
+    const bossFilter = options.bosses || options.queryBosses?.join(',');
+    const SELECTED_BOSSES = filterBosses(bosses, bossFilter).map(b => b.name);
 
     if (SELECTED_BOSSES.length !== 3) {
         console.error(`ERROR: Boss filter must match exactly 3 bosses. Found ${SELECTED_BOSSES.length}:`);
@@ -209,48 +54,27 @@ async function main() {
         return;
     }
 
-    // Maximum number of team combinations to display
-    const RESULT_LIMIT = CLI.depth;
+    // ============================================================================
+    // CONFIGURATION
+    // ============================================================================
 
-    // Units to exclude from consideration
-    let EXCLUDED_UNITS = [];
-    if (CLI.exclude && CLI.exclude.length > 0) {
-        EXCLUDED_UNITS = CLI.exclude;
-        console.log(`Excluding units: ${EXCLUDED_UNITS.join(', ')}`);
-    }
-
-    // Log include requirement if specified
-    if (CLI.include && CLI.include.length > 0) {
-        console.log(`Solutions must include at least one of: ${CLI.include.join(', ')}`);
-    }
-
-    // Flex/universal units: Can join ANY 2-person team to form a 3-person team
-    const UNIVERSAL_UNITS = CLI.flex || ["Nicole"];
+    const DEBUG = options.debug;
 
     // Developer-only: Additional units not in units.json
-    // Useful for testing unreleased characters, characters you don't own, or hypothetical units
-    const DEVELOPER_UNITS = [
-        // {
-        //     "name" : "Ye Shunguong",
-        //     "rank" : "S",
-        //     "limited" : true,
-        //     "tier" : 0,
-        //     "tags" : ["attack", "physical", "yunkui", "title", "assist:defensive"],
-        //     "join" : ["support", "defense"],
-        //     "stat" : "M2W1",
-        //     "synergy" : { "units": ["Zhao", "Lucia"], "tags": [], "avoid": [] }
-        // },
-        // {
-        //     "name" : "Zhao",
-        //     "rank" : "S",
-        //     "limited" : true,
-        //     "tier" : 1.0,
-        //     "tags" : ["defense", "ice", "krampus", "assist:defensive"],
-        //     "join" : ["attack", "anomaly", "rupture"],
-        //     "stat" : "M0W0",
-        //     "synergy" : { "units": ["Ye Shunguong"], "tags": ["rupture"], "avoid": [] }
-        // },
-    ];
+    const DEVELOPER_UNITS = [];
+
+    if (options.include && options.include.length > 0) {
+        console.log(`Solutions must include at least one of: ${options.include.join(', ')}`);
+    }
+
+    const { availableUnits, universalUnits } = buildAvailableUnits(allUnits, options, roster, {
+        extraUnits: DEVELOPER_UNITS
+    });
+
+    if (DEBUG) {
+        const modeNote = options.units ? " (whitelist mode)" : (options.onlyMine ? " (personal roster)" : "");
+        console.log(`Using ${availableUnits.length} units${modeNote}\n`);
+    }
 
     // ============================================================================
     // TIER 0 SANITY CHECK
@@ -259,149 +83,98 @@ async function main() {
     const DPS_ROLES = ["attack", "anomaly", "rupture"];
     const ELEMENTS = ["fire", "ice", "electric", "physical", "ether"];
 
-    /**
-     * Analyzes a combination for Tier 0 unit utilization.
-     * Returns warnings/notes if key units are missing.
-     * 
-     * Rules:
-     * - Tier 0 supports should be used UNLESS their synergy.avoid conflicts with ALL teams
-     * - Tier 0 DPS should be used if their element matches any boss weakness (and not anti'd)
-     */
     function checkTier0Utilization(combination, availableUnits, selectedBosses, bosses) {
         const warnings = [];
         const notes = [];
-        
-        // Get all units used in this combination
+
         const usedUnits = new Set();
         for (const assignment of combination.assignments) {
             for (const unit of assignment.team) {
                 usedUnits.add(unit.name);
             }
         }
-        
-        // Get DPS types present in the combination
+
         const dpsTypesInCombo = new Set();
         for (const assignment of combination.assignments) {
             for (const unit of assignment.team) {
                 for (const role of DPS_ROLES) {
-                    if (unit.tags.includes(role)) {
-                        dpsTypesInCombo.add(role);
-                    }
+                    if (unit.tags.includes(role)) dpsTypesInCombo.add(role);
                 }
             }
         }
-        
-        // Get available Tier 0 units
+
         const tier0Units = availableUnits.filter(u => u.tier === 0);
         const tier0Supports = tier0Units.filter(u => u.tags.includes("support"));
         const tier0DPS = tier0Units.filter(u => DPS_ROLES.some(role => u.tags.includes(role)));
-        
-        // Check Tier 0 Supports
+
         for (const support of tier0Supports) {
             if (usedUnits.has(support.name)) continue;
-            
-            // Check if this support's synergy.avoid conflicts with ALL DPS types in combo
             const avoidTags = support.synergy?.avoid || [];
-            
+
             if (avoidTags.length === 0) {
-                // No restrictions - this support should definitely be used
                 warnings.push(`⚠️  ${support.name} (Tier 0 support, no restrictions) is not used`);
             } else {
-                // Check if there's ANY DPS type in combo that this support doesn't avoid
                 const canFitSomewhere = [...dpsTypesInCombo].some(dpsType => !avoidTags.includes(dpsType));
-                
                 if (canFitSomewhere) {
-                    // There's a team this support could join but wasn't used
                     const compatibleTypes = [...dpsTypesInCombo].filter(t => !avoidTags.includes(t));
                     warnings.push(`⚠️  ${support.name} (Tier 0 support) not used despite compatible teams (${compatibleTypes.join("/")})`);
                 }
-                // If canFitSomewhere is false, it's expected this support isn't used
             }
         }
-        
-        // Check Tier 0 DPS
+
         const bossData = selectedBosses.map(name => bosses.find(b => b.name === name));
-        
         for (const dps of tier0DPS) {
             if (usedUnits.has(dps.name)) continue;
-            
             const dpsElement = dps.tags.find(t => ELEMENTS.includes(t));
             const dpsType = dps.tags.find(t => DPS_ROLES.includes(t));
-            
-            // Find bosses that could use this DPS (weakness match + not anti'd)
+
             const matchingBosses = bossData.filter(boss => {
                 const weaknessMatch = boss.weaknesses.includes(dpsElement);
                 const notAnti = !boss.anti || !boss.anti.includes(dpsType);
                 return weaknessMatch && notAnti;
             });
-            
+
             if (matchingBosses.length > 0) {
-                const bossNames = matchingBosses.map(b => 
+                const bossNames = matchingBosses.map(b =>
                     b.name.replace("Notorious ", "").substring(0, 15)
                 ).join(", ");
                 notes.push(`ℹ️  ${dps.name} (Tier 0 ${dpsType}) not used but matches weakness for: ${bossNames}`);
             }
         }
-        
-        // Summary: count how many Tier 0 units are used
+
         const tier0Used = [...usedUnits].filter(name => {
             const unit = availableUnits.find(u => u.name === name);
             return unit && unit.tier === 0;
         }).length;
-        
         const tier0Available = tier0Units.length;
-        
-        return {
-            warnings,
-            notes,
-            tier0Used,
-            tier0Available,
-            usedUnits: [...usedUnits]
-        };
+
+        return { warnings, notes, tier0Used, tier0Available, usedUnits: [...usedUnits] };
     }
 
     // ============================================================================
     // DOMINANCE CHECK
     // ============================================================================
 
-    /**
-     * Checks if a combination is dominated by a better alternative.
-     * A combination is dominated if:
-     * - There exists a swap that includes a missing Tier 0 unit
-     * - AND the swap has a BETTER score than the current team
-     * - AND doesn't conflict with other teams
-     * 
-     * This is less aggressive than the original version which filtered
-     * any combination missing a Tier 0 unit.
-     */
     function isDominatedCombination(combination, viableTeamsByBoss, availableUnits) {
-        // Get all units used in this combination
         const usedUnitIds = new Set();
         for (const assignment of combination.assignments) {
             for (const unit of assignment.team) {
                 usedUnitIds.add(unit.id);
             }
         }
-        
-        // Get Tier 0 units that are NOT used
+
         const tier0Units = availableUnits.filter(u => u.tier === 0);
         const missingTier0 = tier0Units.filter(u => !usedUnitIds.has(u.id));
-        
-        if (missingTier0.length === 0) {
-            // All Tier 0 units are used - not dominated
-            return { dominated: false };
-        }
-        
-        // For each missing Tier 0 unit, check if we could IMPROVE by swapping them in
+
+        if (missingTier0.length === 0) return { dominated: false };
+
         for (const missingUnit of missingTier0) {
-            // For each boss assignment, check if there's a BETTER team with this unit
             for (let i = 0; i < combination.assignments.length; i++) {
                 const assignment = combination.assignments[i];
                 const bossName = assignment.boss;
                 const currentScore = assignment.score;
                 const viableTeams = viableTeamsByBoss[bossName] || [];
-                
-                // Get the other two teams' unit IDs (to check for conflicts)
+
                 const otherTeamUnitIds = new Set();
                 for (let j = 0; j < combination.assignments.length; j++) {
                     if (j !== i) {
@@ -410,23 +183,12 @@ async function main() {
                         }
                     }
                 }
-                
-                // Find a team for this boss that:
-                // 1. Contains the missing Tier 0 unit
-                // 2. Doesn't conflict with the other two teams
-                // 3. Has a BETTER score than the current team (strict improvement)
+
                 for (const candidateTeam of viableTeams) {
-                    // Must have better score to be a strict improvement
                     if (candidateTeam.score <= currentScore) continue;
-                    
-                    const hasUnit = candidateTeam.team.some(u => u.id === missingUnit.id);
-                    if (!hasUnit) continue;
-                    
-                    // Check for conflicts with other teams
-                    const hasConflict = candidateTeam.team.some(u => otherTeamUnitIds.has(u.id));
-                    if (hasConflict) continue;
-                    
-                    // Found a strictly better swap - this combination is dominated
+                    if (!candidateTeam.team.some(u => u.id === missingUnit.id)) continue;
+                    if (candidateTeam.team.some(u => otherTeamUnitIds.has(u.id))) continue;
+
                     return {
                         dominated: true,
                         reason: `Could use ${candidateTeam.label} (${candidateTeam.score}) for ${bossName.replace("Notorious ", "")} instead of ${assignment.label} (${currentScore}) to include ${missingUnit.name}`
@@ -434,36 +196,29 @@ async function main() {
                 }
             }
         }
-        
+
         return { dominated: false };
     }
-
-    // ============================================================================
-    // COMBINATION FINDER (uses shared functions from team-builder.js)
-    // ============================================================================
 
     // ============================================================================
     // MAIN EXECUTION
     // ============================================================================
 
     console.log("===== Deadly Assault Team Builder =====\n");
-    
-    // Validate selected bosses
+
     const selectedBossObjects = [];
     for (const bossName of SELECTED_BOSSES) {
         const boss = bosses.find(b => b.name === bossName);
         if (!boss) {
             console.error(`ERROR: Boss "${bossName}" not found in bosses.json`);
-            console.log("Available bosses:");
-            bosses.forEach(b => console.log(`  - ${b.name}`));
             return;
         }
         selectedBossObjects.push(boss);
     }
-    
+
     console.log("Selected Bosses:");
     for (const boss of selectedBossObjects) {
-        if (DEBUG_MATCHUPS) {
+        if (DEBUG) {
             const weakStr = boss.weaknesses.join(", ") || "none";
             const resStr = boss.resistances.join(", ") || "none";
             const shillStr = boss.shill || "none";
@@ -474,128 +229,54 @@ async function main() {
         }
     }
     console.log();
-    
-    // Build roster based on CLI options
-    let availableUnits;
-    
-    if (CLI.units && CLI.units.length > 0) {
-        // --units/-u: Use specified units only (replaces full roster)
-        availableUnits = allUnits.filter(u => CLI.units.includes(u.name));
-        console.log(`Unit whitelist: ${CLI.units.join(', ')}`);
-    } else {
-        // Default: use all units
-        availableUnits = [...allUnits];
-    }
-    
-    // Add developer units if any
-    if (DEVELOPER_UNITS && DEVELOPER_UNITS.length > 0) {
-        availableUnits = availableUnits.concat(DEVELOPER_UNITS);
-        if (DEBUG_MATCHUPS) console.log(`Developer units added: ${DEVELOPER_UNITS.map(u => u.name).join(", ")}`);
-    }
-    
-    // --only-mine/-m: Filter to personal roster (applied on top of other filters)
-    if (CLI.onlyMine) {
-        const beforeCount = availableUnits.length;
-        availableUnits = availableUnits.filter(u => myRoster.hasOwnProperty(u.name));
-        console.log(`Personal roster filter: ${availableUnits.length} units (from ${beforeCount})`);
-    }
-    
-    // --preview/-p: Filter out unavailable units unless preview flag is set
-    if (!CLI.preview) {
-        const beforeCount = availableUnits.length;
-        availableUnits = availableUnits.filter(u => u.available !== false);
-        const filteredCount = beforeCount - availableUnits.length;
-        if (filteredCount > 0) {
-            console.log(`Filtered out ${filteredCount} preview/unavailable unit(s) (use --preview to include)`);
-        }
-    }
-    
-    // --exclude/-x: Apply blacklist
-    availableUnits = availableUnits.filter(u => !EXCLUDED_UNITS.includes(u.name));
-    
-    if (DEBUG_MATCHUPS) {
-        const modeNote = CLI.units ? " (whitelist mode)" : (CLI.onlyMine ? " (personal roster)" : "");
-        console.log(`Using ${availableUnits.length} units${modeNote}\n`);
-    }
-    
-    // Generate all valid teams (includes 2-person and 3-person teams)
-    const allTeams = getTeams(availableUnits);
-    
-    // Separate 2-person and 3-person teams
-    // Labels from getTeams() are already normalized by role order
-    const twoCharTeams = {};
-    const threeCharTeams = {};
-    for (const label in allTeams) {
-        const team = allTeams[label];
-        if (team.length === 2) {
-            twoCharTeams[label] = team;
-        } else if (team.length === 3) {
-            threeCharTeams[label] = team;
-        }
-    }
-    
-    // Extend 2-person teams with universal units
-    const universalUnitObjects = availableUnits.filter(u => UNIVERSAL_UNITS.includes(u.name));
-    
+
+    const { threeCharTeams, teamLabels, extendedCount, universalUnitObjects } = buildTeams(availableUnits, universalUnits);
+
     if (universalUnitObjects.length > 0) {
-        if (DEBUG_MATCHUPS) console.log(`Universal units: ${universalUnitObjects.map(u => u.name).join(", ")}`);
-        
-        const extendedTeamCount = extendTeamsWithUniversalUnits(twoCharTeams, threeCharTeams, universalUnitObjects);
-        
-        if (DEBUG_MATCHUPS && extendedTeamCount > 0) {
-            console.log(`Extended ${extendedTeamCount} teams using universal units`);
-        }
+        if (DEBUG) console.log(`Universal units: ${universalUnitObjects.map(u => u.name).join(", ")}`);
+        if (DEBUG && extendedCount > 0) console.log(`Extended ${extendedCount} teams using universal units`);
     }
-    
-    const teamLabels = Object.keys(threeCharTeams);
-    if (DEBUG_MATCHUPS) console.log(`Total 3-character teams: ${teamLabels.length}\n`);
-    
+    if (DEBUG) console.log(`Total 3-character teams: ${teamLabels.length}\n`);
+
     // Score teams for each boss
     const viableTeamsByBoss = {};
-    const lenientBosses = []; // Track bosses that needed fallback mode
-    
+    const lenientBosses = [];
+
     for (const boss of selectedBossObjects) {
         viableTeamsByBoss[boss.name] = [];
-        
-        // First pass: normal scoring
+
         for (const label of teamLabels) {
             const team = threeCharTeams[label];
-            const score = scoreTeamForBoss(team, boss, { debug: CLI.debug });
-            
+            const score = scoreTeamForBoss(team, boss, { debug: options.debug });
             if (score > 0) {
                 viableTeamsByBoss[boss.name].push({ label, team, score });
             }
         }
-        
-        // Fallback: if no viable teams, rescore with lenient mode
+
         if (viableTeamsByBoss[boss.name].length === 0) {
             lenientBosses.push(boss.name);
             for (const label of teamLabels) {
                 const team = threeCharTeams[label];
-                const score = scoreTeamForBoss(team, boss, { lenient: true, debug: CLI.debug });
-                
+                const score = scoreTeamForBoss(team, boss, { lenient: true, debug: options.debug });
                 if (score > 0) {
                     viableTeamsByBoss[boss.name].push({ label, team, score, lenient: true });
                 }
             }
         }
-        
-        // Sort by score descending
+
         viableTeamsByBoss[boss.name].sort((a, b) => b.score - a.score);
-        
-        if (DEBUG_MATCHUPS) {
+        if (DEBUG) {
             const lenientNote = lenientBosses.includes(boss.name) ? " (LENIENT)" : "";
             console.log(`${boss.name}: ${viableTeamsByBoss[boss.name].length} viable teams${lenientNote}`);
         }
     }
-    
+
     if (lenientBosses.length > 0) {
         console.log(`⚠️  No on-element DPS for: ${lenientBosses.join(", ")} - using fallback mode`);
     }
-    if (DEBUG_MATCHUPS) console.log();
-    
-    // Display top teams per boss for verification (debug mode only)
-    if (DEBUG_MATCHUPS) {
+    if (DEBUG) console.log();
+
+    if (DEBUG) {
         console.log("===== Top Teams Per Boss =====\n");
         const TOP_DISPLAY = 7;
         for (const boss of selectedBossObjects) {
@@ -607,68 +288,56 @@ async function main() {
             console.log();
         }
     }
-    
+
     // Find exclusive combinations
     let combinations = findExclusiveCombinations(viableTeamsByBoss, SELECTED_BOSSES);
     const totalCombos = combinations.length;
-    
-    // --include/-i: Filter to combinations that include at least one required unit
-    if (CLI.include && CLI.include.length > 0) {
+
+    if (options.include && options.include.length > 0) {
         const beforeIncludeFilter = combinations.length;
         combinations = combinations.filter(combo => {
-            // Get all units in this solution set
             const allUnitsInSolution = new Set();
             for (const assignment of combo.assignments) {
                 for (const unit of assignment.team) {
                     allUnitsInSolution.add(unit.name);
                 }
             }
-            // Check if at least one required unit is present
-            return CLI.include.some(requiredUnit => allUnitsInSolution.has(requiredUnit));
+            return options.include.some(req => allUnitsInSolution.has(req));
         });
-        const includeFilteredCount = beforeIncludeFilter - combinations.length;
-        if (DEBUG_MATCHUPS && includeFilteredCount > 0) {
-            console.log(`Include filter removed ${includeFilteredCount} combinations`);
+        if (DEBUG && beforeIncludeFilter - combinations.length > 0) {
+            console.log(`Include filter removed ${beforeIncludeFilter - combinations.length} combinations`);
         }
     }
-    
-    // Filter out dominated combinations
-    // A combo is dominated if we could swap in a team with more Tier 0 units without conflicts
+
     combinations = combinations.filter(combo => {
         const result = isDominatedCombination(combo, viableTeamsByBoss, availableUnits);
         combo.dominanceCheck = result;
         return !result.dominated;
     });
-    
+
     const dominatedCount = totalCombos - combinations.length;
-    
-    // Apply sanity check for remaining combinations
+
     for (const combo of combinations) {
         const check = checkTier0Utilization(combo, availableUnits, SELECTED_BOSSES, bosses);
         combo.sanityCheck = check;
-        
-        // Add penalty for warnings (unused Tier 0 support with no excuse)
         combo.priority += check.warnings.length * 1000;
     }
-    
-    // Re-sort with sanity penalties applied
+
     combinations.sort((a, b) => {
-        if (a.priority !== b.priority) {
-            return a.priority - b.priority;
-        }
+        if (a.priority !== b.priority) return a.priority - b.priority;
         return b.totalScore - a.totalScore;
     });
-    
-    if (DEBUG_MATCHUPS) {
+
+    if (DEBUG) {
         console.log(`Found ${combinations.length} valid team allocations (${dominatedCount} dominated removed)\n`);
     }
-    
+
     if (combinations.length === 0) {
         console.log('⚠️ No non-overlapping combinations found — retrying all bosses in lenient mode...');
         for (const boss of selectedBossObjects) {
             for (const label of teamLabels) {
                 const team = threeCharTeams[label];
-                const score = scoreTeamForBoss(team, boss, { lenient: true, debug: CLI.debug });
+                const score = scoreTeamForBoss(team, boss, { lenient: true, debug: options.debug });
                 if (score <= 0) continue;
 
                 const existing = viableTeamsByBoss[boss.name].find(t => t.label === label);
@@ -684,7 +353,6 @@ async function main() {
         }
 
         combinations = findExclusiveCombinations(viableTeamsByBoss, SELECTED_BOSSES);
-        const lenientDominated = totalCombos;
         combinations = combinations.filter(combo => {
             const result = isDominatedCombination(combo, viableTeamsByBoss, availableUnits);
             combo.dominanceCheck = result;
@@ -706,42 +374,35 @@ async function main() {
             return;
         }
     }
-    
+
     // Display results
-    const displayCount = Math.min(RESULT_LIMIT, combinations.length);
+    const displayCount = Math.min(options.depth, combinations.length);
     console.log(`===== Top ${displayCount} Team Allocations =====\n`);
-    
+
     for (let i = 0; i < displayCount; i++) {
         const combo = combinations[i];
         const ranksUsed = combo.assignments.map(a => a.rank).join('+');
         console.log(`Combination #${i + 1} (Ranks: ${ranksUsed}, Total: ${combo.totalScore.toFixed(0)})`);
-        
+
         for (const assignment of combo.assignments) {
-            // Shorten boss name for display
             const shortBoss = assignment.boss.replace("Notorious ", "").substring(0, 20).padEnd(20);
             console.log(`  ${shortBoss}: [#${assignment.rank}] ${assignment.label} (${assignment.score})`);
         }
-        
-        // Display cached sanity check results
+
         const check = combo.sanityCheck;
-        
         if (check.warnings.length > 0 || check.notes.length > 0) {
             console.log(`  --- Tier 0 Check (${check.tier0Used}/${check.tier0Available} used) ---`);
-            for (const warning of check.warnings) {
-                console.log(`  ${warning}`);
-            }
-            for (const note of check.notes) {
-                console.log(`  ${note}`);
-            }
+            for (const warning of check.warnings) console.log(`  ${warning}`);
+            for (const note of check.notes) console.log(`  ${note}`);
         } else {
             console.log(`  ✓ Tier 0 utilization: ${check.tier0Used}/${check.tier0Available}`);
         }
-        
+
         console.log();
     }
-    
-    if (combinations.length > RESULT_LIMIT) {
-        console.log(`... and ${combinations.length - RESULT_LIMIT} more combinations.`);
+
+    if (combinations.length > options.depth) {
+        console.log(`... and ${combinations.length - options.depth} more combinations.`);
         console.log(`Use --depth or -N to see more (e.g., -10 for top 10).`);
     }
 }

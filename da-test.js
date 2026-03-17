@@ -1,18 +1,13 @@
 #!/usr/bin/env node
 /**
  * CLI tool for testing Deadly Assault diversity algorithm.
- * Usage: node da-test.js <boss1> <boss2> <boss3>
- * Example: node da-test.js defiler hunter vesper
+ * Runs predefined or custom boss combinations and displays diverse strategy results.
  */
 
-import { readFile } from 'fs/promises';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
-import { inflateSync } from 'zlib';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = join(__dirname, 'app','public', 'data');
-
+import { parseArgs } from './lib/cli.js';
+import { loadUnits, loadBosses, loadRoster } from './lib/data.js';
+import { applyShareUrl } from './lib/share-url.js';
+import { buildAvailableUnits } from './lib/roster-builder.js';
 import {
     getTeams, sortTeamByRole, getTeamLabel,
     extendTeamsWithUniversalUnits, teamsOverlap
@@ -25,95 +20,26 @@ const PER_BOSS_FLOOR_RATIO = 0.5;
 const MIN_RESULTS_BEFORE_FLOOR = 3;
 const BUCKET_CAP = 15;
 
-// ============================================================================
-// DATA LOADING
-// ============================================================================
+const TEST_CASES = {
+    A: ['defiler', 'hunter', 'vesper'],
+    B: ['butcher', 'pompey', 'thrall'],
+    C: ['typhon', 'fiend', 'ucc']
+};
 
-async function loadJson(path) {
-    const raw = await readFile(path, 'utf-8');
-    return JSON.parse(raw);
-}
-
-function base64UrlDecodeNode(str) {
-    let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
-    while (base64.length % 4) base64 += '=';
-    return Buffer.from(base64, 'base64');
-}
-
-function decodeRosterFromParam(encoded, allUnits) {
-    let deltaString;
-    try {
-        if (encoded.startsWith('u_')) {
-            deltaString = base64UrlDecodeNode(encoded.slice(2)).toString('utf8');
-        } else {
-            deltaString = inflateSync(base64UrlDecodeNode(encoded)).toString('utf8');
-        }
-    } catch (e) {
-        console.error('Failed to decode roster from share URL:', e.message);
-        process.exit(1);
-    }
-
-    const [ownedLimitedStr, notOwnedOthersStr, universalStr] = deltaString.split('|');
-    const ownedLimited = new Set(ownedLimitedStr ? ownedLimitedStr.split(',').filter(Boolean) : []);
-    const notOwnedOthers = new Set(notOwnedOthersStr ? notOwnedOthersStr.split(',').filter(Boolean) : []);
-    const universalSet = new Set(universalStr ? universalStr.split(',').filter(Boolean) : []);
-
-    const owned = [];
-    const universal = [];
-    for (const unit of allUnits) {
-        const defaultOwned = unit.rank === 'A' || (unit.rank === 'S' && !unit.limited);
-        let isOwned = defaultOwned;
-        if (ownedLimited.has(unit.id)) isOwned = true;
-        if (notOwnedOthers.has(unit.id)) isOwned = false;
-        if (isOwned) owned.push(unit);
-        if (isOwned && universalSet.has(unit.id)) universal.push(unit.name);
-    }
-    return { owned, universal };
-}
-
-function decodeShareUrl(input, allUnits) {
-    const queryStart = input.indexOf('?');
-    const qs = queryStart >= 0 ? input.substring(queryStart + 1) : input;
-    const params = new URLSearchParams(qs);
-    const result = { units: null, universal: [], bosses: null };
-
-    const rosterParam = params.get('roster');
-    if (rosterParam) {
-        const decoded = decodeRosterFromParam(rosterParam, allUnits);
-        result.units = decoded.owned;
-        result.universal = decoded.universal;
-    }
-
-    const bossesParam = params.get('bosses');
-    if (bossesParam) {
-        result.bosses = bossesParam.split(',').filter(Boolean);
-    }
-
-    return result;
-}
-
-async function loadData(query) {
-    const allUnits = await loadJson(join(DATA_DIR, 'units.json'));
-    const bosses = await loadJson(join(DATA_DIR, 'bosses.json'));
-
-    if (query) {
-        const decoded = decodeShareUrl(query, allUnits);
-        console.log(`Share URL roster: ${decoded.units.length} owned units`);
-        if (decoded.universal.length > 0) {
-            console.log(`Share URL flex units: ${decoded.universal.join(', ')}`);
-        }
-        return { units: decoded.units, bosses, queryBosses: decoded.bosses };
-    }
-
-    const roster = await loadJson(join(__dirname, 'roster.json'));
-    const rosterNames = new Set(Object.keys(roster));
-    const ownedUnits = allUnits.filter(u => rosterNames.has(u.name));
-
-    return { units: ownedUnits, bosses, queryBosses: null };
-}
+const options = parseArgs({
+    name: 'da-test.js',
+    description: 'Tests Deadly Assault diversity algorithm with predefined or custom boss combos.',
+    positional: '[A|B|C|ALL | <boss1> <boss2> <boss3>]',
+    examples: [
+        '  node da-test.js A                        Run test case A',
+        '  node da-test.js defiler hunter solo       Custom boss IDs',
+        '  node da-test.js ALL                       Run all test cases',
+        '  node da-test.js -q "?roster=..." -d       From share URL, debug mode'
+    ].join('\n')
+});
 
 // ============================================================================
-// ALGORITHM (mirrors deadly-assault.js)
+// ALGORITHM
 // ============================================================================
 
 function isPrimaryDps(u) {
@@ -158,7 +84,6 @@ function findDiverseStrategies(viableTeamsByBoss, bossNames, limit) {
     }
 
     const bucketKeys = bossNames.map(bn => [...bucketsByBoss[bn].keys()]);
-
     const strategies = [];
 
     for (const fp0 of bucketKeys[0]) {
@@ -202,7 +127,6 @@ function findDiverseStrategies(viableTeamsByBoss, bossNames, limit) {
         }
     }
 
-    // Phase 3: Greedy diversity-aware selection
     strategies.sort((a, b) => b.totalScore - a.totalScore);
     if (strategies.length === 0) return { selected: [], totalStrategies: 0, candidateCount: 0, perBossFloor: 0 };
 
@@ -211,7 +135,6 @@ function findDiverseStrategies(viableTeamsByBoss, bossNames, limit) {
     const perBossFloor = avgBossScore * PER_BOSS_FLOOR_RATIO;
 
     const selected = [best];
-
     const allCandidates = strategies.slice(1);
 
     const seenDpsPerBoss = bossNames.map(() => new Set());
@@ -439,50 +362,35 @@ function formatResults(results) {
 // MAIN
 // ============================================================================
 
-const TEST_CASES = {
-    A: ['defiler', 'hunter', 'vesper'],
-    B: ['butcher', 'pompey', 'thrall'],
-    C: ['typhon', 'fiend', 'ucc']
-};
-
 async function main() {
-    const args = process.argv.slice(2);
+    const allUnits = await loadUnits();
+    const allBosses = await loadBosses();
+    const roster = await loadRoster();
 
-    const debugMode = args.includes('--debug');
-    let query = null;
-    const filteredArgs = [];
-    for (let i = 0; i < args.length; i++) {
-        if (args[i] === '--debug') continue;
-        if ((args[i] === '-q' || args[i] === '--query') && args[i + 1]) {
-            query = args[i + 1];
-            i++;
-        } else {
-            filteredArgs.push(args[i]);
-        }
-    }
+    applyShareUrl(options, allUnits);
 
-    const { units, bosses, queryBosses } = await loadData(query);
-    console.log(`Loaded ${units.length} owned units`);
+    const { availableUnits } = buildAvailableUnits(allUnits, options, roster);
+    console.log(`Loaded ${availableUnits.length} owned units`);
 
     let casesToRun = [];
 
-    if (queryBosses && filteredArgs.length === 0) {
-        casesToRun = [['Query', queryBosses]];
-    } else if (filteredArgs.length === 0 || filteredArgs[0]?.toUpperCase() === 'ALL') {
+    if (options.queryBosses && options.positional.length === 0) {
+        casesToRun = [['Query', options.queryBosses]];
+    } else if (options.positional.length === 0 || options.positional[0]?.toUpperCase() === 'ALL') {
         casesToRun = Object.entries(TEST_CASES);
-    } else if (filteredArgs.length === 1 && TEST_CASES[filteredArgs[0].toUpperCase()]) {
-        casesToRun = [[filteredArgs[0].toUpperCase(), TEST_CASES[filteredArgs[0].toUpperCase()]]];
-    } else if (filteredArgs.length === 3) {
-        casesToRun = [['Custom', filteredArgs.map(a => a.toLowerCase())]];
+    } else if (options.positional.length === 1 && TEST_CASES[options.positional[0].toUpperCase()]) {
+        casesToRun = [[options.positional[0].toUpperCase(), TEST_CASES[options.positional[0].toUpperCase()]]];
+    } else if (options.positional.length === 3) {
+        casesToRun = [['Custom', options.positional.map(a => a.toLowerCase())]];
     } else {
-        console.log('Usage: node da-test.js [A|B|C|ALL] [--debug]');
-        console.log('       node da-test.js <boss1> <boss2> <boss3> [--debug]');
-        console.log('       node da-test.js -q "<share-url-query>" [--debug]');
+        console.log('Usage: node da-test.js [A|B|C|ALL] [options]');
+        console.log('       node da-test.js <boss1> <boss2> <boss3> [options]');
         console.log('\nTest cases:');
         for (const [key, ids] of Object.entries(TEST_CASES)) {
             console.log(`  ${key}: ${ids.join(', ')}`);
         }
         console.log('\nBoss IDs: defiler, hunter, vesper, butcher, pompey, thrall, typhon, fiend, ucc, marionettes, bringer, priest, nightmare');
+        console.log('\nUse --help for all options.');
         process.exit(1);
     }
 
@@ -490,7 +398,7 @@ async function main() {
         console.log(`\n${'='.repeat(70)}`);
         console.log(`TEST ${label}`);
         console.log('='.repeat(70));
-        const results = calculateOptimalTeams(units, bosses, bossIds, debugMode);
+        const results = calculateOptimalTeams(availableUnits, allBosses, bossIds, options.debug);
         console.log(formatResults(results));
     }
 }
