@@ -326,25 +326,24 @@ function buildSynergyLine(unit) {
     }
 
     if (unit.synergy) {
-        const { units, tags, avoid } = unit.synergy;
+        const { units, tags } = unit.synergy;
 
-        const withParts = [];
-        if (units && units.length > 0) {
-            withParts.push(...units.map(u => `<span class="unit-ref">${cap(u)}</span>`));
-        }
-        const meaningfulTags = (tags || []).filter(t => t !== 'subdps' && t !== 'stunless');
-        if (meaningfulTags.length > 0) {
-            withParts.push(...meaningfulTags.map(t => `${cap(t)} agents`));
-        }
-        if (withParts.length > 0) {
-            parts.push(`Works well with ${withParts.join(', ')}.`);
-        }
+        const archetypeTags = (tags || []).filter(t =>
+            !ELEMENTS.includes(t) && t !== 'subdps' && t !== 'stunless'
+        );
+        const unitNames = (units && units.length > 0) ? units.map(u => cap(u)).join(', ') : null;
+        const archDescriptions = archetypeTags.map(t => `${cap(t)} agents`);
 
-        if (tags && tags.includes('stunless')) {
-            parts.push('Prefers teams without Stunners.');
-        }
-        if (avoid && avoid.length > 0) {
-            parts.push(`Avoid ${avoid.map(cap).join(', ')} units.`);
+        if (unitNames || archDescriptions.length > 0) {
+            const allParts = [];
+            if (unitNames) {
+                const trailing = archDescriptions.length > 0 ? ',' : '.';
+                allParts.push(`<span class="unit-ref">${unitNames}${trailing}</span>`);
+            }
+            if (archDescriptions.length > 0) {
+                allParts.push(archDescriptions.join(', ') + '.');
+            }
+            parts.push(`Works well with ${allParts.join(' ')}`);
         }
     }
 
