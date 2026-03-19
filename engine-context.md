@@ -227,7 +227,7 @@ pattern to any anomaly DPS with named synergy connections.
 **Harumasa** - Monoshock Composition
 - Has `synergy.tags: ["anomaly"]`
 - Monoshock requires ALL THREE team members to share the same element
-- Valid: Grace/Harumasa/Rina (all electric), Trigger/Grace/Harumasa (all electric)
+- Valid: Grace/Harumasa/Rina (all electric), Trigger/Yanagi/Harumasa (all electric)
 - Invalid: Yanagi/Harumasa/Astra (Astra is ether, not electric)
 - Two composition patterns (both require same-element third):
   - Stun/Anomaly/Attack (e.g., Trigger/Grace/Harumasa) - stunner provides damage windows, anomaly as pseudo-support (+56 bonus)
@@ -511,6 +511,8 @@ Key scenarios that exercise distinct algorithm paths:
 - Subdps attacker with other attacker: 50% tier multiplier
 
 ## DPS Bucketing and Diversity Selection
+
+(This section does not describe the algorithm in team-scorer.js, but rather describes the algorithm in app/public/lib/common/dps-buckets.js, which uses the scores as inputs.)
 
 When optimizing 3 teams for Deadly Assault's 3 bosses, the top results by raw score tend to be near-identical — often the same DPS units with minor support or stunner variations. Showing the player five "options" that only differ by swapping one support for another is not useful.
 

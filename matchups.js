@@ -136,7 +136,8 @@ async function main() {
             previousScore = t.score;
 
             const allInRoster = t.team.every(unit => myUnits.some(u => u.name === unit.name));
-            const rosterIndicator = allInRoster ? '✓' : ' ';
+            const hasPreview = t.team.some(unit => unit.available === false);
+            const rosterIndicator = allInRoster ? '✓' : hasPreview ? '★' : ' ';
             const teamNum = String(currentRank).padStart(2, ' ');
             console.log(`    #${teamNum}: ${rosterIndicator} ${t.label} (${t.score.toFixed(1)})`);
         });
