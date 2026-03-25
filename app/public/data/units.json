@@ -609,7 +609,7 @@
         "rank": "S",
         "limited": true,
         "tier": 1.5,
-        "tags": ["attack", "ether", "pubsec", "assist:defensive"],
+        "tags": ["attack", "ether", "pubsec", "assist:evasive"],
         "join": ["support", "pubsec"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "faction": "PubSec"
