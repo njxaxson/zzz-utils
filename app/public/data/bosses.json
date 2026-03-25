@@ -154,8 +154,21 @@
         "shill": "anomaly",
         "anti": ["rupture"],
         "assists": 2,
-        "favored": ["Aria", "Sunna"],
+        "favored": ["Aria", "Sunna", "Nangong"],
         "shillIntensity": 2
+    },
+    {
+        "id": "sweeper",
+        "name": "Sanguine Sweeper",
+        "shortName": "Sanguine Sweeper",
+        "image": "./assets/bosses/sweeper.webp",
+        "weaknesses": ["electric", "ether"],
+        "resistances": ["fire"],
+        "shill": "",
+        "anti": ["rupture"],
+        "assists": 2,
+        "favored": [],
+        "available": false
     }
 ]
 
