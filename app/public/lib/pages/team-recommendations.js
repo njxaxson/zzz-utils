@@ -16,13 +16,13 @@ import {
     initRoster, getUnitStates, getAllUnits,
     getInitials, getUnitElement, getCharacterImageUrl, getUniversalUnitNames
 } from '../common/roster-ui.js';
+import { ELEMENTS, DPS_ROLES } from '../common/constants.js';
 
 // ============================================================================
 // CONSTANTS
 // ============================================================================
 
-const DPS_ARCHETYPES = ['attack', 'anomaly', 'rupture'];
-const ELEMENTS = ['fire', 'ice', 'electric', 'physical', 'ether'];
+const DPS_ARCHETYPES = DPS_ROLES;
 const MIN_UNITS_REQUIRED = 3;
 const PAGE_STORAGE_KEY = 'zzz-team-recommendations';
 

@@ -1,12 +1,11 @@
 import { getElement, isSRank, isLimited, isARank } from '../common/team-scorer.js';
+import { ELEMENTS } from '../common/constants.js';
 
 let allUnits = [];
 let filters = { rank: [], element: [], role: [], faction: [], tier: [], owned: false };
 
 const FILTERS_STORAGE_KEY = 'zzz-char-summary-filters';
 const ROSTER_STORAGE_KEY = 'zzz-roster';
-
-const ELEMENTS = ['fire', 'ice', 'electric', 'physical', 'ether'];
 const ROLES = ['attack', 'stun', 'anomaly', 'support', 'defense', 'rupture'];
 
 const FACTION_MAP = {

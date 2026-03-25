@@ -4,8 +4,10 @@
  * Used by both the web UI (pull-recommendations.js) and CLI debug tool (pull-debug.js).
  */
 
-export const DPS_ARCHETYPES = ['attack', 'anomaly', 'rupture'];
-export const ELEMENTS = ['fire', 'ice', 'electric', 'physical', 'ether'];
+import { ELEMENTS, DPS_ROLES } from './constants.js';
+
+export { ELEMENTS };
+export const DPS_ARCHETYPES = DPS_ROLES;
 
 // ============================================================================
 // HELPERS

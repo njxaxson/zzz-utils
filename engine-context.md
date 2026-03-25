@@ -440,7 +440,9 @@ Current mutual synergy pairs:
   "anti": ["rupture"],
   "assists": 0,
   "favored": ["Aria", "Sunna"],
-  "shillIntensity": 2
+  "shillIntensity": 2,
+  "available" : true
+
 }
 ```
 
@@ -449,6 +451,7 @@ Current mutual synergy pairs:
   values mean the boss fight is more heavily skewed toward its favored units.
   Currently only affects favored bonus; designed to be extensible to also amplify
   shill match/mismatch penalties in the future.
+- `available` - (optional, default `true`) When `false`, the boss is unreleased and cannot be selected in the production deployment. Unreleased bosses are added to `bosses.json` with preliminary data so the scoring algorithm can be tested against them before their release.
 
 ### Specialist Detection
 

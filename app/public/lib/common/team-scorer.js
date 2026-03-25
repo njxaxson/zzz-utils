@@ -5,14 +5,15 @@
  * Browser-compatible ES module version
  */
 
+import { ELEMENTS, DPS_ROLES } from './constants.js';
+
 // ============================================================================
 // CONSTANTS
 // ============================================================================
 
-export const DPS_ROLES = ["attack", "anomaly", "rupture"];
+export { ELEMENTS, DPS_ROLES };
 export const SUPPORT_ROLE = "support";
 export const NON_DPS_ROLES = ["defense", "stun", "support"];
-export const ELEMENTS = ["fire", "ice", "electric", "physical", "ether"];
 
 // ============================================================================
 // ROLE CLASSIFICATION HELPERS

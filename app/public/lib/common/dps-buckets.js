@@ -9,9 +9,7 @@
  */
 
 import { teamsOverlap } from './team-builder.js';
-
-const ELEMENTS = ['fire', 'ice', 'electric', 'physical', 'ether'];
-const DPS_ROLES = ['attack', 'anomaly', 'rupture'];
+import { ELEMENTS, DPS_ROLES } from './constants.js';
 
 export const DEFAULT_BUCKET_CAP = 15;
 export const DEFAULT_PER_BOSS_FLOOR_RATIO = 0.5;

@@ -4,11 +4,12 @@
  */
 
 import { getTeams, sortTeamByRole, getTeamLabel } from '../common/team-builder.js';
-import { scoreTeamForBoss, isDPS, isStun, isSupport, isDefense, getElement, ELEMENTS, DPS_ROLES } from '../common/team-scorer.js';
+import { scoreTeamForBoss, isDPS, isStun, isSupport, isDefense, getElement } from '../common/team-scorer.js';
 import { 
     initRoster, getUnitStates, getAllUnits,
     getInitials, getUnitElement, getCharacterImageUrl
 } from '../common/roster-ui.js';
+import { ELEMENTS, DPS_ROLES } from '../common/constants.js';
 
 // ============================================================================
 // CONSTANTS
@@ -17,9 +18,8 @@ import {
 const FILTERS_STORAGE_KEY = 'zzz-team-builder-filters';
 const MIN_TEAMS_TO_SHOW = 6;
 
-// Elements and DPS types for grid
-const GRID_ELEMENTS = ['fire', 'ice', 'electric', 'physical', 'ether'];
-const GRID_DPS_TYPES = ['attack', 'anomaly', 'rupture'];
+const GRID_ELEMENTS = ELEMENTS;
+const GRID_DPS_TYPES = DPS_ROLES;
 
 /**
  * Check if a team has a DPS unit that matches BOTH the target element AND DPS type.

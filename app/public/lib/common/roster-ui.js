@@ -10,9 +10,9 @@ import {
     copyToClipboard
 } from './roster-share.js';
 import { addLongPressListener } from './touch-utils.js';
+import { ELEMENTS } from './constants.js';
 
 const ROSTER_STORAGE_KEY = 'zzz-roster';
-const ELEMENTS = ['fire', 'ice', 'electric', 'physical', 'ether'];
 
 let allUnits = [];
 let unitStates = {};

@@ -30,7 +30,6 @@ const COMBINATION_LIMIT = 25;
 const DISPLAY_LIMIT = 5;
 const MIN_UNITS_REQUIRED = 9;
 const BOSSES_REQUIRED = 3;
-const ELEMENTS = ['fire', 'ice', 'electric', 'physical', 'ether'];
 const PAGE_STORAGE_KEY = 'zzz-deadly-assault';     // Page-specific settings
 
 // ============================================================================
@@ -191,17 +190,6 @@ function getWeaknessGradientClass(weaknesses) {
     // For two weaknesses, sort alphabetically to match CSS class naming
     const sorted = [...weaknesses].sort();
     return `weakness-${sorted[0]}-${sorted[1]}`;
-}
-
-function getElementIcon(element) {
-    const icons = {
-        fire: '🔥',
-        ice: '❄️',
-        electric: '⚡',
-        physical: '💥',
-        ether: '🌀'
-    };
-    return `<span class="element-icon element-${element}" title="${element}">${icons[element] || '?'}</span>`;
 }
 
 // ============================================================================

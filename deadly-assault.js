@@ -15,6 +15,7 @@ import { buildTeams } from './lib/team-pipeline.js';
 import { parseTeams } from './lib/team-parser.js';
 import { scoreTeamForBoss } from './app/public/lib/common/team-scorer.js';
 import { findExclusiveCombinations, teamsOverlap } from './app/public/lib/common/team-builder.js';
+import { ELEMENTS, DPS_ROLES } from './app/public/lib/common/constants.js';
 
 const options = parseArgs({
     name: 'deadly-assault.js',
@@ -213,9 +214,6 @@ async function main() {
     // ============================================================================
     // TIER 0 SANITY CHECK
     // ============================================================================
-
-    const DPS_ROLES = ["attack", "anomaly", "rupture"];
-    const ELEMENTS = ["fire", "ice", "electric", "physical", "ether"];
 
     function checkTier0Utilization(combination, availableUnits, selectedBosses, bosses) {
         const warnings = [];
