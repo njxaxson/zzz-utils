@@ -186,7 +186,7 @@
         "tier": 3,
         "tags": ["anomaly", "electric", "belobog", "assist:evasive"],
         "join": ["electric", "belobog"],
-        "synergy": { "units": [], "tags": ["subdps"], "avoid": [] },
+        "synergy": { "units": ["Rina"], "tags": ["subdps"], "avoid": [] },
         "faction": "Belobog Heavy Industries"
     },
     {
@@ -320,7 +320,7 @@
         "tier": 0,
         "tags": ["anomaly", "ice", "section6", "title", "assist:defensive"],
         "join": ["support", "section6"],
-        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "synergy": { "units": ["Lighter", "Nangong"], "tags": [], "avoid": [] },
         "faction": "Section 6"
     },
     {
@@ -476,7 +476,7 @@
         "tier": 3.5,
         "tags": ["defense", "electric", "pubsec", "assist:defensive"],
         "join": ["electric", "pubsec"],
-        "synergy": { "units": ["Jane Doe"], "tags": ["anomaly"], "avoid": [] },
+        "synergy": { "units": [], "tags": ["anomaly"], "avoid": [] },
         "faction": "PubSec"
     },
     {
@@ -497,7 +497,7 @@
         "name": "Soukaku",
         "image": "./assets/characters/soukaku.webp",
         "rank": "A",
-        "tier": 1,
+        "tier": 1.5,
         "tags": ["support", "ice", "section6", "assist:defensive"],
         "join": ["ice", "section6"],
         "synergy": { "units": ["Miyabi", "Yuzuha"], "tags": ["ice"], "avoid": ["fire", "electric", "physical", "ether"] },
@@ -537,7 +537,7 @@
         "tier": 0.5,
         "tags": ["anomaly", "ether", "mockingbird", "assist:defensive"],
         "join": ["anomaly", "ether"],
-        "synergy": { "units": ["Astra", "Nicole"], "tags": ["anomaly", "subdps"], "avoid": [] },
+        "synergy": { "units": ["Astra", "Nicole", "Nangong"], "tags": ["anomaly", "subdps"], "avoid": [] },
         "faction": "Mockingbird"
     },
     {
@@ -549,7 +549,7 @@
         "tier": 1,
         "tags": ["anomaly", "electric", "section6", "assist:defensive"],
         "join": ["electric", "anomaly"],
-        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "synergy": { "units": ["Rina"], "tags": [], "avoid": [] },
         "faction": "Section 6"
     },
     {
@@ -562,7 +562,7 @@
         "tier": 0,
         "tags": ["attack", "physical", "yunkui", "title", "assist:defensive"],
         "join": ["support", "defense"],
-        "synergy": { "units": ["Zhao", "Sunna"], "tags": ["stunless"], "avoid": [] },
+        "synergy": { "units": ["Zhao", "Sunna", "Dialyn"], "tags": ["stunless"], "avoid": [] },
         "faction": "Yunkui Summit"
     },
     {
