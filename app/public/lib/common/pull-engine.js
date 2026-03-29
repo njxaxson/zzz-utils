@@ -294,7 +294,7 @@ function detectSupportGap(gaps, ownedUnits, ownedSupports, dpsQuality, unownedLi
         if (dpsQuality.anomaly >= 50 && !hasYuzuha) missingSpecialists.push('anomaly');
         if (dpsQuality.rupture >= 50 && !hasLucia) missingSpecialists.push('rupture');
         if (missingSpecialists.length > 0) {
-            score = missingSpecialists.length > 1 ? 40 : 30;
+            score = missingSpecialists.length > 1 ? 50 : 40;
             reason = `You have Astra but could benefit from specialist supports for your ${missingSpecialists.map(capitalize).join(' and ')} teams`;
         }
     }
@@ -384,7 +384,6 @@ function detectSubdpsGap(gaps, dpsQuality, ownedSubdps, unownedLimitedS, sortCan
     const atkBest = getBestTier(ownedSubdps.attack);
     const atkSubdpsQuality = atkBest !== null ? tierToQuality(atkBest) : 0;
     if (dpsQuality.attack >= 75 && atkSubdpsQuality < 50) {
-        const score = atkSubdpsQuality === 0 ? 45 : 35;
         const candidates = sortCandidates(
             unownedLimitedS.filter(u => u.tags.includes('attack') && isSubdps(u))
         );
@@ -392,8 +391,8 @@ function detectSubdpsGap(gaps, dpsQuality, ownedSubdps, unownedLimitedS, sortCan
             gaps.push({
                 id: 'subdps-attack',
                 title: 'Attack Sub-DPS',
-                reason: 'You have strong attack DPS but no attack sub-DPS partner for optimal team compositions',
-                score,
+                reason: 'You have strong attack DPS but no attack sub-DPS partner — niche, but adds flexibility',
+                score: 20,
                 units: candidates
             });
         }
@@ -477,7 +476,7 @@ function detectSynergies(gaps, ownedUnits, unownedLimitedS, unitByName, ownedByN
                 recommended: unit,
                 ownedPartner: null,
                 type: 'tag',
-                score: 30,
+                score: 35,
                 tags: matchingTags
             });
         }
@@ -523,7 +522,7 @@ function detectSynergies(gaps, ownedUnits, unownedLimitedS, unitByName, ownedByN
             const ownedNames = [...new Set(
                 group.entries.filter(e => e.ownedPartner).map(e => e.ownedPartner.name)
             )];
-            score = 35 + Math.max(0, pairCount - 1) * 10;
+            score = 25 + Math.max(0, pairCount - 1) * 5;
             reason = `${group.recommended.name} synergizes with your ${ownedNames.join(' and ')}`;
         }
 

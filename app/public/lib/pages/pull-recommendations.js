@@ -10,6 +10,11 @@ import {
 
 import { analyze, getUnitElement } from '../common/pull-engine.js';
 
+const PAGE_STORAGE_KEY = 'zzz-pull-recommendations';
+
+let resultLimit = 5;
+let lastResults = null;
+
 // ============================================================================
 // DATA LOADING
 // ============================================================================
@@ -21,6 +26,7 @@ async function loadData() {
             pageUrl: 'pull-recommendations.html',
             lockedUnits: ['nicole', 'anby', 'billy']
         });
+        loadPageFromStorage();
         setupEventListeners();
     } catch (error) {
         console.error('Failed to load data:', error);
@@ -28,8 +34,41 @@ async function loadData() {
     }
 }
 
+function savePageToStorage() {
+    localStorage.setItem(PAGE_STORAGE_KEY, JSON.stringify({ resultLimit }));
+}
+
+function loadPageFromStorage() {
+    try {
+        const saved = localStorage.getItem(PAGE_STORAGE_KEY);
+        if (saved) {
+            const data = JSON.parse(saved);
+            if (typeof data.resultLimit === 'number') resultLimit = data.resultLimit;
+        }
+    } catch (e) {
+        console.warn('Failed to load page state:', e);
+    }
+}
+
 function setupEventListeners() {
     document.getElementById('run-btn').addEventListener('click', runAnalysis);
+
+    document.querySelectorAll('#result-limit-toggle .filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            resultLimit = parseInt(btn.dataset.value);
+            applyResultLimitState();
+            savePageToStorage();
+            if (lastResults) displayResults(lastResults);
+        });
+    });
+
+    applyResultLimitState();
+}
+
+function applyResultLimitState() {
+    document.querySelectorAll('#result-limit-toggle .filter-btn').forEach(btn => {
+        btn.classList.toggle('active', parseInt(btn.dataset.value) === resultLimit);
+    });
 }
 
 // ============================================================================
@@ -54,8 +93,8 @@ function runAnalysis() {
 
     setTimeout(() => {
         try {
-            const results = analyze(allUnits, unitStates, ownedUnits);
-            displayResults(results);
+            lastResults = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 10 });
+            displayResults(lastResults);
         } catch (error) {
             console.error('Analysis failed:', error);
             showError('Failed to analyze roster. Please try again.');
@@ -74,7 +113,7 @@ function displayResults(results) {
     const section = document.getElementById('results-section');
 
     renderAssessment(results.assessment);
-    renderRecommendations(results.recommendations);
+    renderRecommendations(results.recommendations.slice(0, resultLimit));
 
     section.style.display = 'block';
     section.scrollIntoView({ behavior: 'smooth' });
