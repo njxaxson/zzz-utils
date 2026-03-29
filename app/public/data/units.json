@@ -93,6 +93,19 @@
         "faction": "Cunning Hares"
     },
     {
+        "id": "sbilly",
+        "name": "Starlight Billy",
+        "image": "./assets/characters/billy.webp",
+        "rank": "S",
+        "limited": true,
+        "tier": 0.5,
+        "tags": ["rupture", "physical", "hares", "assist:defensive"],
+        "join": ["stun", "support", "defense"],
+        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "faction": "Cunning Hares",
+        "available": false
+    },
+    {
         "id": "burnice",
         "name": "Burnice",
         "image": "./assets/characters/burnice.webp",
@@ -307,8 +320,8 @@
         "limited": false,
         "tier": 1,
         "tags": ["stun", "ice", "victoria", "assist:defensive"],
-        "join": ["ice", "victoria"],
-        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "join": ["ice", "victoria", "anomaly"],
+        "synergy": { "units": [], "tags": ["anomaly"], "avoid": [] },
         "faction": "Victoria Housekeeping"
     },
     {
