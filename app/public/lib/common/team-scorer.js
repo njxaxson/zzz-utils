@@ -2,6 +2,7 @@
  * Shared team scoring logic for Zenless Zone Zero
  * Used by both matchups.js and deadly-assault.js
  * 
+ * Mechanics-driven scoring engine (5-layer architecture)
  * Browser-compatible ES module version
  */
 
@@ -14,6 +15,38 @@ import { ELEMENTS, DPS_ROLES } from './constants.js';
 export { ELEMENTS, DPS_ROLES };
 export const SUPPORT_ROLE = "support";
 export const NON_DPS_ROLES = ["defense", "stun", "support"];
+
+const MULT = {
+    NEED_FULFILLMENT: 7,
+    TOTALIZE_QTY: 5,
+    STUN_EMERGENCE: 1.0,
+    ELEMENT_BUFF: 2,
+    ELEMENT_DEBUFF: 2,
+    ANOMALY_BUFF: 2,
+    SHEER_BUFF: 9,
+    PEN_BUFF: 2,
+    ATK_BUFF: 0.7,
+    CR_BUFF: 0.7,
+    CD_BUFF: 0.7,
+    DEFENSE_DEBUFF: 1.5,
+    RECOVERY_DEBUFF: 2,
+    STUN_INFRA: 1,
+    ULTIMATES_PROVISION: 1.5,
+    STUN_MULT_BUFF: 2,
+    TOTALIZE_PENALTY: 38,
+    DISORDER_BONUS: 12,
+    DIAMETRIC: 3,
+};
+
+const RUPTURE_ATK_EFFICIENCY = 0.33;
+
+const BURST_DAMAGE_TYPES = ['enhanced', 'ultimate:strong', 'ultimate:double', 'chain', 'totalize'];
+const NEED_FULFILLMENT_KEYS = [
+    'disorders', 'ablooms', 'chains', 'ultimates', 'veils',
+    'quick-assists', 'interrupt-resistance'
+];
+const NATURALLY_AVAILABLE_NEEDS = new Set(['ultimates', 'chains']);
+const STAT_SCALING_KEYS = ['am', 'ap', 'cr', 'cd', 'hp', 'def', 'pen', 'sheer'];
 
 // ============================================================================
 // ROLE CLASSIFICATION HELPERS
@@ -55,10 +88,6 @@ export function isTitled(unit) {
     return unit.tags.includes("title");
 }
 
-export function hasStunSynergy(unit) {
-    return unit.synergy?.tags?.includes("stun");
-}
-
 export function isLimited(unit) {
     return unit.limited === true;
 }
@@ -79,459 +108,672 @@ export function hasDefensiveAssist(unit) {
     return unit.tags.includes("assist:defensive");
 }
 
+export function isOnField(unit) {
+    const explicit = unit.mechanics?.onfield;
+    if (explicit !== undefined) return !!explicit;
+    return isDPS(unit) || isStun(unit);
+}
+
 // ============================================================================
-// SYNERGY SCORING
+// MECHANICS HELPERS
 // ============================================================================
 
-export function calculateSynergyScore(unit, teammates, boss, lenient = false, debug = false) {
-    let score = 0;
-    const synergy = unit.synergy;
-    if (!synergy) return 0;
-    
-    const dbg = (msg) => { if (debug) console.log(`      ${unit.name}: ${msg}`); };
-    
-    // Unit-specific synergies (e.g., Nicole synergizes with Astra)
-    // Small bonus to avoid over-coupling issues
-    if (synergy.units && synergy.units.length > 0) {
-        for (const teammate of teammates) {
-            if (synergy.units.includes(teammate.name)) {
-                score += 5;
-                dbg(`unit synergy with ${teammate.name}: +5`);
-            }
-            if(unitsHaveMutualSynergy(unit, teammate)) {
-                //Additional bonus for mutual synergy, particularly for enabling DPS units 
-                const bonus = isDPS(unit) ? 25 : 5;
-                score += bonus;
-                dbg(`mutual synergy with ${teammate.name}: +${bonus}`);
-            }
+function w(value) {
+    if (value === true) return 1;
+    if (typeof value === 'number') return value;
+    return 0;
+}
+
+export function getEffectiveRoles(unit) {
+    if (unit._activatedRoles) return unit._activatedRoles;
+    const roles = [];
+    for (const role of ['attack', 'anomaly', 'rupture', 'stun', 'support', 'defense']) {
+        if (unit.tags.includes(role)) roles.push(role);
+    }
+    const pseudoRole = unit.mechanics?.pseudoRole;
+    if (pseudoRole) {
+        for (const pr of pseudoRole.split(',').map(s => s.trim())) {
+            if (pr && !roles.includes(pr)) roles.push(pr);
         }
     }
-    
-    if (synergy.tags && synergy.tags.length > 0) {
-        if (debug) dbg(`synergy.tags = [${synergy.tags.join(', ')}]`);
-        
-        // Check if this unit has element synergy (like Soukaku's "ice")
-        // Units with ALL elements (like Yuzuha) are element-agnostic — they support any element
-        const synergyElements = synergy.tags.filter(tag => ELEMENTS.includes(tag));
-        const isUniversalElementSynergy = synergyElements.length >= ELEMENTS.length;
-        const hasElementSynergy = synergyElements.length > 0 && !isUniversalElementSynergy;
-        
-        // Check if this unit has subdps synergy (like Burnice, Grace, Vivian, Orphie)
-        const hasSubDPSSynergy = synergy.tags.includes("subdps");
-        
-        if (hasElementSynergy) {
-            // Check if ANY teammate matches ANY of the synergy elements
-            // This handles both single-element (Soukaku: ice) and multi-element (Yuzuha: all) synergies
-            const anyTeammateMatchesElement = teammates.some(t => 
-                synergyElements.some(elem => t.tags.includes(elem))
-            );
-            
-            if (!anyTeammateMatchesElement) {
-                // Element synergy unit on team with NO matching element teammates
-                // (e.g., Soukaku on Harumasa team) - dead weight, not penalty
-                // The support just doesn't help with element synergy, but doesn't hurt
-                // Continue processing - unit may have other synergies (unit-specific, etc.)
-                dbg(`element synergy: no matching elements (dead weight, 0)`);
-            }
-        }
-        
-        if (hasSubDPSSynergy) {
-            // Units with subdps synergy (Burnice, Grace, Vivian, Orphie) need a MAIN DPS teammate
-            // A main DPS is any DPS unit that does NOT have the subdps tag
-            // The main DPS can be any role type - doesn't have to match
-            // Examples: 
-            //   - Grace (anomaly/subdps) + Harumasa (attack, no subdps) = VALID
-            //   - Burnice (anomaly/subdps) + Jane Doe (anomaly, no subdps) = VALID
-            //   - Burnice + Vivian (both subdps) = INVALID (no main DPS)
-            //   - Orphie (attack/subdps) alone with supports = INVALID (no main DPS)
-            
-            const otherMainDPSCount = teammates.filter(t => 
-                isDPS(t) && !t.synergy?.tags?.includes("subdps")
-            ).length;
-            
-            if (otherMainDPSCount === 0) {
-                // No main DPS teammate - only subdps units or supports
-                // These teams lack a primary damage dealer
-                if (lenient) {
-                    // In lenient mode, ignore this penalty (desperate situations)
-                    // No penalty applied
-                    dbg(`subdps without main DPS (lenient): 0`);
-                } else {
-                    score -= 100; // Heavy penalty in strict mode
-                    dbg(`subdps without main DPS: -100`);
-                }
-            } else {
-                // Has a main DPS teammate - good synergy
-                score += 20;
-                dbg(`subdps has main DPS: +20`);
-            }
-        }
-        
-        // Track which DPS roles have already given synergy bonus (to prevent double-counting)
-        // E.g., Dialyn with "attack" synergy should only get +30 once, even with 2 attackers
-        const countedDPSRoles = new Set();
-        
-        for (const teammate of teammates) {
-            let matchBlockedByDedup = false;
-            
-            const matchesAnyPreference = synergy.tags.some(tag => {
-                // Universal element synergy (like Yuzuha) means "works with any element"
-                // Don't let individual element tags produce additional generic matches;
-                // the non-element tags (e.g. "anomaly") already capture the real synergy
-                if (isUniversalElementSynergy && ELEMENTS.includes(tag)) return false;
-                
-                if (!teammate.tags.includes(tag)) return false;
-                
-                // DPS role synergy (attack/anomaly/rupture) - only count once per role type
-                // E.g., Dialyn + Orphie + Seed: only +30 for "attack", not +60
-                if (DPS_ROLES.includes(tag)) {
-                    if (countedDPSRoles.has(tag)) {
-                        matchBlockedByDedup = true;
-                        return false;
-                    }
-                    countedDPSRoles.add(tag);
-                }
-                
-                return true;
-            });
-            
-            if (matchesAnyPreference) {
-                if (hasElementSynergy) {
-                    // Element synergy supports (like Soukaku) need TWO conditions:
-                    // 1. Boss must be weak to that element (OR boss is neutral/global)
-                    // 2. Team must have a DPS of that element
-                    // Universal element units (like Yuzuha) bypass this — they support any element
-                    const matchingSynergyElement = synergyElements.find(elem => boss.weaknesses.includes(elem));
-                    const bossWeakToElement = matchingSynergyElement !== undefined;
-                    // If boss has no specific weaknesses (neutral/global), treat as weak to element
-                    const isNeutralBoss = boss.weaknesses.length === 0;
-                    const effectiveBossWeak = bossWeakToElement || isNeutralBoss;
+    return roles;
+}
 
-                    // For neutral boss: check all synergy elements
-                    // For boss with weakness: only check the matching element
-                    const elementsToCheck = matchingSynergyElement 
-                        ? [matchingSynergyElement] 
-                        : synergyElements; // Neutral boss: check all synergy elements
-                    
-                    // Check if team has element DPS matching ANY of the relevant synergy elements
-                    const unitIsElementDPS = isDPS(unit) && elementsToCheck.includes(getElement(unit));
-                    const teamHasElementDPS = unitIsElementDPS || teammates.some(t => 
-                        isDPS(t) && elementsToCheck.includes(getElement(t))
-                    );
-                    
-                    if (!effectiveBossWeak || !teamHasElementDPS) {
-                        dbg(`element synergy with ${teammate.name}: off-element, no bonus`);
-                    } else if (isDPS(teammate)) {
-                        // DPS-to-DPS element synergy: only count once per pair if MUTUAL
-                        // Check if teammate has a reciprocal element synergy with this unit
-                        const teammateElementSynergies = teammate.synergy?.tags?.filter(t => ELEMENTS.includes(t)) || [];
-                        const hasMutualElementSynergy = isDPS(unit) && 
-                            teammateElementSynergies.some(elem => unit.tags.includes(elem));
-                        
-                        if (hasMutualElementSynergy && unit.name > teammate.name) {
-                            // Mutual synergy - skip to avoid double counting (other unit will count)
-                            dbg(`element synergy with ${teammate.name}: SKIP (mutual, alphabetically later)`);
-                        } else {
-                            score += 30;
-                            dbg(`element synergy with ${teammate.name} (DPS): +30`);
-                        }
-                    } else {
-                        score += 15;
-                        dbg(`element synergy with ${teammate.name} (support): +15`);
-                    }
-                } else if (isDPS(teammate)) {
-                    // DPS-to-DPS tag synergy: only count once per pair if MUTUAL
-                    // Check if teammate has a reciprocal tag synergy with this unit
-                    const teammateSynergyTags = teammate.synergy?.tags || [];
-                    const hasMutualTagSynergy = isDPS(unit) && 
-                        teammateSynergyTags.some(tag => unit.tags.includes(tag) && !ELEMENTS.includes(tag));
-                    
-                    if (hasMutualTagSynergy && unit.name > teammate.name) {
-                        // Mutual synergy - skip to avoid double counting (other unit will count)
-                        dbg(`tag synergy with ${teammate.name}: SKIP (mutual, alphabetically later)`);
-                    } else {
-                        score += 30;
-                        dbg(`tag synergy with ${teammate.name} (DPS): +30`);
-                    }
-                } else {
-                    score += 15;
-                    dbg(`tag synergy with ${teammate.name} (support): +15`);
-                }
-            } else if (isDPS(teammate) && !matchBlockedByDedup) {
-                score -= 20;
-                dbg(`NO tag match with DPS ${teammate.name}: -20`);
+function computeActivatedRoles(unit, team) {
+    const roles = [];
+    for (const role of ['attack', 'anomaly', 'rupture', 'stun', 'support', 'defense']) {
+        if (unit.tags.includes(role)) roles.push(role);
+    }
+    const pseudoRole = unit.mechanics?.pseudoRole;
+    if (pseudoRole) {
+        for (const pr of pseudoRole.split(',').map(s => s.trim())) {
+            if (!pr || roles.includes(pr)) continue;
+            if (DPS_ROLES.includes(pr)) {
+                const hasActivator = team.some(t => t !== unit && t.tags.includes(pr));
+                if (!hasActivator) continue;
             }
+            roles.push(pr);
         }
     }
-    
-    if (synergy.avoid && synergy.avoid.length > 0) {
-        for (const avoidTag of synergy.avoid) {
-            const avoidedTeammates = teammates.filter(t => t.tags.includes(avoidTag));
-            if (avoidedTeammates.length > 0) {
-                const avoidedDPS = avoidedTeammates.filter(isDPS);
-                if (avoidedDPS.length > 0) {
-                    dbg(`AVOID ${avoidTag} triggered by DPS: DISQUALIFY`);
-                    return -999;
-                } else {
-                    score -= 35;
-                    dbg(`AVOID ${avoidTag} triggered by non-DPS: -35`);
-                }
+    return roles;
+}
+
+function isDPSByRoles(roles) {
+    return roles.some(r => DPS_ROLES.includes(r));
+}
+
+function isStunnerByRoles(roles) {
+    return roles.includes('stun');
+}
+
+function isStunlessUnit(unit) {
+    return unit.mechanics?.utility?.stunless === true;
+}
+
+function hasSubDPSRole(unit) {
+    const pr = unit.mechanics?.pseudoRole;
+    return pr ? pr.split(',').map(s => s.trim()).includes('subdps') : false;
+}
+
+function isForcedSecondaryDPS(unit, sameTypeUnits) {
+    if (sameTypeUnits.length <= 1) return false;
+    if (sameTypeUnits.some(hasSubDPSRole)) return false;
+    const sorted = [...sameTypeUnits].sort((a, b) => {
+        const ta = a.tier ?? 2.5, tb = b.tier ?? 2.5;
+        if (ta !== tb) return ta - tb;
+        if (isTitled(a) !== isTitled(b)) return isTitled(a) ? -1 : 1;
+        if (isSRank(a) !== isSRank(b)) return isSRank(a) ? -1 : 1;
+        return 0;
+    });
+    return unit !== sorted[0];
+}
+
+export function getEffectiveScaling(unit) {
+    const roles = getEffectiveRoles(unit);
+    const baseline = {};
+    if (roles.includes('attack'))  Object.assign(baseline, { cr: 2, cd: 2 });
+    if (roles.includes('anomaly')) Object.assign(baseline, { am: 2, ap: 1 });
+    if (roles.includes('rupture')) Object.assign(baseline, { sheer: 3, hp: 2, cr: 2, cd: 2 });
+    if (roles.includes('stun'))    Object.assign(baseline, { daze: 1 });
+    if (isDPSByRoles(roles)) {
+        const damage = unit.mechanics?.damage || {};
+        let implicitUlt = 1;
+        if (damage['ultimate:strong']) implicitUlt = Math.max(implicitUlt, 2);
+        if (damage['ultimate:double']) implicitUlt = Math.max(implicitUlt, 3);
+        baseline.ultimates = implicitUlt;
+        baseline['quick-assists'] = 0.25;
+        const totalizeWeight = w(damage.totalize);
+        if (totalizeWeight > 0) {
+            baseline.recovery = totalizeWeight * 2;
+        }
+    }
+    const explicit = unit.mechanics?.scaling || {};
+    return { ...baseline, ...explicit };
+}
+
+function resolveBaselineWeight(consumer, category) {
+    const scaling = consumer.mechanics?.scaling;
+    const roles = getEffectiveRoles(consumer);
+
+    switch (category) {
+        case 'atk':
+            if (scaling?.atk) return w(scaling.atk);
+            return isDPSByRoles(roles) ? 1 : 0;
+        case 'anomaly-affinity': {
+            const am = scaling?.am;
+            const ap = scaling?.ap;
+            if (am || ap) return Math.max(w(am || 0), w(ap || 0));
+            return roles.includes('anomaly') ? 2 : 0;
+        }
+        case 'sheer':
+            if (scaling?.sheer) return w(scaling.sheer);
+            return roles.includes('rupture') ? 3 : 0;
+        case 'pen':
+            if (scaling?.pen) return w(scaling.pen);
+            return (isDPSByRoles(roles) && !roles.includes('rupture')) ? 1 : 0;
+        case 'cr':
+            if (scaling?.cr) return w(scaling.cr);
+            if (roles.includes('attack') || roles.includes('rupture')) return 2;
+            if (roles.includes('anomaly')) return 0.3;
+            return 0;
+        case 'cd':
+            if (scaling?.cd) return w(scaling.cd);
+            if (roles.includes('attack') || roles.includes('rupture')) return 2;
+            if (roles.includes('anomaly')) return 0.3;
+            return 0;
+        case 'stun-infra':
+            if (isStunlessUnit(consumer)) return 0;
+            if (roles.includes('attack') || roles.includes('rupture')) return 1;
+            if (roles.includes('anomaly')) return 0.5;
+            if (roles.includes('stun')) {
+                const pseudo = consumer.mechanics?.pseudoRole || '';
+                if (DPS_ROLES.some(r => pseudo.includes(r))) return 0.5;
             }
+            return 0;
+        case 'defense':
+            return ((isDPSByRoles(roles) || isStunnerByRoles(roles)) && !roles.includes('rupture')) ? 1 : 0;
+        case 'element':
+            return (isDPSByRoles(roles) || isStunnerByRoles(roles)) ? 1 : 0;
+        default:
+            return 0;
+    }
+}
+
+function getSupplierDaze(supplier) {
+    const daze = supplier.mechanics?.utility?.daze;
+    if (daze) return w(daze);
+    return getEffectiveRoles(supplier).includes('stun') ? 1 : 0;
+}
+
+function getStunInfraWeight(supplier) {
+    const buffs = supplier.mechanics?.buffs || {};
+    const raw = w(buffs['stun-multiplier']) + getSupplierDaze(supplier);
+    if (raw === 0) return 0;
+    const isStunRole = getEffectiveRoles(supplier).includes('stun');
+    return isStunRole ? raw : raw * 0.5;
+}
+
+function getMaxBurstWeight(unit) {
+    const damage = unit.mechanics?.damage || {};
+    const explicit = Math.max(0, ...BURST_DAMAGE_TYPES.map(type => w(damage[type])));
+    if (explicit > 0) return explicit;
+    const roles = getEffectiveRoles(unit);
+    return isDPSByRoles(roles) ? 1 : 0;
+}
+
+const BUFF_UTIL_FLOOR = 0;
+
+function getBuffRelevance(key, consumer) {
+    const roles = getEffectiveRoles(consumer);
+    const element = getElement(consumer);
+    const dps = isDPSByRoles(roles);
+
+    switch (key) {
+        case 'atk':
+            if (!dps) return 0;
+            return roles.includes('rupture') ? RUPTURE_ATK_EFFICIENCY : 1;
+        case 'anomaly':
+            return roles.includes('anomaly') ? 1 : 0;
+        case 'sheer':
+            return roles.includes('rupture') ? 1 : 0;
+        case 'pen':
+            return (dps && !roles.includes('rupture')) ? 1 : 0;
+        case 'cr':
+            if (consumer.mechanics?.scaling?.cr) return 1;
+            if (roles.includes('attack') || roles.includes('rupture')) return 1;
+            if (roles.includes('anomaly')) return 0.3;
+            return 0;
+        case 'cd':
+            if (consumer.mechanics?.scaling?.cd) return 1;
+            if (roles.includes('attack') || roles.includes('rupture')) return 1;
+            if (roles.includes('anomaly')) return 0.3;
+            return 0;
+        case 'stun-multiplier':
+            return dps ? 1 : 0;
+        case 'chains':
+            return 1;
+        default:
+            if (consumer.mechanics?.damage?.[key]) return 1;
+            if (ELEMENTS.includes(key) && element === key && (dps || roles.includes('stun'))) return 1;
+            return 0;
+    }
+}
+
+function getDebuffRelevance(key, consumer) {
+    const roles = getEffectiveRoles(consumer);
+    const element = getElement(consumer);
+    const dps = isDPSByRoles(roles);
+
+    switch (key) {
+        case 'defense':
+            return ((dps || roles.includes('stun')) && !roles.includes('rupture')) ? 1 : 0;
+        case 'recovery':
+            return (dps && !isStunlessUnit(consumer)) ? 1 : 0;
+        default:
+            if (ELEMENTS.includes(key) && element === key && (dps || roles.includes('stun'))) return 1;
+            return 0;
+    }
+}
+
+const STAT_BUFF_KEYS = new Set(['atk', 'anomaly', 'sheer', 'pen', 'cr', 'cd', 'stun-multiplier', ...ELEMENTS]);
+
+function computeBuffUtilization(supplier, team) {
+    const buffs = supplier.mechanics?.buffs || {};
+    const debuffs = supplier.mechanics?.debuffs || {};
+    const utility = supplier.mechanics?.utility || {};
+    let totalWeight = 0;
+    let effectiveWeight = 0;
+    const consumers = team.filter(t => t !== supplier);
+    const nConsumers = consumers.length;
+
+    for (const [key, value] of Object.entries(buffs)) {
+        const bw = w(value);
+        if (bw <= 0) continue;
+        totalWeight += bw;
+
+        if (STAT_BUFF_KEYS.has(key)) {
+            let maxRelevance = 0;
+            for (const consumer of consumers) {
+                maxRelevance = Math.max(maxRelevance, getBuffRelevance(key, consumer));
+            }
+            effectiveWeight += bw * maxRelevance;
+        } else {
+            let totalRelevance = 0;
+            for (const consumer of consumers) {
+                totalRelevance += getBuffRelevance(key, consumer);
+            }
+            effectiveWeight += bw * (nConsumers > 0 ? totalRelevance / nConsumers : 0);
         }
     }
-    
-    return score;
-}
 
-export function getDPSType(unit) {
-    if (unit.tags.includes("attack")) return "attack";
-    if (unit.tags.includes("anomaly")) return "anomaly";
-    if (unit.tags.includes("rupture")) return "rupture";
-    return null;
-}
+    for (const [key, value] of Object.entries(debuffs)) {
+        const dw = w(value);
+        if (dw <= 0) continue;
+        totalWeight += dw;
+        let maxRelevance = 0;
+        for (const consumer of consumers) {
+            maxRelevance = Math.max(maxRelevance, getDebuffRelevance(key, consumer));
+        }
+        effectiveWeight += dw * maxRelevance;
+    }
 
-/**
- * Determines if a unit is a specialist.
- * A specialist has synergy with exactly ONE DPS type and avoids the other two.
- * Examples: Lucia (rupture specialist), Yuzuha (anomaly specialist), Pan (rupture specialist)
- */
-export function isSpecialist(unit) {
-    if (!unit.synergy) return false;
-    
-    const synergyTags = unit.synergy.tags || [];
-    const avoidTags = unit.synergy.avoid || [];
-    
-    // Count how many DPS types are in synergy tags
-    const dpsTypesInSynergy = DPS_ROLES.filter(role => synergyTags.includes(role));
-    
-    // Count how many DPS types are in avoid tags
-    const dpsTypesInAvoid = DPS_ROLES.filter(role => avoidTags.includes(role));
-    
-    // Specialist: synergizes with exactly 1 DPS type AND avoids the other 2
-    return dpsTypesInSynergy.length === 1 && dpsTypesInAvoid.length === 2;
-}
-
-/**
- * Gets the DPS type a specialist synergizes with (null if not a specialist)
- */
-export function getSpecialistType(unit) {
-    if (!isSpecialist(unit)) return null;
-    
-    const synergyTags = unit.synergy.tags || [];
-    for (const role of DPS_ROLES) {
-        if (synergyTags.includes(role)) {
-            return role;
+    if (!isDPS(supplier)) {
+        for (const key of NEED_FULFILLMENT_KEYS) {
+            const uv = w(utility[key]);
+            if (uv <= 0) continue;
+            totalWeight += uv;
+            let maxRelevance = 0;
+            for (const consumer of consumers) {
+                const scaling = getEffectiveScaling(consumer);
+                if (w(scaling[key]) > 0) maxRelevance = 1;
+            }
+            effectiveWeight += uv * maxRelevance;
         }
     }
-    return null;
+
+    if (totalWeight === 0) return isDPS(supplier) ? 1.0 : 0.0;
+    const BUFF_UTIL_BASELINE = 4;
+    const ratio = effectiveWeight / totalWeight;
+    const threshold = effectiveWeight / BUFF_UTIL_BASELINE;
+    return Math.min(1.0, Math.max(ratio, threshold));
 }
 
-export function unitsHaveSynergy(unit1, unit2) {
-    const u1SynergizesU2 = 
-        unit1.synergy?.units?.includes(unit2.name) ||
-        unit1.synergy?.tags?.some(tag => unit2.tags.includes(tag));
-    
-    const u2SynergizesU1 = 
-        unit2.synergy?.units?.includes(unit1.name) ||
-        unit2.synergy?.tags?.some(tag => unit1.tags.includes(tag));
-    
-    return u1SynergizesU2 || u2SynergizesU1;
-}
-export function unitsHaveMutualSynergy(unit1, unit2) {
-    //This is an explicit tag-team duo bonus:
-    const u1SynergizesU2 = unit1.synergy?.units?.includes(unit2.name);
-    const u2SynergizesU1 = unit2.synergy?.units?.includes(unit1.name);
-    return u1SynergizesU2 && u2SynergizesU1;
-}
+// ============================================================================
+// LAYER 1: DISQUALIFICATIONS
+// ============================================================================
 
-export function calculateDPSMixingPenalty(team) {
+function checkDisqualifications(team, boss, debug) {
     const dpsUnits = team.filter(isDPS);
-    if (dpsUnits.length < 2) return 0;
-    
-    let penalty = 0;
-    
-    const attackers = dpsUnits.filter(u => u.tags.includes("attack"));
-    const anomalyUnits = dpsUnits.filter(u => u.tags.includes("anomaly"));
-    const ruptureUnits = dpsUnits.filter(u => u.tags.includes("rupture"));
-    
-    const dpsTypes = new Set(dpsUnits.map(getDPSType).filter(t => t !== null));
-    
-    // Double attack without synergy - disqualify unless one is subdps
-    if (attackers.length >= 2) {
-        let hasSynergy = false;
-        for (let i = 0; i < attackers.length; i++) {
-            for (let j = i + 1; j < attackers.length; j++) {
-                if (unitsHaveSynergy(attackers[i], attackers[j])) {
-                    hasSynergy = true;
-                    break;
-                }
+
+    if (dpsUnits.length === 0) {
+        if (debug) console.log('  DISQUALIFIED: No DPS unit');
+        return -1;
+    }
+
+    if (dpsUnits.length >= 3) {
+        if (debug) console.log('  DISQUALIFIED: Triple DPS');
+        return -1;
+    }
+
+    if (boss.anti && boss.anti.length > 0) {
+        for (const antiType of boss.anti) {
+            if (dpsUnits.some(u => u.tags.includes(antiType))) {
+                if (debug) console.log(`  DISQUALIFIED: DPS matches boss anti-type ${antiType}`);
+                return -1;
             }
         }
-        if (!hasSynergy) {
-            const hasSubdps = attackers.some(u => u.synergy?.tags?.includes("subdps"));
-            if (!hasSubdps) return -999;
-            penalty -= 200;
+    }
+
+    for (const unit of dpsUnits) {
+        if (boss.resistances.includes(getElement(unit))) {
+            const pseudo = unit.mechanics?.pseudoRole || '';
+            if (pseudo.includes('support')) continue;
+            if (debug) console.log(`  DISQUALIFIED: ${unit.name} element resisted by boss`);
+            return -1;
         }
     }
-    
-    // Double rupture without synergy - disqualify unless one is subdps
-    if (ruptureUnits.length >= 2) {
-        let hasSynergy = false;
-        for (let i = 0; i < ruptureUnits.length; i++) {
-            for (let j = i + 1; j < ruptureUnits.length; j++) {
-                if (unitsHaveSynergy(ruptureUnits[i], ruptureUnits[j])) {
-                    hasSynergy = true;
-                    break;
-                }
-            }
-        }
-        if (!hasSynergy) {
-            const hasSubdps = ruptureUnits.some(u => u.synergy?.tags?.includes("subdps"));
-            if (!hasSubdps) return -999;
-            penalty -= 200;
-        }
+
+    const defensiveAssistCount = team.filter(hasDefensiveAssist).length;
+    if (defensiveAssistCount < boss.assists) {
+        if (debug) console.log(`  DISQUALIFIED: ${defensiveAssistCount}/${boss.assists} defensive assists`);
+        return -1;
     }
-    
-    if (dpsTypes.size <= 1) return penalty;
-    
-    // Attack + Rupture: NEVER valid - disqualify
-    if (dpsTypes.has("attack") && dpsTypes.has("rupture")) {
-        return -999;
-    }
-    
-    if (dpsTypes.has("attack") && dpsTypes.has("anomaly")) {
-        let hasValidSynergy = false;
-        
-        // Monoshock requires ALL THREE team members to share the same element
-        // Check if attacker has anomaly synergy + same-element anomaly + same-element third
-        for (const attacker of attackers) {
-            if (attacker.synergy?.tags?.includes("anomaly")) {
-                const attackerElement = getElement(attacker);
-                for (const anomaly of anomalyUnits) {
-                    if (getElement(anomaly) === attackerElement) {
-                        // Found matching attacker+anomaly, now check third unit
-                        const thirdUnit = team.find(u => !isAttacker(u) && !isAnomaly(u));
-                        if (thirdUnit && getElement(thirdUnit) === attackerElement) {
-                            hasValidSynergy = true;
-                            break;
-                        }
-                    }
-                }
-            }
-            if (hasValidSynergy) break;
-        }
-        
-        if (!hasValidSynergy) {
-            // Also check reverse: anomaly with attack synergy
-            for (const anomaly of anomalyUnits) {
-                if (anomaly.synergy?.tags?.includes("attack")) {
-                    const anomalyElement = getElement(anomaly);
-                    for (const attacker of attackers) {
-                        if (getElement(attacker) === anomalyElement) {
-                            // Found matching anomaly+attacker, now check third unit
-                            const thirdUnit = team.find(u => !isAttacker(u) && !isAnomaly(u));
-                            if (thirdUnit && getElement(thirdUnit) === anomalyElement) {
-                                hasValidSynergy = true;
-                                break;
-                            }
-                        }
-                    }
-                }
-                if (hasValidSynergy) break;
-            }
-        }
-        
-        if (!hasValidSynergy) {
-            return -999;
-        }
-    }
-    
-    if (dpsTypes.has("anomaly") && dpsTypes.has("rupture")) {
-        return -999;
-    }
-    
-    return penalty;
+
+    return 0;
 }
 
 // ============================================================================
-// TEAM-BOSS SCORING LOGIC
+// LAYER 1.5: TEAM STRUCTURE
 // ============================================================================
 
-export function scoreTeamForBoss(team, boss, options = {}) {
-    const { lenient = false, debug = false } = options;
-    // In lenient mode, start with higher base score to offset unavoidable penalties
-    let score = lenient ? 200 : 100;
-    const debugLog = [];
-    
-    const log = (reason, delta = 0) => {
-        if (debug) {
-            debugLog.push({ reason, delta, runningScore: score + delta });
-        }
-    };
-    
-    const teamLabel = team.map(u => u.name).join(' / ');
-    if (debug) {
-        console.log(`\n${'='.repeat(60)}`);
-        console.log(`SCORING: ${teamLabel}`);
-        console.log(`Base score: ${score}`);
-    }
-    
-    const dpsUnits = team.filter(isDPS);
+const STRUCTURE = {
+    CONVENTIONAL_BONUS: 35,
+    UNCONVENTIONAL_VIABLE: 0,
+    UNCONVENTIONAL_NO_INTERACTION: -50,
+    WILDLY_UNCONVENTIONAL: -150,
+};
+
+const FIELD_TIME = {
+    SOLO_CARRY_BONUS: 15,
+    TRIPLE_ONFIELD_PENALTY: -25,
+    ZERO_ONFIELD_PENALTY: -30,
+};
+
+function scoreTeamStructure(team, debug) {
     const attackers = team.filter(isAttacker);
     const anomalyUnits = team.filter(isAnomaly);
     const ruptureUnits = team.filter(isRupture);
+    const stunUnits = team.filter(isStun);
+    const supportLike = team.filter(u => isSupport(u) || isDefense(u));
+    const dpsUnits = team.filter(isDPS);
+
+    const nAtk = attackers.length;
+    const nAno = anomalyUnits.length;
+    const nRup = ruptureUnits.length;
+    const nStun = stunUnits.length;
+    const nSup = supportLike.length;
+
+    // --- CONVENTIONAL COMPOSITIONS ---
+
+    // Attacker + Stunner + Support/Defense
+    if (nAtk === 1 && nStun >= 1 && nSup >= 1 && nAno === 0 && nRup === 0) {
+        if (debug) console.log('    Structure: CONVENTIONAL (attacker + stunner + support)');
+        return STRUCTURE.CONVENTIONAL_BONUS;
+    }
+
+    // 2x Anomaly + Support/Defense
+    if (nAno >= 2 && nSup >= 1) {
+        const hasAnoSubDPS = anomalyUnits.some(hasSubDPSRole);
+        if (hasAnoSubDPS) {
+            if (debug) console.log('    Structure: CONVENTIONAL (double anomaly + support, has subdps)');
+            return STRUCTURE.CONVENTIONAL_BONUS;
+        }
+        if (debug) console.log('    Structure: UNCONVENTIONAL viable (double anomaly + support, no subdps)');
+        return STRUCTURE.UNCONVENTIONAL_VIABLE;
+    }
+
+    // 2x Anomaly + Stunner
+    if (nAno >= 2 && nStun >= 1) {
+        const hasAnoSubDPS = anomalyUnits.some(hasSubDPSRole);
+        if (hasAnoSubDPS) {
+            if (debug) console.log('    Structure: CONVENTIONAL (double anomaly + stunner, has subdps)');
+            return STRUCTURE.CONVENTIONAL_BONUS;
+        }
+        if (debug) console.log('    Structure: UNCONVENTIONAL viable (double anomaly + stunner, no subdps)');
+        return STRUCTURE.UNCONVENTIONAL_VIABLE;
+    }
+
+    // Anomaly hypercarry: Anomaly + Stunner + Support/Defense
+    if (nAno === 1 && nStun >= 1 && nSup >= 1 && nAtk === 0 && nRup === 0) {
+        if (debug) console.log('    Structure: CONVENTIONAL (anomaly hypercarry)');
+        return STRUCTURE.CONVENTIONAL_BONUS;
+    }
+
+    // Rupture + Stunner + Support/Defense
+    if (nRup >= 1 && nStun >= 1 && nSup >= 1 && nAtk === 0 && nAno === 0) {
+        if (debug) console.log('    Structure: CONVENTIONAL (rupture + stunner + support)');
+        return STRUCTURE.CONVENTIONAL_BONUS;
+    }
+
+    // Rupture + 2x Support/Defense
+    if (nRup >= 1 && nSup >= 2 && nAtk === 0 && nAno === 0) {
+        if (debug) console.log('    Structure: CONVENTIONAL (rupture + double support)');
+        return STRUCTURE.CONVENTIONAL_BONUS;
+    }
+
+    // --- UNCONVENTIONAL BUT VIABLE ---
+
+    // DPS + 2x Stunner: conventional for totalize units (stun uptime IS their damage),
+    // unconventional-viable for others
+    if (dpsUnits.length >= 1 && nStun >= 2) {
+        const hasTotalize = dpsUnits.some(u => w(u.mechanics?.damage?.totalize) > 0);
+        if (hasTotalize) {
+            if (debug) console.log('    Structure: CONVENTIONAL (totalize + double stun)');
+            return STRUCTURE.CONVENTIONAL_BONUS;
+        }
+        if (debug) console.log('    Structure: UNCONVENTIONAL viable (DPS + double stun)');
+        return STRUCTURE.UNCONVENTIONAL_VIABLE;
+    }
+
+    // Solo Anomaly + 2x Support/Defense (wheelchair)
+    if (nAno === 1 && nSup >= 2 && nAtk === 0 && nRup === 0) {
+        if (debug) console.log('    Structure: UNCONVENTIONAL viable (anomaly wheelchair)');
+        return STRUCTURE.UNCONVENTIONAL_VIABLE;
+    }
+
+    // Stunless attacker + 2x Support/Defense (YSG-type compositions)
+    if (nAtk === 1 && nSup >= 2) {
+        const stunlessAttacker = attackers.some(u => u.mechanics?.utility?.stunless);
+        if (stunlessAttacker) {
+            if (debug) console.log('    Structure: CONVENTIONAL (stunless attacker + double support)');
+            return STRUCTURE.CONVENTIONAL_BONUS;
+        }
+        if (debug) console.log('    Structure: UNCONVENTIONAL viable (attacker + double support)');
+        return STRUCTURE.UNCONVENTIONAL_VIABLE;
+    }
+
+    // Anomaly + Attacker + (Stun|Support) — Monoshock variant
+    // Valid if the attacker has anomaly scaling; boss matchup (Layer 3) handles
+    // whether both DPS agents align with weaknesses
+    if (nAno >= 1 && nAtk >= 1 && (nStun >= 1 || nSup >= 1) && nRup === 0) {
+        const attackerHasAnomalyScaling = attackers.some(u => {
+            const scaling = u.mechanics?.scaling || {};
+            return scaling.anomaly || scaling.am || scaling.ap;
+        });
+        if (attackerHasAnomalyScaling) {
+            if (debug) console.log('    Structure: UNCONVENTIONAL viable (monoshock)');
+            return STRUCTURE.UNCONVENTIONAL_VIABLE;
+        }
+        if (debug) console.log('    Structure: WILDLY UNCONVENTIONAL (anomaly+attacker, no anomaly scaling)');
+        return STRUCTURE.WILDLY_UNCONVENTIONAL;
+    }
+
+    // 2x Attacker + (Stun|Support) — Seed-like variant
+    if (nAtk >= 2 && (nStun >= 1 || nSup >= 1) && nAno === 0 && nRup === 0) {
+        const hasSubDPS = attackers.some(hasSubDPSRole);
+        const sameElement = attackers.every(a => getElement(a) === getElement(attackers[0]));
+        if (hasSubDPS || sameElement) {
+            if (debug) console.log('    Structure: UNCONVENTIONAL viable (double attacker with interaction)');
+            return STRUCTURE.UNCONVENTIONAL_VIABLE;
+        }
+        if (debug) console.log('    Structure: UNCONVENTIONAL (double attacker, no interaction)');
+        return STRUCTURE.UNCONVENTIONAL_NO_INTERACTION;
+    }
+
+    // --- EVERYTHING ELSE: PENALTY ---
+    if (debug) console.log(`    Structure: WILDLY UNCONVENTIONAL (atk=${nAtk} ano=${nAno} rup=${nRup} stun=${nStun} sup=${nSup})`);
+    return STRUCTURE.WILDLY_UNCONVENTIONAL;
+}
+
+// ============================================================================
+// LAYER 2: INHERENT QUALITY
+// ============================================================================
+
+function scoreInherentQuality(team, { lenient = false, debug = false } = {}) {
+    let score = 0;
+
+    const dpsUnits = team.filter(isDPS);
+    const attackers = team.filter(isAttacker);
+    const anomalyUnits = team.filter(isAnomaly);
     const supportUnits = team.filter(isSupport);
     const stunUnits = team.filter(isStun);
     const defenseUnits = team.filter(isDefense);
-    const nonDpsUnits = team.filter(isNonDPS);
-    
-    if (debug) {
-        console.log(`  DPS: ${dpsUnits.map(u => `${u.name}(T${u.tier})`).join(', ')}`);
-        console.log(`  Anomaly: ${anomalyUnits.map(u => u.name).join(', ') || 'none'}`);
-        console.log(`  Support: ${supportUnits.map(u => u.name).join(', ') || 'none'}`);
-        console.log(`  Stun: ${stunUnits.map(u => u.name).join(', ') || 'none'}`);
-    }
-    
-    // ANTI check
-    if (boss.anti && boss.anti.length > 0) {
-        for (const antiType of boss.anti) {
-            const hasAntiDPS = dpsUnits.some(unit => unit.tags.includes(antiType));
-            if (hasAntiDPS) {
-                return -1;
+
+    if (debug) console.log('\n  LAYER 2: INHERENT QUALITY');
+
+    // --- DPS Tier ---
+    if (debug) console.log('    DPS Tier:');
+    const forcedSecondaryUnits = new Set();
+    for (const unit of dpsUnits) {
+        const tier = unit.tier ?? 2.5;
+
+        const isSubDPS = hasSubDPSRole(unit);
+        const isSecondaryAttacker = isSubDPS && isAttacker(unit) &&
+            attackers.filter(a => a !== unit).length > 0;
+        const isSecondaryAnomaly = isSubDPS && isAnomaly(unit) &&
+            anomalyUnits.filter(a => a !== unit).length > 0;
+        const forcedSecondary =
+            (isAttacker(unit) && isForcedSecondaryDPS(unit, attackers)) ||
+            (isAnomaly(unit) && isForcedSecondaryDPS(unit, anomalyUnits)) ||
+            (isRupture(unit) && isForcedSecondaryDPS(unit, team.filter(isRupture)));
+        if (forcedSecondary) forcedSecondaryUnits.add(unit);
+        const tierMult = (isSecondaryAttacker || isSecondaryAnomaly || forcedSecondary) ? 0.5 : 1.0;
+
+        let tierBonus = 0;
+        if (tier <= 0.5)      tierBonus = (65 - (tier * 20)) * tierMult;
+        else if (tier <= 1.5) tierBonus = (25 - ((tier - 1) * 10)) * tierMult;
+        else if (tier <= 2)   tierBonus = -(lenient ? 15 : 40);
+        else if (tier <= 3)   tierBonus = -(lenient ? 40 : 130);
+        else                  tierBonus = -(lenient ? 60 : 130);
+        score += tierBonus;
+
+        if (isTitled(unit)) {
+            const titledBonus = forcedSecondary ? Math.round(20 * tierMult) : 20;
+            score += titledBonus;
+            if (debug) console.log(`      ${unit.name}: T${tier} → ${tierBonus >= 0 ? '+' : ''}${tierBonus}${tierMult < 1 ? ` (${forcedSecondary ? 'forced' : 'subdps'} x0.5)` : ''}, +${titledBonus} titled`);
+        } else if (debug) {
+            console.log(`      ${unit.name}: T${tier} → ${tierBonus >= 0 ? '+' : ''}${tierBonus}${tierMult < 1 ? ` (${forcedSecondary ? 'forced' : 'subdps'} x0.5)` : ''}`);
+        }
+
+        const dpsBuffUtil = computeBuffUtilization(unit, team);
+        if (dpsBuffUtil < 1.0) {
+            const buffs = unit.mechanics?.buffs || {};
+            const totalBuffWeight = Object.values(buffs).reduce((sum, v) => sum + w(v), 0);
+            if (totalBuffWeight > 0) {
+                const wastedWeight = totalBuffWeight * (1 - dpsBuffUtil);
+                const penalty = Math.round(wastedWeight * 15);
+                score -= penalty;
+                if (debug) console.log(`      ${unit.name}: wasted DPS buff penalty -${penalty} (util ${Math.round(dpsBuffUtil * 100)}%, wasted ${wastedWeight.toFixed(1)})`);
             }
         }
-    }
-    
-    // SHILL preference
-    if (boss.shill) {
-        const isDPSShill = DPS_ROLES.includes(boss.shill);
-        
-        if (isDPSShill) {
-            const hasShilledDPS = dpsUnits.some(unit => unit.tags.includes(boss.shill));
-            
-            if (hasShilledDPS) {
-                score += 15;
-            } else {
-                const dpsMatchesWeaknessElement = dpsUnits.some(unit => 
-                    boss.weaknesses.includes(getElement(unit))
-                );
-                
-                if (dpsMatchesWeaknessElement) {
-                    score -= 10;
+
+        const totalizeWeight = w(unit.mechanics?.damage?.totalize);
+        if (totalizeWeight > 0) {
+            const teammates = team.filter(t => t !== unit);
+            let stunInfra = 0;
+            for (const t of teammates) {
+                const tRoles = getEffectiveRoles(t);
+                if (tRoles.includes('stun')) {
+                    stunInfra += 1;
                 } else {
-                    score -= 35;
+                    const hasHighDaze = w(t.mechanics?.utility?.daze) >= 2;
+                    if (hasHighDaze) stunInfra += 0.3;
                 }
             }
+
+            if (stunInfra < 2) {
+                const deficit = 2 - stunInfra;
+                const penalty = Math.round(totalizeWeight * MULT.TOTALIZE_PENALTY * deficit * (1 + deficit));
+                score -= penalty;
+                if (debug) console.log(`      ${unit.name}: totalize stun demand -${penalty} (stun infra ${stunInfra.toFixed(1)}, need 2)`);
+            }
+        }
+    }
+
+    // --- Non-DPS Tier + Rank (gated by buff utilization) ---
+    for (const unit of [...supportUnits, ...defenseUnits, ...stunUnits]) {
+        const tier = unit.tier ?? 2.5;
+        let tierBonus = 0;
+        if (tier <= 0.5)      tierBonus = 23 - (tier * 8);
+        else if (tier <= 1.5) tierBonus = 9 - ((tier - 1) * 4);
+        else if (tier <= 2)   tierBonus = -(lenient ? 5 : 14);
+        else if (tier <= 3)   tierBonus = -(lenient ? 20 : 60);
+        else                  tierBonus = -(lenient ? 40 : 100);
+
+        let rankBonus = 0;
+        if (isStun(unit)) {
+            if (isSRank(unit)) { rankBonus += 10; if (isLimited(unit)) rankBonus += 5; }
+            else if (isARank(unit)) rankBonus = -5;
         } else {
-            const hasShilledRole = team.some(unit => unit.tags.includes(boss.shill));
-            if (!hasShilledRole) {
-                return -1;
+            if (isSRank(unit)) { rankBonus += 10; if (isLimited(unit)) rankBonus += 8; }
+            else if (isARank(unit)) rankBonus = -5;
+        }
+
+        if (tier >= 2 && tierBonus < 0 && rankBonus > 0) {
+            rankBonus = Math.min(rankBonus, Math.floor(Math.abs(tierBonus) / 2));
+        }
+
+        if (isStun(unit)) {
+            const allDPSStunless = team.filter(isDPS).every(isStunlessUnit);
+            if (allDPSStunless) {
+                tierBonus = Math.round(tierBonus * 0.4);
+                rankBonus = Math.round(rankBonus * 0.4);
+            }
+        }
+
+        const utilization = computeBuffUtilization(unit, team);
+        const relevanceMult = Math.max(BUFF_UTIL_FLOOR, utilization * utilization);
+        if (tierBonus > 0) tierBonus = Math.round(tierBonus * relevanceMult);
+        if (rankBonus > 0) rankBonus = Math.round(rankBonus * relevanceMult);
+
+        score += tierBonus + rankBonus;
+        if (debug) {
+            const role = isStun(unit) ? 'stun' : 'support/def';
+            const utilPct = Math.round(utilization * 100);
+            console.log(`      ${unit.name}: T${tier} → tier ${tierBonus >= 0 ? '+' : ''}${tierBonus}, rank ${rankBonus >= 0 ? '+' : ''}${rankBonus} (${role}, util ${utilPct}%)`);
+        }
+    }
+
+    // --- DPS Rank ---
+    if (debug) console.log('    Rank:');
+    for (const unit of dpsUnits) {
+        let rankBonus = 0;
+        if (isSRank(unit)) {
+            rankBonus += 20;
+            if (isTitled(unit)) rankBonus += 15;
+            if (isLimited(unit)) rankBonus += 10;
+        } else if (isARank(unit)) {
+            const tier = unit.tier ?? 2.5;
+            rankBonus = (tier >= 2) ? -(lenient ? 25 : 80) : -10;
+        }
+        if (forcedSecondaryUnits.has(unit) && rankBonus > 0) {
+            rankBonus = Math.round(rankBonus * 0.5);
+        }
+        score += rankBonus;
+        if (debug) console.log(`      ${unit.name} (DPS): ${rankBonus >= 0 ? '+' : ''}${rankBonus}${forcedSecondaryUnits.has(unit) ? ' (forced x0.5)' : ''}`);
+    }
+
+    return score;
+}
+
+// ============================================================================
+// LAYER 3: BOSS MATCHUP
+// ============================================================================
+
+function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
+    let score = 0;
+    
+    const dpsUnits = team.filter(isDPS);
+    const stunUnits = team.filter(isStun);
+    const defenseUnits = team.filter(isDefense);
+
+    if (debug) console.log('\n  LAYER 3: BOSS MATCHUP');
+
+    // --- Shill preference ---
+    if (boss.shill) {
+        const isDPSShill = DPS_ROLES.includes(boss.shill);
+        if (isDPSShill) {
+            const hasShilledDPS = dpsUnits.some(u => u.tags.includes(boss.shill));
+            if (hasShilledDPS) {
+                score += 15;
+                if (debug) console.log(`    Shill match (${boss.shill}): +15`);
+            } else {
+                const dpsMatchesElement = dpsUnits.some(u => boss.weaknesses.includes(getElement(u)));
+                const penalty = dpsMatchesElement ? -25 : -50;
+                score += penalty;
+                if (debug) console.log(`    Shill mismatch (${boss.shill}): ${penalty}`);
+            }
+        } else {
+            if (!team.some(u => u.tags.includes(boss.shill))) {
+                if (debug) console.log(`    DISQUALIFIED: Missing required role ${boss.shill}`);
+                return { score: -1, disqualified: true };
             }
             score += 15;
+            if (debug) console.log(`    Non-DPS shill match (${boss.shill}): +15`);
         }
     }
     
-    // Favored units (amplified by shillIntensity)
+    // --- Favored units ---
     const shillIntensity = boss.shillIntensity ?? 1;
     if (boss.favored && boss.favored.length > 0) {
         let favoredCount = 0;
@@ -541,779 +783,717 @@ export function scoreTeamForBoss(team, boss, options = {}) {
                 const multiplier = favoredCount === 1
                     ? shillIntensity
                     : 1 + (shillIntensity - 1) * 0.5;
-                const bonus = Math.round(25 * multiplier);
+                const bonus = Math.round(35 * multiplier);
                 score += bonus;
-                if (debug) console.log(`  Favored: ${unit.name} +${bonus} (intensity ${shillIntensity}, #${favoredCount})`);
+                if (debug) console.log(`    Favored: ${unit.name} +${bonus} (intensity ${shillIntensity}, #${favoredCount})`);
             }
         }
     }
     
-    // TIER scoring for DPS - cliff-based system with big gaps between tiers (full weight)
-    if (debug) console.log(`\n  DPS TIER SCORING:`);
-    for (const unit of dpsUnits) {
-        const tier = unit.tier ?? 2.5;
-        
-        // Subdps units get reduced tier when paired with another DPS of the same type
-        // Attack subdps (Orphie) with another attacker, or anomaly subdps (Vivian,
-        // Burnice, Grace) with another anomaly unit — the subdps enhances, not carries
-        const isSubDPSAttacker = unit.tags.includes("attack") && 
-                                 unit.synergy?.tags?.includes("subdps");
-        const hasOtherAttacker = attackers.filter(a => a !== unit).length > 0;
-        const isSecondaryAttacker = isSubDPSAttacker && hasOtherAttacker;
-        const isSubDPSAnomaly = unit.tags.includes("anomaly") && 
-                                unit.synergy?.tags?.includes("subdps");
-        const hasOtherAnomaly = anomalyUnits.filter(a => a !== unit).length > 0;
-        const isSecondaryAnomaly = isSubDPSAnomaly && hasOtherAnomaly;
-        const tierMultiplier = (isSecondaryAttacker || isSecondaryAnomaly) ? 0.5 : 1.0;
-        
-        let tierBonus = 0;
-        if (tier <= 0.5) {
-            // Elite tier - strong bonus (bigger cliff from good tier)
-            tierBonus = (65 - (tier * 20)) * tierMultiplier; // T0: +65, T0.5: +55
-            score += tierBonus;
-        } else if (tier <= 1.5) {
-            // Good tier - moderate bonus (significant cliff from elite)
-            tierBonus = (25 - ((tier - 1) * 10)) * tierMultiplier; // T1: +25, T1.5: +20
-            score += tierBonus;
-        } else if (tier <= 2) {
-            // Mediocre tier - penalty (big cliff from good)
-            tierBonus = -(lenient ? 15 : 40);
-            score += tierBonus;
-        } else if (tier <= 3) {
-            // Bad tier - near-disqualifying (T3 DPS like Nekomata should rarely appear)
-            tierBonus = -(lenient ? 40 : 130);
-            score += tierBonus;
-        } else {
-            // Terrible tier - disqualifying
-            tierBonus = -(lenient ? 60 : 130);
-            score += tierBonus;
-        }
-        if (debug) {
-            const multiplierNote = (isSecondaryAttacker || isSecondaryAnomaly) ? ` (subdps x0.5)` : '';
-            console.log(`    ${unit.name}: T${tier} → ${tierBonus >= 0 ? '+' : ''}${tierBonus}${multiplierNote}`);
-        }
-        
-        // Titled DPS bonus - titled S-ranks are significantly stronger than other units
-        // This creates proper separation between titled and non-titled units
-        if (unit.tags.includes('title')) {
-            const titledBonus = 20;
-            score += titledBonus;
-            if (debug) console.log(`    ${unit.name}: +${titledBonus} (titled unit bonus)`);
-        }
-    }
-    
-    // TIER scoring for support/defense/stun - REDUCED weight (~35% of DPS)
-    // DPS matters MORE than supports; supports enhance good teams but can't carry bad DPS
-    for (const unit of [...supportUnits, ...defenseUnits, ...stunUnits]) {
-        const tier = unit.tier ?? 2.5;
-        
-        if (tier <= 0.5) {
-            // Elite tier - reduced bonus
-            const tierBonus = 23 - (tier * 8); // T0: +23, T0.5: +19 (was +40/+34)
-            score += tierBonus;
-        } else if (tier <= 1.5) {
-            // Good tier - reduced bonus
-            const tierBonus = 9 - ((tier - 1) * 4); // T1: +9, T1.5: +7 (was +15/+12)
-            score += tierBonus;
-        } else if (tier <= 2) {
-            // Mediocre tier - reduced penalty
-            score -= lenient ? 5 : 14; // (was -10/-25)
-        } else if (tier <= 3) {
-            // Bad tier - significant penalty
-            score -= lenient ? 20 : 60;
-        } else {
-            // Terrible tier (T4+) - near-disqualifying penalty
-            score -= lenient ? 40 : 100;
-        }
-    }
-    
-    // Team composition rules
-    if (dpsUnits.length >= 3) {
-        return -1;
-    }
-    
-    // Teams MUST have at least 1 DPS unit
-    if (dpsUnits.length === 0) {
-        return -1;
-    }
-    
-    const nonTitledAnomalyUnits = anomalyUnits.filter(u => !isTitled(u));
-    const nonAnomalyDPS = dpsUnits.filter(u => !u.tags.includes("anomaly"));
-    
-    // Flags for solo anomaly composition validity - hoisted so anomaly comp section can use them
-    let hasStunSynergyAnomalyComp = false;
-    let hasExplicitSynergyAnomalyComp = false;
-    
-    if (nonTitledAnomalyUnits.length > 0 && anomalyUnits.length < 2) {
-        // Check for Monoshock exception: ALL THREE team members must share the same element
-        // Example: Harumasa (attack, electric) + Grace (anomaly, electric) + Rina (support, electric)
-        let hasAnomalyAttackSynergy = false;
-        
-        for (const attacker of attackers) {
-            if (attacker.synergy?.tags?.includes("anomaly")) {
-                const attackerElement = getElement(attacker);
-                const matchingAnomalies = nonTitledAnomalyUnits.filter(a => getElement(a) === attackerElement);
-                
-                if (matchingAnomalies.length > 0) {
-                    // Check that the third team member is also the same element
-                    const thirdUnit = team.find(u => !isAttacker(u) && !isAnomaly(u));
-                    if (thirdUnit && getElement(thirdUnit) === attackerElement) {
-                        // All three units share the same element - valid Monoshock
-                        hasAnomalyAttackSynergy = true;
-                        log(`Monoshock (all ${attackerElement}): ${attacker.name} + ${matchingAnomalies[0].name} + ${thirdUnit.name}`, 10);
-                        score += 10; // Small bonus for valid Monoshock composition
-                        break;
-                    }
-                }
-            }
-        }
-        
-        // Check for stun-synergy anomaly exception (e.g., Aria)
-        // These anomaly units can work in stun/anomaly/support compositions like attack teams
-        // OR with explicit unit synergy (e.g., Aria/Sunna/Yuzuha)
-        const stunSynergyAnomalyUnits = nonTitledAnomalyUnits.filter(hasStunSynergy);
-        
-        if (stunSynergyAnomalyUnits.length > 0) {
-            const hasStunner = stunUnits.length >= 1;
-            
-            let hasExplicitSynergy = false;
-            for (const anomaly of stunSynergyAnomalyUnits) {
-                for (const teammate of team.filter(t => t !== anomaly)) {
-                    if (anomaly.synergy?.units?.includes(teammate.name) || 
-                        teammate.synergy?.units?.includes(anomaly.name)) {
-                        hasExplicitSynergy = true;
-                        break;
-                    }
-                }
-                if (hasExplicitSynergy) break;
-            }
-            
-            hasStunSynergyAnomalyComp = hasStunner || hasExplicitSynergy;
-        }
-        
-        // Explicit synergy anomaly/support/support pattern (generalized)
-        // Non-subdps anomaly with explicit unit synergy partner can use double-support composition
-        // This enables patterns like Aria/Sunna/Yuzuha and future similar compositions
-        if (!hasStunSynergyAnomalyComp) {
-            const nonSubdpsAnomalyUnits = nonTitledAnomalyUnits.filter(u => 
-                !u.synergy?.tags?.includes("subdps")
-            );
-            for (const anomaly of nonSubdpsAnomalyUnits) {
-                for (const teammate of team.filter(t => t !== anomaly)) {
-                    if (anomaly.synergy?.units?.includes(teammate.name) || 
-                        teammate.synergy?.units?.includes(anomaly.name)) {
-                        hasExplicitSynergyAnomalyComp = true;
-                        break;
-                    }
-                }
-                if (hasExplicitSynergyAnomalyComp) break;
-            }
-        }
-        
-        if (hasStunSynergyAnomalyComp) {
-            log('Stun-synergy anomaly composition', 15);
-            score += 15;
-        } else if (hasExplicitSynergyAnomalyComp) {
-            log('Explicit synergy anomaly/support/support', 15);
-            score += 15;
-        }
-        
-        if (!hasAnomalyAttackSynergy && !hasStunSynergyAnomalyComp && !hasExplicitSynergyAnomalyComp) {
-            if (nonAnomalyDPS.length > 0) {
-                // Non-titled anomaly with non-anomaly DPS - normally invalid
-                if (lenient) {
-                    log('Non-titled anomaly with non-anomaly DPS (lenient)', -80);
-                    score -= 80; // Heavy penalty but allow in desperate situations
-                } else {
-                    log('DISQUALIFIED: Non-titled anomaly with non-anomaly DPS');
-                    if (debug) console.log('Team disqualified:', team.map(u => u.name).join('/'));
-                    return -1;
-                }
-            }
-            if (dpsUnits.length === nonTitledAnomalyUnits.length) {
-                // Solo non-titled anomaly - normally invalid
-                if (lenient) {
-                    log('Solo non-titled anomaly (lenient)', -100);
-                    score -= 100; // Very heavy penalty but allow
-                } else {
-                    log('DISQUALIFIED: Solo non-titled anomaly');
-                    if (debug) console.log('Team disqualified:', team.map(u => u.name).join('/'));
-                    return -1;
-                }
-            }
-        }
-    }
-    
-    // Solo titled anomaly agent validation
-    if (anomalyUnits.length === 1 && dpsUnits.length === 1 && isTitled(anomalyUnits[0])) {
-        const hasSupportOrDefense = supportUnits.length > 0 || defenseUnits.length > 0;
-        const hasStun = stunUnits.length > 0;
-        
-        // Check for explicit unit synergy (named synergy)
-        let hasExplicitSynergy = false;
-        for (let i = 0; i < team.length; i++) {
-            for (let j = i + 1; j < team.length; j++) {
-                const u1 = team[i];
-                const u2 = team[j];
-                // Check if u1 lists u2, or u2 lists u1 in synergy.units
-                if (u1.synergy?.units?.includes(u2.name) || u2.synergy?.units?.includes(u1.name)) {
-                    hasExplicitSynergy = true;
-                    break;
-                }
-            }
-            if (hasExplicitSynergy) break;
-        }
-
-        // Must have Support/Defense AND (Stun OR Explicit Synergy)
-        if (!hasSupportOrDefense || (!hasStun && !hasExplicitSynergy)) {
-             if (lenient) {
-                 log('Invalid solo titled anomaly comp (lenient)', -100);
-                 score -= 100;
-             } else {
-                 log('DISQUALIFIED: Invalid solo titled anomaly comp');
-                 if (debug) console.log('Team disqualified:', team.map(u => u.name).join('/'), 'Invalid solo titled anomaly comp');
-                 return -1;
-             }
-        }
-    }
-
-    // Anomaly team composition (runs for any anomaly team, not just anomaly-shill bosses)
-    if (anomalyUnits.length > 0) {
-        const isNeutralBoss = boss.weaknesses.length === 0;
-        
-        // Check if ALL anomaly units are on-element (for full bonuses)
-        // Neutral boss does NOT get element bonuses - must compete on tier/composition
-        const allAnomalyOnElement = anomalyUnits.length > 0 && 
-            !isNeutralBoss &&
-            anomalyUnits.every(u => boss.weaknesses.includes(getElement(u)));
-        
-        // Titled anomaly is valid as long as their element isn't RESISTED
-        // Off-element (not weak, not resisted) is viable but won't get weakness bonuses
-        const hasValidTitledAnomaly = anomalyUnits.some(u => 
-            isTitled(u) && !boss.resistances.includes(getElement(u))
-        );
-        // Double anomaly is valid if at least one anomaly is not resisted
-        const hasValidDoubleAnomaly = anomalyUnits.length >= 2 &&
-            anomalyUnits.some(u => !boss.resistances.includes(getElement(u)));
-        // Stun-synergy anomaly and explicit-synergy anomaly compositions also qualify
-        // as long as at least one anomaly is not resisted
-        const hasValidSoloSynergyAnomaly = (hasStunSynergyAnomalyComp || hasExplicitSynergyAnomalyComp) &&
-            anomalyUnits.some(u => !boss.resistances.includes(getElement(u)));
-        const hasValidAnomalyComp = hasValidTitledAnomaly || hasValidDoubleAnomaly || hasValidSoloSynergyAnomaly;
-        
-        if (hasValidAnomalyComp) {
-            // Base comp bonus for valid anomaly teams
-            if (nonDpsUnits.length === 0) {
-                score -= 50;
-            } else {
-                score += 5; // Reduced base comp bonus
-            }
-            
-            if (anomalyUnits.length >= 2) {
-                if (allAnomalyOnElement) {
-                    // Full double anomaly bonus ONLY if both are on-element
-                    score += 15; // Reduced from 25
-                    
-                    const anomalyElements = anomalyUnits.map(getElement);
-                    const uniqueElements = new Set(anomalyElements);
-                    if (uniqueElements.size >= 2) {
-                        score += 20; // Reduced from 30
-                    } else {
-                        score -= 15; // Same element penalty
-                    }
-                } else {
-                    // At least one anomaly is off-element
-                    if (boss.weaknesses.length > 0) {
-                        const anyAnomalyMatchesWeakness = anomalyUnits.some(u => 
-                            boss.weaknesses.includes(getElement(u))
-                        );
-                        if (anyAnomalyMatchesWeakness) {
-                            score -= 25; // Some match, some don't - moderate penalty for off-element partner
-                        }
-                        // If none match weakness: no bonus, no penalty (off-element but not resisted)
-                    }
-                }
-            } else if (anomalyUnits.length === 1 && isTitled(anomalyUnits[0])) {
-                // Solo titled anomaly - bonus only if on-element
-                const soloElement = getElement(anomalyUnits[0]);
-                if (boss.weaknesses.includes(soloElement)) {
-                    score += 30; // Bonus for on-element focused composition
-                }
-                // Off-element but not resisted: valid, no bonus, no penalty
-            }
-            
-            const nonAnomalyDPSInComp = dpsUnits.filter(u => !u.tags.includes("anomaly"));
-            if (nonAnomalyDPSInComp.length > 0) {
-                score -= 40;
-            }
-            
-            // Anomaly teams prefer support/defense over stun
-            // EXCEPTION 1: Stun-synergy anomaly units (like Aria) WANT a stunner
-            // EXCEPTION 2: Monoshock compositions (attacker with anomaly synergy + same-element anomaly)
-            //              can work with OR without a stunner - it's a hybrid team, not pure anomaly
-            const hasStunSynergyAnomalyUnit = anomalyUnits.some(hasStunSynergy);
-            
-            // Check for Monoshock composition (attacker with anomaly synergy + same-element anomaly + same-element third)
-            // ALL THREE team members must share the same element (e.g., Grace/Harumasa/Rina all electric)
-            const hasMonoshockComp = attackers.some(a => {
-                if (!a.synergy?.tags?.includes("anomaly")) return false;
-                const attackerElement = getElement(a);
-                const hasMatchingAnomaly = anomalyUnits.some(an => getElement(an) === attackerElement);
-                if (!hasMatchingAnomaly) return false;
-                // Check that the third team member is also the same element
-                const thirdUnit = team.find(u => !isAttacker(u) && !isAnomaly(u));
-                return thirdUnit && getElement(thirdUnit) === attackerElement;
-            });
-            
-            if (stunUnits.length > 0 && !hasStunSynergyAnomalyUnit && !hasMonoshockComp) {
-                // Regular anomaly team with stunner - suboptimal
-                if (supportUnits.length === 0 && defenseUnits.length === 0) {
-                    score -= 40;
-                } else {
-                    score -= 20;
-                }
-            }
-            // If hasStunSynergyAnomalyUnit && stunUnits.length > 0: no penalty (intended composition)
-            // If hasMonoshockComp && stunUnits.length > 0: no penalty (hybrid team can use stunner)
-            
-            // Support/defense bonuses - given for valid anomaly comps (not just fully on-element)
-            // This ensures anomaly teams on neutral boss still get support bonus
-            if (supportUnits.length >= 1) {
-                score += 15;
-            }
-            if (defenseUnits.length >= 1) {
-                score += 10;
-            }
-        } else {
-            // No valid anomaly comp - need on-element DPS as fallback
-            const dpsMatchesWeakness = dpsUnits.some(u => boss.weaknesses.includes(getElement(u)));
-            
-            if (!dpsMatchesWeakness) {
-                // Off-element DPS on anomaly-shill without anomaly comp
-                if (lenient) {
-                    score -= 120; // Very heavy penalty but allow
-                } else {
-                    return -1;
-                }
-            }
-        }
-    }
-    
-    // Attack teams NEED a stunner - it's fundamental to the playstyle
-    // Ideal: stun/attack/support or stun/attack/defense
-    // EXCEPTION: Monoshock teams (attacker with anomaly synergy + same-element anomaly)
-    if (attackers.length > 0) {
-        // Check for Monoshock composition (all three team members must share the same element)
-        const hasAnomalyAttackComp = attackers.some(a => {
-            if (!a.synergy?.tags?.includes("anomaly")) return false;
-            const attackerElement = getElement(a);
-            const hasMatchingAnomaly = anomalyUnits.some(an => getElement(an) === attackerElement);
-            if (!hasMatchingAnomaly) return false;
-            // Check that the third team member is also the same element
-            const thirdUnit = team.find(u => !isAttacker(u) && !isAnomaly(u));
-            return thirdUnit && getElement(thirdUnit) === attackerElement;
-        });
-        
-        // Check for Stunless composition (e.g. Ye Shunguong)
-        const hasStunlessAttacker = attackers.some(a => a.synergy?.tags?.includes("stunless"));
-
-        if (hasAnomalyAttackComp && anomalyUnits.length > 0) {
-            // Monoshock: attacker + anomaly = valid hybrid
-            // Can work WITH a stunner (Stun/Anomaly/Attack) or WITHOUT (Anomaly/Attack/Support)
-            log('Anomaly-attack composition (monoshock)', 10);
-            score += 10;
-            
-            // If monoshock has a stunner (Stun/Anomaly/Attack), the anomaly acts as "support"
-            // for the attacker by providing shock buildup. Give bonus to partially compensate
-            // for missing traditional support bonuses - but not fully, since supports like Rina
-            // with element synergy contribute more to the anomaly/attack hybridization
-            if (stunUnits.length >= 1) {
-                log('Monoshock with stunner - anomaly as pseudo-support', 55);
-                score += 55;
-            }
-        } else if (stunUnits.length >= 1) {
-            if(hasStunlessAttacker && boss.shill !== "stun") {
-                log('Stunless attack unit present - stunner not required', -10);
-                score -= 10;
-            } else {
-                log('Attack team with stunner', 25);
-                score += 25; // Boosted from 15 to match other archetypes
-           }
-        } else if (hasStunlessAttacker && boss.shill !== "stun") {
-            log('Stunless attack unit present - stunner not required', 20);
-            score += 20; // Boosted from 10 to match other archetypes
-            
-            // Ideal stunless composition: stunless attacker + double support (no stunner)
-            // This is YSG's intended playstyle - she doesn't benefit from stunners
-            const supportDefenseCount = supportUnits.length + defenseUnits.length;
-            if (supportDefenseCount >= 2) {
-                log('Ideal stunless composition - double support', 40);
-                score += 40;
-            }
-        } else {
-            log('Attack team without stunner', -60);
-            score -= 60; // Near-disqualifying: normal attack teams need stunner
-        }
-        
-        // Double-stun composition for attackers who synergize with stun (e.g., Hugo)
-        // These attackers NEED two stunners - one stunner is suboptimal for them
-        // The bonus must compensate for:
-        //   - Missing support/defense bonus (+20)
-        //   - Missing support contribution bonuses (specialist +35, or generalist +8-10)
-        //   - The actual benefit of having double-stun synergy
-        for (const unit of attackers) {
-            if (hasStunSynergy(unit)) {
-                if (stunUnits.length === 2) {
-                    score += 70; // Fully compensates for missing support + provides double-stun benefit
-                    if (debug) console.log(`    ${unit.name}: +70 (double-stun composition)`);
-                } else if (stunUnits.length === 1) {
-                    score -= 30; // Single stunner is suboptimal for stun-synergy attackers
-                    if (debug) console.log(`    ${unit.name}: -30 (needs double-stun, only has one)`);
-                }
-            }
-        }
-        
-        if (supportUnits.length >= 1 || defenseUnits.length >= 1) {
-            score += 20; // Boosted from 10 to match other archetypes
-        }
-        if (attackers.length > 1) {
-             const hasSubDPS = attackers.some(u => u.synergy?.tags?.includes("subdps"));
-             if (!hasSubDPS) {
-                 score -= 50; // Double attacker rarely makes sense UNLESS one is SubDPS
-             }
-        }
-    }
-    
-    // Rupture teams (runs for any rupture team, not just rupture-shill bosses)
-    if (ruptureUnits.length > 0) {
-        // Check if rupture DPS is A-rank (requires stunner unless boss shills rupture)
-        const hasARankRupture = ruptureUnits.some(isARank);
-        const hasSRankRupture = ruptureUnits.some(isSRank);
-        
-        if (hasARankRupture && !hasSRankRupture) {
-            // A-rank rupture NEEDS a stunner (unless boss shills rupture)
-            if (stunUnits.length === 0) {
-                if (boss.shill === "rupture") {
-                    score -= 40; // Penalty but allowed on rupture-shill
-                } else {
-                    return -1; // Disqualify on non-rupture-shill
-                }
-            }
-        }
-        
-        // Two valid compositions:
-        // 1. stun/rupture/[support|defense] - traditional composition (with bonus)
-        // 2. rupture/2x[support|defense] - double support composition (S-rank only)
-        const hasStunComposition = stunUnits.length >= 1 && (supportUnits.length >= 1 || defenseUnits.length >= 1);
-        const hasDoubleSupport = supportUnits.length + defenseUnits.length >= 2;
-        
-        if (hasStunComposition || hasDoubleSupport) {
-            score += 15;
-            
-            // Bonus for the traditional stun/rupture/support|defense composition
-            // Consensus: rupture teams with stun are generally better than double-support
-            if (hasStunComposition) {
-                score += 25; // Increased base bonus to lift the entire Stun/Rupture archetype
-                
-                // Extra bonus if the stunner specifically synergizes with Rupture
-                // (e.g. Dialyn, Ju Fufu) - this makes them superior to generic stunners
-                const synergisticStunner = stunUnits.some(u => u.synergy?.tags?.includes("rupture"));
-                if (synergisticStunner) {
-                    log('Synergistic Stunner in Rupture team', 20);
-                    score += 20;
-                }
-            }
-        }
-        
-        // For rupture teams, stunners without rupture synergy are suboptimal
-        for (const unit of stunUnits) {
-            const hasRuptureSynergy = unit.synergy?.tags?.includes("rupture");
-            if (!hasRuptureSynergy) {
-                score -= 20; // Non-synergy stun is always suboptimal for rupture
-            }
-        }
-    }
-    
-    // DPS weakness/resistance
+    // --- DPS element weakness/resistance ---
     let dpsMatchesWeakness = false;
-    
     for (const unit of dpsUnits) {
         const element = getElement(unit);
-        
-        if (boss.resistances.includes(element)) {
-            return -1;
-        }
-        
-        if (boss.weaknesses.includes(element)) {
-            dpsMatchesWeakness = true;
-            const isSubDPS = unit.synergy?.tags?.includes("subdps");
 
-            // On-element DPS is the foundation of team building
-            if (isSRank(unit)) {
-                if (isSubDPS) {
-                    score += 25; // Reduced for subdps
-                } else {
-                    score += 40; // S-rank on-element DPS is the starting point
-                }
-            } else {
-                if (isSubDPS) {
-                    score += 10; // Reduced for subdps
-                } else {
-                    score += 20; // A-rank on-element still good
-                }
-            }
-            
-            // Titled on-element DPS can partially compete with shill mismatch
-            // They're powerful enough to overcome not matching the boss shill
+        if (boss.weaknesses.includes(element)) {
+            const isSubDPS = hasSubDPSRole(unit);
+            if (!isSubDPS) dpsMatchesWeakness = true;
+            const bonus = isSRank(unit)
+                ? (isSubDPS ? 25 : 40)
+                : (isSubDPS ? 10 : 20);
+            score += bonus;
+            if (debug) console.log(`    ${unit.name} on-element (${element}): +${bonus}`);
+
             if (isTitled(unit) && boss.shill && DPS_ROLES.includes(boss.shill) && !unit.tags.includes(boss.shill)) {
-                score += 30; // Helps titled on-element compete with shill-matching teams
+                score += 30;
+                if (debug) console.log(`    ${unit.name} titled on-element vs shill mismatch: +30`);
             }
-        } else {
-            // Neutral off-element DPS - moderate penalty (not as harsh as resistance)
-            // Titled units partially overcome element mismatch due to raw power
-            // But if boss has no weaknesses (element-neutral), no penalty
-            if (boss.weaknesses.length > 0) {
-                const basePenalty = 20; // Reduced from 30
-                const penalty = isTitled(unit) ? basePenalty / 2 : basePenalty;
-                score -= lenient ? Math.floor(penalty / 3) : penalty;
-            }
+        } else if (boss.weaknesses.length > 0) {
+            const singleWeakness = boss.weaknesses.length === 1;
+            const basePenalty = singleWeakness ? 30 : 20;
+            const applied = lenient ? Math.floor(basePenalty / 3) : basePenalty;
+            score -= applied;
+            if (debug) console.log(`    ${unit.name} off-element: -${applied}${singleWeakness ? ' (single weakness)' : ''}`);
         }
     }
-    
+
     if (dpsUnits.length > 0 && !dpsMatchesWeakness && boss.weaknesses.length > 0) {
-        // No DPS matches weakness - penalty (but not as severe as resistance)
-        // Titled DPS can partially overcome this with raw power
+        const subdpsMatchesWeakness = dpsUnits.some(u =>
+            hasSubDPSRole(u) && boss.weaknesses.includes(getElement(u)));
         const hasTitledDPS = dpsUnits.some(isTitled);
-        const basePenalty = 50; // Reduced from 100
-        const penalty = hasTitledDPS ? basePenalty / 2 : basePenalty;
-        score -= lenient ? Math.floor(penalty / 2) : penalty;
+        const singleWeakness = boss.weaknesses.length === 1;
+        const basePenalty = subdpsMatchesWeakness ? 25 : 50;
+        const specificity = singleWeakness ? 1.5 : 1;
+        const penalty = (hasTitledDPS ? basePenalty / 2 : basePenalty) * specificity;
+        const applied = lenient ? Math.floor(penalty / 2) : penalty;
+        score -= applied;
+        if (debug) console.log(`    No primary DPS matches weakness${subdpsMatchesWeakness ? ' (subdps match)' : ''}: -${applied}`);
     }
-    
-    // Stun weakness/resistance - stun units deal damage, so element matters
+
+    // --- Stunner element ---
     for (const unit of stunUnits) {
         const element = getElement(unit);
-        
         if (boss.resistances.includes(element)) {
-            // Resisted stun is near-useless - heavy penalty
             score -= 80;
+            if (debug) console.log(`    ${unit.name} stun element resisted: -80`);
         }
-        
         if (boss.weaknesses.includes(element)) {
-            score += 15;
+            const util = computeBuffUtilization(unit, team);
+            const scaledBonus = Math.round(15 * util);
+            score += scaledBonus;
+            if (debug) console.log(`    ${unit.name} stun on-element: +${scaledBonus} (util ${Math.round(util * 100)}%)`);
         } else if (!boss.resistances.includes(element) && boss.weaknesses.length > 0) {
-            // Neutral/off-element stun
-            
-            // EXCEPTION: If stunner has explicit synergy with the team's DPS type, waive the penalty
-            // Synergy trumps element for utility roles
-            const dpsTypes = new Set(dpsUnits.map(getDPSType).filter(t => t !== null));
-            const hasTypeSynergy = unit.synergy?.tags?.some(tag => dpsTypes.has(tag));
-            
-            if (hasTypeSynergy) {
-                log(`Off-element stunner waived due to synergy (${unit.name})`, 0);
-            } else {
-                // Only penalize if boss has weaknesses (element-neutral)
-                if (boss.shill === "stun") {
-                    // On stun-shill, off-element is acceptable (stun is priority)
-                    score -= 15;
-                } else {
-                    // On non-stun-shill, off-element stunner is a bigger issue
-                    score -= 35;
+            score -= 15;
+            if (debug) console.log(`    ${unit.name} stun off-element: -15`);
+        }
+    }
+
+    // --- Pseudo-role vs boss anti-type ---
+    if (boss.anti && boss.anti.length > 0) {
+        for (const unit of team) {
+            if (isDPS(unit)) continue;
+            const pr = unit.mechanics?.pseudoRole;
+            if (!pr) continue;
+            const pseudoRoles = pr.split(',').map(s => s.trim());
+            for (const antiType of boss.anti) {
+                if (pseudoRoles.includes(antiType)) {
+                    score -= 30;
+                    if (debug) console.log(`    ${unit.name} pseudo-role '${antiType}' matches boss anti: -30`);
                 }
             }
         }
     }
-    
-    // Defense weakness/resistance
+
+    // --- Defense element ---
     for (const unit of defenseUnits) {
         const element = getElement(unit);
-        
-        if (boss.resistances.includes(element)) {
-            score -= 10;
-        }
-        
         if (boss.weaknesses.includes(element)) {
             score += 3;
+            if (debug) console.log(`    ${unit.name} defense on-element: +3`);
         }
     }
-    
-    // Rank preferences
-    for (const unit of dpsUnits) {
-        if (isSRank(unit)) {
-            score += 20;
-            if (isTitled(unit)) {
-                score += 15;
-            }
-            if (isLimited(unit)) {
-                score += 10;
-            }
-        } else if (isARank(unit)) {
-            const tier = unit.tier ?? 2.5;
-            if (tier >= 2) {
-                // A-rank Tier 2+ DPS (Anton, Billy, Corin) are near-useless
-                // (reduced penalty in lenient mode - might be only option)
-                score -= lenient ? 25 : 80;
-            } else {
-                score -= 10;
-            }
-        }
-    }
-    
-    for (const unit of stunUnits) {
-        if (isSRank(unit)) {
-            score += 10;
-            if (isLimited(unit)) {
-                score += 5;
-            }
-        } else if (isARank(unit)) {
-            score -= 5;
-        }
-    }
-    
-    for (const unit of [...supportUnits, ...defenseUnits]) {
-        if (isSRank(unit)) {
-            score += 15;
-            if (isLimited(unit)) {
-                score += 10;
-            }
-        } else if (isARank(unit)) {
-            score -= 8;
-        }
-    }
-    
-    // Universal support bonus
-    const teamElements = new Set(team.map(getElement));
-    const isMixedElementTeam = teamElements.size > 1;
-    
-    if (isMixedElementTeam) {
-        for (const unit of [...supportUnits, ...defenseUnits]) {
-            const hasTagPreferences = unit.synergy?.tags?.length > 0;
-            if (!hasTagPreferences) {
-                score += 8;
-            }
-        }
-    }
-    
-    // Support Contribution Scoring (dead weight approach)
-    // Philosophy: Mismatched supports contribute 0 (dead weight), not negative.
-    // A support that doesn't help is "absence of positive", not a penalty.
-    //
-    // Uses existing synergy.avoid for archetype compatibility:
-    // - If team archetype is in synergy.avoid → dead weight (0 contribution)
-    // - Specialists get +35 when matched, +25 for A-rank
-    // - T0 non-specialist on attack team gets +35 (de-facto specialist since attack has none)
-    // - Other generalists get +8 (small positive contribution)
-    
-    const teamDPSTypes = dpsUnits.map(getDPSType).filter(t => t !== null);
-    const teamArchetype = teamDPSTypes[0] || null; // Primary DPS defines team archetype
-    
-    if (debug) console.log(`\n  SUPPORT CONTRIBUTION SCORING (archetype: ${teamArchetype || 'none'}):`);
-    
-    for (const unit of [...supportUnits, ...defenseUnits]) {
-        // Check archetype compatibility via existing synergy.avoid
-        const avoidTags = unit.synergy?.avoid || [];
-        const avoidsTeamArchetype = teamArchetype && avoidTags.includes(teamArchetype);
-        
-        if (avoidsTeamArchetype) {
-            // Dead weight - no contribution, no penalty
-            if (debug) console.log(`    ${unit.name}: 0 (dead weight - avoids ${teamArchetype})`);
-            continue; // Skip to next unit - no further contribution
-        }
-        
-        // Support is compatible with team - determine bonus level
-        if (isSpecialist(unit) && getSpecialistType(unit) === teamArchetype) {
-            // Matching specialist (Yuzuha on anomaly, Lucia on rupture)
-            const bonus = isARank(unit) ? 25 : 35;
-            score += bonus;
-            if (debug) console.log(`    ${unit.name}: +${bonus} (matching specialist)`);
-        } else if (unit.tier <= 0 && teamArchetype === 'attack' && !isSpecialist(unit)) {
-            // T0 non-specialist on attack team = de-facto specialist
-            // Attack has no true specialist, so T0 generalist fills that role
-            score += 35;
-            if (debug) console.log(`    ${unit.name}: +35 (T0 generalist on attack = de-facto specialist)`);
-        } else if (shillIntensity > 1 && boss.favored?.includes(unit.name) && 
-                   unit.synergy?.tags?.includes(teamArchetype)) {
-            // Boss-favored support on high shill intensity boss, synergizing with team archetype
-            // Acts as a pseudo-specialist for this specific fight
-            score += 25;
-            if (debug) console.log(`    ${unit.name}: +25 (favored pseudo-specialist, intensity ${shillIntensity})`);
-        } else {
-            // Regular generalist contribution
-            score += 8;
-            if (debug) console.log(`    ${unit.name}: +8 (generalist contribution)`);
-        }
-    }
-    
-    // Synergy scoring
-    if (debug) console.log(`\n  SYNERGY SCORING:`);
+
+    // --- Damage-relevant resistance for support/pseudo-support units ---
     for (const unit of team) {
-        const teammates = team.filter(t => t.name !== unit.name);
-        const synergyScore = calculateSynergyScore(unit, teammates, boss, lenient, debug);
-        score += synergyScore;
-        if (debug) console.log(`    ${unit.name} synergy total: ${synergyScore >= 0 ? '+' : ''}${synergyScore}`);
-    }
-    
-    // DPS mixing penalty
-    score += calculateDPSMixingPenalty(team);
-    
-    // Double stun penalty
-    // Two stunners without synergy is wasteful - you'd rather have support/defense
-    if (stunUnits.length >= 2) {
-        let doubleStunJustified = false;
-        
-        // Check for specific stun synergy:
-        // 1. Explicit unit synergy (one stunner lists the other in synergy.units)
-        // 2. Explicit tag synergy for 'stun' (one stunner lists 'stun' in synergy.tags)
-        // 3. DPS unit explicitly requests 'stun' synergy (e.g., Hugo, Aria)
-        
-        for (let i = 0; i < stunUnits.length; i++) {
-            for (let j = i + 1; j < stunUnits.length; j++) {
-                const s1 = stunUnits[i];
-                const s2 = stunUnits[j];
-                
-                // Check named synergy
-                if (s1.synergy?.units?.includes(s2.name) || s2.synergy?.units?.includes(s1.name)) {
-                    doubleStunJustified = true;
-                    break;
-                }
-                
-                // Check specific 'stun' tag synergy
-                // We do NOT count elemental tags here because sharing an element doesn't justify double stun
-                if (hasStunSynergy(s1) || hasStunSynergy(s2)) {
-                     doubleStunJustified = true;
-                     break;
-                }
-            }
-            if (doubleStunJustified) break;
-            
-            for (const dps of dpsUnits) {
-                if (hasStunSynergy(dps)) {
-                    doubleStunJustified = true;
-                    break;
-                }
-            }
-        }
-        
-        if (!doubleStunJustified) {
-            score -= 150; // Heavy penalty - double stun without synergy is inefficient and should be disqualified
+        const element = getElement(unit);
+        if (!boss.resistances.includes(element)) continue;
+        const pseudo = unit.mechanics?.pseudoRole || '';
+        const isActualSupport = isSupport(unit) || isDefense(unit);
+        const isPseudoSupport = isDPS(unit) && pseudo.includes('support');
+        if (!isActualSupport && !isPseudoSupport) continue;
+        const damage = unit.mechanics?.damage || {};
+        const maxDamage = Math.max(0, ...Object.values(damage).map(v =>
+            typeof v === 'object' ? Math.max(...Object.values(v).map(Number)) : Number(v) || 0
+        ));
+        if (maxDamage > 1) {
+            const penalty = Math.round(maxDamage * 8);
+            score -= penalty;
+            if (debug) console.log(`    ${unit.name} damage-relevant resistance: -${penalty} (damage ${maxDamage})`);
         }
     }
-    
-    // Defensive assist requirement
-    const defensiveAssistCount = team.filter(hasDefensiveAssist).length;
-    if (defensiveAssistCount < boss.assists) {
-        return -1;
-    }
-    
-    // Only reward extra defensive assists when boss actually demands them
+
+    // --- Defensive assist bonus ---
     if (boss.assists >= 2) {
-        score += (defensiveAssistCount - boss.assists) * 3;
+        const extra = team.filter(hasDefensiveAssist).length - boss.assists;
+        if (extra > 0) {
+            score += extra * 3;
+            if (debug) console.log(`    Extra defensive assists: +${extra * 3}`);
+        }
     }
-    
-    if (debug) {
-        console.log(`\n  FINAL SCORE: ${score}`);
-        console.log(`${'='.repeat(60)}\n`);
+
+    return { score, disqualified: false };
+}
+
+// ============================================================================
+// LAYER 4: MECHANICAL SYNERGY
+// ============================================================================
+
+// --- Baseline Affinity ---
+
+function scoreBaselineAffinity(supplier, consumer, debug, options = {}) {
+    let score = 0;
+    const supplierBuffs = supplier.mechanics?.buffs || {};
+    const supplierDebuffs = supplier.mechanics?.debuffs || {};
+    const consumerRoles = getEffectiveRoles(consumer);
+    const consumerElement = getElement(consumer);
+    const firedCategories = new Set();
+    const dbg = (cat, val) => {
+        if (val > 0) firedCategories.add(cat);
+        if (debug && val > 0) console.log(`        ${cat}: ${val.toFixed(1)}`);
+    };
+
+    // ATK buffs → all DPS
+    if (supplierBuffs.atk) {
+        const cw = resolveBaselineWeight(consumer, 'atk');
+        if (cw > 0) {
+            const isRup = consumerRoles.includes('rupture');
+            const supply = isRup ? w(supplierBuffs.atk) * RUPTURE_ATK_EFFICIENCY : w(supplierBuffs.atk);
+            const val = supply * cw * MULT.ATK_BUFF;
+            score += val;
+            dbg('atk', val);
+        }
     }
-    
+
+    // Anomaly buffs → anomaly agents
+    if (supplierBuffs.anomaly) {
+        const cw = resolveBaselineWeight(consumer, 'anomaly-affinity');
+        if (cw > 0) {
+            const val = w(supplierBuffs.anomaly) * cw * MULT.ANOMALY_BUFF;
+            score += val;
+            dbg('anomaly', val);
+        }
+    }
+
+    // Sheer buffs → rupture agents
+    if (supplierBuffs.sheer) {
+        const cw = resolveBaselineWeight(consumer, 'sheer');
+        if (cw > 0) {
+            const val = w(supplierBuffs.sheer) * cw * MULT.SHEER_BUFF;
+            score += val;
+            dbg('sheer', val);
+        }
+    }
+
+    // PEN buffs → non-rupture DPS
+    if (supplierBuffs.pen) {
+        const cw = resolveBaselineWeight(consumer, 'pen');
+        if (cw > 0) {
+            const discount = options?.antiRupture ? 0.5 : 1;
+            const val = w(supplierBuffs.pen) * cw * MULT.PEN_BUFF * discount;
+            score += val;
+            dbg('pen', val);
+        }
+    }
+
+    // CR buffs → attackers and rupture
+    if (supplierBuffs.cr) {
+        const cw = resolveBaselineWeight(consumer, 'cr');
+        if (cw > 0) {
+            const val = w(supplierBuffs.cr) * cw * MULT.CR_BUFF;
+            score += val;
+            dbg('cr', val);
+        }
+    }
+
+    // CD buffs → attackers and rupture
+    if (supplierBuffs.cd) {
+        const cw = resolveBaselineWeight(consumer, 'cd');
+        if (cw > 0) {
+            const val = w(supplierBuffs.cd) * cw * MULT.CD_BUFF;
+            score += val;
+            dbg('cd', val);
+        }
+    }
+
+    // Stun-multiplier buffs → all DPS
+    if (supplierBuffs['stun-multiplier']) {
+        const cw = isDPSByRoles(consumerRoles) ? 1 : 0;
+        if (cw > 0) {
+            const val = w(supplierBuffs['stun-multiplier']) * cw * MULT.STUN_MULT_BUFF;
+            score += val;
+            dbg('stun-multiplier', val);
+        }
+    }
+
+    // Defense debuffs → non-rupture DPS and stunners
+    if (supplierDebuffs.defense) {
+        const cw = resolveBaselineWeight(consumer, 'defense');
+        if (cw > 0) {
+            const discount = options?.antiRupture ? 0.5 : 1;
+            const val = w(supplierDebuffs.defense) * cw * MULT.DEFENSE_DEBUFF * discount;
+            score += val;
+            dbg('defense', val);
+        }
+    }
+
+    // Element buffs → matching-element DPS and stunners
+    for (const elem of ELEMENTS) {
+        if (supplierBuffs[elem] && consumerElement === elem) {
+            const cw = resolveBaselineWeight(consumer, 'element');
+            if (cw > 0) {
+                const val = w(supplierBuffs[elem]) * cw * MULT.ELEMENT_BUFF;
+                score += val;
+                dbg(`element-buff(${elem})`, val);
+            }
+        }
+    }
+
+    // Element debuffs → matching-element DPS and stunners
+    for (const elem of ELEMENTS) {
+        if (supplierDebuffs[elem] && consumerElement === elem) {
+            const cw = resolveBaselineWeight(consumer, 'element');
+            if (cw > 0) {
+                const val = w(supplierDebuffs[elem]) * cw * MULT.ELEMENT_DEBUFF;
+                score += val;
+                dbg(`element-debuff(${elem})`, val);
+            }
+        }
+    }
+
+    // Stun infrastructure → non-stunless attackers and rupture
+    const infraWeight = getStunInfraWeight(supplier);
+    if (infraWeight > 0) {
+        const cw = resolveBaselineWeight(consumer, 'stun-infra');
+        if (cw > 0) {
+            const val = infraWeight * cw * MULT.STUN_INFRA;
+            score += val;
+            dbg('stun-infra', val);
+        }
+    }
+
+    // Recovery debuffs → all DPS (non-stunless), proportional to burst potential
+    // Chains scaling: longer stun windows = more chains
+    // Totalize: entire damage output is stun-time-dependent, so recovery is critical
+    if (supplierDebuffs.recovery) {
+        if (!isStunlessUnit(consumer) && isDPSByRoles(consumerRoles)) {
+            const burstWeight = getMaxBurstWeight(consumer);
+            const chainsScaling = w(consumer.mechanics?.scaling?.chains);
+            const totalizeWeight = w(consumer.mechanics?.damage?.totalize);
+            const effectiveBurst = burstWeight + chainsScaling + totalizeWeight * 2;
+            const val = w(supplierDebuffs.recovery) * effectiveBurst * MULT.RECOVERY_DEBUFF;
+            score += val;
+            dbg('recovery', val);
+        }
+    }
+
+    // Ultimates provision → all DPS benefit from free ultimate access, scaled by burst potential
+    const supplierUtility = supplier.mechanics?.utility || {};
+    const ultimatesWeight = w(supplierUtility.ultimates);
+    if (ultimatesWeight > 0 && isDPSByRoles(consumerRoles)) {
+        const burstWeight = getMaxBurstWeight(consumer);
+        const val = ultimatesWeight * burstWeight * MULT.ULTIMATES_PROVISION;
+        score += val;
+        dbg('ultimates', val);
+    }
+
+    return { score, firedCategories };
+}
+
+// --- Need Fulfillment ---
+
+function scoreNeedFulfillment(supplier, consumer, debug) {
+    let score = 0;
+    const scaling = getEffectiveScaling(consumer);
+    const supplierBuffs = supplier.mechanics?.buffs || {};
+    const supplierDebuffs = supplier.mechanics?.debuffs || {};
+    const supplierUtility = supplier.mechanics?.utility || {};
+
+    for (const key of NEED_FULFILLMENT_KEYS) {
+        const scalingWeight = w(scaling[key]);
+        if (scalingWeight === 0) continue;
+
+        const supplyWeight = Math.max(
+            w(supplierBuffs[key]),
+            w(supplierDebuffs[key]),
+            w(supplierUtility[key])
+        );
+        if (supplyWeight > 0) {
+            const fulfillment = Math.min(1, supplyWeight / scalingWeight);
+            const val = supplyWeight * scalingWeight * MULT.NEED_FULFILLMENT * fulfillment;
+            score += val;
+            if (debug) console.log(`        need(${key}): ${val.toFixed(1)}${fulfillment < 1 ? ` (gated ${Math.round(fulfillment * 100)}%)` : ''}`);
+        }
+    }
+
+    const scalingAttacker = w(scaling.attacker);
+    if (scalingAttacker > 0) {
+        const supplierRoles = getEffectiveRoles(supplier);
+        if (supplierRoles.includes('attack')) {
+            const val = scalingAttacker * MULT.NEED_FULFILLMENT;
+            score += val;
+            if (debug) console.log(`        need(attacker-role): ${val.toFixed(1)}`);
+        }
+    }
+
+    // Damage-type need fulfillment: consumer's damage types create implicit scaling
+    // for matching supplier buffs (aftershock buff → aftershock dealer, etc.)
+    const consumerDamage = consumer.mechanics?.damage || {};
+    for (const [damageType, damageWeight] of Object.entries(consumerDamage)) {
+        const dw = w(damageWeight);
+        if (dw === 0) continue;
+        const buffWeight = w(supplierBuffs[damageType]);
+        if (buffWeight > 0) {
+            const val = buffWeight * dw * MULT.NEED_FULFILLMENT;
+            score += val;
+            if (debug) console.log(`        need(damage:${damageType}): ${val.toFixed(1)}`);
+        }
+    }
+
     return score;
 }
 
+// --- Stun Emergence ---
+
+function scoreStunEmergence(supplier, consumer, debug) {
+    if (isStunlessUnit(consumer)) return 0;
+
+    const burstWeight = getMaxBurstWeight(consumer);
+    if (burstWeight === 0) return 0;
+
+    const infraWeight = getStunInfraWeight(supplier);
+    if (infraWeight === 0) return 0;
+
+    let score = burstWeight * infraWeight * MULT.STUN_EMERGENCE;
+    if (debug) console.log(`        stun-emergence: burst=${burstWeight} × infra=${infraWeight} × ${MULT.STUN_EMERGENCE} = ${score.toFixed(1)}`);
+
+    // Totalize quantity bonus: more stunners = more stun cycles for totalize
+    const totalizeWeight = w(consumer.mechanics?.damage?.totalize);
+    if (totalizeWeight > 0 && getEffectiveRoles(supplier).includes('stun')) {
+        const stunWeight = getSupplierDaze(supplier);
+        const bonus = totalizeWeight * stunWeight * MULT.TOTALIZE_QTY;
+        score += bonus;
+        if (debug) console.log(`        totalize-qty: ${totalizeWeight} × ${stunWeight} × ${MULT.TOTALIZE_QTY} = ${bonus.toFixed(1)}`);
+    }
+
+    return score;
+}
+
+// --- Diametric Buff Synergy ---
+
+function scoreDiametricSynergy(team, diametricMap, debug) {
+    let totalBonus = 0;
+
+    for (const consumer of team) {
+        const categories = diametricMap.get(consumer.name);
+        if (categories && categories.size >= 2) {
+            const bonus = (categories.size - 1) * MULT.DIAMETRIC;
+            totalBonus += bonus;
+            if (debug) console.log(`    Diametric for ${consumer.name}: ${categories.size} categories (${[...categories].join(', ')}) → +${bonus.toFixed(1)}`);
+        }
+    }
+
+    return totalBonus;
+}
+
+// --- Layer 4 Orchestrator ---
+
+function scoreMechanicalSynergy(team, debug, options = {}) {
+    let totalScore = 0;
+    const diametricMap = new Map();
+
+    if (debug) console.log('\n  LAYER 4: MECHANICAL SYNERGY');
+
+    // Pairwise scoring
+    for (const consumer of team) {
+        diametricMap.set(consumer.name, new Set());
+
+        for (const supplier of team) {
+            if (supplier === consumer) continue;
+
+            if (debug) console.log(`      ${supplier.name} → ${consumer.name}:`);
+
+            const { score: affinityScore, firedCategories } = scoreBaselineAffinity(supplier, consumer, debug, options);
+            totalScore += affinityScore;
+
+            for (const cat of firedCategories) {
+                diametricMap.get(consumer.name).add(cat);
+            }
+
+            const needScore = scoreNeedFulfillment(supplier, consumer, debug);
+            totalScore += needScore;
+
+            const stunScore = scoreStunEmergence(supplier, consumer, debug);
+            totalScore += stunScore;
+
+            if (debug) {
+                const pairTotal = affinityScore + needScore + stunScore;
+                console.log(`        pair total: ${pairTotal.toFixed(1)}`);
+            }
+        }
+    }
+
+    // Implicit disorder generation: dual-anomaly teams with different elements
+    const anomalyDPS = team.filter(u => getEffectiveRoles(u).includes('anomaly'));
+    if (anomalyDPS.length >= 2) {
+        const elements = anomalyDPS.map(u => {
+            const base = getElement(u);
+            return u.mechanics?.elementalVariant ? base + '-variant' : base;
+        });
+        const hasDifferentElements = new Set(elements).size >= 2;
+        if (hasDifferentElements) {
+            for (const unit of anomalyDPS) {
+                if (w(unit.mechanics?.scaling?.disorders) > 0) continue;
+                totalScore += MULT.DISORDER_BONUS;
+                if (debug) console.log(`    Implicit disorder: ${unit.name} +${MULT.DISORDER_BONUS}`);
+            }
+        }
+    }
+
+    // Diametric buff synergy
+    if (debug) console.log('    Diametric synergy:');
+    totalScore += scoreDiametricSynergy(team, diametricMap, debug);
+
+    if (debug) console.log(`    Layer 4 total: ${totalScore.toFixed(1)}`);
+
+    return totalScore;
+}
+
+// ============================================================================
+// LAYER 5: ADDITIONAL SYNERGIES
+// ============================================================================
+
+function scoreAdditionalSynergies(team, debug) {
+    let score = 0;
+
+    if (debug) console.log('\n  LAYER 5: ADDITIONAL SYNERGIES');
+
+    // Unit synergy (currently AoD only)
+    for (const unit of team) {
+        const unitSynergies = unit.synergy?.units || [];
+        if (unitSynergies.length === 0) continue;
+
+        for (const teammate of team) {
+            if (teammate === unit) continue;
+            if (unitSynergies.includes(teammate.name)) {
+                score += 15;
+                if (debug) console.log(`    ${unit.name} → ${teammate.name}: +15 (unit synergy)`);
+
+                const mutual = teammate.synergy?.units?.includes(unit.name);
+                if (mutual) {
+                    score += 25;
+                    if (debug) console.log(`    ${unit.name} ↔ ${teammate.name}: +25 (mutual)`);
+                }
+            }
+        }
+    }
+
+    // Tag synergy (currently only Ju Fufu → rupture)
+    for (const unit of team) {
+        const synergyTags = unit.synergy?.tags || [];
+        if (synergyTags.length === 0) continue;
+
+        for (const teammate of team) {
+            if (teammate === unit) continue;
+            const match = synergyTags.some(tag => teammate.tags.includes(tag));
+            if (match) {
+                score += 25;
+                if (debug) console.log(`    ${unit.name} tag synergy with ${teammate.name}: +25`);
+            }
+        }
+    }
+
+    if (debug) console.log(`    Layer 5 total: ${score}`);
+
+    return score;
+}
+
+// ============================================================================
+// TEAMWORK MULTIPLIER
+// ============================================================================
+
+const STRUCTURE_FACTOR = new Map([
+    [STRUCTURE.CONVENTIONAL_BONUS, 1.0],
+    [STRUCTURE.UNCONVENTIONAL_VIABLE, 0.85],
+    [STRUCTURE.UNCONVENTIONAL_NO_INTERACTION, 0.6],
+    [STRUCTURE.WILDLY_UNCONVENTIONAL, 0.35],
+]);
+
+const COHESION_FLOOR = 0.2;
+
+function computeTeamworkMultiplier(team, structureScore, debug) {
+    const structureFactor = STRUCTURE_FACTOR.get(structureScore) ?? 0.35;
+
+    let logSum = 0;
+    let totalWeight = 0;
+
+    for (const unit of team) {
+        const buffs = unit.mechanics?.buffs || {};
+        const debuffs = unit.mechanics?.debuffs || {};
+        const utility = unit.mechanics?.utility || {};
+        const hasBuffContributions = Object.keys(buffs).length > 0 || Object.keys(debuffs).length > 0
+            || (!isDPS(unit) && NEED_FULFILLMENT_KEYS.some(k => w(utility[k]) > 0));
+        if (!hasBuffContributions && isDPS(unit)) {
+            const scaling = getEffectiveScaling(unit);
+            let needsMet = 0;
+            let needsTotal = 0;
+            for (const key of NEED_FULFILLMENT_KEYS) {
+                if (NATURALLY_AVAILABLE_NEEDS.has(key)) continue;
+                const sw = w(scaling[key]);
+                if (sw < 1) continue;
+                const selfProvision = Math.max(
+                    w(unit.mechanics?.buffs?.[key]),
+                    w(unit.mechanics?.debuffs?.[key]),
+                    w(unit.mechanics?.utility?.[key])
+                );
+                if (selfProvision > 0) continue;
+                needsTotal++;
+                for (const supplier of team) {
+                    if (supplier === unit) continue;
+                    const supplyWeight = Math.max(
+                        w(supplier.mechanics?.buffs?.[key]),
+                        w(supplier.mechanics?.debuffs?.[key]),
+                        w(supplier.mechanics?.utility?.[key])
+                    );
+                    if (supplyWeight > 0) { needsMet++; break; }
+                }
+            }
+            if (needsTotal > 0 && needsMet < needsTotal) {
+                const reception = needsMet / needsTotal;
+                const receptionUtil = 0.4 + 0.6 * reception;
+                const weight = 0.5;
+                logSum += weight * Math.log(Math.max(receptionUtil * receptionUtil, 0.01));
+                totalWeight += weight;
+            }
+            continue;
+        }
+        if (!hasBuffContributions && !isDPS(unit)) {
+            const weight = 1.0;
+            logSum += weight * Math.log(0.01);
+            totalWeight += weight;
+            continue;
+        }
+
+        const util = computeBuffUtilization(unit, team);
+        const weight = isDPS(unit) ? 0.5 : 1.0;
+        const utilSquared = util * util;
+
+        logSum += weight * Math.log(Math.max(utilSquared, 0.01));
+        totalWeight += weight;
+    }
+
+    const cohesion = totalWeight > 0 ? Math.exp(logSum / totalWeight) : 0.5;
+    const teamwork = structureFactor * (COHESION_FLOOR + (1 - COHESION_FLOOR) * cohesion);
+
+    if (debug) {
+        console.log(`    Teamwork multiplier: ${teamwork.toFixed(3)} (structure=${structureFactor}, cohesion=${cohesion.toFixed(2)})`);
+    }
+
+    return teamwork;
+}
+
+// ============================================================================
+// SYNERGY AVOID CHECK
+// ============================================================================
+
+function checkSynergyAvoid(team, { lenient = false, debug = false } = {}) {
+    for (const unit of team) {
+        const avoidList = unit.synergy?.avoid || [];
+        for (const teammate of team) {
+            if (teammate === unit) continue;
+            if (avoidList.includes(teammate.name)) {
+                if (debug) console.log(`  AVOID: ${unit.name} explicitly avoids ${teammate.name}`);
+                if (!lenient) return -1;
+                return -200;
+            }
+        }
+    }
+    return 0;
+}
+
+// ============================================================================
+// MAIN SCORING FUNCTION
+// ============================================================================
+
+export function scoreTeamForBoss(team, boss, options = {}) {
+    const { lenient = false, debug = false } = options;
+    const baseScore = lenient ? 200 : 100;
+    let score = baseScore;
+
+    for (const unit of team) {
+        unit._activatedRoles = computeActivatedRoles(unit, team);
+    }
+
+    if (debug) {
+        const teamLabel = team.map(u => u.name).join(' / ');
+        console.log(`\n${'='.repeat(60)}`);
+        console.log(`SCORING: ${teamLabel}`);
+        console.log(`Boss: ${boss.name}`);
+        console.log(`Base score: ${baseScore}`);
+    }
+
+    const cleanupRoles = () => { for (const u of team) delete u._activatedRoles; };
+
+    // Layer 1: Disqualifications
+    const disq = checkDisqualifications(team, boss, debug);
+    if (disq < 0) { cleanupRoles(); return disq; }
+
+    // Synergy avoid check (near-disqualification)
+    const avoidResult = checkSynergyAvoid(team, { lenient, debug });
+    if (avoidResult === -1) { cleanupRoles(); return -1; }
+    score += avoidResult;
+
+    // Layer 1.5: Team Structure (feeds into teamwork multiplier, not additive)
+    if (debug) console.log('\n  LAYER 1.5: TEAM STRUCTURE');
+    let structureScore = scoreTeamStructure(team, debug);
+    if (structureScore === STRUCTURE.CONVENTIONAL_BONUS) {
+        const supLike = team.filter(u => isSupport(u) || isDefense(u));
+        for (const sup of supLike) {
+            const util = computeBuffUtilization(sup, team);
+            if (util < 0.5) {
+                structureScore = STRUCTURE.UNCONVENTIONAL_VIABLE;
+                if (debug) console.log(`    Structure downgraded: ${sup.name} buff util ${Math.round(util * 100)}% below 50%`);
+                break;
+            }
+        }
+    }
+    if (debug) console.log(`    Structure type: ${structureScore >= 0 ? '+' : ''}${structureScore} (used for teamwork multiplier)`);
+
+    // Field-time economy
+    const onFieldCount = team.filter(isOnField).length;
+    let fieldTimeAdj = 0;
+    if (onFieldCount === 0)      fieldTimeAdj = FIELD_TIME.ZERO_ONFIELD_PENALTY;
+    else if (onFieldCount === 1) fieldTimeAdj = FIELD_TIME.SOLO_CARRY_BONUS;
+    else if (onFieldCount >= 3)  fieldTimeAdj = FIELD_TIME.TRIPLE_ONFIELD_PENALTY;
+    score += fieldTimeAdj;
+    if (debug) console.log(`    Field time: ${onFieldCount} on-field agent(s) → ${fieldTimeAdj >= 0 ? '+' : ''}${fieldTimeAdj}`);
+
+    // Layer 2: Inherent Quality
+    score += scoreInherentQuality(team, { lenient, debug });
+
+    // Layer 3: Boss Matchup
+    const bossResult = scoreBossMatchup(team, boss, { lenient, debug });
+    if (bossResult.disqualified) { cleanupRoles(); return -1; }
+    score += bossResult.score;
+
+    // Layer 4: Mechanical Synergy
+    const antiRupture = boss.anti?.includes('rupture') || false;
+    score += scoreMechanicalSynergy(team, debug, { antiRupture });
+
+    // Layer 5: Additional Synergies
+    score += scoreAdditionalSynergies(team, debug);
+
+    // Apply teamwork multiplier (replaces additive structure scoring)
+    const rawScore = score;
+    const teamwork = computeTeamworkMultiplier(team, structureScore, debug);
+    score = Math.round(rawScore * teamwork * 10) / 10;
+
+    if (debug) {
+        console.log(`\n  RAW SCORE: ${rawScore.toFixed(1)}`);
+        console.log(`  TEAMWORK: ×${teamwork.toFixed(3)}`);
+        console.log(`  FINAL SCORE: ${score.toFixed(1)}`);
+        console.log(`${'='.repeat(60)}\n`);
+    }
+
+    cleanupRoles();
+    return score;
+}
+
+// ============================================================================
+// LEGACY EXPORTS (backwards compatibility)
+// ============================================================================
+
+export function getDPSType(unit) {
+    if (unit.tags.includes("attack")) return "attack";
+    if (unit.tags.includes("anomaly")) return "anomaly";
+    if (unit.tags.includes("rupture")) return "rupture";
+    return null;
+}
+
+export function unitsHaveSynergy(unit1, unit2) {
+    const u1 = unit1.synergy?.units?.includes(unit2.name) ||
+        unit1.synergy?.tags?.some(tag => unit2.tags.includes(tag));
+    const u2 = unit2.synergy?.units?.includes(unit1.name) ||
+        unit2.synergy?.tags?.some(tag => unit1.tags.includes(tag));
+    return u1 || u2;
+}
+
+export function unitsHaveMutualSynergy(unit1, unit2) {
+    return unit1.synergy?.units?.includes(unit2.name) &&
+        unit2.synergy?.units?.includes(unit1.name);
+}
+
+export function calculateSynergyScore() { return 0; }
+export function calculateDPSMixingPenalty() { return 0; }
+export function isSpecialist() { return false; }
+export function getSpecialistType() { return null; }
+export function hasStunSynergy() { return false; }

@@ -114,6 +114,10 @@ favored bonuses.
   vulnerable to the Freeze status effect, so as an ice-anomaly unit Miyabi can easily
   paralyze this boss (literally) and prevent them from acting. This makes the fight
   trivial when using Miyabi.
+* **Sanguine Sweeper** (`shillIntensity: 2`): An anomaly-shill boss that heavily
+  benefits from being stunned. Nangong is favored because her stun+anomaly hybrid kit
+  is uniquely suited to this fight. The higher intensity ensures Nangong teams properly
+  outrank non-Nangong anomaly teams (e.g., MVY) on this boss.
 
 ### Lenient Mode
 
@@ -271,6 +275,11 @@ pattern to any anomaly DPS with named synergy connections.
 * **Unique playstyle:** Aria plays like an attacker despite being anomaly - she wants
   stun windows to unload powerful attacks, rather than relying on disorder reactions
   like most anomaly units. Her stun-synergy tag reflects this attacker-like playstyle.
+* **Ether Veil scaling:** Aria's enhanced attacks are fueled by ether veil generations
+  (`scaling: { veils: 2 }`). This is a transformative scaling relationship — more veils
+  → more enhanced attacks. This is the primary mechanical reason Sunna (`utility.veils:3`)
+  is better than Yuzuha for Aria: Sunna directly feeds Aria's enhanced attack frequency
+  through veil generation, while Yuzuha provides anomaly buffs but no veils.
 * With Nangong Yu now released, Aria's best-in-slot team is **Nangong/Aria/Sunna**
   (stun/anomaly/support — the standard stun-synergy anomaly pattern). Aria/Sunna/Yuzuha
   remains a very strong alternative.
@@ -309,8 +318,19 @@ pattern to any anomaly DPS with named synergy connections.
 **Seed** - Requires Second Attacker
 
 * Has `synergy.tags: ["attack"]` and `join: ["attack"]`
-* Best paired with Orphie (mutual synergy)
+* Best paired with Cissia (ideal partner) or Orphie (strong alternative)
 * Cannot function without another attacker on team
+* Key team: Trigger/Seed/Cissia is likely Seed's best team
+
+**Cissia** - Electric Subdps / Seed's Ideal Partner
+
+* T1.5 electric attacker with subdps pseudoRole
+* Primarily designed as Seed's best partner (replacing Orphie for Seed teams)
+* Can technically be run as a standalone DPS, but is really a subdps for electric attack teams
+* Also usable with Harumasa, SAnby (even without aftershock buff), Yanagi, and Grace — anomaly teams can use her more as a support-like unit due to her electric debuff
+* Not quite a pseudosupport the way Orphie is, but is usable in a support-like capacity
+* Her only truly great home is on a Seed team (e.g., Trigger/Seed/Cissia)
+* Provides: cr:1 buff, electric:2 debuff, daze:1 utility
 
 ### Subdps Units
 
@@ -372,7 +392,7 @@ how mutual synergy and team construction should be evaluated.
   anomaly agents can use stunner-based compositions rather than requiring double-anomaly.
   Nangong Yu completes the stun/anomaly/support archetype for AoD and has become a
   meta-defining unit (see Stunner-Anomaly Paradigm Shift section).
-* **Obol** - Synergistic (Seed/Orphie mutual synergy, Trigger integration)
+* **Obol** - Synergistic (Seed/Orphie mutual synergy, Trigger integration). With Cissia's release, the electric attacker ecosystem now splits: SAnby+Orphie (aftershock duo) and Seed+Cissia (burst duo).
 * **Section 6** - Originally built to be very synergistic
 * **Pubsec** - Originally built to be very synergistic
 
@@ -457,7 +477,10 @@ intentional and correct.
   "tags": ["anomaly", "ether", "aod", "assist:defensive"],
   "join": ["stun", "support"],
   "available": false,
-  "synergy": { "units": ["Sunna", "Nangong"], "tags": ["stun"], "avoid": [] }
+  "synergy": { "units": ["Sunna", "Nangong"], "tags": ["stun"], "avoid": [] },
+  "mechanics": {
+    "damage": { "enhanced": 2, "abloom": 2 }
+  }
 }
 ```
 
@@ -472,6 +495,7 @@ intentional and correct.
 * `join` - Tags that at least one teammate must have for this unit's additional ability to activate (see Additional Abilities above); also used as a hard prerequisite for team formation
 * `available` - (optional, default `true`) When `false`, the unit is unreleased and cannot be selected in the production deployment. Unreleased units are added to `units.json` with preliminary data so the scoring algorithm can be tested against them before their release.
 * `synergy` - Synergy configuration object (see below)
+* `mechanics` - Mechanics object describing the unit's game mechanics for scoring (see Unit Mechanics Object below)
 
 ### Unit Synergy Object
 
@@ -489,11 +513,10 @@ intentional and correct.
 
 ### Mutual Synergy
 
-When BOTH units list each other in `synergy.units` (scores are illustrative):
+When BOTH units list each other in `synergy.units`:
 
-* Base synergy: +5
-* DPS mutual bonus: +25 (total +30 for DPS)
-* Non-DPS mutual: +5 (total +10)
+* One-directional: +5 (A lists B)
+* Mutual bonus: +10 additional (both list each other, +15 total per direction)
 
 Current mutual synergy pairs:
 
@@ -503,6 +526,45 @@ Current mutual synergy pairs:
 * Nangong ↔ Sunna
 * Seed ↔ Orphie
 * SAnby ↔ Orphie
+* Seed ↔ Nekomata (minor/niche — Seed doesn't want Nekomata unless no better option)
+
+### Unit Mechanics Object
+
+The `mechanics` object describes a unit's game mechanics for the scoring engine. It captures what is **distinctive** about a unit beyond its role baseline. Units with no distinctive mechanics have an empty `mechanics: {}`.
+
+```json
+{
+  "mechanics": {
+    "pseudoRole": "anomaly",
+    "damage": { "polarity": true, "abloom": true },
+    "buffs": { "anomaly": 3 },
+    "debuffs": { "recovery": 3 },
+    "utility": { "disorders": 2, "daze": true },
+    "scaling": { "am": 3 }
+  }
+}
+```
+
+All fields are optional. Values are weighted: `true` (or 1) = minor, `2` = strong, `3` = defining.
+
+**Fields:**
+
+* `pseudoRole` - (optional) One or more secondary roles the unit effectively fills, comma-separated: `"subdps"`, `"anomaly"`, `"stunner"`, `"support"`, `"attack"`, `"defense"`. Causes the engine to apply role baselines for each pseudo-role in addition to the tagged role. Examples: Nangong (stunner with `"anomaly"`), Caesar (defense with `"stunner"`), Orphie (attack with `"support,subdps"`), Vivian (anomaly with `"subdps"`).
+* `elementalVariant` - (optional) Boolean flag (`true`) marking titled units that have elemental variants. These units have alternate-element versions tracked via the `elementVariant` data, which affects boss element-weakness matching in Layer 3. Currently: Miyabi, Yixuan, YSG.
+* `damage` - What distinctive damage types the unit deals. Keys: `enhanced`, `ultimate:strong`, `ultimate:double`, `chain`, `aftershock`, `abloom`, `polarity`, `totalize`.
+* `buffs` - What stats or damage types the unit buffs for teammates. Keys: `atk`, `anomaly`, `aftershock`, `chain`, `sheer`, `pen`, `stun-multiplier`, `cr`, `cd`, and element names (`fire`, `ice`, `electric`, `physical`, `ether`).
+* `debuffs` - What the unit debuffs on enemies. Keys: `defense`, `recovery`, and element names.
+* `utility` - Non-stat team contributions. Keys: `disorders`, `quick-assists`, `chains`, `ultimates`, `heal:team`, `heal:self`, `shields`, `interrupt-resistance`, `kaleidoscope`, `veils`, `daze`, `stunless`.
+* `scaling` - What the unit specifically benefits from. Overrides role baseline when present. Non-stat keys (go through Need Fulfillment matching): `disorders`, `ablooms`, `chains`, `ultimates`, `veils`, `quick-assists`, `interrupt-resistance`, `attacker`, `stun`, `anomaly`. Stat keys (enhance Baseline Affinity): `am`, `ap`, `cr`, `cd`, `hp`, `def`, `pen`, `sheer`.
+
+**Override rule:** When `scaling` is present, it replaces the role-baseline scaling for Need Fulfillment purposes. An attacker that omits `scaling` gets the baseline (cr:2, cd:2). An attacker that lists `scaling: { "ultimates": 3 }` scales ONLY with ultimates through Need Fulfillment. Baseline Affinity rules (ATK, defense shred, element matching, stun infrastructure) still apply regardless.
+
+**Role baselines (applied implicitly when no explicit scaling exists):**
+
+* Attacker: cr:2, cd:2
+* Anomaly: am:2, ap:1, anomaly:2
+* Rupture: sheer:3, hp:2, cr:2, cd:2
+* Stunner: daze:1
 
 ### Boss Data Object
 
@@ -747,6 +809,14 @@ ones. The division between abloom and non-abloom anomaly agents is a key future 
 **Producers:** Vivian (first abloom unit), Aria, Nangong Yu, Burnice (via potential
 silhouettes), Grace (via potential silhouettes), Promeia
 **Non-producers (older anomaly agents):** Miyabi, Yanagi, Jane, Alice
+**Abloom buff ecosystem:** Promeia's `buffs.abloom:2` will boost all abloom producers
+(Aria, Vivian, Burnice, Grace). This is a deliberate game design choice to carve out a
+niche where Promeia (ice anomaly) can justify a team slot over Miyabi in some cases —
+by offering abloom-specific support that Miyabi cannot benefit from.
+**Note on Aria's abloom:** Aria's enhanced attack is classified as abloom damage, but she
+also deals abloom damage outside of her enhanced attacks. These are separate damage
+sources (not the same attack described twice), so `damage: { enhanced: 2, abloom: 2 }`
+does not represent double-counting.
 **Future significance:** Version 3.0 is expected to introduce abloom-specific synergies
 and buffs that differentiate newer anomaly agents from older ones. This will create a
 meaningful scoring axis where abloom producers gain advantages in new content.
@@ -996,211 +1066,344 @@ emerge automatically when new units are added.
 
 ---
 
-## Planned Architecture: Unit Mechanics Object
+## Mechanics-Driven Scoring Architecture
 
-### Motivation
+### Background
 
-The current scoring engine relies on a combination of:
+The original scoring engine relied on hardcoded composition rules, synergy tags, and named
+unit synergies. The Nangong release exposed a fundamental problem: the engine's archetype-level
+rules couldn't handle units with cross-archetype mechanical synergies (e.g., Nangong as a
+stunner who is superior to a second anomaly DPS on anomaly teams). Surgical fixes caused
+cascading side effects in other team compositions.
 
-* **Hardcoded composition rules** ("anomaly teams prefer support over stun" with exceptions)
-* **Synergy tags** (binary properties like `"stun"`, `"anomaly"`, `"subdps"`)
-* **Named unit synergies** (`synergy.units` for specific pairings)
+### Current Architecture: Five-Layer Scoring
 
-This approach has reached its limits. The Nangong release exposed a fundamental problem:
-`<Anomaly DPS>/Vivian/Yuzuha` scores higher than `Nangong/<Anomaly DPS>/Yuzuha` in the
-current engine, and fixing this without causing serious side effects in other team
-compositions is extremely difficult. The issue is not a missing exception — it's that the
-engine's team composition framework was built on broad archetype-level rules that are
-increasingly being violated by units with cross-archetype mechanical synergies.
+The mechanics object (now implemented in `units.json`) enables a mechanics-driven scoring
+engine structured in five layers:
 
-Additionally, the upcoming Wind element and catalysis reactions (v3.0) will introduce
-element-pair-dependent damage scaling that the current architecture cannot express at all.
-
-### Design Direction: Mechanics-Driven Scoring
-
-Instead of hardcoded archetype rules with per-unit exceptions, the engine will move toward
-**mechanics-driven scoring** where team quality emerges from how well the units' individual
-mechanics mesh together.
-
-**Core concept:** Each unit has a `mechanics` object that describes what the unit
-**produces**, **consumes**, **buffs**, and **debuffs** — with directionality. The scoring
-engine evaluates how well a team's mechanics interconnect rather than checking against
-rigid composition templates.
-
-### Mechanics Object Design (Preliminary)
-
-The mechanics object will be added to each unit in `units.json`, coexisting with the
-existing `synergy` object. Over time, much of what currently lives in `synergy` will
-migrate to `mechanics` and become naturally emergent from mechanical compatibility. The
-`synergy` block will remain as a catch-all for one-off relationships that are difficult
-to express through mechanics alone.
-
-```json
-{
-  "mechanics": {
-    "produces": ["abloom", "polarity-disorder", "stun-window-extension"],
-    "consumes": ["disorder", "stun-window"],
-    "buffs": ["anomaly-buildup", "atk"],
-    "debuffs": ["defense-shred:ice"]
-  }
-}
-```
-
-**Important:** The exact shape, field names, and vocabulary of the mechanics object are
-preliminary. The above is illustrative of the directional concept
-(produces/consumes/buffs/debuffs), not a final specification. The precise structure will
-be determined during implementation. What IS decided: the mechanics object must express
-**directionality** (not flat arrays of tags) so that the engine can evaluate producer → consumer relationships between teammates.
-
-**Scope of the mechanics object:** The mechanics object should be broad enough to capture:
-
-* **Hybrid/pseudo roles:** Nangong and Soukaku as pseudo-anomaly, Orphie as
-  pseudo-support, Caesar as pseudo-stunner (she is a defense unit but provides
-  meaningful stun contribution, making her more valuable on teams like Hugo's that
-  want stun). Role concepts (primary DPS vs. subdps, pseudo roles) help express a lot
-  of basic mechanics implicitly without having to spell out every interaction.
-* **Key damage types:** Crit damage (attackers), anomaly buildup (anomaly units), Sheer
-  (rupture), aftershock, abloom, chain attacks, ultimate damage (e.g., Seed, Rina, and
-  YSG have unusually high ultimate damage multipliers).
-* **General role mechanics as implicit baselines:** Rather than explicitly stating that
-  every anomaly agent "produces anomalies and disorders" (which is obvious and tedious),
-  general role guidelines should express basic mechanics implicitly. A stunner obviously
-  creates stuns and naturally triggers chain attacks; an anomaly agent obviously produces
-  anomaly buildup. The mechanics object should focus on what is **distinctive** about a
-  unit beyond its role baseline -- Nangong's stun window extension and polarity disorder
-  triggers are distinctive; "she stuns enemies" is not.
-* **Incremental contribution modeling:** The mechanics object should enable the scoring
-  engine to move away from the current "large-chunk, black-or-white" bonus system toward
-  finer-grained, incremental bonuses that emerge from mechanical overlap. For example,
-  Cissia's electric damage buff slightly helps Rina (high ultimate damage) on electric
-  teams -- this is not worth a dedicated `synergy.units` entry, but a mechanics-driven
-  engine should capture it naturally as a small point boost rather than requiring
-  explicit modeling for every such interaction.
-
-**Post-refactoring calibration:** Because the mechanics-driven engine will shift from
-discrete large-chunk bonuses (+35/+20/-40) toward many smaller overlapping mechanical
-contributions, all scoring point allocations will need recalibration after the engine
-overhaul. The current Scoring Results Scale boundaries (300+/230+/145+) will almost
-certainly shift and should be re-evaluated against known team rankings once the new
-engine is stable.
-
-### Relationship to Composition Rules
-
-Mechanics-driven scoring does not completely replace conventional team-building rules.
-Instead, it operates in layers:
-
-
-1. **Base conventions remain as fundamentals.** Most attackers want a stunner. Anomaly
-   teams benefit from specialist supports. Rupture ignores defense. These are "default
-   mechanics" that apply in the absence of overriding mechanical interactions. Standard
-   team archetypes (stun/attack/support, double-anomaly/support, stun/rupture/support)
-   represent the baseline expectations — like how Lycaon/Ellen/Soukaku is a conventional
-   ice attack team with no unique mechanical interactions beyond being a standard
-   archetype done well.
-2. **Mechanics can trump convention.** When unit mechanics create cross-archetype
-   synergies (e.g., Nangong's anomaly buffs + stun window extension + polarity disorder
-   triggers making her superior to a second anomaly DPS), the mechanical compatibility
-   should override the default composition penalty. The "stunner on anomaly team" penalty
-   should not apply when the stunner's mechanics actively produce what the anomaly DPS
-   consumes.
-3. **Emergent team quality.** Rather than explicitly coding "Nangong is good with Miyabi,"
-   the engine should recognize that Nangong produces disorder fuel + stun windows +
-   anomaly buffs, Miyabi consumes disorder fuel + stun windows, and therefore the
-   mechanical mesh is excellent. This approach scales to 600+ agents without requiring
-   manual synergy entries for every pair.
+1. **Layer 1: Disqualifications** — Boss anti, resisted DPS element, insufficient defensive
+   assists, no DPS. Hard disqualifications are minimal; bad combinations (like attack+rupture
+   mixing) are not disqualified but instead score low through lack of mechanical overlap.
+2. **Layer 2: Inherent Quality** — Tier scoring, rank scoring, titled bonus. These capture
+   individual unit power independent of team context.
+3. **Layer 3: Boss Matchup** — Shill preference, favored units, element weakness/resistance.
+   These capture how well a team fits a specific boss fight.
+4. **Layer 4: Mechanical Synergy** — Pairwise directional evaluation of all teammate pairs
+   using the `mechanics` object. This replaces synergy scoring, support contribution,
+   composition templates, and most hard composition rules. Four scoring components:
+   * **Baseline Affinity**: Broad stat interactions (ATK helps DPS, anomaly buffs help anomaly
+     agents, defense/element debuffs help DPS and stunners, stun infrastructure helps attackers/rupture)
+   * **Damage Amplification**: Supplier buffs a damage type the consumer deals (MULT=3)
+   * **Need Fulfillment**: Supplier provides something the consumer explicitly scales with (MULT=4)
+   * **Stun Emergence**: Consumer has burst damage that benefits from stun infrastructure (MULT=2)
+   * **Diametric Buff Synergy**: When a consumer receives buffs from multiple complementary dimensions across different suppliers (e.g., ATK boost + defense reduction), the combined effect is multiplicative in-game. The engine rewards teams whose suppliers contribute through different baseline affinity categories.
+   * Plus general utility (heal:team, shields)
+5. **Layer 5: Additional Synergies** — Hand-curated `synergy.units` bonuses for edge cases
+   that mechanics alone can't fully capture. Lower-weighted than in the old algorithm.
 
 ### What Mechanics Replaces
 
-The following current mechanisms will partially or fully migrate to mechanics-driven evaluation, although many of these are challenging to currently define in a precise manner:
+The following are removed from the scoring engine and subsumed by Layer 4:
 
-* `synergy.tags: ["stun"]` on anomaly units → replaced by mechanics that express
-  "this unit consumes stun windows" or "this unit produces enhanced attacks during stun"
-* `synergy.tags: ["anomaly"]` on stunners → replaced by mechanics that express "this
-  unit produces anomaly buffs / disorder triggers during stun"
-* `synergy.tags: ["subdps"]` → may remain as a role tag, but the subdps's actual
-  contribution is better captured by its mechanics
-* `synergy.avoid: ["rupture"]` → partially replaced by mechanical incompatibility
-  (units that produce defense-shred or PEN bonuses are mechanically useless alongside
-  Sheer damage dealers)
-* **Specialist detection** → may be expressible through mechanics producing outputs that
-  exactly match one archetype's consumption needs
-* **Monoshock composition rules** → should emerge from mechanical overlap between
-  same-element attacker+anomaly units
+* `calculateSynergyScore` (unit synergy, tag synergy, element synergy, subdps pairing, avoid penalties)
+* Support contribution scoring (specialist matching, generalist, dead-weight)
+* All composition templates (anomaly, attack, rupture, stunless, double-stun)
+* Universal support bonus, double-stun penalty
+* DPS mixing penalties (attack+rupture, anomaly+rupture, monoshock special case)
+* `synergy.avoid` — mechanical incompatibility makes this naturally emergent (e.g., Nicole's
+  defense debuff scores 0 on rupture teams because baseline affinity excludes rupture from
+  defense shred benefit)
 
-The `synergy.units` list and `synergy.avoid` list will likely remain for cases where
-named relationships or hard exclusions can't be captured mechanically.
+### Relationship to synergy Object
+
+The `synergy` block remains alongside `mechanics`:
+
+* `synergy.units` — Named partnerships scored in Layer 5. Currently only used for **Angels of Delusion** (Aria↔Nangong↔Sunna), whose faction-level cohesion is deliberately strong and unlikely to emerge fully from mechanics alone. All other unit synergies are expressed through mechanics.
+* `synergy.tags` — Largely retired. Only Ju Fufu retains `["rupture"]` as a stopgap for off-field stunner / field-time economy modeling not yet expressible in mechanics (see future enhancements).
+* `synergy.avoid` — Retired. Mechanical dead-weight handles this naturally.
+
+### Post-Refactoring Calibration
+
+Because the mechanics engine shifts from discrete large-chunk bonuses (+35/+20/-40) toward
+many smaller overlapping mechanical contributions, all scoring point allocations will need
+recalibration. The current Scoring Results Scale boundaries (300+/230+/145+) will almost
+certainly shift and should be re-evaluated against known team rankings once the new engine
+is stable.
 
 ### Extensibility for Wind/Catalysis
 
-By building the mechanics infrastructure now, the engine will be ready to model catalysis
-when the time comes through:
+The mechanics infrastructure is designed to accommodate future wind/catalysis modeling:
 
 * Adding catalysis-related mechanics to wind agents' `mechanics` objects
 * Using the `elementVariant` data to determine catalysis interaction strength
-* Potentially adding an element interaction matrix that maps element pairs to reaction
-  types and power levels
-* All without requiring another architectural overhaul of the scoring engine
+* Potentially adding an element interaction matrix for asymmetric element-pair reactions
+* All without requiring another architectural overhaul
 
+### On-field / Off-field Demand Modeling
+
+The `mechanics.onfield` boolean flag models field-time demand. Defaults: attackers, anomaly, rupture, and stun agents default to `true`; support and defense default to `false`. Units that primarily contribute while off-field override this to `false`.
+
+**Scoring:** The engine awards a bonus when exactly 1 agent demands field time (solo carry — efficient field economy), applies no modifier for 2 on-field agents (standard), and penalizes 3 on-field agents (field-time competition) or 0 on-field agents (no primary damage dealer).
+
+**Units with explicit `onfield: false` overrides:**
+
+* **Off-field stunners:** Ju Fufu, Trigger, Pulchra — apply daze primarily through off-field aftershocks
+* **Off-field anomaly subdps:** Burnice, Grace, Vivian — deal damage through off-field DoT/abloom
+* **Off-field attacker:** Orphie — pseudoRole support/subdps, provides aftershock damage and buffs while off-field
+
+This directly addresses field-time competition issues (e.g., SAnby + Seed + on-field stunner = 3 competing for field time → penalty) and rewards teams with efficient field economy (e.g., Miyabi + Vivian + Yuzuha = 1 on-field agent → bonus).
 
 ---
 
-## Known Scoring Issues and Refactoring Motivation
+## Scoring Engine Design Principles
+
+These principles govern how the mechanics-driven scoring engine evaluates team compositions. They emerge from extensive iterative testing and analysis.
+
+### Principle 1: Mechanics Only Score When Consumed
+
+A mechanic's existence on a unit has no inherent scoring value. Points are only awarded when a mechanic is **consumed** by another unit's scaling or need. For example, `heal:team` and `shields` exist in the data model to track what units provide — but since no unit currently declares `scaling.heal` or `scaling.shields`, these mechanics contribute zero score. If a future unit scales off healing, the need fulfillment pathway will automatically capture it without engine changes.
+
+The only exceptions are **foundational mechanics** (ATK, CR, CD, AP, AM, ultimates) that have automatic value through the baseline affinity pathway, because every DPS intrinsically benefits from them. Even these are role-gated (e.g., rupture agents barely benefit from ATK buffs because their damage scales primarily from sheer).
+
+### Principle 2: Damage Buffs on Non-DPS Units Are Negligible
+
+Element damage buffs and similar offensive mechanics that "technically apply" to support/defense units are practically meaningless. A fire damage buff hitting a defense unit with matching element is like doubling a two-dollar salary — the absolute impact is negligible because the unit isn't a damage dealer. The engine should NOT count element buffs as "relevant" for non-DPS units in buff utilization calculations. Only DPS units (and to a lesser extent, stunners) meaningfully convert damage-type buffs into output.
+
+This principle extends to the buff utilization / teamwork multiplier: a support/defense unit whose element matches a teammate's element buff should NOT inflate the supplier's buff utilization score. The buff is mechanically applicable but strategically irrelevant.
+
+### Principle 3: Wasting Buffs = Wasting DPS Potential
+
+When a DPS unit also provides buffs (e.g., SAnby buffs aftershocks, Cissia buffs electric, Promeia buffs abloom), the team must be able to *consume* those buffs. If teammates cannot utilize the buffs, the DPS unit's overall value is diminished — you are not just losing the buff value, you are losing the *reason* to field that DPS over a different one. The engine applies a significant waste penalty proportional to the unused buff weight.
+
+**Examples:**
+* SAnby on a team with no aftershock teammates (e.g., Seed + Sunna) wastes her entire aftershock:3 buff → massive penalty
+* Cissia on a team with no electric teammates loses much of her kit's advantage
+* SAnby on Trigger + Seed wastes half her aftershock buff (only Trigger benefits) → moderate penalty
+
+### Principle 4: Scarcity Determines Value
+
+Not all buffs/needs have equal weight. Foundational stats (ATK, CR, CD) can be sourced from many units and from equipment — they are common and replaceable. Rare or unique mechanics (veils, aftershock buffs, abloom buffs, chains provision, recovery debuffs) can only be provided by a small number of units and cannot be substituted through equipment.
+
+The engine reflects this through the multiplier structure:
+* **Foundational stat buffs** (ATK, CR, CD): scored through Baseline Affinity at 0.7× multipliers — intentionally lower than specialist buffs because these stats are common and replaceable through equipment or alternative supports.
+* **Specialist stat buffs** (SHEER, PEN, ANOMALY, ELEMENT): scored at 1.5–9× multipliers, reflecting their rarity and the narrow pool of providers.
+* **Rare/scaling-driven needs** (veils, chains, aftershock, abloom, etc.): scored through Need Fulfillment at 7× multiplier — the highest value tier, because matching a consumer's declared scaling need is the most impactful synergy in the game.
+
+This means a unit that provides a rare mechanic matching a consumer's scaling will always outscore a unit providing a common stat buff, all else being equal. For example: Zhao providing veils:2 to YSG (veils:2 scaling) generates 28 points via need fulfillment, while Astra providing CD:3 to the same YSG generates ~4.2 points via baseline affinity. The scarcity premium is structural, and it flips ordering for YSG: Zhao > Astra when veils are needed, despite Astra's higher tier/rank.
+
+**Directional asymmetry**: On teams that don't need veils (or any other specialist need Zhao provides), Astra remains better than Zhao. Astra's quick-assists:3 matches every DPS's implicit baseline, and her CD still contributes — just at a reduced rate. The scarcity principle only kicks in when a consumer actually declares a scaling need for the specialist mechanic.
+
+### Principle 5: Need Fulfillment Supply/Scaling Gating
+
+When a consumer declares a scaling need, the supplier must provide sufficient supply to fully satisfy it. A weak provider is penalized: the fulfillment score is multiplied by `min(1, supply / scaling)`. This prevents units with incidental, low-weight mechanics from gaining disproportionate credit.
+
+**Example:** YSG has veils:2 scaling. Sunna provides veils:3 → full credit (oversupply is fine). Zhao provides veils:2 → full credit. Lucia provides veils:1 → only 50% credit, because her supply doesn't meet the scaling need. This naturally stratifies: Sunna >> Zhao >> Lucia for YSG's veil needs.
+
+### Principle 6: Buff Utilization Gates Support Quality
+
+A support/defense unit's inherent quality (tier, rank, titled status) only matters to the extent that their buffs are actually utilized by the team. Buff utilization is calculated as the weighted proportion of a support's buffs/debuffs that fire for at least one consumer. A support with 30% utilization sees their quality score crushed to 9% (squared gating). A support with 0% utilization receives zero quality credit regardless of tier or rank.
+
+This prevents high-tier supports from appearing on teams where their kit doesn't align. It also explains why broadly useful supports (Astra, Yuzuha) rank consistently high — their buffs fire for almost any team — while narrow supports (Rina with only PEN) struggle outside their niche.
+
+### Principle 7: Faction Synergies Require Explicit Modeling
+
+Some synergies are inherently faction-based and cannot be derived purely from mechanics. For example, Sunna is normally not better than Yuzuha on anomaly teams, except when paired with Nangong + Aria (full AoD trio) or against Discordant Solo specifically. These 3-way faction interactions must be expressed through the `synergy` data model rather than emergent mechanics alone.
+
+### Principle 8: Tier Degradation Rates Differ by Role
+
+The impact of falling to a lower tier is NOT uniform across roles:
+* **DPS units**: Tier quality matters enormously. A T2 DPS is already a significant compromise; a T3 DPS is nearly unplayable. The gap between T0 and T2 for a DPS is the difference between meta-defining and "use only if you have nothing better."
+* **Stunners**: Tier matters less. A T2 stunner is not amazing but still gets the job done — stun is stun, and the damage window they create is valuable regardless of their personal DPS output.
+* **Supports/Defense**: Tier matters least. A T2 support is weaker than a better support, but buffs are buffs and every bit helps. The support's value comes from what they provide to the DPS, not from their own damage.
+
+This means the penalty curve for lower-tier units should be steeper for DPS than for stunners/supports.
+
+### Principle 9: CR/CD Role Asymmetry
+
+CR (crit rate) and CD (crit damage) are critical stats for **attackers** and **rupture** agents — the majority of their damage comes from critical hits. For **anomaly** agents, the majority of damage comes from ATK, AP, disorders, and ablooms, NOT critical hits. Anomaly agents typically have very low crit rates, so increases to CD provide minimal benefit.
+
+The exception is **Miyabi**, who is a rare anomaly agent with an extraordinarily high crit rate (effectively 100% crit rate). Her CD hits at full force all the time, making CD as valuable for her as it is for an attacker. This is why the engine gives Miyabi explicit `scaling: { cr: 3, cd: 3 }` — she behaves like an attacker for CR/CD purposes despite being an anomaly agent.
+
+The engine reflects this asymmetry through `resolveBaselineWeight` and `getBuffRelevance`: CR/CD return full weight (1.0) for attackers/rupture but only 0.3 for anomaly agents without explicit CR/CD scaling.
+
+### Principle 10: Scaling Types — Direct, Transformative, and Constant
+
+Scaling entries in unit data come in three flavors with different mechanical implications:
+
+**Direct Scaling** (scaling type matches damage type):
+* Example: Evelyn has `scaling.chains:3` and `damage.chain:3`. She deals chain damage A LOT more than normal, so chain buffs are bigger and better for her than for other units.
+* Direct scaling does NOT improve frequency of the damage type — Evelyn's chain attacks happen at the same rate regardless. Their value comes from the outsized damage multiplier. Evelyn still does big damage even without chain-specific support, because chain attacks are inherently powerful and other buffs (ATK, CD, fire damage) still help.
+* To improve chain attack frequency, you need more stuns (stuns trigger chain attacks) or specific utilities like Astra's ultimate granting two free teammate chain attacks.
+
+**Transformative Scaling** (scaling feeds enhanced attack frequency):
+* Example: Miyabi has `scaling.disorders:3` and `damage.enhanced:3`. Disorders don't produce disorder damage — they are **converted** into enhanced attack resources. More disorders → more enhanced attacks. Miyabi's enhanced attacks are on par with ultimates; she can execute the equivalent of 5 ultimate attacks in a single stun window under optimal conditions. Starving her of disorder fuel drastically reduces her output.
+* Example: Harumasa has `scaling.anomaly:2` and `damage.aftershock:1`. Anomaly applications are converted into enhanced aftershock attack resources. Without anomaly fuel, his enhanced attacks happen less frequently and his damage output is garbage.
+* **Key insight**: Transformative scaling affects FREQUENCY. Meeting the scaling need means enhanced attacks happen more often; not meeting it means they happen less often. This is why need fulfillment for transformative scaling is so critical — it's not just a damage boost, it's the difference between the unit functioning or not.
+
+**Constant Scaling** (scaling provides steady stat amplification):
+* Example: Alice/Vivian have `scaling.am:3/2`. AM buffs directly increase both their AM (anomaly application speed) AND their AP (anomaly damage), because these units have a special passive converting AM into AP. This is a constant, steady effect — not frequency-dependent.
+* Example: Trigger has `scaling.cr:3`. CR determines the magnitude of her defense debuff — a constant proportional effect.
+* Example: Yanagi has `scaling.pen:true`. External PEN amplifies her already-high pen ratio, giving her the highest effective PEN in the game — a constant damage multiplier.
+
+**No Scaling Connection** (enhanced attacks from natural resource building):
+* Example: Aria has `damage.enhanced:2` but no scaling that feeds it. She builds resources naturally over time through normal gameplay rotations. Enhanced attacks come out when the meter fills, regardless of teammates.
+* Example: Alice has `scaling.am:3` but this is constant scaling (AM→AP conversion), not transformative. Her enhanced attacks are also resource-meter based, building up naturally.
+
+**Engine implications**: The need fulfillment pathway handles all three types, but should weight them differently. Transformative scaling (frequency-dependent) deserves a HIGHER need fulfillment multiplier than direct scaling (multiplier-based), because missing transformative scaling is catastrophic (unit barely functions) while missing direct scaling is merely suboptimal (unit still does big damage). The engine should distinguish between these scaling types and apply different multipliers accordingly.
+
+**Inferring scaling type from data**: If a unit has `damage.enhanced` alongside a non-stat scaling entry (e.g., Miyabi's `scaling.disorders` + `damage.enhanced`), that scaling is likely transformative. If a unit has `damage.X` where X matches `scaling.X` (e.g., Evelyn's `scaling.chains` + `damage.chain`), that's direct. Constant scaling entries (stat-based like `am`, `cr`, `pen`) are identified by being base-stat keys.
+
+---
+
+### Principle 11: Totalize Damage and Stun Uptime Dependency
+
+**Totalize** is a damage mechanic where the unit converts accumulated stun time into damage. The longer the boss is stunned, the more totalize damage is dealt. This makes totalize units (e.g., Hugo) **uniquely dependent on stun infrastructure**.
+
+**Key implications:**
+- Totalize units want **double-stun teams** as their conventional composition. A second stunner provides more stun cycles and higher stun uptime, which directly translates to more totalize damage. This preference far outweighs what standard support buffs (ATK, CD) can offer.
+- `damage.totalize` implies massive implicit scaling on `recovery` (longer stun windows = more totalize conversion time). In the engine, totalize weight is added as an amplifier to the recovery debuff scoring path, analogous to how chains scaling amplifies recovery value.
+- DPS + 2x Stunner is classified as **CONVENTIONAL** team structure when the DPS has totalize damage.
+- The `TOTALIZE_QTY` bonus rewards each additional stun-role supplier on the team, reflecting that more stunners = more stun cycles = more totalize opportunities.
+- Hugo is ice element (not physical).
+
+**Totalize stun demand penalty:** In Layer 2 (Inherent Quality), totalize units are penalized when they lack stun infrastructure. The engine counts stun-role teammates with differentiated credit:
+- **Proper stunner**: 1.0 credit (full stun agent)
+- **Pseudostunner** (e.g. Caesar): 0.9 credit — nearly a real stunner, can do the job, just not as well as a premium stunner
+- **High-daze support** (e.g. Sunna): 0.4 credit — meaningful daze contribution but nowhere close to a real stunner
+
+If the total infrastructure is below 2.0, the penalty uses a **non-linear formula**: `totalizeWeight × TOTALIZE_PENALTY × deficit × (1 + deficit)`. The `(1 + deficit)` term makes larger deficits disproportionately costly — a small gap (pseudostunner) is barely punished, while a large gap (pure support) is devastating. This means:
+- 2 stunners: no penalty (ideal)
+- 1 stunner + pseudostunner (deficit 0.1): negligible penalty (~11 for Hugo)
+- 1 stunner + high-daze support (deficit 0.6): substantial penalty (~95 for Hugo, below 300 threshold)
+- 1 stunner + regular support (deficit 1.0): severe penalty (~198 for Hugo, severely handicapped)
+- 0 stunners: devastating penalty (Hugo basically unplayable)
+
+Hugo is also marked `onfield: false` because he comes in briefly for chain attacks and totalize burst, then returns field time to his stunners.
+
+**Design principle:** For totalize units, stun infrastructure scaling far outpaces stat buffs. Hugo should prefer even a low-tier stunner (Koleda) over a high-tier support (Sunna) because more stun uptime = more totalize damage. This emerges from the combination of the stun demand penalty, amplified recovery debuff scoring, and totalize quantity bonuses.
+
+### Principle 12: Stun Multiplier Is a Real Buff
+
+The `stun-multiplier` buff (provided by Dialyn, Sunna, Lycaon) increases the damage dealt during stun windows. It benefits all DPS units, not just specific archetypes. The engine scores it in Layer 4 Baseline Affinity at `STUN_MULT_BUFF` multiplier for each DPS consumer. This is distinct from stun infrastructure (which is about creating stun opportunities) — stun multiplier amplifies the damage you deal once the boss IS stunned.
+
+### Principle 13: Ultimates Provision Scales with Burst Potential
+
+Free ultimates (provided by Dialyn's `utility.ultimates:3`) are worth more for DPS units with powerful ultimates. Evelyn's chain:3 attacks are roughly 1600% multiplier; her ultimates are roughly 4000%. A free ultimate for Evelyn is therefore more impactful than a free ultimate for a unit with a basic 1000% ultimate.
+
+The engine scales `ULTIMATES_PROVISION` by the consumer's `getMaxBurstWeight`. This means Dialyn's free ultimates are most valuable for high-burst DPS (Evelyn, Miyabi, YSG) and least valuable for low-burst DPS. Combined with the burst-weight being the same factor that amplifies recovery debuff value, this creates the correct ordering: Dialyn > Lighter for Evelyn overall (ultimates at 4000% > extra chains at 1600%), while Lighter remains competitive on fire-weak bosses due to elemental alignment.
+
+### Principle 14: DPS Reception and Team Completeness
+
+A DPS unit without buff contributions (no buffs/debuffs to share) is currently skipped in the cohesion calculation. This creates a blind spot: a "duo + deadweight" team gets perfect cohesion because only the buff-providing units are checked, while the deadweight DPS rides for free.
+
+The engine adds a **reception check** for DPS units without buff contributions: for each such DPS, count what fraction of their declared scaling needs (from `NEED_FULFILLMENT_KEYS`, with scaling weight >= 1) are met by the team. If not all needs are met, the DPS is included in the cohesion geometric mean with a reduced utilization. This catches teams like Nangong/Miyabi/Harumasa where Harumasa receives almost nothing useful from the team, while leaving legitimately strong teams (Nangong/Miyabi/Yuzuha) unaffected because their DPS's critical needs ARE met.
+
+### Principle 15: Implicit Disorder Generation on Dual-Anomaly Teams
+
+ALL anomaly DPS units benefit from disorder damage — it is a core source of anomaly damage output. When two anomaly-tagged units of different elements are on the same team, they naturally generate disorders by applying different anomaly types to the boss.
+
+The engine awards a flat `DISORDER_BONUS` per anomaly DPS unit on such teams, **excluding** units with explicit `scaling.disorders` (like Miyabi) who already receive full credit through the need fulfillment pathway. This prevents hyperinflation on teams like Nangong/Miyabi while properly boosting teams like Alice/Vivian/Yuzuha.
+
+**elementalVariant edge case:** Units with `elementalVariant: true` (e.g., Miyabi is "frost" not "ice") are treated as having a different element from their base for disorder generation purposes. Miyabi + Soukaku triggers disorders (frost != ice). Promeia + Soukaku does NOT (both ice, no variant).
+
+### Principle 16: Stunner Value Discount on Stunless Teams
+
+When the primary DPS is stunless (e.g., Ye Shunguong), a stunner's main role contribution — creating stun windows — is unwanted. The engine already gates stun-emergence and recovery debuff scoring on `isStunlessUnit`, but the stunner's inherent quality (tier/rank bonus) was not discounted. A T0.5 stunner like Ju Fufu would receive full tier+rank credit even on a YSG team where stuns are irrelevant.
+
+The fix applies a 0.4x multiplier to stunner tier and rank bonuses when ALL DPS units on the team are stunless. Stunners that provide other value (stun-multiplier buffs, ultimates utility) still contribute through Layer 4 mechanics — this only reduces the "being a good stunner" inherent quality credit.
+
+### Principle 17: synergy.avoid as Near-Disqualification
+
+Explicit `synergy.avoid` annotations represent severe, game-mechanically-rooted anti-synergy where one unit's kit is essentially rendered useless. For example, Dialyn + Pan Yinhu: Pan's contribution is entirely negated by Dialyn's presence. These are not soft penalties — they are fundamental team composition failures.
+
+In normal scoring mode, avoid pairs result in full disqualification (return -1). In lenient mode, a -200 penalty is applied, allowing the team to appear in results at a very low score for informational purposes.
+
+### Principle 18: Quick-Assists Baseline Value
+
+Quick-assists (the ability for a support to quickly swap the DPS back into play) are useful but not transformative for most units. Their implicit scaling baseline is set low (0.25), meaning the need fulfillment credit for providing quick-assists is modest. Units that explicitly declare `scaling['quick-assists']` (like Anton) override this baseline and receive full credit. Even a common ATK buff is more impactful than quick-assists for the majority of DPS units.
+
+### Principle 19: Naturally Available Needs
+
+Some scaling needs — `ultimates` and `chains` — are naturally available to all units without requiring team support. Every unit can use their ultimate; chains always trigger during stun windows. Having a provider (e.g., Ju Fufu's `utility.ultimates`) makes these available *faster*, which is correctly rewarded through L4 Need Fulfillment scoring. However, the DPS reception check in the Teamwork Multiplier must skip these keys: not having a dedicated provider is not a cohesion failure. Without this exclusion, teams like YSG/Zhao/Sunna and Alice/Vivian/Yuzuha are falsely penalized for "unmet needs" that are actually always met by default game mechanics.
+
+### Principle 20: Defense Element Irrelevance
+
+Pure defense units (Pan, Zhao) provide their value through buffs, utility, and damage mitigation — not personal damage. Element resistance penalties on defense units are inappropriate because a defense unit's element being resisted by the boss has negligible gameplay impact. The engine removes the -10 resistance penalty for defense units while keeping the small +3 on-element bonus (which represents minor elemental resonance benefits beyond damage).
+
+### Principle 21: Element Resistance and SubDPS/PseudoSupport Handling
+
+Standard subdps units (Burnice, Vivian, Grace, Cissia) are **disqualified** when their element is resisted by the boss, just like any other DPS unit. They do not bypass resistance disqualification — their damage is their primary contribution, and element resistance makes them ineffective.
+
+The **only** DPS exception is pseudo-support units (e.g., Orphie with `pseudoRole: "support"`). These bypass disqualification because they still contribute meaningfully as supports (buffing ATK, etc.) even when their damage element is resisted. However, they receive a **damage-proportional penalty** if they have significant damage mechanics (`damage` weight > 1). The penalty is `maxDamageWeight * 8`. This affects Orphie (`damage.aftershock:3`, penalty 24 on fire-resistant bosses).
+
+For actual support/defense units, the same damage-proportional penalty applies when their element is resisted AND they have damage mechanics > 1. This affects Rina (`damage.ultimate:strong:2`, penalty 16 on electric-resistant bosses). Support/defense units with low or no damage mechanics continue to ignore element resistance entirely (Principle 20).
+
+### Principle 22: Self-Provision Excludes Needs from Cohesion Check
+
+When a DPS unit scales with a mechanic that it also provides to itself (e.g., Banyue has both `scaling.interrupt-resistance:2` and `utility.interrupt-resistance:2`), the DPS reception check in the Teamwork Multiplier should not count that as an unmet need. The self-provision check looks at the unit's own buffs, debuffs, and utility before counting a need toward the total. This prevents units like Banyue from being penalized for "missing" something they already have.
+
+### Principle 23: Pseudo-DPS Role Activation Requires Team Context
+
+A `pseudoRole` that includes a DPS type (attack, anomaly, rupture) only **activates** when the team contains a teammate whose primary tags include that DPS type. This models the idea that pseudo-roles indicate role flexibility: a unit only "becomes" that role when the team context supports it.
+
+**Examples:**
+- Soukaku (`pseudoRole: "anomaly"`, tags: support) on Miyabi/Soukaku/Yuzuha: Miyabi has `anomaly` tag → Soukaku's anomaly activates → she participates in disorder generation. Correct.
+- Soukaku on Lycaon/Yixuan/Soukaku: No teammate has `anomaly` tag → Soukaku's anomaly does NOT activate → she's treated as a pure support. No inflated DPS consumer scoring.
+- Soukaku on YSG/Zhao/Soukaku: No anomaly tag → she's a support providing ATK buff. Sensible emergent behavior.
+- Nangong (`pseudoRole: "anomaly"`, tags: stun) on Nangong/Miyabi/Yuzuha: Miyabi has `anomaly` tag → Nangong's anomaly activates → she generates disorders. Correct.
+- Nangong on Nangong/YSG/Sunna: No anomaly tag → Nangong is just a stunner. Correct — she's stunning, not doing anomaly things.
+- Nangong/Soukaku/Yuzuha (hypothetical): Neither has `anomaly` in primary tags → neither activates → no DPS unit → disqualified. Correct — they can't "cast" each other.
+
+**Non-DPS pseudo-roles** (stun, support, defense, subdps) always activate unconditionally — they don't require team context. Caesar's pseudo-stun always works; Orphie's pseudo-support always works.
+
+**Implementation:** At the start of `scoreTeamForBoss`, activated roles are computed for each unit and cached as `_activatedRoles`. `getEffectiveRoles` returns these when available, falling back to the unconditional version for non-scoring contexts (team formation, etc.).
+
+### Principle 24: Dual-Anomaly Teams Are Inherently Cohesive
+
+Teams with a primary anomaly DPS + off-field anomaly subdps of a different element (e.g., Alice/Vivian/Yuzuha, Miyabi/Vivian/Yuzuha) are inherently cohesive. The subdps provides disorder triggers, elemental diversity, and off-field damage without competing for field time. These teams should NOT receive cohesion penalties for the subdps "not providing buffs." Nangong is strictly better than Vivian on these teams not because of a cohesion problem, but because Nangong provides anomaly buffs + stun + disorders on top of the same synergy pattern. The difference is a matter of kit breadth, not team incoherence.
+
+---
+
+## Known Scoring Issues and Refactoring Status
 
 ### Primary Issue: Nangong Scoring Inversion
 
 **Problem:** `<Anomaly DPS>/Vivian/Yuzuha` currently scores higher than
-`Nangong/<Anomaly DPS>/Yuzuha` for most anomaly bosses.
+`Nangong/<Anomaly DPS>/Yuzuha` in the old engine for most anomaly bosses.
 
-**Why it's wrong:** Nangong has objectively replaced Vivian as the optimal second slot
-on anomaly teams for most compositions. Nangong/Miyabi/Yuzuha should score as the
-strongest anomaly team in the game (barring element resistance). The current engine
-cannot produce this result without causing cascading side effects in other team
-compositions.
+**Root cause:** The old engine's anomaly composition rules treat stunners as inherently
+suboptimal for anomaly teams. The exceptions (stun-synergy tag, titled anomaly, monoshock)
+are narrow carve-outs that don't capture the reality that some stunners are genuinely
+superior to a second anomaly DPS.
 
-**Root cause:** The engine's anomaly composition rules treat stunners as inherently
-suboptimal for anomaly teams (applying a -20 to -40 penalty). The exceptions (stun-synergy
-tag, titled anomaly, monoshock) are narrow carve-outs that don't capture the broad reality
-that some stunners are genuinely superior to a second anomaly DPS on anomaly teams.
+**Status:** Being resolved by the mechanics-driven scoring refactoring. Nangong's mechanics
+(`buffs.anomaly:3`, `debuffs.recovery:3`, `utility.disorders:2`, `pseudoRole:"anomaly"`)
+directly express why she is valuable on anomaly teams. The mechanics engine's Baseline
+Affinity, Need Fulfillment, and Stun Emergence rules combine to score
+Nangong/Miyabi/Yuzuha ~60 points higher than Vivian/Miyabi/Yuzuha in Layer 4 alone.
 
-**Why surgical fixes fail:** Removing or reducing the stunner penalty for anomaly teams
-would also incorrectly boost teams like Koleda/Alice/Yuzuha or Trigger/Burnice/Yuzuha,
-where the stunner provides no anomaly-relevant mechanics. The penalty is correct for
-generic stunners — it's just wrong for anomaly-synergistic stunners. The current binary
-flags (`synergy.tags: ["anomaly"]`) don't capture the *degree* of anomaly synergy a
-stunner provides, nor do they capture what specific mechanics make that stunner valuable
-for anomaly teams.
+### Secondary Issues (all addressed by mechanics refactoring)
 
-### Secondary Issues
+* **Lycaon P1+ anomaly compatibility** — now expressed through `debuffs.ice:2` and
+  `buffs.stun-multiplier:2`, providing granular benefit to ice DPS/stunners
+* **Lighter's element synergy** — now expressed through `buffs.fire:2, ice:2` and
+  `debuffs.recovery:3`, capturing both element buffing and stun extension
+* **Abloom damage synergy** — now captured through `damage.abloom` entries on
+  Nangong/Vivian/Aria/Burnice/Grace/Promeia
+* **Chain attack synergy** — Evelyn's `scaling.chains:3` + Astra's `utility.chains:2`
+  creates a 24-point Need Fulfillment match, replacing the `synergy.units` workaround
+* **Defense shred incompatibility with rupture** — now emergent: Nicole's `debuffs.defense:3`
+  scores 0 on rupture teams because Baseline Affinity excludes rupture from defense shred
+* **Cissia incremental electric buff** — uffs.electric:2 naturally gives a small
+  Baseline Affinity boost to all electric DPS and stunners on the team, including Rina
 
-* **Lycaon P1+ anomaly compatibility** is modeled only through `synergy.tags: ["anomaly"]`
-  and `join` updates — a binary flag that doesn't capture the nuance of his ice-defense-shred
-  being specifically good for ice anomaly agents
-* **Lighter's element synergy** with fire/ice anomaly agents (e.g., Lighter/Burnice/Promeia)
-  is modeled through element tags but not through anomaly-specific mechanics
-* **Abloom damage synergy** between Nangong/Vivian/Aria is unmodeled — when abloom becomes
-  a scored mechanic (expected v3.0), the engine will need to handle it
-* **Chain attack synergy** (Evelyn ↔ Astra/Koleda) is unmodeled — Evelyn's extreme
-  preference for Astra is only partially captured by `synergy.units`
-* **Defense shred / PEN ratio incompatibility with rupture** is modeled through
-  `synergy.avoid` rather than through the actual mechanical reason (Sheer damage ignores
-  defense)
-* The upcoming agent Cissia is an electric attacker that specifically provides a large buff for electric damage to teammates, meaning that mechanically she best benefits Seed, because <Stun>/Seed/Cissia is the only meaningful composition that enables this.  This niche pigeonholing is easy to model via mutual synergy today, but is not extensible - for example, Cissia’s electric damage actually also boost Rina, who despite being a support unit has one of the highest ultimate damage multipliers in the game after YSG and Seed. Cissia boosting Rina’s value to electric teams is something that would emerge naturally from a mechanics-based model rather than having to be specifically modeled as a unit-to-unit synergy, which is annoying because realistically speaking no one actually makes a team decision to put Rina with Cissia BECAUSE OF that interaction. It’s a nice benefit that might give a small point boost to a team composition but current modeling is very black-or-white rather than emerging from mechanical overlap, which could better model small incremental team composition bonuses rather than the more static large-chunk bonuses in the current model are capable of. 
+### Refactoring Progress
 
-### Refactoring Scope
-
-The planned refactoring introduces the mechanics object and mechanics-driven scoring to
-address these issues holistically. The scope is:
-
-
-1. **Design and implement the** `mechanics` object on `units.json` entries
-2. **Refactor composition rules** in `team-scorer.js` to use mechanics-driven evaluation
-   where applicable, while preserving base conventions as defaults
-3. **Migrate existing synergy patterns** to mechanics where they represent genuine
-   mechanical interactions (vs. one-off relationships)
-4. **Validate against scoring baseline** to ensure the refactoring produces correct
-   relative ordering of known team compositions
-5. **NOT included in this phase:** Wind element, catalysis, element interaction matrices,
-   or any speculative future mechanics — architecture only needs to be extensible for
-   these
+1. ~~Design the `mechanics` object~~ — **DONE** (see mechanics spec plan)
+2. ~~Add `mechanics` to all units in `units.json`~~ — **DONE** (44 units with populated mechanics, 9 with empty baseline)
+3. ~~Clean up `synergy` blocks in `units.json`~~ — **DONE** (all `synergy.tags` emptied except Ju Fufu's `["rupture"]`, all `synergy.avoid` emptied, all `synergy.units` emptied except data-level faction synergies)
+4. ~~Refactor `team-scorer.js`~~ — **DONE** (mechanics-driven 5-layer architecture implemented with iterative tuning)
+5. **Validate against scoring baseline** — ongoing iterative tuning
+6. **NOT included in this phase:** Wind element, catalysis, element interaction matrices, on-field/off-field modeling
 
 

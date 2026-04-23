@@ -9,7 +9,7 @@
         "shill": "anomaly",
         "anti": [],
         "assists": 0,
-        "favored": ["Miyabi", "Vivian"]
+        "favored": []
     },
     {
         "id": "ucc",
@@ -45,7 +45,7 @@
         "shill": null,
         "anti": [],
         "assists": 0,
-        "favored": ["Evelyn"]
+        "favored": []
     },
     {
         "id": "typhon",
@@ -82,7 +82,7 @@
         "shill": "rupture",
         "anti": [],
         "assists": 2,
-        "favored": ["Yixuan"]
+        "favored": []
     },
     {
         "id": "fiend",
@@ -94,7 +94,7 @@
         "shill": "anomaly",
         "anti": [],
         "assists": 0,
-        "favored": ["Alice", "Jane", "Vivian"]
+        "favored": []
     },
     {
         "id": "defiler",
@@ -106,7 +106,7 @@
         "shill": "attack",
         "anti": ["anomaly"],
         "assists": 2,
-        "favored": ["Seed", "SAnby"]
+        "favored": []
     },
     {
         "id": "hunter",
@@ -118,7 +118,7 @@
         "shill": "rupture",
         "anti": ["anomaly", "attack"],
         "assists": 2,
-        "favored": ["Yidhari", "Banyue"]
+        "favored": []
     },
     {
         "id": "thrall",
@@ -130,7 +130,7 @@
         "shill": "stun",
         "anti": ["anomaly"],
         "assists": 2,
-        "favored": ["Dialyn", "Ye Shunguong"]
+        "favored": []
     },
     {
         "id": "nightmare",
@@ -167,8 +167,8 @@
         "shill": "anomaly",
         "anti": ["rupture"],
         "assists": 2,
-        "favored": [],
-        "available": false
+        "favored": ["Nangong"],
+        "shillIntensity": 2
     }
 ]
 

@@ -18,6 +18,7 @@ import {
     isPrimaryDps, unitFingerprint, getTeamDpsBuckets,
     getPrimaryDpsNames, findDiverseStrategies
 } from './app/public/lib/common/dps-buckets.js';
+import { rawScorePassesFilter } from './lib/score-filter.js';
 
 const DISPLAY_LIMIT = 5;
 
@@ -28,7 +29,8 @@ const options = parseArgs({
         '  node da-buckets.js -b defiler,hunter,vesper',
         '  node da-buckets.js -b butch,ucc,pomp -m',
         '  node da-buckets.js -b typhon,fiend,ucc -d',
-        '  node da-buckets.js -b defiler,hunter,vesper -t "Miyabi/Soukaku/Astra,YSG/Zhao/Sunna,Harumasa/Grace/Rina"'
+        '  node da-buckets.js -b defiler,hunter,vesper -t "Miyabi/Soukaku/Astra,YSG/Zhao/Sunna,Harumasa/Grace/Rina"',
+        '  node da-buckets.js -b butch,ucc,pomp -r 100 400   Per-boss viable teams in score band'
     ].join('\n')
 });
 
@@ -42,7 +44,7 @@ function evaluateExplicitTeams(teamEntries, selectedBossObjects, opts) {
         scoredByBoss[boss.name] = [];
         for (const { label, team } of teamEntries) {
             const score = scoreTeamForBoss(team, boss, { debug: opts.debug });
-            if (score > 0) {
+            if (score > 0 && rawScorePassesFilter(score, opts)) {
                 scoredByBoss[boss.name].push({ label, team, score });
             }
         }
@@ -230,7 +232,7 @@ async function main() {
         for (const label of teamLabels) {
             const team = threeCharTeams[label];
             const score = scoreTeamForBoss(team, boss);
-            if (score > 0) {
+            if (score > 0 && rawScorePassesFilter(score, options)) {
                 viableTeamsByBoss[boss.name].push({ label, team, score });
             } else {
                 disqualified.push({ label, team, score });
@@ -241,7 +243,7 @@ async function main() {
             for (const label of teamLabels) {
                 const team = threeCharTeams[label];
                 const score = scoreTeamForBoss(team, boss, { lenient: true });
-                if (score > 0) {
+                if (score > 0 && rawScorePassesFilter(score, options)) {
                     viableTeamsByBoss[boss.name].push({ label, team, score, lenient: true });
                 }
             }
@@ -286,7 +288,7 @@ async function main() {
             for (const label of teamLabels) {
                 const team = threeCharTeams[label];
                 const score = scoreTeamForBoss(team, boss, { lenient: true });
-                if (score <= 0) continue;
+                if (score <= 0 || !rawScorePassesFilter(score, options)) continue;
                 const existing = viableTeamsByBoss[boss.name].find(t => t.label === label);
                 if (existing) {
                     if (score > existing.score) existing.score = score;

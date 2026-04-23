@@ -9,6 +9,11 @@
         "tags": ["anomaly", "physical", "spookshack", "assist:defensive"],
         "join": ["anomaly", "support"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {
+            "damage": { "enhanced": 2, "polarity": true },
+            "utility": { "disorders": 2 },
+            "scaling": { "am": 3 }
+        },
         "faction": "Spook Shack"
     },
     {
@@ -20,6 +25,7 @@
         "tags": ["stun", "electric", "hares", "assist:defensive"],
         "join": ["electric", "hares"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {},
         "faction": "Cunning Hares"
     },
     {
@@ -30,7 +36,10 @@
         "tier": 3,
         "tags": ["attack", "electric", "belobog", "assist:defensive"],
         "join": ["electric", "belobog"],
-        "synergy": { "units": ["Astra"], "tags": [], "avoid": [] },
+        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {
+            "scaling": { "quick-assists": true }
+        },
         "faction": "Belobog Heavy Industries"
     },
     {
@@ -42,7 +51,11 @@
         "tier": 0.5,
         "tags": ["anomaly", "ether", "aod", "assist:defensive"],
         "join": ["stun", "support"],
-        "synergy": { "units": ["Sunna", "Nangong"], "tags": ["stun"], "avoid": [] },
+        "synergy": { "units": ["sunna"], "tags": [], "avoid": [] },
+        "mechanics": {
+            "damage": { "enhanced": 2, "abloom": 2 },
+            "scaling": { "veils": 2 }
+        },
         "faction": "Angels of Delusion"
     },
     {
@@ -56,6 +69,10 @@
         "tags": ["ether", "support", "lyra", "assist:evasive"],
         "join": ["anomaly", "attack", "rupture"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {
+            "buffs": { "atk": 3, "cd": 3 },
+            "utility": { "quick-assists": 3, "chains": 2, "heal:team": true }
+        },
         "faction": "Stars of Lyra"
     },
     {
@@ -68,6 +85,10 @@
         "tags": ["rupture", "fire", "krampus", "assist:defensive"],
         "join": ["support", "stun"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {
+            "utility": { "interrupt-resistance": 2 },
+            "scaling": { "interrupt-resistance": 2 }
+        },
         "faction": "Krampus"
     },
     {
@@ -79,6 +100,11 @@
         "tags": ["defense", "fire", "belobog", "assist:defensive"],
         "join": ["fire", "belobog"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {
+            "utility": { "shields": 3 },
+            "scaling": { "def": 3 },
+            "onfield": true
+        },
         "faction": "Belobog Heavy Industries"
     },
     {
@@ -90,18 +116,22 @@
         "tags": ["attack", "physical", "hares", "assist:evasive"],
         "join": ["physical", "hares"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {},
         "faction": "Cunning Hares"
     },
     {
         "id": "sbilly",
         "name": "Starlight Billy",
-        "image": "./assets/characters/billy.webp",
+        "image": "./assets/characters/sbilly.webp",
         "rank": "S",
         "limited": true,
         "tier": 0.5,
         "tags": ["rupture", "physical", "hares", "assist:defensive"],
         "join": ["stun", "support", "defense"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {
+            "utility": { "heal:self": true }
+        },
         "faction": "Cunning Hares",
         "available": false
     },
@@ -114,7 +144,12 @@
         "tier": 1,
         "tags": ["anomaly", "fire", "calydon", "assist:evasive"],
         "join": ["anomaly", "calydon"],
-        "synergy": { "units": [], "tags": ["subdps"], "avoid": [] },
+        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {
+            "pseudoRole": "subdps",
+            "onfield": false,
+            "damage": { "abloom": 1 }
+        },
         "faction": "Sons of Calydon"
     },
     {
@@ -127,6 +162,11 @@
         "tags": ["defense", "physical", "calydon", "assist:defensive"],
         "join": ["calydon", "assist:defensive"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {
+            "pseudoRole": "stun",
+            "buffs": { "atk": 2 },
+            "utility": { "shields": 2, "interrupt-resistance": 2 }
+        },
         "faction": "Sons of Calydon"
     },
     {
@@ -138,8 +178,13 @@
         "tier": 1.5,
         "tags": ["attack", "electric", "pubsec", "assist:defensive"],
         "join": ["stun", "electric"],
-        "available": false,
-        "synergy": { "units": ["Seed"], "tags": [], "avoid": [] },
+        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {
+            "pseudoRole": "subdps",
+            "buffs" : { "cr" : 1 },
+            "debuffs": { "electric": 2 },
+            "utility": { "daze": 1 }
+        },
         "faction": "PubSec"
     },
     {
@@ -147,10 +192,10 @@
         "name": "Corin",
         "image": "./assets/characters/corin.webp",
         "rank": "A",
-        "tier": 3,
         "tags": ["attack", "physical", "victoria", "assist:defensive"],
         "join": ["physical", "victoria"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {},
         "faction": "Victoria Housekeeping"
     },
     {
@@ -162,7 +207,12 @@
         "tier": 0,
         "tags": ["stun", "physical", "krampus", "assist:defensive"],
         "join": ["attack", "rupture"],
-        "synergy": { "units": [], "tags": ["attack", "rupture"], "avoid": [] },
+        "synergy": { "units": [], "tags": [], "avoid": ["Pan Yinhu"] },
+        "mechanics": {
+            "buffs": { "stun-multiplier": 2 },
+            "utility": { "ultimates": 3 },
+            "scaling": { "cr": 3 }
+        },
         "faction": "Krampus"
     },
     {
@@ -175,6 +225,7 @@
         "tags": ["attack", "ice", "victoria", "assist:defensive"],
         "join": ["ice", "victoria", "stun"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {},
         "faction": "Victoria Housekeeping"
     },
     {
@@ -187,7 +238,11 @@
         "tier": 0.5,
         "tags": ["attack", "fire", "lyra", "assist:defensive"],
         "join": ["stun", "support"],
-        "synergy": { "units": ["Astra"], "tags": [], "avoid": [] },
+        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {
+            "damage": { "chain": 3, "ultimate:strong": 1 },
+            "scaling": { "chains": 3 }
+        },
         "faction": "Stars of Lyra"
     },
     {
@@ -199,7 +254,12 @@
         "tier": 3,
         "tags": ["anomaly", "electric", "belobog", "assist:evasive"],
         "join": ["electric", "belobog"],
-        "synergy": { "units": ["Rina"], "tags": ["subdps"], "avoid": [] },
+        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {
+            "pseudoRole": "subdps",
+            "damage": { "abloom": 1 },
+            "scaling": { "pen": true }
+        },
         "faction": "Belobog Heavy Industries"
     },
     {
@@ -209,10 +269,14 @@
         "image": "./assets/characters/harumasa.webp",
         "rank": "S",
         "limited": true,
-        "tier": 1.5,
+        "tier": 2,
         "tags": ["attack", "electric", "section6", "assist:defensive"],
         "join": ["stun", "anomaly"],
-        "synergy": { "units": [], "tags": ["anomaly", "electric"], "avoid": [] },
+        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {
+            "damage": { "aftershock": 1 },
+            "scaling": { "anomaly": 2 }
+        },
         "faction": "Section 6"
     },
     {
@@ -224,7 +288,11 @@
         "tier": 1,
         "tags": ["attack", "ice", "mockingbird", "assist:defensive"],
         "join": ["stun", "ice"],
-        "synergy": { "units": [], "tags": ["stun"], "avoid": [] },
+        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {
+            "damage": { "totalize": 3 },
+            "onfield": false
+        },
         "faction": "Mockingbird"
     },
     {
@@ -234,10 +302,11 @@
         "image": "./assets/characters/jane-doe.webp",
         "rank": "S",
         "limited": true,
-        "tier": 1,
+        "tier": 1.5,
         "tags": ["anomaly", "physical", "pubsec", "assist:defensive"],
         "join": ["anomaly", "pubsec"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {},
         "faction": "PubSec"
     },
     {
@@ -251,6 +320,11 @@
         "tags": ["stun", "fire", "yunkui", "assist:defensive"],
         "join": ["attack", "rupture"],
         "synergy": { "units": [], "tags": ["rupture"], "avoid": [] },
+        "mechanics": {
+            "onfield": false,
+            "damage": { "aftershock": true },
+            "utility": { "ultimates" : 1 }
+        },
         "faction": "Yunkui Summit"
     },
     {
@@ -262,7 +336,11 @@
         "tier": 2,
         "tags": ["stun", "fire", "belobog", "assist:defensive"],
         "join": ["fire", "belobog", "rupture"],
-        "synergy": { "units": ["Evelyn"], "tags": [], "avoid": [] },
+        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {
+            "buffs": { "chains": 1 },
+            "utility": { "daze": 1 }
+        },
         "faction": "Belobog Heavy Industries"
     },
     {
@@ -275,6 +353,9 @@
         "tags": ["rupture", "fire", "spookshack", "assist:defensive"],
         "join": ["support", "stun"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {
+            "utility": { "heal:self": true }
+        },
         "faction": "Spook Shack"
     },
     {
@@ -286,7 +367,11 @@
         "tier": 0.5,
         "tags": ["stun", "fire", "calydon", "assist:defensive"],
         "join": ["attack", "calydon"],
-        "synergy": { "units": [], "tags": ["fire", "ice"], "avoid": [] },
+        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {
+            "buffs": { "fire": 2, "ice": 2 },
+            "debuffs": { "recovery": 3 }
+        },
         "faction": "Sons of Calydon"
     },
     {
@@ -298,7 +383,13 @@
         "tier": 0,
         "tags": ["support", "ether", "spookshack", "assist:defensive"],
         "join": ["rupture", "stun"],
-        "synergy": { "units": [], "tags": ["rupture"], "avoid": ["attack", "anomaly"] },
+        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {
+            "damage": { "aftershock": true },
+            "buffs": { "sheer": 3, "cd": 1 },
+            "utility": { "veils": true },
+            "scaling": { "hp": 3 }
+        },
         "faction": "Spook Shack"
     },
     {
@@ -309,7 +400,10 @@
         "tier": 2,
         "tags": ["support", "fire", "calydon", "assist:defensive"],
         "join": ["fire", "calydon", "rupture"],
-        "synergy": { "units": [], "tags": ["fire"], "avoid": [] },
+        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {
+            "buffs": { "atk": 2 }
+        },
         "faction": "Sons of Calydon"
     },
     {
@@ -321,7 +415,11 @@
         "tier": 1,
         "tags": ["stun", "ice", "victoria", "assist:defensive"],
         "join": ["ice", "victoria", "anomaly"],
-        "synergy": { "units": [], "tags": ["anomaly"], "avoid": [] },
+        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {
+            "buffs": { "stun-multiplier": 2 },
+            "debuffs": { "ice": 2 }
+        },
         "faction": "Victoria Housekeeping"
     },
     {
@@ -333,7 +431,12 @@
         "tier": 0,
         "tags": ["anomaly", "ice", "section6", "title", "assist:defensive"],
         "join": ["support", "section6"],
-        "synergy": { "units": ["Lighter", "Nangong"], "tags": [], "avoid": [] },
+        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {
+            "elementalVariant": true,
+            "damage": { "enhanced": 3, "ultimate:strong": 2 },
+            "scaling": { "disorders": 3, "cr": 3, "cd": 3 }
+        },
         "faction": "Section 6"
     },
     {
@@ -346,7 +449,15 @@
         "tier": 0,
         "tags": ["stun", "ether", "aod", "assist:defensive"],
         "join": ["anomaly", "aod"], 
-        "synergy": { "units": ["Aria", "Sunna"], "tags": ["anomaly"], "avoid": [] },
+        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {
+            "pseudoRole": "anomaly",
+            "damage": { "polarity": true, "abloom": true },
+            "buffs": { "anomaly": 3 },
+            "debuffs": { "recovery": 3 },
+            "utility": { "disorders": 2, "daze": true },
+            "scaling": { "am": 3 }
+        },
         "faction": "Angels of Delusion"
     },
     {
@@ -359,6 +470,7 @@
         "tags": ["attack", "physical", "hares", "assist:defensive"],
         "join": ["physical", "hares"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {},
         "faction": "Cunning Hares"
     },
     {
@@ -369,7 +481,11 @@
         "tier": 0.5,
         "tags": ["support", "ether", "hares", "assist:defensive"],
         "join": ["ether", "hares"],
-        "synergy": { "units": ["Astra"], "tags": [], "avoid": ["rupture"] },
+        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {
+            "buffs": { "ether": 1 },
+            "debuffs": { "defense": 3 }
+        },
         "faction": "Cunning Hares"
     },
     {
@@ -382,7 +498,13 @@
         "tier": 1,
         "tags": ["attack", "fire", "obol", "assist:defensive"],
         "join": ["stun", "support"],
-        "synergy": { "units": ["Seed", "SAnby"], "tags": ["attack", "subdps"], "avoid": [] },
+        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {
+            "pseudoRole": "support,subdps",
+            "onfield": false,
+            "damage": { "aftershock": 3 },
+            "buffs": { "atk": 2 }
+        },
         "faction": "Obol Squad"
     },
     {
@@ -394,7 +516,11 @@
         "tier": 1,
         "tags": ["defense", "physical", "yunkui", "assist:defensive"],
         "join": ["rupture", "yunkui"],
-        "synergy": { "units": [], "tags": ["rupture"], "avoid": ["attack", "anomaly"] },
+        "synergy": { "units": [], "tags": [], "avoid": ["Dialyn"] },
+        "mechanics": {
+            "buffs": { "sheer": 2 },
+            "utility": { "quick-assists": true }
+        },
         "faction": "Yunkui Summit"
     },
     {
@@ -406,18 +532,24 @@
         "tags": ["anomaly", "physical", "calydon", "assist:defensive"],
         "join": ["physical", "calydon"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {},
         "faction": "Sons of Calydon"
     },
     {
         "id": "promeia",
         "name": "Promeia",
-        "image": "./assets/characters/promeia_placeholder.webp",
+        "image": "./assets/characters/promeia.webp",
         "rank": "S",
         "limited": true,
         "tier": 0.5,
         "tags": ["anomaly", "ice", "krampus", "assist:defensive"],
         "join": ["stun", "anomaly", "defense"],
-        "synergy": { "units": ["Nangong"], "tags": ["stun"], "avoid": [] },
+        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {
+            "damage": { "abloom": 3 },
+            "buffs" : { "abloom": 2 },
+            "debuffs" : { "defense" : 2 }
+        },
         "faction": "Krampus",
         "available": false
     },
@@ -429,7 +561,11 @@
         "tier": 1.5,
         "tags": ["stun", "physical", "calydon", "assist:evasive"],
         "join": ["attack", "rupture", "calydon"],
-        "synergy": { "units": ["SAnby"], "tags": [], "avoid": [] },
+        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {
+            "onfield": false,
+            "damage": { "aftershock": 2 }
+        },
         "faction": "Sons of Calydon"
     },
     {
@@ -441,7 +577,10 @@
         "tier": 2,
         "tags": ["stun", "electric", "pubsec", "assist:defensive"],
         "join": ["attack", "pubsec"],
-        "synergy": { "units": ["Yixuan"], "tags": [], "avoid": [] },
+        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {
+            "buffs": { "stun-multiplier": 2 }
+        },
         "faction": "PubSec"
     },
     {
@@ -453,7 +592,12 @@
         "tier": 2,
         "tags": ["support", "electric", "victoria", "assist:evasive"],
         "join": ["victoria", "electric"],
-        "synergy": { "units": [], "tags": ["electric"], "avoid": ["rupture"] },
+        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {
+            "damage": { "ultimate:strong": 2 },
+            "buffs": { "pen": 3 },
+            "scaling": { "ap": true }
+        },
         "faction": "Victoria Housekeeping"
     },
     {
@@ -465,7 +609,11 @@
         "tier": 0.5,
         "tags": ["attack", "electric", "silver", "assist:defensive"],
         "join": ["stun", "support"],
-        "synergy": { "units": ["Orphie", "Pulchra", "Trigger"], "tags": [], "avoid": [] },
+        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {
+            "damage": { "aftershock": 2 },
+            "buffs": { "aftershock": 3 }
+        },
         "faction": "Silver Squad"
     },
     {
@@ -478,7 +626,11 @@
         "tier": 0.5,
         "tags": ["attack", "electric", "obol", "assist:defensive"],
         "join": ["attack"],
-        "synergy": { "units": ["Orphie", "Cissia"], "tags": ["attack", "obol"], "avoid": [] },
+        "synergy": { "units": ["Nekomata"], "tags": [], "avoid": [] },
+        "mechanics": {
+            "damage": { "ultimate:strong": 3 },
+            "scaling": { "attacker": 3 }
+        },
         "faction": "Obol Squad"
     },
     {
@@ -489,7 +641,12 @@
         "tier": 3.5,
         "tags": ["defense", "electric", "pubsec", "assist:defensive"],
         "join": ["electric", "pubsec"],
-        "synergy": { "units": [], "tags": ["anomaly"], "avoid": [] },
+        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {
+            "buffs": { "anomaly": 1 },
+            "utility": { "shields": true, "quick-assists": true },
+            "onfield": true
+        },
         "faction": "PubSec"
     },
     {
@@ -503,6 +660,7 @@
         "tags": ["attack", "fire", "obol", "assist:defensive"],
         "join": ["fire", "obol"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {},
         "faction": "Obol Squad"
     },
     {
@@ -513,7 +671,12 @@
         "tier": 1.5,
         "tags": ["support", "ice", "section6", "assist:defensive"],
         "join": ["ice", "section6"],
-        "synergy": { "units": ["Miyabi", "Yuzuha"], "tags": ["ice"], "avoid": ["fire", "electric", "physical", "ether"] },
+        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {
+            "pseudoRole": "anomaly",
+            "buffs": { "atk": 3, "ice": 3 },
+            "onfield": true
+        },
         "faction": "Section 6"
     },
     {
@@ -525,7 +688,11 @@
         "tier": 0.5,
         "tags": ["support", "physical", "aod", "assist:defensive"],
         "join": ["attack", "aod"],
-        "synergy": { "units": ["Ye Shunguong", "Aria", "Nangong"], "tags": ["attack", "anomaly"], "avoid": ["rupture"] },
+        "synergy": { "units": ["aria"], "tags": [], "avoid": [] },
+        "mechanics": {
+            "buffs": { "atk": 3, "stun-multiplier": 2 },
+            "utility": { "veils": 3, "daze": 2 }
+        },
         "faction": "Angels of Delusion"
     },
     {
@@ -537,7 +704,14 @@
         "tier": 0.5,
         "tags": ["stun", "electric", "obol", "assist:defensive"],
         "join": ["attack", "electric"],
-        "synergy": { "units": ["SAnby"], "tags": [], "avoid": [] },
+        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {
+            "onfield": false,
+            "damage": { "aftershock": 2 },
+            "buffs": { "stun-multiplier": 2 },
+            "debuffs": { "defense": 2 },
+            "scaling": { "cr": 3 }
+        },
         "faction": "Obol Squad"
     },
     {
@@ -550,7 +724,13 @@
         "tier": 0.5,
         "tags": ["anomaly", "ether", "mockingbird", "assist:defensive"],
         "join": ["anomaly", "ether"],
-        "synergy": { "units": ["Astra", "Nicole", "Nangong"], "tags": ["anomaly", "subdps"], "avoid": [] },
+        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {
+            "pseudoRole": "subdps",
+            "onfield": false,
+            "damage": { "abloom": 3 },
+            "scaling": { "am": 2 }
+        },
         "faction": "Mockingbird"
     },
     {
@@ -562,7 +742,12 @@
         "tier": 1,
         "tags": ["anomaly", "electric", "section6", "assist:defensive"],
         "join": ["electric", "anomaly"],
-        "synergy": { "units": ["Rina"], "tags": [], "avoid": [] },
+        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {
+            "damage": { "polarity": 2 },
+            "utility": { "disorders": 2 },
+            "scaling": { "pen": true }
+        },
         "faction": "Section 6"
     },
     {
@@ -575,7 +760,13 @@
         "tier": 0,
         "tags": ["attack", "physical", "yunkui", "title", "assist:defensive"],
         "join": ["support", "defense"],
-        "synergy": { "units": ["Zhao", "Sunna", "Dialyn"], "tags": ["stunless"], "avoid": [] },
+        "synergy": { "units": ["Dialyn"], "tags": [], "avoid": [] },
+        "mechanics": {
+            "elementalVariant": true,
+            "damage": { "ultimate:strong": 3, "ultimate:double": 3 },
+            "utility": { "stunless": true },
+            "scaling": { "ultimates": 3, "veils": 2 }
+        },
         "faction": "Yunkui Summit"
     },
     {
@@ -588,11 +779,15 @@
         "tags": ["rupture", "ice", "spookshack", "assist:defensive"],
         "join": ["stun", "support"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {
+            "utility": { "veils": true, "heal:self": true }
+        },
         "faction": "Spook Shack"
     },
     {
         "id": "yixuan",
         "name": "Yixuan",
+        "aliases": ["YX"],
         "image": "./assets/characters/yixuan.webp",
         "rank": "S",
         "limited": true,
@@ -600,6 +795,11 @@
         "tags": ["rupture", "ether", "yunkui", "title", "assist:defensive"],
         "join": ["stun", "support", "defense"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {
+            "elementalVariant": true,
+            "damage": { "enhanced": 2, "ultimate:double": 3, "ultimate:strong": 1 },
+            "scaling": { "ultimates": 2 }
+        },
         "faction": "Yunkui Summit"
     },
     {
@@ -612,7 +812,13 @@
         "tier": 0,
         "tags": ["support", "physical", "spookshack", "assist:defensive"],
         "join": ["anomaly", "spookshack"],
-        "synergy": { "units": [], "tags": ["anomaly", "fire", "ice", "electric", "physical", "ether"], "avoid": ["attack", "rupture"] },
+        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {
+            "damage": { "aftershock": true },
+            "buffs": { "atk": 3, "anomaly": 3, "disorders": 3 },
+            "utility": { "kaleidoscope": true, "quick-assists": 2, "daze": true },
+            "scaling": { "ap": 2 }
+        },
         "faction": "Spook Shack"
     },
     {
@@ -624,7 +830,12 @@
         "tier": 0.5,
         "tags": ["defense", "ice", "krampus", "assist:defensive"],
         "join": ["attack", "anomaly", "support"],
-        "synergy": { "units": ["Ye Shunguong"], "tags": [], "avoid": ["rupture"] },
+        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {
+            "buffs": { "atk": 3 },
+            "utility": { "heal:team": 2, "veils": 2 },
+            "scaling": { "hp": 2 }
+        },
         "faction": "Krampus"
     },
     {
@@ -638,6 +849,7 @@
         "tags": ["attack", "ether", "pubsec", "assist:evasive"],
         "join": ["support", "pubsec"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {},
         "faction": "PubSec"
     }
 ]

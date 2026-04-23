@@ -14,6 +14,7 @@ import { filterBosses } from './lib/boss-filter.js';
 import { buildTeams } from './lib/team-pipeline.js';
 import { parseTeams } from './lib/team-parser.js';
 import { scoreTeamForBoss } from './app/public/lib/common/team-scorer.js';
+import { rawScorePassesFilter } from './lib/score-filter.js';
 
 const options = parseArgs({
     name: 'matchups.js',
@@ -24,7 +25,9 @@ const options = parseArgs({
         '  node matchups.js -b butcher               Filter to Butcher boss',
         '  node matchups.js -m -10                   Personal roster, top 10',
         '  node matchups.js -q "?roster=eJwN..."     From share URL',
-        '  node matchups.js -i Miyabi                Teams must include Miyabi'
+        '  node matchups.js -i Miyabi                Teams must include Miyabi',
+        '  node matchups.js -s 500                   Only teams scoring >= 500 vs each boss',
+        '  node matchups.js -r 20 120                Raw scores between 20 and 120 (inclusive)'
     ].join('\n')
 });
 
@@ -118,7 +121,7 @@ async function main() {
             }
 
             const score = scoreTeamForBoss(team, boss, { debug: options.debug });
-            if (score > 0) {
+            if (score > 0 && rawScorePassesFilter(score, options)) {
                 viableTeams.push({ label, team, score });
             }
         }
