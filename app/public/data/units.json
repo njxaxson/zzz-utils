@@ -564,7 +564,8 @@
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "onfield": false,
-            "damage": { "aftershock": 2 }
+            "damage": { "aftershock": 2 },
+            "utility": { "quick-assists": true }
         },
         "faction": "Sons of Calydon"
     },
@@ -674,8 +675,7 @@
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "pseudoRole": "anomaly",
-            "buffs": { "atk": 3, "ice": 3 },
-            "onfield": true
+            "buffs": { "atk": 3, "ice": 3 }
         },
         "faction": "Section 6"
     },

@@ -111,7 +111,9 @@ export function hasDefensiveAssist(unit) {
 export function isOnField(unit) {
     const explicit = unit.mechanics?.onfield;
     if (explicit !== undefined) return !!explicit;
-    return isDPS(unit) || isStun(unit);
+    if (isDPS(unit) || isStun(unit)) return true;
+    const activated = unit._activatedRoles || [];
+    return activated.some(r => DPS_ROLES.includes(r) || r === 'stun');
 }
 
 // ============================================================================
@@ -168,6 +170,21 @@ function isStunnerByRoles(roles) {
 
 function isStunlessUnit(unit) {
     return unit.mechanics?.utility?.stunless === true;
+}
+
+function teamHasImplicitDisorders(team) {
+    const anomalyAgents = team.filter(u => getEffectiveRoles(u).includes('anomaly'));
+    if (anomalyAgents.length < 2) return false;
+    const elements = anomalyAgents.map(u => {
+        const base = getElement(u);
+        return u.mechanics?.elementalVariant ? base + '-variant' : base;
+    });
+    return new Set(elements).size >= 2;
+}
+
+function teamHasDisorderGeneration(team) {
+    if (teamHasImplicitDisorders(team)) return true;
+    return team.some(u => w(u.mechanics?.utility?.disorders) > 0);
 }
 
 function hasSubDPSRole(unit) {
@@ -337,14 +354,47 @@ function getDebuffRelevance(key, consumer) {
 
 const STAT_BUFF_KEYS = new Set(['atk', 'anomaly', 'sheer', 'pen', 'cr', 'cd', 'stun-multiplier', ...ELEMENTS]);
 
+const BUFF_IMPACT = {
+    atk: MULT.ATK_BUFF, cr: MULT.CR_BUFF, cd: MULT.CD_BUFF,
+    sheer: MULT.SHEER_BUFF, anomaly: MULT.ANOMALY_BUFF, pen: MULT.PEN_BUFF,
+    'stun-multiplier': MULT.STUN_MULT_BUFF,
+};
+
 function computeBuffUtilization(supplier, team) {
+    const consumers = team.filter(t => t !== supplier);
+    const nConsumers = consumers.length;
+
+    if (isDPS(supplier)) {
+        const buffs = supplier.mechanics?.buffs || {};
+        const GENERIC_DPS_BUFFS = new Set(['atk', 'cr', 'cd', 'pen', 'stun-multiplier']);
+        const evaluatableBuffs = Object.entries(buffs).filter(
+            ([key, value]) => !GENERIC_DPS_BUFFS.has(key) && w(value) >= 2
+        );
+        if (evaluatableBuffs.length === 0) return 1.0;
+        let totalWeight = 0;
+        let effectiveWeight = 0;
+        for (const [key, value] of evaluatableBuffs) {
+            const bw = w(value);
+            totalWeight += bw;
+            let totalRelevance = 0;
+            for (const consumer of consumers) {
+                totalRelevance += getBuffRelevance(key, consumer);
+            }
+            effectiveWeight += bw * (nConsumers > 0 ? totalRelevance / nConsumers : 0);
+        }
+        if (totalWeight === 0) return 1.0;
+        const rawUtil = effectiveWeight / totalWeight;
+        return 0.5 + 0.5 * rawUtil;
+    }
+
     const buffs = supplier.mechanics?.buffs || {};
     const debuffs = supplier.mechanics?.debuffs || {};
     const utility = supplier.mechanics?.utility || {};
     let totalWeight = 0;
     let effectiveWeight = 0;
-    const consumers = team.filter(t => t !== supplier);
-    const nConsumers = consumers.length;
+    let coreWeight = 0;
+    let coreEffective = 0;
+    let coreImpact = 0;
 
     for (const [key, value] of Object.entries(buffs)) {
         const bw = w(value);
@@ -352,11 +402,19 @@ function computeBuffUtilization(supplier, team) {
         totalWeight += bw;
 
         if (STAT_BUFF_KEYS.has(key)) {
-            let maxRelevance = 0;
+            let dpsRelevance = 0;
+            let otherRelevance = 0;
             for (const consumer of consumers) {
-                maxRelevance = Math.max(maxRelevance, getBuffRelevance(key, consumer));
+                const rel = getBuffRelevance(key, consumer);
+                if (isDPS(consumer)) dpsRelevance = Math.max(dpsRelevance, rel);
+                else otherRelevance = Math.max(otherRelevance, rel);
             }
+            const hasDPS = consumers.some(c => isDPS(c));
+            const maxRelevance = Math.max(dpsRelevance, otherRelevance * (hasDPS ? 0.5 : 1.0));
             effectiveWeight += bw * maxRelevance;
+            coreWeight += bw;
+            coreEffective += bw * maxRelevance;
+            coreImpact += bw * maxRelevance * (BUFF_IMPACT[key] || MULT.ELEMENT_BUFF);
         } else {
             let totalRelevance = 0;
             for (const consumer of consumers) {
@@ -385,17 +443,29 @@ function computeBuffUtilization(supplier, team) {
             let maxRelevance = 0;
             for (const consumer of consumers) {
                 const scaling = getEffectiveScaling(consumer);
-                if (w(scaling[key]) > 0) maxRelevance = 1;
+                maxRelevance = Math.max(maxRelevance, Math.min(1, w(scaling[key])));
             }
             effectiveWeight += uv * maxRelevance;
         }
     }
 
-    if (totalWeight === 0) return isDPS(supplier) ? 1.0 : 0.0;
+    if (isStun(supplier) && !isDPS(supplier)) {
+        const dazeContribution = 3 + w(utility.daze);
+        totalWeight += dazeContribution;
+        const hasBeneficiary = consumers.some(c => isDPS(c) && !isStunlessUnit(c));
+        effectiveWeight += dazeContribution * (hasBeneficiary ? 1 : 0);
+    }
+
+    if (totalWeight === 0) return 0.0;
     const BUFF_UTIL_BASELINE = 4;
     const ratio = effectiveWeight / totalWeight;
     const threshold = effectiveWeight / BUFF_UTIL_BASELINE;
-    return Math.min(1.0, Math.max(ratio, threshold));
+    const adjustedRatio = ratio * Math.min(1.0, totalWeight / BUFF_UTIL_BASELINE);
+    const CORE_IMPACT_BASELINE = 4;
+    const rawCoreRatio = coreWeight > 0 ? coreEffective / coreWeight : 0;
+    const coreActivation = Math.min(1.0, coreImpact / CORE_IMPACT_BASELINE);
+    const coreRatio = rawCoreRatio * coreActivation;
+    return Math.min(1.0, Math.max(adjustedRatio, threshold, coreRatio));
 }
 
 // ============================================================================
@@ -537,6 +607,10 @@ function scoreTeamStructure(team, debug) {
 
     // Solo Anomaly + 2x Support/Defense (wheelchair)
     if (nAno === 1 && nSup >= 2 && nAtk === 0 && nRup === 0) {
+        if (anomalyUnits.some(u => isTitled(u))) {
+            if (debug) console.log('    Structure: CONVENTIONAL (titled anomaly wheelchair)');
+            return STRUCTURE.CONVENTIONAL_BONUS;
+        }
         if (debug) console.log('    Structure: UNCONVENTIONAL viable (anomaly wheelchair)');
         return STRUCTURE.UNCONVENTIONAL_VIABLE;
     }
@@ -811,9 +885,10 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
         } else if (boss.weaknesses.length > 0) {
             const singleWeakness = boss.weaknesses.length === 1;
             const basePenalty = singleWeakness ? 30 : 20;
-            const applied = lenient ? Math.floor(basePenalty / 3) : basePenalty;
+            const titled = isTitled(unit);
+            const applied = lenient ? Math.floor(basePenalty / 3) : (titled ? Math.floor(basePenalty / 2) : basePenalty);
             score -= applied;
-            if (debug) console.log(`    ${unit.name} off-element: -${applied}${singleWeakness ? ' (single weakness)' : ''}`);
+            if (debug) console.log(`    ${unit.name} off-element: -${applied}${singleWeakness ? ' (single weakness)' : ''}${titled ? ' (titled reduction)' : ''}`);
         }
     }
 
@@ -941,6 +1016,16 @@ function scoreBaselineAffinity(supplier, consumer, debug, options = {}) {
             const val = w(supplierBuffs.anomaly) * cw * MULT.ANOMALY_BUFF;
             score += val;
             dbg('anomaly', val);
+        }
+    }
+
+    // Disorder damage buff → anomaly agents, only when team generates disorders
+    if (supplierBuffs.disorders && options?.hasDisorderGeneration) {
+        const cw = resolveBaselineWeight(consumer, 'anomaly-affinity');
+        if (cw > 0) {
+            const val = w(supplierBuffs.disorders) * cw * MULT.ANOMALY_BUFF;
+            score += val;
+            dbg('disorder-buff', val);
         }
     }
 
@@ -1082,11 +1167,16 @@ function scoreNeedFulfillment(supplier, consumer, debug) {
         const scalingWeight = w(scaling[key]);
         if (scalingWeight === 0) continue;
 
-        const supplyWeight = Math.max(
-            w(supplierBuffs[key]),
-            w(supplierDebuffs[key]),
-            w(supplierUtility[key])
-        );
+        let supplyWeight;
+        if (key === 'disorders') {
+            supplyWeight = w(supplierUtility[key]);
+        } else {
+            supplyWeight = Math.max(
+                w(supplierBuffs[key]),
+                w(supplierDebuffs[key]),
+                w(supplierUtility[key])
+            );
+        }
         if (supplyWeight > 0) {
             const fulfillment = Math.min(1, supplyWeight / scalingWeight);
             const val = supplyWeight * scalingWeight * MULT.NEED_FULFILLMENT * fulfillment;
@@ -1150,78 +1240,153 @@ function scoreStunEmergence(supplier, consumer, debug) {
 
 // --- Diametric Buff Synergy ---
 
-function scoreDiametricSynergy(team, diametricMap, debug) {
-    let totalBonus = 0;
+const DIAMETRIC_RATE = 0.20;
+const ON_ELEMENT_L4 = 1.15;
+const OFF_ELEMENT_L4 = 0.85;
 
-    for (const consumer of team) {
-        const categories = diametricMap.get(consumer.name);
-        if (categories && categories.size >= 2) {
-            const bonus = (categories.size - 1) * MULT.DIAMETRIC;
-            totalBonus += bonus;
-            if (debug) console.log(`    Diametric for ${consumer.name}: ${categories.size} categories (${[...categories].join(', ')}) → +${bonus.toFixed(1)}`);
+function countDiametricPairs(consumer, team) {
+    let pairs = 0;
+    const consumerElement = getElement(consumer);
+    const consumerRoles = getEffectiveRoles(consumer);
+    if (!isDPSByRoles(consumerRoles)) return 0;
+
+    const suppliers = team.filter(t => t !== consumer);
+    const atkCdSuppliers = new Set();
+    const defDebuffSuppliers = new Set();
+    const elemBuffSuppliers = new Map();
+    const elemDebuffSuppliers = new Map();
+
+    for (const s of suppliers) {
+        const buffs = s.mechanics?.buffs || {};
+        const debuffs = s.mechanics?.debuffs || {};
+        if (w(buffs.atk) > 0 || w(buffs.cd) > 0) atkCdSuppliers.add(s.name);
+        if (w(debuffs.defense) > 0) defDebuffSuppliers.add(s.name);
+        for (const elem of ELEMENTS) {
+            if (elem !== consumerElement) continue;
+            if (w(buffs[elem]) > 0) {
+                if (!elemBuffSuppliers.has(elem)) elemBuffSuppliers.set(elem, new Set());
+                elemBuffSuppliers.get(elem).add(s.name);
+            }
+            if (w(debuffs[elem]) > 0) {
+                if (!elemDebuffSuppliers.has(elem)) elemDebuffSuppliers.set(elem, new Set());
+                elemDebuffSuppliers.get(elem).add(s.name);
+            }
         }
     }
 
-    return totalBonus;
+    if (atkCdSuppliers.size > 0 && defDebuffSuppliers.size > 0) {
+        const hasDistinct = [...atkCdSuppliers].some(s => !defDebuffSuppliers.has(s))
+            || [...defDebuffSuppliers].some(s => !atkCdSuppliers.has(s));
+        if (hasDistinct) pairs++;
+    }
+
+    for (const elem of ELEMENTS) {
+        const buffSet = elemBuffSuppliers.get(elem);
+        const debuffSet = elemDebuffSuppliers.get(elem);
+        if (buffSet && debuffSet) {
+            const hasDistinct = [...buffSet].some(s => !debuffSet.has(s))
+                || [...debuffSet].some(s => !buffSet.has(s));
+            if (hasDistinct) pairs++;
+        }
+    }
+
+    return pairs;
 }
 
 // --- Layer 4 Orchestrator ---
 
 function scoreMechanicalSynergy(team, debug, options = {}) {
     let totalScore = 0;
-    const diametricMap = new Map();
+    const hasDisorderGen = teamHasDisorderGeneration(team);
+    const l4Options = { ...options, hasDisorderGeneration: hasDisorderGen };
 
     if (debug) console.log('\n  LAYER 4: MECHANICAL SYNERGY');
 
+    const consumerScores = new Map();
+
     // Pairwise scoring
     for (const consumer of team) {
-        diametricMap.set(consumer.name, new Set());
+        let consumerTotal = 0;
 
         for (const supplier of team) {
             if (supplier === consumer) continue;
 
             if (debug) console.log(`      ${supplier.name} → ${consumer.name}:`);
 
-            const { score: affinityScore, firedCategories } = scoreBaselineAffinity(supplier, consumer, debug, options);
-            totalScore += affinityScore;
-
-            for (const cat of firedCategories) {
-                diametricMap.get(consumer.name).add(cat);
-            }
+            const { score: affinityScore, firedCategories } = scoreBaselineAffinity(supplier, consumer, debug, l4Options);
+            consumerTotal += affinityScore;
 
             const needScore = scoreNeedFulfillment(supplier, consumer, debug);
-            totalScore += needScore;
+            consumerTotal += needScore;
 
             const stunScore = scoreStunEmergence(supplier, consumer, debug);
-            totalScore += stunScore;
+            consumerTotal += stunScore;
 
             if (debug) {
                 const pairTotal = affinityScore + needScore + stunScore;
                 console.log(`        pair total: ${pairTotal.toFixed(1)}`);
             }
         }
+
+        consumerScores.set(consumer.name, consumerTotal);
     }
 
     // Implicit disorder generation: dual-anomaly teams with different elements
-    const anomalyDPS = team.filter(u => getEffectiveRoles(u).includes('anomaly'));
-    if (anomalyDPS.length >= 2) {
-        const elements = anomalyDPS.map(u => {
-            const base = getElement(u);
-            return u.mechanics?.elementalVariant ? base + '-variant' : base;
-        });
-        const hasDifferentElements = new Set(elements).size >= 2;
-        if (hasDifferentElements) {
-            for (const unit of anomalyDPS) {
-                if (w(unit.mechanics?.scaling?.disorders) > 0) continue;
-                totalScore += MULT.DISORDER_BONUS;
+    const hasImplicitDisorders = teamHasImplicitDisorders(team);
+    if (hasImplicitDisorders) {
+        const anomalyDPS = team.filter(u => getEffectiveRoles(u).includes('anomaly'));
+        for (const unit of anomalyDPS) {
+            const disorderScaling = w(unit.mechanics?.scaling?.disorders);
+            if (disorderScaling > 0) {
+                const implicitSupply = 2;
+                const fulfillment = Math.min(1, implicitSupply / disorderScaling);
+                const val = implicitSupply * disorderScaling * MULT.NEED_FULFILLMENT * fulfillment;
+                consumerScores.set(unit.name, (consumerScores.get(unit.name) || 0) + val);
+                if (debug) console.log(`    Implicit disorder need: ${unit.name} +${val.toFixed(1)} (supply ${implicitSupply}, scaling ${disorderScaling}, gated ${Math.round(fulfillment * 100)}%)`);
+            } else {
+                consumerScores.set(unit.name, (consumerScores.get(unit.name) || 0) + MULT.DISORDER_BONUS);
                 if (debug) console.log(`    Implicit disorder: ${unit.name} +${MULT.DISORDER_BONUS}`);
             }
         }
     }
 
-    // Diametric buff synergy
+    // Diametric synergy: proportional amplifier on consumer's incoming L4
     if (debug) console.log('    Diametric synergy:');
-    totalScore += scoreDiametricSynergy(team, diametricMap, debug);
+    for (const consumer of team) {
+        const pairs = countDiametricPairs(consumer, team);
+        if (pairs > 0) {
+            const multiplier = 1 + pairs * DIAMETRIC_RATE;
+            const base = consumerScores.get(consumer.name) || 0;
+            const bonus = base * (multiplier - 1);
+            consumerScores.set(consumer.name, base + bonus);
+            if (debug) console.log(`    Diametric for ${consumer.name}: ${pairs} pair(s) → ×${multiplier.toFixed(2)} on ${base.toFixed(1)} = +${bonus.toFixed(1)}`);
+        }
+    }
+
+    // L4 element modifier: on-element DPS gets boosted, off-element gets discounted
+    const boss = options?.boss;
+    if (boss && boss.weaknesses?.length > 0) {
+        for (const consumer of team) {
+            const roles = getEffectiveRoles(consumer);
+            if (!isDPSByRoles(roles)) continue;
+            const element = getElement(consumer);
+            const base = consumerScores.get(consumer.name) || 0;
+            if (base <= 0) continue;
+            if (boss.weaknesses.includes(element)) {
+                const bonus = base * (ON_ELEMENT_L4 - 1);
+                consumerScores.set(consumer.name, base + bonus);
+                if (debug) console.log(`    L4 element: ${consumer.name} on-element → ×${ON_ELEMENT_L4} on ${base.toFixed(1)} = +${bonus.toFixed(1)}`);
+            } else {
+                const penalty = base * (1 - OFF_ELEMENT_L4);
+                consumerScores.set(consumer.name, base - penalty);
+                if (debug) console.log(`    L4 element: ${consumer.name} off-element → ×${OFF_ELEMENT_L4} on ${base.toFixed(1)} = -${penalty.toFixed(1)}`);
+            }
+        }
+    }
+
+    for (const [, score] of consumerScores) {
+        totalScore += score;
+    }
 
     if (debug) console.log(`    Layer 4 total: ${totalScore.toFixed(1)}`);
 
@@ -1290,7 +1455,7 @@ const STRUCTURE_FACTOR = new Map([
 
 const COHESION_FLOOR = 0.2;
 
-function computeTeamworkMultiplier(team, structureScore, debug) {
+function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs = 0) {
     const structureFactor = STRUCTURE_FACTOR.get(structureScore) ?? 0.35;
 
     let logSum = 0;
@@ -1301,11 +1466,13 @@ function computeTeamworkMultiplier(team, structureScore, debug) {
         const debuffs = unit.mechanics?.debuffs || {};
         const utility = unit.mechanics?.utility || {};
         const hasBuffContributions = Object.keys(buffs).length > 0 || Object.keys(debuffs).length > 0
-            || (!isDPS(unit) && NEED_FULFILLMENT_KEYS.some(k => w(utility[k]) > 0));
+            || (!isDPS(unit) && NEED_FULFILLMENT_KEYS.some(k => w(utility[k]) > 0))
+            || isStun(unit);
         if (!hasBuffContributions && isDPS(unit)) {
             const scaling = getEffectiveScaling(unit);
             let needsMet = 0;
             let needsTotal = 0;
+            const hasImplicitDisorders = teamHasImplicitDisorders(team);
             for (const key of NEED_FULFILLMENT_KEYS) {
                 if (NATURALLY_AVAILABLE_NEEDS.has(key)) continue;
                 const sw = w(scaling[key]);
@@ -1317,20 +1484,29 @@ function computeTeamworkMultiplier(team, structureScore, debug) {
                 );
                 if (selfProvision > 0) continue;
                 needsTotal++;
+                if (key === 'disorders' && hasImplicitDisorders) {
+                    needsMet++;
+                    continue;
+                }
                 for (const supplier of team) {
                     if (supplier === unit) continue;
-                    const supplyWeight = Math.max(
-                        w(supplier.mechanics?.buffs?.[key]),
-                        w(supplier.mechanics?.debuffs?.[key]),
-                        w(supplier.mechanics?.utility?.[key])
-                    );
+                    let supplyWeight;
+                    if (key === 'disorders') {
+                        supplyWeight = w(supplier.mechanics?.utility?.[key]);
+                    } else {
+                        supplyWeight = Math.max(
+                            w(supplier.mechanics?.buffs?.[key]),
+                            w(supplier.mechanics?.debuffs?.[key]),
+                            w(supplier.mechanics?.utility?.[key])
+                        );
+                    }
                     if (supplyWeight > 0) { needsMet++; break; }
                 }
             }
             if (needsTotal > 0 && needsMet < needsTotal) {
                 const reception = needsMet / needsTotal;
                 const receptionUtil = 0.4 + 0.6 * reception;
-                const weight = 0.5;
+                const weight = Math.min(0.5, needsTotal * 0.25);
                 logSum += weight * Math.log(Math.max(receptionUtil * receptionUtil, 0.01));
                 totalWeight += weight;
             }
@@ -1343,7 +1519,31 @@ function computeTeamworkMultiplier(team, structureScore, debug) {
             continue;
         }
 
-        const util = computeBuffUtilization(unit, team);
+        let util = computeBuffUtilization(unit, team);
+        const pseudo = unit.mechanics?.pseudoRole;
+        if (pseudo && !isDPS(unit)) {
+            const unitBuffs = unit.mechanics?.buffs || {};
+            let statBuffWeight = 0, statBuffEffective = 0;
+            const teammates = team.filter(t => t !== unit);
+            for (const [key, value] of Object.entries(unitBuffs)) {
+                if (!STAT_BUFF_KEYS.has(key)) continue;
+                const bw = w(value);
+                if (bw <= 0) continue;
+                statBuffWeight += bw;
+                let maxRel = 0;
+                for (const c of teammates) maxRel = Math.max(maxRel, getBuffRelevance(key, c));
+                statBuffEffective += bw * maxRel;
+            }
+            const buffAlignment = statBuffWeight > 0 ? statBuffEffective / statBuffWeight : 1;
+            if (buffAlignment < 0.5) {
+                for (const pr of pseudo.split(',').map(s => s.trim())) {
+                    if (DPS_ROLES.includes(pr) && !(unit._activatedRoles || []).includes(pr)) {
+                        util *= 0.65;
+                        break;
+                    }
+                }
+            }
+        }
         const weight = isDPS(unit) ? 0.5 : 1.0;
         const utilSquared = util * util;
 
@@ -1351,11 +1551,15 @@ function computeTeamworkMultiplier(team, structureScore, debug) {
         totalWeight += weight;
     }
 
-    const cohesion = totalWeight > 0 ? Math.exp(logSum / totalWeight) : 0.5;
+    let cohesion = totalWeight > 0 ? Math.exp(logSum / totalWeight) : 0.5;
+    if (diametricPairs > 0) {
+        const diametricFloor = 0.70 + diametricPairs * 0.1;
+        cohesion = Math.max(cohesion, Math.min(diametricFloor, 1.0));
+    }
     const teamwork = structureFactor * (COHESION_FLOOR + (1 - COHESION_FLOOR) * cohesion);
 
     if (debug) {
-        console.log(`    Teamwork multiplier: ${teamwork.toFixed(3)} (structure=${structureFactor}, cohesion=${cohesion.toFixed(2)})`);
+        console.log(`    Teamwork multiplier: ${teamwork.toFixed(3)} (structure=${structureFactor}, cohesion=${cohesion.toFixed(2)}${diametricPairs > 0 ? `, diametric=${diametricPairs}` : ''})`);
     }
 
     return teamwork;
@@ -1428,7 +1632,7 @@ export function scoreTeamForBoss(team, boss, options = {}) {
     }
     if (debug) console.log(`    Structure type: ${structureScore >= 0 ? '+' : ''}${structureScore} (used for teamwork multiplier)`);
 
-    // Field-time economy
+    // Field-time economy (stunners have brief rotations that don't compete for DPS field time)
     const onFieldCount = team.filter(isOnField).length;
     let fieldTimeAdj = 0;
     if (onFieldCount === 0)      fieldTimeAdj = FIELD_TIME.ZERO_ONFIELD_PENALTY;
@@ -1447,14 +1651,18 @@ export function scoreTeamForBoss(team, boss, options = {}) {
 
     // Layer 4: Mechanical Synergy
     const antiRupture = boss.anti?.includes('rupture') || false;
-    score += scoreMechanicalSynergy(team, debug, { antiRupture });
+    score += scoreMechanicalSynergy(team, debug, { antiRupture, boss });
 
     // Layer 5: Additional Synergies
     score += scoreAdditionalSynergies(team, debug);
 
     // Apply teamwork multiplier (replaces additive structure scoring)
     const rawScore = score;
-    const teamwork = computeTeamworkMultiplier(team, structureScore, debug);
+    let maxDiametricPairs = 0;
+    for (const unit of team) {
+        maxDiametricPairs = Math.max(maxDiametricPairs, countDiametricPairs(unit, team));
+    }
+    const teamwork = computeTeamworkMultiplier(team, structureScore, debug, maxDiametricPairs);
     score = Math.round(rawScore * teamwork * 10) / 10;
 
     if (debug) {
