@@ -82,7 +82,7 @@ When boss has no weaknesses (neutral):
 
 Boss shills fall into two categories with fundamentally different behavior:
 
-* **DPS shills** (attack, anomaly, rupture): These are *preferences*. A team that matches the shill gets a bonus; a team that doesn't match receives a penalty proportional to how far off they are. But a mismatched team is not automatically disqualified — it can still compete if it has strong on-element DPS or titled units.
+* **DPS shills** (attack, anomaly, rupture): These are *preferences*. A team that matches the shill gets a flat bonus; a team that doesn't match simply doesn't receive the bonus — there is no penalty for mismatching. A non-matching team competes on its own merits through element matching, tier quality, and mechanical synergy. See also Principle 27.
 * **Non-DPS shills** (stun): These are *hard requirements*. If the boss shills a non-DPS role and no unit on the team has that role, the team is disqualified outright. The reasoning is that these bosses have mechanics that make the shilled role essential to completing the fight.
 
 ### Shill Intensity
@@ -1361,6 +1361,48 @@ A `pseudoRole` that includes a DPS type (attack, anomaly, rupture) only **activa
 ### Principle 24: Dual-Anomaly Teams Are Inherently Cohesive
 
 Teams with a primary anomaly DPS + off-field anomaly subdps of a different element (e.g., Alice/Vivian/Yuzuha, Miyabi/Vivian/Yuzuha) are inherently cohesive. The subdps provides disorder triggers, elemental diversity, and off-field damage without competing for field time. These teams should NOT receive cohesion penalties for the subdps "not providing buffs." Nangong is strictly better than Vivian on these teams not because of a cohesion problem, but because Nangong provides anomaly buffs + stun + disorders on top of the same synergy pattern. The difference is a matter of kit breadth, not team incoherence.
+
+### Principle 25: A Pseudorole IS a Role
+
+When the engine computes a unit's activated roles (via `computeActivatedRoles`), those activated roles become the unit's identity for scoring purposes. All role-checking functions (`isDPS`, `isAttacker`, `isAnomaly`, `isRupture`, `isSupport`, `isDefense`, `isStun`) check `_activatedRoles` first, falling back to tags only when activated roles have not yet been computed (e.g., during team formation before scoring begins).
+
+Consequences:
+- Orphie (tags: `attack`, pseudoRole: `support,subdps`) → `isSupport(orphie)` returns true, `isAttacker(orphie)` returns true, `isDPS(orphie)` returns true
+- Nangong (tags: `stun`, pseudoRole: `anomaly`) → when anomaly activates, `isAnomaly(nangong)` returns true alongside `isStun(nangong)`
+- Caesar (tags: `defense`, pseudoRole: `stun`) → `isStun(caesar)` returns true (non-DPS pseudo-roles always activate unconditionally)
+
+This architectural decision ripples through the scoring engine:
+- **L1 Disqualifications**: Only "pure DPS" units (those without concurrent support, defense, or stun roles) count toward the triple-DPS disqualification. A team like Nangong/Alice/Vivian has three units with DPS roles, but Nangong also has a stun role — so only two are "pure DPS."
+- **L1.5 Structure**: For DPS category counting, stun units are excluded from attacker/anomaly/rupture counts to prevent double-classification. Nangong on Nangong/Miyabi/Yuzuha is counted as a stunner (her primary tag), not as a second anomaly unit, yielding "anomaly hypercarry" structure instead of "double anomaly."
+- **L2 Tier/Rank**: Units are scored in their primary role category. Pseudo-DPS stunners (Nangong) receive stun-level tier/rank scoring, not DPS-level. Pseudo-support DPS (Orphie) receive support-level tier/rank scoring. A unit already scored in the DPS loop is excluded from the non-DPS loop to prevent double-counting.
+- **L3 Boss Matchup**: Shill matching checks raw tags (not activated roles) — a pseudosupport with `attack` in their tags but playing the support role can't satisfy an attack shill. Element resistance disqualification skips support/defense units entirely (they are penalized, not disqualified).
+
+### Principle 26: Damage Contribution Determines Buff Relevance
+
+Units divide into two fundamental categories based on whether they meaningfully convert offensive buffs into damage output:
+
+- **Damage contributors**: Any unit with a DPS role (attack, anomaly, rupture) or a stun role. These units convert ATK buffs, crit buffs, element damage buffs, and defense shred into meaningful output. Stun units deal less damage than primary DPS but still benefit materially from offensive stats during stun windows and chain attacks.
+- **Non-damage contributors**: Pure support and defense units whose personal damage is negligible. Offensive buffs landing on these units are like "doubling a two-dollar salary" — mathematically applicable but strategically irrelevant.
+
+A subdps unit is always a damage contributor, even if it also holds a support pseudorole. Orphie's `pseudoRole: "support,subdps"` means she provides support infrastructure AND contributes meaningful damage. She benefits from ATK buffs, on-element bonuses, and stun multipliers. A hypothetical pure support with zero DPS roles would not.
+
+This principle governs buff utilization calculations, element bonus sizing, and the supplier-side relevance checks throughout the engine. It is the conceptual foundation that makes Principles 2 and 6 consistent: non-damage-contributor supports are gated by buff utilization because their VALUE is in what they provide to damage contributors, not in their own output.
+
+### Principle 27: Shill Is a Bonus, Not a Penalty
+
+Boss shill preferences reward teams that match but do not penalize those that don't. When a team's DPS archetype matches the boss shill, the team receives a flat bonus. When it doesn't match, there is no penalty — the team simply doesn't receive the bonus.
+
+This reflects gameplay reality: a rupture team against an anomaly-shill boss isn't "bad" — it just doesn't have the anomaly advantage. The team competes on its own merits through element matching, tier quality, and mechanical synergy. Shill-matching teams get rewarded; non-matching teams are neutral.
+
+The exception remains non-DPS shills (currently only stun): if a boss requires a stunner and the team has none, the team is disqualified outright because certain boss mechanics make the shilled role mechanically essential to completing the fight.
+
+### Principle 28: Ultimates Are a Primary DPS Resource
+
+Free ultimates (provided by units like Dialyn and Ju Fufu via `utility.ultimates`) are a limited resource: during a stun window, the team can only execute one ultimate at a time, and it should go to the unit with the highest burst potential.
+
+SubDPS units do not declare implicit ultimates scaling and do not receive need fulfillment credit for ultimates provision. The primary DPS consumes all ultimate resources. This prevents subdps units from double-dipping on a resource they wouldn't realistically receive in gameplay.
+
+Quick assists, by contrast, are NOT a limited resource. They benefit all DPS roles including subdps, and all DPS units retain their implicit quick-assists baseline regardless of subdps status.
 
 ---
 

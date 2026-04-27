@@ -707,7 +707,7 @@
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "onfield": false,
-            "damage": { "aftershock": 2 },
+            "damage": { "aftershock": 3 },
             "buffs": { "stun-multiplier": 2 },
             "debuffs": { "defense": 2 },
             "scaling": { "cr": 3 }

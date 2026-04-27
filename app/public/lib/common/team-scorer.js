@@ -18,6 +18,7 @@ export const NON_DPS_ROLES = ["defense", "stun", "support"];
 
 const MULT = {
     NEED_FULFILLMENT: 7,
+    DAMAGE_NEED: 3,
     TOTALIZE_QTY: 5,
     STUN_EMERGENCE: 1.0,
     ELEMENT_BUFF: 2,
@@ -53,30 +54,37 @@ const STAT_SCALING_KEYS = ['am', 'ap', 'cr', 'cd', 'hp', 'def', 'pen', 'sheer'];
 // ============================================================================
 
 export function isDPS(unit) {
+    if (unit._activatedRoles) return DPS_ROLES.some(r => unit._activatedRoles.includes(r));
     return DPS_ROLES.some(role => unit.tags.includes(role));
 }
 
 export function isAttacker(unit) {
+    if (unit._activatedRoles) return unit._activatedRoles.includes('attack');
     return unit.tags.includes("attack");
 }
 
 export function isAnomaly(unit) {
+    if (unit._activatedRoles) return unit._activatedRoles.includes('anomaly');
     return unit.tags.includes("anomaly");
 }
 
 export function isRupture(unit) {
+    if (unit._activatedRoles) return unit._activatedRoles.includes('rupture');
     return unit.tags.includes("rupture");
 }
 
 export function isSupport(unit) {
+    if (unit._activatedRoles) return unit._activatedRoles.includes('support');
     return unit.tags.includes(SUPPORT_ROLE);
 }
 
 export function isDefense(unit) {
+    if (unit._activatedRoles) return unit._activatedRoles.includes('defense');
     return unit.tags.includes("defense");
 }
 
 export function isStun(unit) {
+    if (unit._activatedRoles) return unit._activatedRoles.includes('stun');
     return unit.tags.includes("stun");
 }
 
@@ -214,10 +222,12 @@ export function getEffectiveScaling(unit) {
     if (roles.includes('stun'))    Object.assign(baseline, { daze: 1 });
     if (isDPSByRoles(roles)) {
         const damage = unit.mechanics?.damage || {};
-        let implicitUlt = 1;
-        if (damage['ultimate:strong']) implicitUlt = Math.max(implicitUlt, 2);
-        if (damage['ultimate:double']) implicitUlt = Math.max(implicitUlt, 3);
-        baseline.ultimates = implicitUlt;
+        if (!hasSubDPSRole(unit)) {
+            let implicitUlt = 1;
+            if (damage['ultimate:strong']) implicitUlt = Math.max(implicitUlt, 2);
+            if (damage['ultimate:double']) implicitUlt = Math.max(implicitUlt, 3);
+            baseline.ultimates = implicitUlt;
+        }
         baseline['quick-assists'] = 0.25;
         const totalizeWeight = w(damage.totalize);
         if (totalizeWeight > 0) {
@@ -366,11 +376,15 @@ function computeBuffUtilization(supplier, team) {
 
     if (isDPS(supplier)) {
         const buffs = supplier.mechanics?.buffs || {};
+        const debuffs = supplier.mechanics?.debuffs || {};
         const GENERIC_DPS_BUFFS = new Set(['atk', 'cr', 'cd', 'pen', 'stun-multiplier']);
         const evaluatableBuffs = Object.entries(buffs).filter(
             ([key, value]) => !GENERIC_DPS_BUFFS.has(key) && w(value) >= 2
         );
-        if (evaluatableBuffs.length === 0) return 1.0;
+        const evaluatableDebuffs = Object.entries(debuffs).filter(
+            ([key, value]) => w(value) >= 2
+        );
+        if (evaluatableBuffs.length === 0 && evaluatableDebuffs.length === 0) return 1.0;
         let totalWeight = 0;
         let effectiveWeight = 0;
         for (const [key, value] of evaluatableBuffs) {
@@ -382,9 +396,20 @@ function computeBuffUtilization(supplier, team) {
             }
             effectiveWeight += bw * (nConsumers > 0 ? totalRelevance / nConsumers : 0);
         }
+        for (const [key, value] of evaluatableDebuffs) {
+            const dw = w(value);
+            totalWeight += dw;
+            let maxRelevance = 0;
+            for (const consumer of consumers) {
+                if (isDPS(consumer) || hasSubDPSRole(consumer)) {
+                    maxRelevance = Math.max(maxRelevance, getDebuffRelevance(key, consumer));
+                }
+            }
+            effectiveWeight += dw * maxRelevance;
+        }
         if (totalWeight === 0) return 1.0;
         const rawUtil = effectiveWeight / totalWeight;
-        return 0.5 + 0.5 * rawUtil;
+        return 0.65 + 0.35 * rawUtil;
     }
 
     const buffs = supplier.mechanics?.buffs || {};
@@ -480,7 +505,8 @@ function checkDisqualifications(team, boss, debug) {
         return -1;
     }
 
-    if (dpsUnits.length >= 3) {
+    const pureDpsCount = dpsUnits.filter(u => !isSupport(u) && !isDefense(u) && !isStun(u)).length;
+    if (pureDpsCount >= 3) {
         if (debug) console.log('  DISQUALIFIED: Triple DPS');
         return -1;
     }
@@ -496,8 +522,7 @@ function checkDisqualifications(team, boss, debug) {
 
     for (const unit of dpsUnits) {
         if (boss.resistances.includes(getElement(unit))) {
-            const pseudo = unit.mechanics?.pseudoRole || '';
-            if (pseudo.includes('support')) continue;
+            if (isSupport(unit) || isDefense(unit)) continue;
             if (debug) console.log(`  DISQUALIFIED: ${unit.name} element resisted by boss`);
             return -1;
         }
@@ -530,9 +555,9 @@ const FIELD_TIME = {
 };
 
 function scoreTeamStructure(team, debug) {
-    const attackers = team.filter(isAttacker);
-    const anomalyUnits = team.filter(isAnomaly);
-    const ruptureUnits = team.filter(isRupture);
+    const attackers = team.filter(u => isAttacker(u) && !isSupport(u) && !isDefense(u) && !isStun(u));
+    const anomalyUnits = team.filter(u => isAnomaly(u) && !isSupport(u) && !isDefense(u) && !isStun(u));
+    const ruptureUnits = team.filter(u => isRupture(u) && !isSupport(u) && !isDefense(u) && !isStun(u));
     const stunUnits = team.filter(isStun);
     const supportLike = team.filter(u => isSupport(u) || isDefense(u));
     const dpsUnits = team.filter(isDPS);
@@ -645,6 +670,10 @@ function scoreTeamStructure(team, debug) {
     // 2x Attacker + (Stun|Support) — Seed-like variant
     if (nAtk >= 2 && (nStun >= 1 || nSup >= 1) && nAno === 0 && nRup === 0) {
         const hasSubDPS = attackers.some(hasSubDPSRole);
+        if (hasSubDPS && nStun >= 1) {
+            if (debug) console.log('    Structure: CONVENTIONAL (attacker + subdps + stunner)');
+            return STRUCTURE.CONVENTIONAL_BONUS;
+        }
         const sameElement = attackers.every(a => getElement(a) === getElement(attackers[0]));
         if (hasSubDPS || sameElement) {
             if (debug) console.log('    Structure: UNCONVENTIONAL viable (double attacker with interaction)');
@@ -666,7 +695,7 @@ function scoreTeamStructure(team, debug) {
 function scoreInherentQuality(team, { lenient = false, debug = false } = {}) {
     let score = 0;
 
-    const dpsUnits = team.filter(isDPS);
+    const dpsUnits = team.filter(u => isDPS(u) && !isSupport(u) && !isDefense(u) && !isStun(u));
     const attackers = team.filter(isAttacker);
     const anomalyUnits = team.filter(isAnomaly);
     const supportUnits = team.filter(isSupport);
@@ -678,6 +707,7 @@ function scoreInherentQuality(team, { lenient = false, debug = false } = {}) {
     // --- DPS Tier ---
     if (debug) console.log('    DPS Tier:');
     const forcedSecondaryUnits = new Set();
+    const disorderDisabledUnits = new Set();
     for (const unit of dpsUnits) {
         const tier = unit.tier ?? 2.5;
 
@@ -691,7 +721,13 @@ function scoreInherentQuality(team, { lenient = false, debug = false } = {}) {
             (isAnomaly(unit) && isForcedSecondaryDPS(unit, anomalyUnits)) ||
             (isRupture(unit) && isForcedSecondaryDPS(unit, team.filter(isRupture)));
         if (forcedSecondary) forcedSecondaryUnits.add(unit);
-        const tierMult = (isSecondaryAttacker || isSecondaryAnomaly || forcedSecondary) ? 0.5 : 1.0;
+        let tierMult = (isSecondaryAttacker || isSecondaryAnomaly || forcedSecondary) ? 0.5 : 1.0;
+        const disorderDisabled = isSubDPS && isAnomaly(unit) && !team.some(t => t !== unit &&
+            getEffectiveRoles(t).includes('anomaly') && getElement(t) !== getElement(unit));
+        if (disorderDisabled) {
+            tierMult *= 0.5;
+            disorderDisabledUnits.add(unit);
+        }
 
         let tierBonus = 0;
         if (tier <= 0.5)      tierBonus = (65 - (tier * 20)) * tierMult;
@@ -745,7 +781,8 @@ function scoreInherentQuality(team, { lenient = false, debug = false } = {}) {
     }
 
     // --- Non-DPS Tier + Rank (gated by buff utilization) ---
-    for (const unit of [...supportUnits, ...defenseUnits, ...stunUnits]) {
+    const dpsSet = new Set(dpsUnits);
+    for (const unit of [...supportUnits, ...defenseUnits, ...stunUnits].filter(u => !dpsSet.has(u))) {
         const tier = unit.tier ?? 2.5;
         let tierBonus = 0;
         if (tier <= 0.5)      tierBonus = 23 - (tier * 8);
@@ -803,8 +840,11 @@ function scoreInherentQuality(team, { lenient = false, debug = false } = {}) {
         if (forcedSecondaryUnits.has(unit) && rankBonus > 0) {
             rankBonus = Math.round(rankBonus * 0.5);
         }
+        if (disorderDisabledUnits.has(unit) && rankBonus > 0) {
+            rankBonus = Math.round(rankBonus * 0.5);
+        }
         score += rankBonus;
-        if (debug) console.log(`      ${unit.name} (DPS): ${rankBonus >= 0 ? '+' : ''}${rankBonus}${forcedSecondaryUnits.has(unit) ? ' (forced x0.5)' : ''}`);
+        if (debug) console.log(`      ${unit.name} (DPS): ${rankBonus >= 0 ? '+' : ''}${rankBonus}${forcedSecondaryUnits.has(unit) ? ' (forced x0.5)' : ''}${disorderDisabledUnits.has(unit) ? ' (disorder-disabled x0.5)' : ''}`);
     }
 
     return score;
@@ -827,15 +867,10 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
     if (boss.shill) {
         const isDPSShill = DPS_ROLES.includes(boss.shill);
         if (isDPSShill) {
-            const hasShilledDPS = dpsUnits.some(u => u.tags.includes(boss.shill));
+            const hasShilledDPS = dpsUnits.some(u => u.tags.includes(boss.shill) && !isSupport(u) && !isDefense(u));
             if (hasShilledDPS) {
                 score += 15;
                 if (debug) console.log(`    Shill match (${boss.shill}): +15`);
-            } else {
-                const dpsMatchesElement = dpsUnits.some(u => boss.weaknesses.includes(getElement(u)));
-                const penalty = dpsMatchesElement ? -25 : -50;
-                score += penalty;
-                if (debug) console.log(`    Shill mismatch (${boss.shill}): ${penalty}`);
             }
         } else {
             if (!team.some(u => u.tags.includes(boss.shill))) {
@@ -865,44 +900,42 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
     }
     
     // --- DPS element weakness/resistance ---
-    let dpsMatchesWeakness = false;
     for (const unit of dpsUnits) {
         const element = getElement(unit);
 
         if (boss.weaknesses.includes(element)) {
             const isSubDPS = hasSubDPSRole(unit);
-            if (!isSubDPS) dpsMatchesWeakness = true;
-            const bonus = isSRank(unit)
+            const disorderDisabled = isSubDPS && isAnomaly(unit) && !team.some(t => t !== unit &&
+                getEffectiveRoles(t).includes('anomaly') && getElement(t) !== getElement(unit));
+            let bonus = isSRank(unit)
                 ? (isSubDPS ? 25 : 40)
                 : (isSubDPS ? 10 : 20);
+            if (disorderDisabled) bonus = Math.round(bonus * 0.5);
             score += bonus;
-            if (debug) console.log(`    ${unit.name} on-element (${element}): +${bonus}`);
+            if (debug) console.log(`    ${unit.name} on-element (${element}): +${bonus}${disorderDisabled ? ' (disorder-disabled)' : ''}`);
 
             if (isTitled(unit) && boss.shill && DPS_ROLES.includes(boss.shill) && !unit.tags.includes(boss.shill)) {
                 score += 30;
                 if (debug) console.log(`    ${unit.name} titled on-element vs shill mismatch: +30`);
             }
-        } else if (boss.weaknesses.length > 0) {
-            const singleWeakness = boss.weaknesses.length === 1;
-            const basePenalty = singleWeakness ? 30 : 20;
-            const titled = isTitled(unit);
-            const applied = lenient ? Math.floor(basePenalty / 3) : (titled ? Math.floor(basePenalty / 2) : basePenalty);
-            score -= applied;
-            if (debug) console.log(`    ${unit.name} off-element: -${applied}${singleWeakness ? ' (single weakness)' : ''}${titled ? ' (titled reduction)' : ''}`);
         }
     }
 
-    if (dpsUnits.length > 0 && !dpsMatchesWeakness && boss.weaknesses.length > 0) {
-        const subdpsMatchesWeakness = dpsUnits.some(u =>
-            hasSubDPSRole(u) && boss.weaknesses.includes(getElement(u)));
-        const hasTitledDPS = dpsUnits.some(isTitled);
-        const singleWeakness = boss.weaknesses.length === 1;
-        const basePenalty = subdpsMatchesWeakness ? 25 : 50;
-        const specificity = singleWeakness ? 1.5 : 1;
-        const penalty = (hasTitledDPS ? basePenalty / 2 : basePenalty) * specificity;
-        const applied = lenient ? Math.floor(penalty / 2) : penalty;
-        score -= applied;
-        if (debug) console.log(`    No primary DPS matches weakness${subdpsMatchesWeakness ? ' (subdps match)' : ''}: -${applied}`);
+    if (boss.weaknesses.length > 0) {
+        const primaryDPS = dpsUnits.filter(u => !hasSubDPSRole(u));
+        const onCount = primaryDPS.filter(u => boss.weaknesses.includes(getElement(u))).length;
+        const offCount = primaryDPS.length - onCount;
+
+        if (offCount > 0 && primaryDPS.length > 0) {
+            const offRatio = offCount / primaryDPS.length;
+            const singleWeakness = boss.weaknesses.length === 1;
+            const basePenalty = singleWeakness ? 45 : 30;
+            const hasTitled = primaryDPS.some(u => isTitled(u) && !boss.weaknesses.includes(getElement(u)));
+            const titledReduction = hasTitled ? 0.5 : 1.0;
+            const applied = Math.round(basePenalty * offRatio * titledReduction);
+            score -= lenient ? Math.floor(applied / 2) : applied;
+            if (debug) console.log(`    Off-element DPS penalty: -${lenient ? Math.floor(applied / 2) : applied} (${offCount}/${primaryDPS.length} off, base=${basePenalty}${hasTitled ? ', titled' : ''})`);
+        }
     }
 
     // --- Stunner element ---
@@ -948,14 +981,11 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
         }
     }
 
-    // --- Damage-relevant resistance for support/pseudo-support units ---
+    // --- Damage-relevant resistance for support/defense units ---
     for (const unit of team) {
         const element = getElement(unit);
         if (!boss.resistances.includes(element)) continue;
-        const pseudo = unit.mechanics?.pseudoRole || '';
-        const isActualSupport = isSupport(unit) || isDefense(unit);
-        const isPseudoSupport = isDPS(unit) && pseudo.includes('support');
-        if (!isActualSupport && !isPseudoSupport) continue;
+        if (!isSupport(unit) && !isDefense(unit)) continue;
         const damage = unit.mechanics?.damage || {};
         const maxDamage = Math.max(0, ...Object.values(damage).map(v =>
             typeof v === 'object' ? Math.max(...Object.values(v).map(Number)) : Number(v) || 0
@@ -1141,10 +1171,10 @@ function scoreBaselineAffinity(supplier, consumer, debug, options = {}) {
         }
     }
 
-    // Ultimates provision → all DPS benefit from free ultimate access, scaled by burst potential
+    // Ultimates provision → primary DPS only (subdps don't consume the burst window)
     const supplierUtility = supplier.mechanics?.utility || {};
     const ultimatesWeight = w(supplierUtility.ultimates);
-    if (ultimatesWeight > 0 && isDPSByRoles(consumerRoles)) {
+    if (ultimatesWeight > 0 && isDPSByRoles(consumerRoles) && !hasSubDPSRole(consumer)) {
         const burstWeight = getMaxBurstWeight(consumer);
         const val = ultimatesWeight * burstWeight * MULT.ULTIMATES_PROVISION;
         score += val;
@@ -1203,7 +1233,7 @@ function scoreNeedFulfillment(supplier, consumer, debug) {
         if (dw === 0) continue;
         const buffWeight = w(supplierBuffs[damageType]);
         if (buffWeight > 0) {
-            const val = buffWeight * dw * MULT.NEED_FULFILLMENT;
+            const val = buffWeight * dw * MULT.DAMAGE_NEED;
             score += val;
             if (debug) console.log(`        need(damage:${damageType}): ${val.toFixed(1)}`);
         }
@@ -1244,53 +1274,74 @@ const DIAMETRIC_RATE = 0.20;
 const ON_ELEMENT_L4 = 1.15;
 const OFF_ELEMENT_L4 = 0.85;
 
-function countDiametricPairs(consumer, team) {
+function countDiametricPairs(consumer, team, { antiRupture = false } = {}) {
     let pairs = 0;
+    let maxFloor = 0;
     const consumerElement = getElement(consumer);
     const consumerRoles = getEffectiveRoles(consumer);
-    if (!isDPSByRoles(consumerRoles)) return 0;
+    if (!isDPSByRoles(consumerRoles)) return { count: 0, floor: 0 };
 
     const suppliers = team.filter(t => t !== consumer);
-    const atkCdSuppliers = new Set();
-    const defDebuffSuppliers = new Set();
+    const atkCdSuppliers = new Map();
+    const defDebuffSuppliers = new Map();
     const elemBuffSuppliers = new Map();
     const elemDebuffSuppliers = new Map();
 
     for (const s of suppliers) {
         const buffs = s.mechanics?.buffs || {};
         const debuffs = s.mechanics?.debuffs || {};
-        if (w(buffs.atk) > 0 || w(buffs.cd) > 0) atkCdSuppliers.add(s.name);
-        if (w(debuffs.defense) > 0) defDebuffSuppliers.add(s.name);
+        const atkCdWeight = Math.max(w(buffs.atk), w(buffs.cd));
+        if (atkCdWeight > 0) atkCdSuppliers.set(s.name, atkCdWeight);
+        const defWeight = w(debuffs.defense);
+        if (defWeight > 0) defDebuffSuppliers.set(s.name, defWeight);
         for (const elem of ELEMENTS) {
             if (elem !== consumerElement) continue;
-            if (w(buffs[elem]) > 0) {
-                if (!elemBuffSuppliers.has(elem)) elemBuffSuppliers.set(elem, new Set());
-                elemBuffSuppliers.get(elem).add(s.name);
+            const elemBw = w(buffs[elem]);
+            if (elemBw > 0) {
+                if (!elemBuffSuppliers.has(elem)) elemBuffSuppliers.set(elem, new Map());
+                elemBuffSuppliers.get(elem).set(s.name, elemBw);
             }
-            if (w(debuffs[elem]) > 0) {
-                if (!elemDebuffSuppliers.has(elem)) elemDebuffSuppliers.set(elem, new Set());
-                elemDebuffSuppliers.get(elem).add(s.name);
+            const elemDw = w(debuffs[elem]);
+            if (elemDw > 0) {
+                if (!elemDebuffSuppliers.has(elem)) elemDebuffSuppliers.set(elem, new Map());
+                elemDebuffSuppliers.get(elem).set(s.name, elemDw);
             }
         }
     }
 
     if (atkCdSuppliers.size > 0 && defDebuffSuppliers.size > 0) {
-        const hasDistinct = [...atkCdSuppliers].some(s => !defDebuffSuppliers.has(s))
-            || [...defDebuffSuppliers].some(s => !atkCdSuppliers.has(s));
-        if (hasDistinct) pairs++;
-    }
-
-    for (const elem of ELEMENTS) {
-        const buffSet = elemBuffSuppliers.get(elem);
-        const debuffSet = elemDebuffSuppliers.get(elem);
-        if (buffSet && debuffSet) {
-            const hasDistinct = [...buffSet].some(s => !debuffSet.has(s))
-                || [...debuffSet].some(s => !buffSet.has(s));
-            if (hasDistinct) pairs++;
+        const hasDistinct = [...atkCdSuppliers.keys()].some(s => !defDebuffSuppliers.has(s))
+            || [...defDebuffSuppliers.keys()].some(s => !atkCdSuppliers.has(s));
+        if (hasDistinct) {
+            pairs++;
+            if (!antiRupture) {
+                const buffW = Math.max(...atkCdSuppliers.values());
+                const debuffW = Math.max(...defDebuffSuppliers.values());
+                if (buffW >= 2 && debuffW >= 2) {
+                    maxFloor = Math.max(maxFloor, Math.min(1.0, 0.4 + (buffW + debuffW) * 0.1));
+                }
+            }
         }
     }
 
-    return pairs;
+    for (const elem of ELEMENTS) {
+        const buffMap = elemBuffSuppliers.get(elem);
+        const debuffMap = elemDebuffSuppliers.get(elem);
+        if (buffMap && debuffMap) {
+            const hasDistinct = [...buffMap.keys()].some(s => !debuffMap.has(s))
+                || [...debuffMap.keys()].some(s => !buffMap.has(s));
+            if (hasDistinct) {
+                pairs++;
+                const buffW = Math.max(...buffMap.values());
+                const debuffW = Math.max(...debuffMap.values());
+                if (buffW >= 2 && debuffW >= 2) {
+                    maxFloor = Math.max(maxFloor, Math.min(1.0, 0.4 + (buffW + debuffW) * 0.1));
+                }
+            }
+        }
+    }
+
+    return { count: pairs, floor: maxFloor };
 }
 
 // --- Layer 4 Orchestrator ---
@@ -1353,13 +1404,14 @@ function scoreMechanicalSynergy(team, debug, options = {}) {
     // Diametric synergy: proportional amplifier on consumer's incoming L4
     if (debug) console.log('    Diametric synergy:');
     for (const consumer of team) {
-        const pairs = countDiametricPairs(consumer, team);
+        const { count: pairs } = countDiametricPairs(consumer, team);
         if (pairs > 0) {
             const multiplier = 1 + pairs * DIAMETRIC_RATE;
             const base = consumerScores.get(consumer.name) || 0;
-            const bonus = base * (multiplier - 1);
+            const rawBonus = base * (multiplier - 1);
+            const bonus = Math.max(rawBonus, pairs * 10);
             consumerScores.set(consumer.name, base + bonus);
-            if (debug) console.log(`    Diametric for ${consumer.name}: ${pairs} pair(s) → ×${multiplier.toFixed(2)} on ${base.toFixed(1)} = +${bonus.toFixed(1)}`);
+            if (debug) console.log(`    Diametric for ${consumer.name}: ${pairs} pair(s) → ×${multiplier.toFixed(2)} on ${base.toFixed(1)} = +${bonus.toFixed(1)}${bonus > rawBonus ? ' (floored)' : ''}`);
         }
     }
 
@@ -1455,7 +1507,7 @@ const STRUCTURE_FACTOR = new Map([
 
 const COHESION_FLOOR = 0.2;
 
-function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs = 0) {
+function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs = 0, diametricFloor = 0) {
     const structureFactor = STRUCTURE_FACTOR.get(structureScore) ?? 0.35;
 
     let logSum = 0;
@@ -1503,9 +1555,16 @@ function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs =
                     if (supplyWeight > 0) { needsMet++; break; }
                 }
             }
+            if (hasSubDPSRole(unit) && isAnomaly(unit)) {
+                const hasDiffElementPartner = team.some(t => t !== unit &&
+                    getEffectiveRoles(t).includes('anomaly') && getElement(t) !== getElement(unit));
+                if (!hasDiffElementPartner) {
+                    needsTotal++;
+                }
+            }
             if (needsTotal > 0 && needsMet < needsTotal) {
                 const reception = needsMet / needsTotal;
-                const receptionUtil = 0.4 + 0.6 * reception;
+                const receptionUtil = 0.6 + 0.4 * reception;
                 const weight = Math.min(0.5, needsTotal * 0.25);
                 logSum += weight * Math.log(Math.max(receptionUtil * receptionUtil, 0.01));
                 totalWeight += weight;
@@ -1545,16 +1604,15 @@ function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs =
             }
         }
         const weight = isDPS(unit) ? 0.5 : 1.0;
-        const utilSquared = util * util;
+        const utilValue = isDPS(unit) ? util : util * util;
 
-        logSum += weight * Math.log(Math.max(utilSquared, 0.01));
+        logSum += weight * Math.log(Math.max(utilValue, 0.01));
         totalWeight += weight;
     }
 
     let cohesion = totalWeight > 0 ? Math.exp(logSum / totalWeight) : 0.5;
-    if (diametricPairs > 0) {
-        const diametricFloor = 0.70 + diametricPairs * 0.1;
-        cohesion = Math.max(cohesion, Math.min(diametricFloor, 1.0));
+    if (diametricFloor > 0) {
+        cohesion = Math.max(cohesion, diametricFloor);
     }
     const teamwork = structureFactor * (COHESION_FLOOR + (1 - COHESION_FLOOR) * cohesion);
 
@@ -1659,10 +1717,14 @@ export function scoreTeamForBoss(team, boss, options = {}) {
     // Apply teamwork multiplier (replaces additive structure scoring)
     const rawScore = score;
     let maxDiametricPairs = 0;
+    let maxDiametricFloor = 0;
+    const antiRuptureBoss = boss.anti?.includes('rupture') || false;
     for (const unit of team) {
-        maxDiametricPairs = Math.max(maxDiametricPairs, countDiametricPairs(unit, team));
+        const { count, floor } = countDiametricPairs(unit, team, { antiRupture: antiRuptureBoss });
+        maxDiametricPairs = Math.max(maxDiametricPairs, count);
+        maxDiametricFloor = Math.max(maxDiametricFloor, floor);
     }
-    const teamwork = computeTeamworkMultiplier(team, structureScore, debug, maxDiametricPairs);
+    const teamwork = computeTeamworkMultiplier(team, structureScore, debug, maxDiametricPairs, maxDiametricFloor);
     score = Math.round(rawScore * teamwork * 10) / 10;
 
     if (debug) {
