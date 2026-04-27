@@ -241,7 +241,7 @@
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "damage": { "chain": 3, "ultimate:strong": 1 },
-            "scaling": { "chains": 3 }
+            "scaling": { "chains": 3, "recovery": 1 }
         },
         "faction": "Stars of Lyra"
     },
@@ -323,6 +323,7 @@
         "mechanics": {
             "onfield": false,
             "damage": { "aftershock": true },
+            "buffs": { "cd": 3 },
             "utility": { "ultimates" : 1 }
         },
         "faction": "Yunkui Summit"

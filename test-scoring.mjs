@@ -335,7 +335,8 @@ async function main() {
     // Expect: Dialyn > Lighter > JF for Astra 3rd; same for Lucia 3rd; and
     // Dialyn/.../Lighter order where applicable.
     run('TEST 7: Evelyn stunner ordering (Neutral, Pompey)', () => {
-        for (const b of withBosses(bosses, 'Neutral,Pompey')) {
+        // On Neutral: Dialyn > Lighter > JF
+        for (const b of withBosses(bosses, 'Neutral')) {
             const astraTriple =
                 'Dialyn/Evelyn/Astra,Lighter/Evelyn/Astra,Ju Fufu/Evelyn/Astra';
             const m1 = scoreMapForBoss(scoreForTeamString(astraTriple, allUnits), b);
@@ -356,6 +357,17 @@ async function main() {
             assert(
                 m3.get('Dialyn / Lighter / Evelyn') > m3.get('Ju Fufu / Lighter / Evelyn'),
                 `${b.name}: Dialyn/Lighter/Evelyn > JF/Lighter/Evelyn`
+            );
+        }
+        // On Pompey (fire-weak): Lighter beats Dialyn due to fire element + recovery synergy
+        for (const b of withBosses(bosses, 'Pompey')) {
+            const astraTriple =
+                'Dialyn/Evelyn/Astra,Lighter/Evelyn/Astra,Ju Fufu/Evelyn/Astra';
+            const m1 = scoreMapForBoss(scoreForTeamString(astraTriple, allUnits), b);
+            assert(
+                m1.get('Lighter / Evelyn / Astra') > m1.get('Dialyn / Evelyn / Astra') &&
+                    m1.get('Dialyn / Evelyn / Astra') > m1.get('Ju Fufu / Evelyn / Astra'),
+                `${b.name}: Evelyn+Astra: want Lighter > Dialyn > JF (fire-weak)`
             );
         }
     });
@@ -815,6 +827,38 @@ async function main() {
             assert(lesS >= 180, `${b.name} LES: got ${lesS}, expected >= 180`);
             const lenS = scoreTeamForBoss(len.team, b, {});
             assert(lesS > lenS, `${b.name}: LES (${lesS}) should beat LEN (${lenS}) — ice synergy not penalized`);
+        }
+    });
+
+    // ========================================================================
+    // TEST 32: AoD (Nangong/Aria) beats non-AoD on Priest
+    // ========================================================================
+    run('TEST 32: Nangong/Aria/Sunna > Aria/Burnice/Sunna on Priest', () => {
+        const teams = scoreForTeamString(
+            'Nangong/Aria/Sunna,Aria/Burnice/Sunna', allUnits);
+        for (const b of withBosses(bosses, 'Priest')) {
+            const m = scoreMapForBoss(teams, b);
+            const aod = m.get('Nangong / Aria / Sunna');
+            const abs = m.get('Aria / Burnice / Sunna');
+            assert(aod > abs,
+                `${b.name}: NAS (${aod}) should beat ABS (${abs})`);
+        }
+    });
+
+    // ========================================================================
+    // TEST 33: Lighter/Evelyn/Astra > Trigger/Evelyn/Astra on neutral
+    // ========================================================================
+    // Lighter's recovery debuff synergizes with Evelyn's chain-scaling playstyle;
+    // should beat Trigger's diametric synergy advantage on neutral bosses.
+    run('TEST 33: Lighter > Trigger for Evelyn on neutral (recovery synergy)', () => {
+        const teams = scoreForTeamString(
+            'Lighter/Evelyn/Astra,Trigger/Evelyn/Astra', allUnits);
+        for (const b of withBosses(bosses, 'Neutral')) {
+            const m = scoreMapForBoss(teams, b);
+            const lighter = m.get('Lighter / Evelyn / Astra');
+            const trigger = m.get('Trigger / Evelyn / Astra');
+            assert(lighter > trigger,
+                `${b.name}: Lighter/Evelyn/Astra (${lighter}) should beat Trigger/Evelyn/Astra (${trigger})`);
         }
     });
 

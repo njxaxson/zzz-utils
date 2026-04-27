@@ -696,8 +696,8 @@ function scoreInherentQuality(team, { lenient = false, debug = false } = {}) {
     let score = 0;
 
     const dpsUnits = team.filter(u => isDPS(u) && !isSupport(u) && !isDefense(u) && !isStun(u));
-    const attackers = team.filter(isAttacker);
-    const anomalyUnits = team.filter(isAnomaly);
+    const attackers = team.filter(u => isAttacker(u) && !isSupport(u) && !isDefense(u) && !isStun(u));
+    const anomalyUnits = team.filter(u => isAnomaly(u) && !isSupport(u) && !isDefense(u) && !isStun(u));
     const supportUnits = team.filter(isSupport);
     const stunUnits = team.filter(isStun);
     const defenseUnits = team.filter(isDefense);
@@ -1164,7 +1164,8 @@ function scoreBaselineAffinity(supplier, consumer, debug, options = {}) {
             const burstWeight = getMaxBurstWeight(consumer);
             const chainsScaling = w(consumer.mechanics?.scaling?.chains);
             const totalizeWeight = w(consumer.mechanics?.damage?.totalize);
-            const effectiveBurst = burstWeight + chainsScaling + totalizeWeight * 2;
+            const recoveryScaling = w(consumer.mechanics?.scaling?.recovery);
+            const effectiveBurst = burstWeight + chainsScaling + totalizeWeight * 2 + recoveryScaling;
             const val = w(supplierDebuffs.recovery) * effectiveBurst * MULT.RECOVERY_DEBUFF;
             score += val;
             dbg('recovery', val);
@@ -1483,8 +1484,8 @@ function scoreAdditionalSynergies(team, debug) {
             if (teammate === unit) continue;
             const match = synergyTags.some(tag => teammate.tags.includes(tag));
             if (match) {
-                score += 25;
-                if (debug) console.log(`    ${unit.name} tag synergy with ${teammate.name}: +25`);
+                score += 15;
+                if (debug) console.log(`    ${unit.name} tag synergy with ${teammate.name}: +15`);
             }
         }
     }
