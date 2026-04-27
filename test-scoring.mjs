@@ -1,43 +1,18 @@
 /**
  * test-scoring.mjs
  *
- * Programmatic regression checks for the team scoring engine used by
- * `matchups.js` (`scoreTeamForBoss` from `app/public/lib/common/team-scorer.js`).
+ * Assertion-based regression tests for the team scoring engine
+ * (`scoreTeamForBoss` from `app/public/lib/common/team-scorer.js`).
  *
- * Run from the repository root (no npm required):
+ * Run from the repository root:
  *   node test-scoring.mjs
  *
- * Exit code: 0 if every migrated test passes, 1 if any test fails.
+ * Exit code: 0 if all tests pass, 1 if any test fails.
  *
- * ----------------------------------------------------------------------------
- * MIGRATED vs SKIPPED (vs validate-scoring.bat batch sections)
- * ----------------------------------------------------------------------------
- * Skipped because expectations are not expressed as a single pass/fail rule
- * without adding new, arbitrary thresholds:
- *
- *  - (none for whole test numbers) — see each TEST block below. Partial skips
- *    are called out in comments and in stdout under "SKIPPED (informational)".
- *
- * Test 1:  "Conventional meta dominates" is qualitative — NOT automated.
- *          We DO automate: on every boss, the top-25 *viable* (score>0) list
- *          must not contain a team with both SAnby and Yixuan (explicit rule
- *          from the batch). "Other incoherent comps" is NOT checked.
- *
- * Test 15: We check Nangong/Yixua/Sunna band only. "Dialyn/Hugo/Sunna" /
- *          "well below pure-archetype" has no numeric bar in the batch — NOT
- *          automated.
- *
- * Test 16: We check Fiend: best Nangong team scores high, and
- *          Nangong/Alice/Yuzuha sits in a competitive band. Rank-1 may be
- *          Alice or Miyabi in current data — "Miyabi at top" from the batch
- *          is not enforced as a hard rule. "Vivian lower" / full hierarchy: NOT
- *          fully automated.
- *
- * Test 21: At least 5 Banyue teams score 350+ on Hunter.
- *
- * Test 9:  Sweeper+Butcher: full chain Sunna > Yuzuha > Astra > Zhao > Nicole > Vivian.
- *          Solo: only Nicole > Vivian and Sunna not worst (Solo scrambles 3rds).
- * ----------------------------------------------------------------------------
+ * Each TEST block verifies specific ordering relationships, score thresholds,
+ * or structural constraints. Some tests are partial — they check the most
+ * important assertions while noting aspects that are qualitative or
+ * boss-dependent and not suitable for hard automation.
  */
 
 import { loadAllData } from './lib/data.js';
