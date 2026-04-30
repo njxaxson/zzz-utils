@@ -141,7 +141,7 @@
             "utility": { "heal:self": true }
         },
         "faction": "Cunning Hares",
-        "available": false,
+        "available": true,
         "displayText": "Starlight Knight supreme."
     },
     {
@@ -759,6 +759,23 @@
         },
         "faction": "Obol Squad",
         "displayText": "Off-field electric aftershock stun agent that can shred defense with her W-engine."
+    },
+    {
+        "id": "velina",
+        "name": "Velina",
+        "aliases": ["Vel"],
+        "image": "./assets/characters/vivian.webp",
+        "rank": "S",
+        "limited": true,
+        "tier": 0.5,
+        "tags": ["anomaly", "wind", "esb", "assist:defensive"],
+        "join": ["anomaly", "esb"],
+        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {
+            "damage": { "abloom": 2 }
+        },
+        "faction": "ESB",
+        "available": false
     },
     {
         "id": "vivian",
