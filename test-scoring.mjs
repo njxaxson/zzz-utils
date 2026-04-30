@@ -93,8 +93,8 @@ function getTopViableTeams(entries, boss, depth, includeOneOf) {
     return rows.slice(0, depth);
 }
 
-function scoreForTeamString(teamsString, allUnits) {
-    const { teams, warnings } = parseTeams(teamsString, allUnits, { preview: false });
+function scoreForTeamString(teamsString, allUnits, opts = {}) {
+    const { teams, warnings } = parseTeams(teamsString, allUnits, { preview: opts.preview ?? false });
     for (const w of warnings) {
         /* empty — batch suite expects expansion warnings to be ok */
     }
@@ -834,6 +834,106 @@ async function main() {
             const trigger = m.get('Trigger / Evelyn / Astra');
             assert(lighter > trigger,
                 `${b.name}: Lighter/Evelyn/Astra (${lighter}) should beat Trigger/Evelyn/Astra (${trigger})`);
+        }
+    });
+
+    // ========================================================================
+    // TEST 34: Promeia ice vortex dominance on Mutant
+    // ========================================================================
+    run('TEST 34: Promeia teams dominate Mutant; outscore Miyabi teams', () => {
+        const teams = scoreForTeamString(
+            'Lycaon/Promeia/Soukaku,Nangong/Promeia/Yuzuha,Lighter/Promeia/Burnice,Miyabi/Vivian/Yuzuha,Nangong/Miyabi/Yuzuha',
+            allUnits, { preview: true });
+        for (const b of withBosses(bosses, 'Mutant')) {
+            const m = scoreMapForBoss(teams, b);
+            const lps = m.get('Lycaon / Promeia / Soukaku');
+            const npy = m.get('Nangong / Promeia / Yuzuha');
+            const lpb = m.get('Lighter / Burnice / Promeia');
+            const mvy = m.get('Miyabi / Vivian / Yuzuha');
+            const nmy = m.get('Nangong / Miyabi / Yuzuha');
+            assert(npy > 400, `${b.name}: NPY (${npy}) expected > 400`);
+            assert(lps > 400, `${b.name}: LPS (${lps}) expected > 400`);
+            assert(lpb > 380, `${b.name}: LPB (${lpb}) expected > 380`);
+            assert(npy > mvy, `${b.name}: NPY (${npy}) should beat MVY (${mvy})`);
+            assert(lps > mvy, `${b.name}: LPS (${lps}) should beat MVY (${mvy})`);
+            assert(npy > nmy, `${b.name}: NPY (${npy}) should beat NMY (${nmy}) — vortex advantage`);
+        }
+    });
+
+    // ========================================================================
+    // TEST 35: Lighter/Promeia/Burnice abloom synergy on Mutant
+    // ========================================================================
+    run('TEST 35: Lighter/Promeia/Burnice competitive on Mutant (abloom + vortex)', () => {
+        const teams = scoreForTeamString(
+            'Lighter/Promeia/Burnice', allUnits, { preview: true });
+        for (const b of withBosses(bosses, 'Mutant')) {
+            const m = scoreMapForBoss(teams, b);
+            const lpb = m.get('Lighter / Burnice / Promeia');
+            assert(lpb > 380, `${b.name}: LPB (${lpb}) expected > 380 (abloom + dual vortex)`);
+        }
+    });
+
+    // ========================================================================
+    // TEST 36: Miyabi weakness on Mutant vs strength on Sacrifice Bringer
+    // ========================================================================
+    run('TEST 36: Miyabi/Vivian/Yuzuha much stronger on Bringer than Mutant', () => {
+        const teams = scoreForTeamString(
+            'Miyabi/Vivian/Yuzuha', allUnits, { preview: true });
+        const mutants = withBosses(bosses, 'Mutant');
+        const bringers = withBosses(bosses, 'Sacrifice');
+        for (const mb of mutants) {
+            const mutantScore = scoreTeamForBoss(teams[0].team, mb, {});
+            for (const bb of bringers) {
+                const bringerScore = scoreTeamForBoss(teams[0].team, bb, {});
+                assert(bringerScore > 300, `${bb.name}: MVY (${bringerScore}) expected > 300`);
+                assert(bringerScore > mutantScore + 50,
+                    `MVY on Bringer (${bringerScore}) should beat Mutant (${mutantScore}) by 50+`);
+            }
+        }
+    });
+
+    // ========================================================================
+    // TEST 37: Polarity providers mitigate Miyabi on Mutant
+    // ========================================================================
+    run('TEST 37: Nangong/Miyabi/Yuzuha > Miyabi/Vivian/Yuzuha on Mutant (polarity mitigation)', () => {
+        const teams = scoreForTeamString(
+            'Nangong/Miyabi/Yuzuha,Miyabi/Vivian/Yuzuha', allUnits, { preview: true });
+        for (const b of withBosses(bosses, 'Mutant')) {
+            const m = scoreMapForBoss(teams, b);
+            const nmy = m.get('Nangong / Miyabi / Yuzuha');
+            const mvy = m.get('Miyabi / Vivian / Yuzuha');
+            assert(nmy > mvy,
+                `${b.name}: NMY (${nmy}) should beat MVY (${mvy}) — Nangong polarity feeds Miyabi scaling`);
+        }
+    });
+
+    // ========================================================================
+    // TEST 38: Non-anomaly teams unaffected by vortex on Mutant
+    // ========================================================================
+    run('TEST 38: Attack/rupture teams on Mutant — no accidental vortex bonuses', () => {
+        const teams = scoreForTeamString(
+            'Lighter/Evelyn/Astra,Lycaon/Zhu Yuan/Nicole', allUnits, { preview: true });
+        for (const b of withBosses(bosses, 'Mutant')) {
+            const m = scoreMapForBoss(teams, b);
+            for (const [label, s] of m) {
+                assert(s > 0, `${b.name}: ${label} (${s}) should not be disqualified as a non-anomaly team`);
+            }
+        }
+    });
+
+    // ========================================================================
+    // TEST 39: Regression — existing compositions unchanged on non-Mutant bosses
+    // ========================================================================
+    run('TEST 39: Key compositions identical on Sacrifice Bringer (no vortex regression)', () => {
+        const teams = scoreForTeamString(
+            'Nangong/Miyabi/Yuzuha,Miyabi/Vivian/Yuzuha', allUnits);
+        for (const b of withBosses(bosses, 'Sacrifice')) {
+            const m = scoreMapForBoss(teams, b);
+            const nmy = m.get('Nangong / Miyabi / Yuzuha');
+            const mvy = m.get('Miyabi / Vivian / Yuzuha');
+            assert(nmy > 400, `${b.name}: NMY (${nmy}) expected > 400 (regression check)`);
+            assert(mvy > 300, `${b.name}: MVY (${mvy}) expected > 300 (regression check)`);
+            assert(nmy > mvy, `${b.name}: NMY (${nmy}) should beat MVY (${mvy}) (regression check)`);
         }
     });
 

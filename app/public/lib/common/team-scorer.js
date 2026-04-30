@@ -44,8 +44,13 @@ const RUPTURE_ATK_EFFICIENCY = 0.33;
 const BURST_DAMAGE_TYPES = ['enhanced', 'ultimate:strong', 'ultimate:double', 'chain', 'totalize'];
 const NEED_FULFILLMENT_KEYS = [
     'disorders', 'ablooms', 'chains', 'ultimates', 'veils',
-    'quick-assists', 'interrupt-resistance'
+    'quick-assists', 'interrupt-resistance', 'vortex'
 ];
+
+const VORTEX_TIERS = { ice: 3, fire: 2, physical: 1, ether: 1, electric: 1 };
+const VORTEX_DEFAULT_TIER = 0.08;
+const VORTEX_BASE = 16;
+const POLARITY_VORTEX_DISCOUNT = 0.25;
 const NATURALLY_AVAILABLE_NEEDS = new Set(['ultimates', 'chains']);
 const STAT_SCALING_KEYS = ['am', 'ap', 'cr', 'cd', 'hp', 'def', 'pen', 'sheer'];
 
@@ -193,6 +198,93 @@ function teamHasImplicitDisorders(team) {
 function teamHasDisorderGeneration(team) {
     if (teamHasImplicitDisorders(team)) return true;
     return team.some(u => w(u.mechanics?.utility?.disorders) > 0);
+}
+
+// --- Boss Anomaly State helpers ---
+
+function getBossAnomalyState(boss) {
+    return boss?.mechanics?.['anomaly:state'] || null;
+}
+
+function isVortexBoss(boss) {
+    const state = getBossAnomalyState(boss);
+    return state === 'wind';
+}
+
+function getAnomalyElement(unit) {
+    const base = getElement(unit);
+    return unit.mechanics?.elementalVariant ? base + '-variant' : base;
+}
+
+function getVortexTierForElement(unit, bossAnomaly) {
+    if (unit.mechanics?.elementalVariant) return VORTEX_DEFAULT_TIER;
+    const el = getElement(unit);
+    if (el === 'wind' && bossAnomaly && bossAnomaly !== 'wind') {
+        return VORTEX_TIERS[bossAnomaly] ?? VORTEX_DEFAULT_TIER;
+    }
+    return VORTEX_TIERS[el] ?? VORTEX_DEFAULT_TIER;
+}
+
+function computeAnomalyReactions(team, boss) {
+    const bossAnomaly = getBossAnomalyState(boss);
+    const anomalyAgents = team.filter(u => getEffectiveRoles(u).includes('anomaly'));
+    const reactions = new Map();
+
+    for (const unit of anomalyAgents) {
+        const element = getAnomalyElement(unit);
+        let bestVortexTier = 0;
+        let hasDisorder = false;
+
+        if (bossAnomaly) {
+            if (element !== bossAnomaly) {
+                if (bossAnomaly === 'wind' || element === 'wind') {
+                    bestVortexTier = getVortexTierForElement(unit, bossAnomaly);
+                } else {
+                    hasDisorder = true;
+                }
+            }
+        } else {
+            for (const partner of anomalyAgents) {
+                if (partner === unit) continue;
+                const partnerEl = getAnomalyElement(partner);
+                if (element === partnerEl) continue;
+
+                if (element === 'wind' || partnerEl === 'wind') {
+                    const nonWindUnit = (element === 'wind') ? partner : unit;
+                    bestVortexTier = Math.max(bestVortexTier,
+                        getVortexTierForElement(nonWindUnit, null));
+                } else {
+                    hasDisorder = true;
+                }
+            }
+        }
+
+        reactions.set(unit, { bestVortexTier, hasDisorder });
+    }
+
+    return reactions;
+}
+
+function teamHasAnyDisorder(reactions) {
+    for (const [, r] of reactions) { if (r.hasDisorder) return true; }
+    return false;
+}
+
+function teamHasAnyVortex(reactions) {
+    for (const [, r] of reactions) { if (r.bestVortexTier > 0) return true; }
+    return false;
+}
+
+function teamHasAnyReaction(reactions) {
+    return teamHasAnyDisorder(reactions) || teamHasAnyVortex(reactions);
+}
+
+function teamHasPolarity(team) {
+    return team.some(u => w(u.mechanics?.utility?.disorders) > 0);
+}
+
+function teamHasDisorderGenerationFromReactions(team, reactions) {
+    return teamHasAnyDisorder(reactions) || teamHasPolarity(team);
 }
 
 function hasSubDPSRole(unit) {
@@ -692,8 +784,9 @@ function scoreTeamStructure(team, debug) {
 // LAYER 2: INHERENT QUALITY
 // ============================================================================
 
-function scoreInherentQuality(team, { lenient = false, debug = false } = {}) {
+function scoreInherentQuality(team, { lenient = false, debug = false, boss = null } = {}) {
     let score = 0;
+    const reactions = computeAnomalyReactions(team, boss);
 
     const dpsUnits = team.filter(u => isDPS(u) && !isSupport(u) && !isDefense(u) && !isStun(u));
     const attackers = team.filter(u => isAttacker(u) && !isSupport(u) && !isDefense(u) && !isStun(u));
@@ -707,7 +800,7 @@ function scoreInherentQuality(team, { lenient = false, debug = false } = {}) {
     // --- DPS Tier ---
     if (debug) console.log('    DPS Tier:');
     const forcedSecondaryUnits = new Set();
-    const disorderDisabledUnits = new Set();
+    const reactionDisabledUnits = new Set();
     for (const unit of dpsUnits) {
         const tier = unit.tier ?? 2.5;
 
@@ -722,11 +815,12 @@ function scoreInherentQuality(team, { lenient = false, debug = false } = {}) {
             (isRupture(unit) && isForcedSecondaryDPS(unit, team.filter(isRupture)));
         if (forcedSecondary) forcedSecondaryUnits.add(unit);
         let tierMult = (isSecondaryAttacker || isSecondaryAnomaly || forcedSecondary) ? 0.5 : 1.0;
-        const disorderDisabled = isSubDPS && isAnomaly(unit) && !team.some(t => t !== unit &&
-            getEffectiveRoles(t).includes('anomaly') && getElement(t) !== getElement(unit));
-        if (disorderDisabled) {
+        const unitReaction = reactions.get(unit);
+        const reactionDisabled = isSubDPS && isAnomaly(unit) &&
+            !(unitReaction?.bestVortexTier > 0 || unitReaction?.hasDisorder);
+        if (reactionDisabled) {
             tierMult *= 0.5;
-            disorderDisabledUnits.add(unit);
+            reactionDisabledUnits.add(unit);
         }
 
         let tierBonus = 0;
@@ -840,11 +934,11 @@ function scoreInherentQuality(team, { lenient = false, debug = false } = {}) {
         if (forcedSecondaryUnits.has(unit) && rankBonus > 0) {
             rankBonus = Math.round(rankBonus * 0.5);
         }
-        if (disorderDisabledUnits.has(unit) && rankBonus > 0) {
+        if (reactionDisabledUnits.has(unit) && rankBonus > 0) {
             rankBonus = Math.round(rankBonus * 0.5);
         }
         score += rankBonus;
-        if (debug) console.log(`      ${unit.name} (DPS): ${rankBonus >= 0 ? '+' : ''}${rankBonus}${forcedSecondaryUnits.has(unit) ? ' (forced x0.5)' : ''}${disorderDisabledUnits.has(unit) ? ' (disorder-disabled x0.5)' : ''}`);
+        if (debug) console.log(`      ${unit.name} (DPS): ${rankBonus >= 0 ? '+' : ''}${rankBonus}${forcedSecondaryUnits.has(unit) ? ' (forced x0.5)' : ''}${reactionDisabledUnits.has(unit) ? ' (reaction-disabled x0.5)' : ''}`);
     }
 
     return score;
@@ -900,19 +994,21 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
     }
     
     // --- DPS element weakness/resistance ---
+    const l3Reactions = computeAnomalyReactions(team, boss);
     for (const unit of dpsUnits) {
         const element = getElement(unit);
 
         if (boss.weaknesses.includes(element)) {
             const isSubDPS = hasSubDPSRole(unit);
-            const disorderDisabled = isSubDPS && isAnomaly(unit) && !team.some(t => t !== unit &&
-                getEffectiveRoles(t).includes('anomaly') && getElement(t) !== getElement(unit));
+            const unitReaction = l3Reactions.get(unit);
+            const reactionDisabled = isSubDPS && isAnomaly(unit) &&
+                !(unitReaction?.bestVortexTier > 0 || unitReaction?.hasDisorder);
             let bonus = isSRank(unit)
                 ? (isSubDPS ? 25 : 40)
                 : (isSubDPS ? 10 : 20);
-            if (disorderDisabled) bonus = Math.round(bonus * 0.5);
+            if (reactionDisabled) bonus = Math.round(bonus * 0.5);
             score += bonus;
-            if (debug) console.log(`    ${unit.name} on-element (${element}): +${bonus}${disorderDisabled ? ' (disorder-disabled)' : ''}`);
+            if (debug) console.log(`    ${unit.name} on-element (${element}): +${bonus}${reactionDisabled ? ' (reaction-disabled)' : ''}`);
 
             if (isTitled(unit) && boss.shill && DPS_ROLES.includes(boss.shill) && !unit.tags.includes(boss.shill)) {
                 score += 30;
@@ -1050,12 +1146,16 @@ function scoreBaselineAffinity(supplier, consumer, debug, options = {}) {
     }
 
     // Disorder damage buff → anomaly agents, only when team generates disorders
+    // On vortex bosses, natural disorders are suppressed; discount proportionally
     if (supplierBuffs.disorders && options?.hasDisorderGeneration) {
-        const cw = resolveBaselineWeight(consumer, 'anomaly-affinity');
-        if (cw > 0) {
-            const val = w(supplierBuffs.disorders) * cw * MULT.ANOMALY_BUFF;
-            score += val;
-            dbg('disorder-buff', val);
+        const discount = options?.disorderBuffDiscount ?? 1;
+        if (discount > 0) {
+            const cw = resolveBaselineWeight(consumer, 'anomaly-affinity');
+            if (cw > 0) {
+                const val = w(supplierBuffs.disorders) * cw * MULT.ANOMALY_BUFF * discount;
+                score += val;
+                dbg('disorder-buff', val);
+            }
         }
     }
 
@@ -1187,7 +1287,7 @@ function scoreBaselineAffinity(supplier, consumer, debug, options = {}) {
 
 // --- Need Fulfillment ---
 
-function scoreNeedFulfillment(supplier, consumer, debug) {
+function scoreNeedFulfillment(supplier, consumer, debug, options = {}) {
     let score = 0;
     const scaling = getEffectiveScaling(consumer);
     const supplierBuffs = supplier.mechanics?.buffs || {};
@@ -1228,15 +1328,22 @@ function scoreNeedFulfillment(supplier, consumer, debug) {
 
     // Damage-type need fulfillment: consumer's damage types create implicit scaling
     // for matching supplier buffs (aftershock buff → aftershock dealer, etc.)
+    // Polarity is a subclass of disorders: buffs.disorders also satisfies damage.polarity
     const consumerDamage = consumer.mechanics?.damage || {};
     for (const [damageType, damageWeight] of Object.entries(consumerDamage)) {
         const dw = w(damageWeight);
         if (dw === 0) continue;
-        const buffWeight = w(supplierBuffs[damageType]);
+        let buffWeight = w(supplierBuffs[damageType]);
+        if (damageType === 'polarity') {
+            buffWeight = Math.max(buffWeight, w(supplierBuffs.disorders));
+        }
         if (buffWeight > 0) {
-            const val = buffWeight * dw * MULT.DAMAGE_NEED;
+            let val = buffWeight * dw * MULT.DAMAGE_NEED;
+            if (damageType === 'polarity' && isVortexBoss(options?.boss)) {
+                val *= POLARITY_VORTEX_DISCOUNT;
+            }
             score += val;
-            if (debug) console.log(`        need(damage:${damageType}): ${val.toFixed(1)}`);
+            if (debug) console.log(`        need(damage:${damageType}): ${val.toFixed(1)}${damageType === 'polarity' && isVortexBoss(options?.boss) ? ' (vortex discount)' : ''}`);
         }
     }
 
@@ -1349,8 +1456,20 @@ function countDiametricPairs(consumer, team, { antiRupture = false } = {}) {
 
 function scoreMechanicalSynergy(team, debug, options = {}) {
     let totalScore = 0;
-    const hasDisorderGen = teamHasDisorderGeneration(team);
-    const l4Options = { ...options, hasDisorderGeneration: hasDisorderGen };
+    const boss = options.boss;
+    const reactions = computeAnomalyReactions(team, boss);
+    const hasDisorderGen = teamHasDisorderGenerationFromReactions(team, reactions);
+    const vortexBoss = isVortexBoss(boss);
+
+    const disorderBuffDiscount = vortexBoss
+        ? (teamHasPolarity(team) ? POLARITY_VORTEX_DISCOUNT : 0)
+        : 1;
+    const l4Options = {
+        ...options,
+        hasDisorderGeneration: hasDisorderGen,
+        disorderBuffDiscount,
+        boss,
+    };
 
     if (debug) console.log('\n  LAYER 4: MECHANICAL SYNERGY');
 
@@ -1368,7 +1487,7 @@ function scoreMechanicalSynergy(team, debug, options = {}) {
             const { score: affinityScore, firedCategories } = scoreBaselineAffinity(supplier, consumer, debug, l4Options);
             consumerTotal += affinityScore;
 
-            const needScore = scoreNeedFulfillment(supplier, consumer, debug);
+            const needScore = scoreNeedFulfillment(supplier, consumer, debug, l4Options);
             consumerTotal += needScore;
 
             const stunScore = scoreStunEmergence(supplier, consumer, debug);
@@ -1383,11 +1502,19 @@ function scoreMechanicalSynergy(team, debug, options = {}) {
         consumerScores.set(consumer.name, consumerTotal);
     }
 
-    // Implicit disorder generation: dual-anomaly teams with different elements
-    const hasImplicitDisorders = teamHasImplicitDisorders(team);
-    if (hasImplicitDisorders) {
-        const anomalyDPS = team.filter(u => getEffectiveRoles(u).includes('anomaly'));
-        for (const unit of anomalyDPS) {
+    // Anomaly reaction bonuses (vortex + disorder)
+    const anomalyDPS = team.filter(u => getEffectiveRoles(u).includes('anomaly'));
+    for (const unit of anomalyDPS) {
+        const reaction = reactions.get(unit);
+        if (!reaction) continue;
+
+        if (reaction.bestVortexTier > 0) {
+            const vortexBonus = VORTEX_BASE * reaction.bestVortexTier;
+            consumerScores.set(unit.name, (consumerScores.get(unit.name) || 0) + vortexBonus);
+            if (debug) console.log(`    Vortex bonus: ${unit.name} +${vortexBonus.toFixed(1)} (tier ${reaction.bestVortexTier})`);
+        }
+
+        if (reaction.hasDisorder) {
             const disorderScaling = w(unit.mechanics?.scaling?.disorders);
             if (disorderScaling > 0) {
                 const implicitSupply = 2;
@@ -1417,7 +1544,6 @@ function scoreMechanicalSynergy(team, debug, options = {}) {
     }
 
     // L4 element modifier: on-element DPS gets boosted, off-element gets discounted
-    const boss = options?.boss;
     if (boss && boss.weaknesses?.length > 0) {
         for (const consumer of team) {
             const roles = getEffectiveRoles(consumer);
@@ -1508,8 +1634,9 @@ const STRUCTURE_FACTOR = new Map([
 
 const COHESION_FLOOR = 0.2;
 
-function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs = 0, diametricFloor = 0) {
+function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs = 0, diametricFloor = 0, boss = null) {
     const structureFactor = STRUCTURE_FACTOR.get(structureScore) ?? 0.35;
+    const twReactions = computeAnomalyReactions(team, boss);
 
     let logSum = 0;
     let totalWeight = 0;
@@ -1525,7 +1652,6 @@ function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs =
             const scaling = getEffectiveScaling(unit);
             let needsMet = 0;
             let needsTotal = 0;
-            const hasImplicitDisorders = teamHasImplicitDisorders(team);
             for (const key of NEED_FULFILLMENT_KEYS) {
                 if (NATURALLY_AVAILABLE_NEEDS.has(key)) continue;
                 const sw = w(scaling[key]);
@@ -1537,9 +1663,12 @@ function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs =
                 );
                 if (selfProvision > 0) continue;
                 needsTotal++;
-                if (key === 'disorders' && hasImplicitDisorders) {
-                    needsMet++;
-                    continue;
+                if (key === 'disorders') {
+                    const unitReaction = twReactions.get(unit);
+                    if (unitReaction?.hasDisorder) {
+                        needsMet++;
+                        continue;
+                    }
                 }
                 for (const supplier of team) {
                     if (supplier === unit) continue;
@@ -1557,9 +1686,9 @@ function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs =
                 }
             }
             if (hasSubDPSRole(unit) && isAnomaly(unit)) {
-                const hasDiffElementPartner = team.some(t => t !== unit &&
-                    getEffectiveRoles(t).includes('anomaly') && getElement(t) !== getElement(unit));
-                if (!hasDiffElementPartner) {
+                const unitReaction = twReactions.get(unit);
+                const hasReaction = unitReaction?.bestVortexTier > 0 || unitReaction?.hasDisorder;
+                if (!hasReaction) {
                     needsTotal++;
                 }
             }
@@ -1701,7 +1830,7 @@ export function scoreTeamForBoss(team, boss, options = {}) {
     if (debug) console.log(`    Field time: ${onFieldCount} on-field agent(s) → ${fieldTimeAdj >= 0 ? '+' : ''}${fieldTimeAdj}`);
 
     // Layer 2: Inherent Quality
-    score += scoreInherentQuality(team, { lenient, debug });
+    score += scoreInherentQuality(team, { lenient, debug, boss });
 
     // Layer 3: Boss Matchup
     const bossResult = scoreBossMatchup(team, boss, { lenient, debug });
@@ -1725,7 +1854,7 @@ export function scoreTeamForBoss(team, boss, options = {}) {
         maxDiametricPairs = Math.max(maxDiametricPairs, count);
         maxDiametricFloor = Math.max(maxDiametricFloor, floor);
     }
-    const teamwork = computeTeamworkMultiplier(team, structureScore, debug, maxDiametricPairs, maxDiametricFloor);
+    const teamwork = computeTeamworkMultiplier(team, structureScore, debug, maxDiametricPairs, maxDiametricFloor, boss);
     score = Math.round(rawScore * teamwork * 10) / 10;
 
     if (debug) {

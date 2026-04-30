@@ -169,6 +169,23 @@
         "assists": 2,
         "favored": ["Nangong"],
         "shillIntensity": 2
+    },
+    {
+        "id": "mutant",
+        "name": "Mutant",
+        "shortName": "Mutant",
+        "image": "./assets/bosses/mutant.webp",
+        "weaknesses": ["wind", "ice"],
+        "resistances": ["electric"],
+        "shill": "anomaly",
+        "anti": [],
+        "assists": 2,
+        "favored": ["Promeia"],
+        "shillIntensity": 1,
+        "available": false,
+        "mechanics": {
+            "anomaly:state": "wind"
+        }
     }
 ]
 

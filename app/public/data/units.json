@@ -548,7 +548,7 @@
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "damage": { "abloom": 3 },
-            "buffs" : { "abloom": 2 },
+            "buffs" : { "abloom": 3 },
             "debuffs" : { "defense" : 2 }
         },
         "faction": "Krampus",
