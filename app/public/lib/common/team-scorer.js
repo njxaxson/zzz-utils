@@ -47,10 +47,10 @@ const NEED_FULFILLMENT_KEYS = [
     'quick-assists', 'interrupt-resistance', 'vortex'
 ];
 
-const VORTEX_TIERS = { ice: 3, fire: 2, physical: 1, ether: 1, electric: 1 };
-const VORTEX_DEFAULT_TIER = 0.08;
-const VORTEX_BASE = 16;
-const POLARITY_VORTEX_DISCOUNT = 0.25;
+const VORTEX_TIERS = { ice: 4, fire: 2, physical: 2, ether: 1, electric: 1 };
+const VORTEX_DEFAULT_TIER = 0.001;
+const VORTEX_BASE = 17;
+const POLARITY_VORTEX_DISCOUNT = 0.35;
 const NATURALLY_AVAILABLE_NEEDS = new Set(['ultimates', 'chains']);
 const STAT_SCALING_KEYS = ['am', 'ap', 'cr', 'cd', 'hp', 'def', 'pen', 'sheer'];
 
@@ -861,7 +861,7 @@ function scoreInherentQuality(team, { lenient = false, debug = false, boss = nul
                     stunInfra += 1;
                 } else {
                     const hasHighDaze = w(t.mechanics?.utility?.daze) >= 2;
-                    if (hasHighDaze) stunInfra += 0.3;
+                    if (hasHighDaze) stunInfra += 0.2;
                 }
             }
 

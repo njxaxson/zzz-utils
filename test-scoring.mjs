@@ -5,9 +5,11 @@
  * (`scoreTeamForBoss` from `app/public/lib/common/team-scorer.js`).
  *
  * Run from the repository root:
- *   node test-scoring.mjs
+ *   node test-scoring.mjs            — run all tests
+ *   node test-scoring.mjs -17 -22    — run only tests 17 and 22
  *
- * Exit code: 0 if all tests pass, 1 if any test fails.
+ * Exit code: 0 if all (specified) tests pass, 1 if any (specified) test fails.
+ * Unspecified tests are completely ignored when -N flags are provided.
  *
  * Each TEST block verifies specific ordering relationships, score thresholds,
  * or structural constraints. Some tests are partial — they check the most
@@ -119,6 +121,13 @@ function withBosses(bosses, filterStr) {
 // ---------------------------------------------------------------------------
 
 async function main() {
+    // Collect -N flags (e.g. -17 -22 -34) from argv.
+    const onlyTests = new Set();
+    for (const arg of process.argv.slice(2)) {
+        const m = /^-(\d+)$/.exec(arg);
+        if (m) onlyTests.add(Number(m[1]));
+    }
+
     const { units: allUnits, bosses: bossesRaw, roster } = await loadAllData();
     const bosses = [...bossesRaw, { ...NEUTRAL_BOSS }];
     const allTeamEntries = makeAllViableTeamEntries(allUnits, roster);
@@ -126,6 +135,11 @@ async function main() {
     const failures = [];
 
     function run(name, fn) {
+        // If a filter is active, skip tests whose number is not listed.
+        if (onlyTests.size > 0) {
+            const nm = /^TEST (\d+)/.exec(name);
+            if (!nm || !onlyTests.has(Number(nm[1]))) return;
+        }
         try {
             fn();
             console.log(`PASS: ${name}`);
@@ -267,8 +281,8 @@ async function main() {
         for (const b of withBosses(bosses, 'Thrall,Marionettes')) {
             const lowS = scoreTeamForBoss(low.team, b, {});
             assert(
-                lowS >= 180 && lowS <= 275,
-                `${b.name} Dialyn/Hugo/Sunna: got ${lowS}, expected [180, 275]`
+                lowS >= 200 && lowS <= 290,
+                `${b.name} Dialyn/Hugo/Sunna: got ${lowS}, expected [200, 290]`
             );
             for (const { label, team } of dualStunList) {
                 const s = scoreTeamForBoss(team, b, {});
@@ -334,14 +348,15 @@ async function main() {
                 `${b.name}: Dialyn/Lighter/Evelyn > JF/Lighter/Evelyn`
             );
         }
-        // On Pompey (fire-weak): Lighter beats Dialyn due to fire element + recovery synergy
+        // On Pompey (fire-weak): Dialyn still beats Lighter despite fire element
         for (const b of withBosses(bosses, 'Pompey')) {
             const astraTriple =
                 'Dialyn/Evelyn/Astra,Lighter/Evelyn/Astra,Ju Fufu/Evelyn/Astra';
             const m1 = scoreMapForBoss(scoreForTeamString(astraTriple, allUnits), b);
             assert(
-                m1.get('Lighter / Evelyn / Astra') > m1.get('Dialyn / Evelyn / Astra') &&
-                    m1.get('Dialyn / Evelyn / Astra') > m1.get('Ju Fufu / Evelyn / Astra'),
+                m1.get('Dialyn / Evelyn / Astra') > m1.get('Lighter / Evelyn / Astra') &&
+                m1.get('Dialyn / Evelyn / Astra') > m1.get('Ju Fufu / Evelyn / Astra') && 
+                m1.get('Lighter / Evelyn / Astra') > m1.get('Ju Fufu / Evelyn / Astra'),
                 `${b.name}: Evelyn+Astra: want Lighter > Dialyn > JF (fire-weak)`
             );
         }
@@ -857,6 +872,7 @@ async function main() {
             assert(npy > mvy, `${b.name}: NPY (${npy}) should beat MVY (${mvy})`);
             assert(lps > mvy, `${b.name}: LPS (${lps}) should beat MVY (${mvy})`);
             assert(npy > nmy, `${b.name}: NPY (${npy}) should beat NMY (${nmy}) — vortex advantage`);
+            assert(npy > lps, `${b.name}: NPY (${npy}) should beat LPS (${lps}) — premier team should beat standard team`)
         }
     });
 

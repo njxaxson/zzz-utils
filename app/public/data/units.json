@@ -210,6 +210,7 @@
         "synergy": { "units": [], "tags": [], "avoid": ["Pan Yinhu"] },
         "mechanics": {
             "buffs": { "stun-multiplier": 2 },
+            "debuffs": { "recovery": 2 },
             "utility": { "ultimates": 3 },
             "scaling": { "cr": 3 }
         },
@@ -547,9 +548,8 @@
         "join": ["stun", "anomaly", "defense"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
-            "damage": { "abloom": 3 },
-            "buffs" : { "abloom": 3 },
-            "debuffs" : { "defense" : 2 }
+            "damage": { "abloom": 3, "enhanced": 1 },
+            "buffs" : { "abloom": 3 }
         },
         "faction": "Krampus",
         "available": false
