@@ -507,6 +507,25 @@
         "displayText": "Cat girl is the bane of 50/50s everywhere. Her best use is as a low-energy-consumption teammate for Seed, but even that is pushing it."
     },
     {
+        "id": "norma",
+        "name": "Norma",
+        "image": "./assets/characters/norma.webp",
+        "rank": "S",
+        "limited": false,
+        "tier": 0.5,
+        "tags": ["stun", "fire", "esb", "assist:defensive"],
+        "join": ["attack", "rupture"],
+        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {
+            "damage" : { "chain" : 3 },
+            "buffs" : { "stun-multiplier" : 2 },
+            "utility" : { "ultimates" : 1 },
+            "scaling" : { "quick-assists" : 2 }
+        },
+        "available" : false,
+        "faction": "ESB"
+    },
+    {
         "id": "nicole",
         "name": "Nicole",
         "image": "./assets/characters/nicole.webp",
@@ -769,9 +788,10 @@
         "limited": true,
         "tier": 0.5,
         "tags": ["anomaly", "wind", "esb", "assist:defensive"],
-        "join": ["anomaly", "esb"],
+        "join": ["anomaly", "wind"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
+            "pseudoRole": "subdps",
             "damage": { "abloom": 2 }
         },
         "faction": "ESB",
