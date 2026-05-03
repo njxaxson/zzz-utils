@@ -12,20 +12,142 @@ import { analyze, getUnitElement } from '../common/pull-engine.js';
 
 const PAGE_STORAGE_KEY = 'zzz-pull-recommendations';
 
+// Banner schedule tuning (edit by hand as the meta shifts)
+const BANNER_BUMP_WINDOW_MIN_TOTAL = 6;
+const BANNER_BUMP_WINDOW_MIN_FROM_UPCOMING = 2;
+const BANNER_CARD_SCORE_BUMP = 8;
+
 let resultLimit = 5;
 let lastResults = null;
+/** @type {{ active: string[], upcoming: string[] } | null} */
+let bannersData = null;
 
 // ============================================================================
 // DATA LOADING
 // ============================================================================
 
+async function loadBanners() {
+    try {
+        const res = await fetch('data/banners.json');
+        if (!res.ok) return null;
+        const data = await res.json();
+        if (!data || typeof data !== 'object') return null;
+        if (!Array.isArray(data.active) || !Array.isArray(data.upcoming)) return null;
+        return { active: data.active, upcoming: data.upcoming };
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Globally dedupe IDs: active order first, then upcoming; later duplicates removed.
+ * @returns {{ activeIds: string[], upcomingIds: string[], fullOrder: string[] }}
+ */
+function normalizeBannerSchedule(raw) {
+    const seen = new Set();
+    const activeIds = [];
+    for (const id of raw.active) {
+        if (typeof id !== 'string') continue;
+        const k = id.trim();
+        if (!k || seen.has(k)) continue;
+        seen.add(k);
+        activeIds.push(k);
+    }
+    const upcomingIds = [];
+    for (const id of raw.upcoming) {
+        if (typeof id !== 'string') continue;
+        const k = id.trim();
+        if (!k || seen.has(k)) continue;
+        seen.add(k);
+        upcomingIds.push(k);
+    }
+    return { activeIds, upcomingIds, fullOrder: [...activeIds, ...upcomingIds] };
+}
+
+/**
+ * All active IDs, then upcoming until min total length and min count from upcoming are met.
+ */
+function computeBannerBumpWindow(activeIds, upcomingIds) {
+    const W = [...activeIds];
+    let fromUpcoming = 0;
+    for (const id of upcomingIds) {
+        W.push(id);
+        fromUpcoming++;
+        if (
+            W.length >= BANNER_BUMP_WINDOW_MIN_TOTAL &&
+            fromUpcoming >= BANNER_BUMP_WINDOW_MIN_FROM_UPCOMING
+        ) {
+            break;
+        }
+    }
+    return W;
+}
+
+function buildBannerIndexMap(fullOrder) {
+    const m = new Map();
+    fullOrder.forEach((id, i) => m.set(id, i));
+    return m;
+}
+
+function sortRecommendationUnits(units, bannerIndexMap) {
+    const indexed = units.map((u, i) => ({ u, i }));
+    const onBanner = indexed.filter(x => bannerIndexMap.has(x.u.id));
+    const offBanner = indexed.filter(x => !bannerIndexMap.has(x.u.id));
+    onBanner.sort((a, b) => bannerIndexMap.get(a.u.id) - bannerIndexMap.get(b.u.id));
+    offBanner.sort((a, b) => a.i - b.i);
+    return [...onBanner.map(x => x.u), ...offBanner.map(x => x.u)];
+}
+
+/**
+ * @param {ReturnType<typeof analyze>['recommendations']} recommendations
+ * @param {string[]} bumpWindowIds
+ * @param {Map<string, number>} bannerIndexMap
+ */
+function applyBannerRecommendationOrdering(recommendations, bumpWindowIds, bannerIndexMap) {
+    const bumpSet = new Set(bumpWindowIds);
+    const decorated = recommendations.map((rec, origIdx) => {
+        const units = sortRecommendationUnits(rec.units, bannerIndexMap);
+        const touchesBumpWindow = units.some(u => bumpSet.has(u.id));
+        const sortScore = rec.score + (touchesBumpWindow ? BANNER_CARD_SCORE_BUMP : 0);
+        return { rec: { ...rec, units }, sortScore, origIdx };
+    });
+    decorated.sort((a, b) => {
+        if (b.sortScore !== a.sortScore) return b.sortScore - a.sortScore;
+        return a.origIdx - b.origIdx;
+    });
+    return decorated.map(d => d.rec);
+}
+
+/** Best gap priority for a unit across all gaps (calibrated scores). */
+function bannerTileVerdictClass(unitId, allGaps) {
+    let best = -1;
+    for (const gap of allGaps) {
+        if (!gap.units?.some(u => u.id === unitId)) continue;
+        if (gap.score > best) best = gap.score;
+    }
+    if (best < 0) return 'no';
+    if (best >= 70) return 'high';
+    if (best >= 40) return 'medium';
+    return 'low';
+}
+
+function verdictLabel(verdictClass) {
+    if (verdictClass === 'no') return 'No';
+    return verdictClass.charAt(0).toUpperCase() + verdictClass.slice(1);
+}
+
 async function loadData() {
     try {
-        await initRoster({
-            containerSelector: '#roster-container',
-            pageUrl: 'pull-recommendations.html',
-            lockedUnits: ['nicole', 'anby', 'billy']
-        });
+        await Promise.all([
+            initRoster({
+                containerSelector: '#roster-container',
+                pageUrl: 'pull-recommendations.html',
+                lockedUnits: ['nicole', 'anby', 'billy']
+            }),
+            loadBanners().then((data) => {
+                bannersData = data;
+            })
+        ]);
         loadPageFromStorage();
         setupEventListeners();
     } catch (error) {
@@ -93,7 +215,31 @@ function runAnalysis() {
 
     setTimeout(() => {
         try {
-            lastResults = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 10 });
+            const analyzed = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 10 });
+            let recommendations = analyzed.recommendations;
+            let bannerMeta = null;
+
+            if (bannersData) {
+                const { activeIds, upcomingIds, fullOrder } = normalizeBannerSchedule(bannersData);
+                const bumpWindow = computeBannerBumpWindow(activeIds, upcomingIds);
+                const bannerIndexMap = buildBannerIndexMap(fullOrder);
+                recommendations = applyBannerRecommendationOrdering(
+                    analyzed.recommendations,
+                    bumpWindow,
+                    bannerIndexMap
+                );
+                const unitById = new Map(allUnits.map(u => [u.id, u]));
+                bannerMeta = {
+                    activeIds,
+                    upcomingIds,
+                    fullOrder,
+                    bumpWindow,
+                    bannerIndexMap,
+                    unitById
+                };
+            }
+
+            lastResults = { ...analyzed, recommendations, bannerMeta };
             displayResults(lastResults);
         } catch (error) {
             console.error('Analysis failed:', error);
@@ -113,10 +259,84 @@ function displayResults(results) {
     const section = document.getElementById('results-section');
 
     renderAssessment(results.assessment);
-    renderRecommendations(results.recommendations.slice(0, resultLimit));
+    renderBannerTiles(results);
+    renderRecommendations(results);
 
     section.style.display = 'block';
     section.scrollIntoView({ behavior: 'smooth' });
+}
+
+function renderBannerTiles(results) {
+    const el = document.getElementById('banner-tiles-section');
+    if (!el) return;
+
+    if (!results.bannerMeta) {
+        el.style.display = 'none';
+        el.innerHTML = '';
+        return;
+    }
+
+    const { activeIds, upcomingIds, unitById } = results.bannerMeta;
+    const unitStates = getUnitStates();
+    const { allGaps } = results;
+
+    function tilesForIds(ids) {
+        return ids
+            .filter(id => unitById.has(id) && !unitStates[id]?.owned)
+            .map(id => {
+                const unit = unitById.get(id);
+                const verdict = bannerTileVerdictClass(id, allGaps);
+                return createBannerUnitTile(unit, verdict);
+            })
+            .join('');
+    }
+
+    const activeHtml = tilesForIds(activeIds);
+    const upcomingHtml = tilesForIds(upcomingIds);
+
+    if (!activeHtml && !upcomingHtml) {
+        el.style.display = 'none';
+        el.innerHTML = '';
+        return;
+    }
+
+    const groups = [];
+    if (activeHtml) {
+        groups.push(`
+            <div class="banner-tiles-group">
+                <span class="banner-tiles-group-label">Current banners</span>
+                <div class="banner-tiles-strip">${activeHtml}</div>
+            </div>
+        `);
+    }
+    if (upcomingHtml) {
+        groups.push(`
+            <div class="banner-tiles-group">
+                <span class="banner-tiles-group-label">Upcoming banners</span>
+                <div class="banner-tiles-strip">${upcomingHtml}</div>
+            </div>
+        `);
+    }
+
+    el.innerHTML = `<div class="banner-tiles-inner"><div class="banner-tiles-row">${groups.join('')}</div></div>`;
+    el.style.display = 'block';
+}
+
+function createBannerUnitTile(unit, verdictClass) {
+    const initials = getInitials(unit.name);
+    const imageUrl = getCharacterImageUrl(unit.id);
+    const avatarHtml = imageUrl
+        ? `<img class="banner-tile-avatar" src="${imageUrl}" alt="${unit.name}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="banner-tile-initials" style="display:none">${initials}</span>`
+        : `<span class="banner-tile-initials">${initials}</span>`;
+    const label = verdictLabel(verdictClass);
+
+    return `
+        <div class="banner-unit-tile verdict-${verdictClass}" title="${unit.name}: ${label}">
+            ${avatarHtml}
+            <span class="banner-tile-name">${unit.name}</span>
+            <span class="banner-tile-verdict">${label}</span>
+        </div>
+    `;
 }
 
 function renderAssessment(assessment) {
@@ -132,7 +352,8 @@ function renderAssessment(assessment) {
     `;
 }
 
-function renderRecommendations(recommendations) {
+function renderRecommendations(results) {
+    const recommendations = results.recommendations.slice(0, resultLimit);
     const container = document.getElementById('recommendations-list');
 
     if (recommendations.length === 0) {
@@ -145,12 +366,22 @@ function renderRecommendations(recommendations) {
         return;
     }
 
-    container.innerHTML = recommendations.map(rec => createRecommendationCard(rec)).join('');
+    let activeSet = null;
+    let upcomingSet = null;
+    if (results.bannerMeta) {
+        const { activeIds, upcomingIds, unitById } = results.bannerMeta;
+        activeSet = new Set(activeIds.filter(id => unitById.has(id)));
+        upcomingSet = new Set(upcomingIds.filter(id => unitById.has(id)));
+    }
+
+    container.innerHTML = recommendations.map(rec => createRecommendationCard(rec, activeSet, upcomingSet)).join('');
 }
 
-function createRecommendationCard(rec) {
+function createRecommendationCard(rec, activeSet, upcomingSet) {
     const priorityClass = rec.priority.toLowerCase();
-    const unitsHtml = rec.units.map(unit => createRecUnitCard(unit)).join('');
+    const unitsHtml = rec.units.map(unit =>
+        createRecUnitCard(unit, activeSet, upcomingSet)
+    ).join('');
 
     return `
         <div class="pull-rec-card priority-${priorityClass}">
@@ -166,21 +397,38 @@ function createRecommendationCard(rec) {
     `;
 }
 
-function createRecUnitCard(unit) {
+/**
+ * @param {Set<string> | null} activeSet
+ * @param {Set<string> | null} upcomingSet
+ */
+function createRecUnitCard(unit, activeSet, upcomingSet) {
     const element = getUnitElement(unit);
     const initials = getInitials(unit.name);
     const imageUrl = getCharacterImageUrl(unit.id);
-    const isUpcoming = unit.available === false;
+    const onActiveBanner = activeSet?.has(unit.id);
+    const onUpcomingBanner = upcomingSet?.has(unit.id);
+    const isGameUpcoming = unit.available === false;
 
     const avatarHtml = imageUrl
         ? `<img class="unit-avatar" src="${imageUrl}" alt="${unit.name}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="unit-initials" style="display:none">${initials}</span>`
         : `<span class="unit-initials">${initials}</span>`;
 
+    let badgeHtml = '';
+    if (onActiveBanner) {
+        badgeHtml = '<span class="available-badge">Available</span>';
+    } else if (onUpcomingBanner || isGameUpcoming) {
+        badgeHtml = '<span class="upcoming-badge">Upcoming</span>';
+    }
+
+    const titleBits = [unit.name];
+    if (onActiveBanner) titleBits.push('Available on current banner');
+    else if (onUpcomingBanner || isGameUpcoming) titleBits.push('Upcoming');
+
     return `
-        <div class="rec-unit element-${element}" title="${unit.name}${isUpcoming ? ' (Upcoming)' : ''}">
+        <div class="rec-unit element-${element}" title="${titleBits.join(' — ')}">
             ${avatarHtml}
             <span class="unit-name">${unit.name}</span>
-            ${isUpcoming ? '<span class="upcoming-badge">Upcoming</span>' : ''}
+            ${badgeHtml}
         </div>
     `;
 }
