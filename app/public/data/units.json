@@ -192,6 +192,7 @@
         "name": "Corin",
         "image": "./assets/characters/corin.webp",
         "rank": "A",
+        "tier": 3,
         "tags": ["attack", "physical", "victoria", "assist:defensive"],
         "join": ["physical", "victoria"],
         "synergy": { "units": [], "tags": [], "avoid": [] },

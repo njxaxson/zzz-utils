@@ -1,0 +1,12 @@
+- Pull Recommendations uses mechanics engine to help make decisions (meet scaling needs, buff damage types, etc.)
+- Revisit Character Summary (mechanics-based)?
+- Full migration to boss mechanics (freezable, veil dependencies, etc.) 
+- Advanced Preview states - shows up in UI vs. not 
+- Model directional mechanics for quick assists
+- Update tiers:
+    Harumasa, Rina, Zhu Yuan -> 2.5
+    Jane Doe -> 2
+    Burnice, Hugo -> 1.5
+    Evelyn, Ju Fufu, Nicole -> 1
+- Start debugging Norma and Velina
+- Create a DA duel page that lets you pick a boss and your three-person team so that you can see what the actual score is. 
