@@ -138,6 +138,7 @@
         "join": ["stun", "support", "defense"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
+            "damage": { "chains": 2 },
             "utility": { "heal:self": true }
         },
         "faction": "Cunning Hares",
@@ -513,7 +514,7 @@
         "rank": "S",
         "limited": false,
         "tier": 0.5,
-        "tags": ["stun", "fire", "esb", "assist:defensive"],
+        "tags": ["stun", "fire", "esd", "assist:defensive"],
         "join": ["attack", "rupture"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
@@ -523,7 +524,8 @@
             "scaling" : { "quick-assists" : 2 }
         },
         "available" : false,
-        "faction": "ESB"
+        "faction": "External Strategy Department",
+        "displayText" : "Whacky bangboo engineer fires missiles at enemies and specializes in chain attacks and decibel refunds. She can convert some quick assists into chain attacks."
     },
     {
         "id": "nicole",
@@ -594,6 +596,7 @@
     {
         "id": "promeia",
         "name": "Promeia",
+        "aliases": ["Prom"],
         "image": "./assets/characters/promeia.webp",
         "rank": "S",
         "limited": true,
@@ -624,6 +627,20 @@
         },
         "faction": "Sons of Calydon",
         "displayText": "Specializes in off-field aftershock daze and damage; not well-suited for on-field play."
+    },
+    {
+        "id": "pyrois",
+        "name": "Pyrois",
+        "aliases": ["Belle", "Wise", "Phaethon"],
+        "image": "./assets/characters/pyrois.webp",
+        "rank": "S",
+        "limited": false,
+        "tier": 1.5,
+        "tags": ["attack", "ether", "phaethon", "assist:evasive"],
+        "join": ["support", "stun"],
+        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {},
+        "faction": "Phaethon"
     },
     {
         "id": "qingyi",
@@ -729,6 +746,7 @@
     {
         "id": "soukaku",
         "name": "Soukaku",
+        "aliases": ["SKK"],
         "image": "./assets/characters/soukaku.webp",
         "rank": "A",
         "tier": 1.5,
@@ -787,15 +805,16 @@
         "rank": "S",
         "limited": true,
         "tier": 0.5,
-        "tags": ["anomaly", "wind", "esb", "assist:defensive"],
+        "tags": ["anomaly", "wind", "esd", "assist:defensive"],
         "join": ["anomaly", "wind"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "pseudoRole": "subdps",
             "damage": { "abloom": 2 }
         },
-        "faction": "ESB",
-        "available": false
+        "faction": "External Strategy Department",
+        "available": false,
+        "displayText" : "Tall anomaly gentlelady sub-DPS with oversized fan creates on-field tornado traps."
     },
     {
         "id": "vivian",
@@ -820,6 +839,7 @@
     {
         "id": "yanagi",
         "name": "Yanagi",
+        "aliases": ["Nagi"],
         "image": "./assets/characters/yanagi.webp",
         "rank": "S",
         "limited": true,
@@ -838,7 +858,7 @@
     {
         "id" : "ysg",
         "name" : "Ye Shunguong",
-        "aliases": ["YSG"],
+        "aliases": ["YSG","Shungus"],
         "image": "./assets/characters/ysg.webp",
         "rank": "S",
         "limited": true,
