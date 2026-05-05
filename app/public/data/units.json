@@ -546,14 +546,13 @@
         "limited": true,
         "tier": 0.5,
         "tags": ["anomaly", "ice", "krampus", "assist:defensive"],
-        "join": ["stun", "anomaly", "defense"],
+        "join": ["stun", "anomaly"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "damage": { "abloom": 3, "enhanced": 1 },
             "buffs" : { "abloom": 3 }
         },
-        "faction": "Krampus",
-        "available": false
+        "faction": "Krampus"
     },
     {
         "id": "pulchra",
