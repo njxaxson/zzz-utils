@@ -2,11 +2,12 @@
 - Revisit Character Summary (mechanics-based)?
 - Full migration to boss mechanics (freezable, veil dependencies, etc.) 
 - Advanced Preview states - shows up in UI vs. not 
-- Model directional mechanics for quick assists
+- Model directional mechanics for quick assists? (Or just stop worrying about Pan/Dialyn)
 - Update tiers:
     Harumasa, Rina, Zhu Yuan -> 2.5
     Jane Doe -> 2
     Burnice, Hugo -> 1.5
     Evelyn, Ju Fufu, Nicole -> 1
-- Start debugging Norma and Velina
+- Start debugging Norma and Velina (External Strategy Department)
 - Create a DA duel page that lets you pick a boss and your three-person team so that you can see what the actual score is. 
+- Scoring diff script to ignore trailing changes that push units off the bottom of the list

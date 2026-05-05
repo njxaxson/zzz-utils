@@ -183,7 +183,7 @@
             "pseudoRole": "subdps",
             "buffs" : { "cr" : 1 },
             "debuffs": { "electric": 2 },
-            "utility": { "daze": 1 }
+            "utility": { "daze": 1, "veils" : 1 }
         },
         "faction": "PubSec"
     },
