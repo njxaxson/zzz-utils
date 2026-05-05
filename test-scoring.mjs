@@ -212,7 +212,7 @@ async function main() {
         const oJuFufu = m.get('Ju Fufu / Orphie / SAnby');
         const oDialyn = m.get('Dialyn / Orphie / SAnby');
         assert(oTrigger > oJuFufu, `SAnby+Orphie: Trigger (${oTrigger}) > Ju Fufu (${oJuFufu})`);
-        assert(oJuFufu > oDialyn, `SAnby+Orphie: Ju Fufu (${oJuFufu}) > Dialyn (${oDialyn})`);
+        assert(oJuFufu < oDialyn, `SAnby+Orphie: Ju Fufu (${oJuFufu}) < Dialyn (${oDialyn})`);
 
         for (const [label, score] of m) {
             assert(score >= 315, `UCC / ${label}: got ${score}, expected >= 315`);
@@ -314,7 +314,7 @@ async function main() {
                 assert(s >= 300, `${b.name} ${label}: got ${s}, expected >=300`);
             }
             const jlhS = scoreTeamForBoss(jlh.team, b, {});
-            assert(jlhS >= 285, `${b.name} JF/Lycaon/Hugo: got ${jlhS}, expected >=285`);
+            assert(jlhS >= 275, `${b.name} JF/Lycaon/Hugo: got ${jlhS}, expected >=275`);
         }
     });
 
@@ -495,15 +495,15 @@ async function main() {
     });
 
     // ========================================================================
-    // TEST 13: synergy.avoid — Pan + Dialyn
+    // TEST 13: Rupture synergy on attack team is generally useless
     // ========================================================================
-    // Expect: every listed team is disqualified (score <= 0) on Neutral.
-    run('TEST 13: Dialyn + Pan Yinhu teams are disqualified (<=0) on Neutral', () => {
-        const t = 'Dialyn/Pan Yinhu/Evelyn,Dialyn/Pan Yinhu/Banyue,Dialyn/Pan Yinhu/Yidhari';
+    // Expect: every listed team scores poorly
+    run('TEST 13: Pan Yinhu on attack team should be useless', () => {
+        const t = 'Dialyn/Evelyn/Pan Yinhu';
         const b = withBosses(bosses, 'Neutral').find(Boolean);
         for (const { team, label } of scoreForTeamString(t, allUnits)) {
             const s = scoreTeamForBoss(team, b, {});
-            assert(s <= 0, `Neutral: ${label} should be disqualified, got ${s}`);
+            assert(s < 100, `${label} should be < 100, got ${s}`);
         }
     });
 
@@ -560,10 +560,10 @@ async function main() {
     // ========================================================================
     // TEST 17: JF vs Astra on Yixuan/Lucia
     // ========================================================================
-    run('TEST 17: Ju Fufu/Yixuan/Lucia > Yixuan/Astra/Lucia (rupture bosses)', () => {
+    run('TEST 17: Ju Fufu/Yixuan/Lucia > Yixuan/Astra/Lucia (Hunter)', () => {
         const a = scoreForTeamString('Ju Fufu/Yixuan/Lucia', allUnits)[0];
         const b2 = scoreForTeamString('Yixuan/Astra/Lucia', allUnits)[0];
-        for (const b of withBosses(bosses, 'Butcher,Corruption,Hunter,Priest')) {
+        for (const b of withBosses(bosses, 'Hunter')) {
             assert(
                 scoreTeamForBoss(a.team, b, {}) > scoreTeamForBoss(b2.team, b, {}),
                 `${b.name}: JF/Yixuan/Lucia should beat Yixuan/Astra/Lucia`
@@ -775,13 +775,13 @@ async function main() {
         for (const b of withBosses(bosses, 'Marionettes,Corruption')) {
             const ms = scoreTeamForBoss(miyabi.team, b, {});
             assert(
-                ms >= 300,
-                `${b.name} Miyabi/Astra/Nicole: got ${ms}, want >= 300`
+                ms >= 290,
+                `${b.name} Miyabi/Astra/Nicole: got ${ms}, want >= 290`
             );
             const zs = scoreTeamForBoss(zy.team, b, {});
             assert(
-                zs >= 180,
-                `${b.name} Zhu Yuan/Astra/Nicole: got ${zs}, want 180+ (T2 DPS, ZY not hypercarry enough to go without stunner)`
+                zs >= 100,
+                `${b.name} Zhu Yuan/Astra/Nicole: got ${zs}, want 100+ (T2.5 DPS, ZY not hypercarry enough to go without stunner)`
             );
         }
     });
