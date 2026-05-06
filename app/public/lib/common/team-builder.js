@@ -13,6 +13,18 @@
  * @returns {Object} Map of team label strings to team arrays
  */
 export function getTeams(units) {
+    // Preprocess: replace 'faction' keyword with actual faction values
+    units = units.map(unit => {
+        if (unit.join && unit.join.includes('faction') && unit.faction) {
+            return {
+                ...unit,
+                join: unit.join.map(j => j === 'faction' ? unit.faction : j),
+                tags: [...unit.tags, unit.faction]
+            };
+        }
+        return unit;
+    });
+    
     let permutations = {};
     
     for (const unitA of units) {

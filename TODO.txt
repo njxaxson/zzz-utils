@@ -1,7 +1,6 @@
 - Pull Recommendations uses mechanics engine to help make decisions (meet scaling needs, buff damage types, etc.)
 - Revisit Character Summary (mechanics-based)?
 - Full migration to boss mechanics (freezable, veil dependencies, etc.) 
-- Advanced Preview states - shows up in UI vs. not 
 - Start debugging Norma and Velina (External Strategy Department)
 - Create a DA duel page that lets you pick a boss and your three-person team so that you can see what the actual score is. 
 - Scoring diff script to ignore trailing changes that push units off the bottom of the list

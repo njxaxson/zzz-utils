@@ -6,7 +6,7 @@
         "rank": "S",
         "limited": true,
         "tier": 0.5,
-        "tags": ["anomaly", "physical", "spookshack", "assist:defensive"],
+        "tags": ["anomaly", "physical", "assist:defensive"],
         "join": ["anomaly", "support"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
@@ -22,8 +22,8 @@
         "image": "./assets/characters/anby.webp",
         "rank": "A",
         "tier": 4,
-        "tags": ["stun", "electric", "hares", "assist:defensive"],
-        "join": ["electric", "hares"],
+        "tags": ["stun", "electric", "assist:defensive"],
+        "join": ["electric", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {},
         "faction": "Cunning Hares"
@@ -34,8 +34,8 @@
         "image": "./assets/characters/anton.webp",
         "rank": "A",
         "tier": 3,
-        "tags": ["attack", "electric", "belobog", "assist:defensive"],
-        "join": ["electric", "belobog"],
+        "tags": ["attack", "electric", "assist:defensive"],
+        "join": ["electric", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "scaling": { "quick-assists": true }
@@ -49,7 +49,7 @@
         "rank": "S",
         "limited": true,
         "tier": 0.5,
-        "tags": ["anomaly", "ether", "aod", "assist:defensive"],
+        "tags": ["anomaly", "ether", "assist:defensive"],
         "join": ["stun", "support"],
         "synergy": { "units": ["sunna"], "tags": [], "avoid": [] },
         "mechanics": {
@@ -66,7 +66,7 @@
         "rank": "S",
         "limited": true,
         "tier": 0,
-        "tags": ["ether", "support", "lyra", "assist:evasive"],
+        "tags": ["ether", "support", "assist:evasive"],
         "join": ["anomaly", "attack", "rupture"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
@@ -82,7 +82,7 @@
         "rank": "S",
         "limited": true,
         "tier": 1,
-        "tags": ["rupture", "fire", "krampus", "assist:defensive"],
+        "tags": ["rupture", "fire", "assist:defensive"],
         "join": ["support", "stun"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
@@ -97,8 +97,8 @@
         "image": "./assets/characters/ben.webp",
         "rank": "A",
         "tier": 4,
-        "tags": ["defense", "fire", "belobog", "assist:defensive"],
-        "join": ["fire", "belobog"],
+        "tags": ["defense", "fire", "assist:defensive"],
+        "join": ["fire", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "utility": { "shields": 3 },
@@ -113,8 +113,8 @@
         "image": "./assets/characters/billy.webp",
         "rank": "A",
         "tier": 3,
-        "tags": ["attack", "physical", "hares", "assist:evasive"],
-        "join": ["physical", "hares"],
+        "tags": ["attack", "physical", "assist:evasive"],
+        "join": ["physical", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {},
         "faction": "Cunning Hares"
@@ -126,7 +126,7 @@
         "rank": "S",
         "limited": true,
         "tier": 0.5,
-        "tags": ["rupture", "physical", "hares", "assist:defensive"],
+        "tags": ["rupture", "physical", "assist:defensive"],
         "join": ["stun", "support", "defense"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
@@ -142,8 +142,8 @@
         "rank": "S",
         "limited": true,
         "tier": 1.5,
-        "tags": ["anomaly", "fire", "calydon", "assist:evasive"],
-        "join": ["anomaly", "calydon"],
+        "tags": ["anomaly", "fire", "assist:evasive"],
+        "join": ["anomaly", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "pseudoRole": "subdps",
@@ -159,8 +159,8 @@
         "rank": "S",
         "limited": true,
         "tier": 2,
-        "tags": ["defense", "physical", "calydon", "assist:defensive"],
-        "join": ["calydon", "assist:defensive"],
+        "tags": ["defense", "physical", "assist:defensive"],
+        "join": ["faction", "assist:defensive"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "pseudoRole": "stun",
@@ -176,7 +176,7 @@
         "rank": "S",
         "limited": true,
         "tier": 1.5,
-        "tags": ["attack", "electric", "pubsec", "assist:defensive"],
+        "tags": ["attack", "electric", "assist:defensive"],
         "join": ["stun", "electric"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
@@ -193,8 +193,8 @@
         "image": "./assets/characters/corin.webp",
         "rank": "A",
         "tier": 3,
-        "tags": ["attack", "physical", "victoria", "assist:defensive"],
-        "join": ["physical", "victoria"],
+        "tags": ["attack", "physical", "assist:defensive"],
+        "join": ["physical", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {},
         "faction": "Victoria Housekeeping"
@@ -206,7 +206,7 @@
         "rank": "S",
         "limited": true,
         "tier": 0,
-        "tags": ["stun", "physical", "krampus", "assist:defensive"],
+        "tags": ["stun", "physical", "assist:defensive"],
         "join": ["attack", "rupture"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
@@ -224,8 +224,8 @@
         "rank": "S",
         "limited": true,
         "tier": 2,
-        "tags": ["attack", "ice", "victoria", "assist:defensive"],
-        "join": ["ice", "victoria", "stun"],
+        "tags": ["attack", "ice", "assist:defensive"],
+        "join": ["ice", "faction", "stun"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {},
         "faction": "Victoria Housekeeping"
@@ -238,7 +238,7 @@
         "rank": "S",
         "limited": true,
         "tier": 1,
-        "tags": ["attack", "fire", "lyra", "assist:defensive"],
+        "tags": ["attack", "fire", "assist:defensive"],
         "join": ["stun", "support"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
@@ -254,8 +254,8 @@
         "rank": "S",
         "limited": false,
         "tier": 3,
-        "tags": ["anomaly", "electric", "belobog", "assist:evasive"],
-        "join": ["electric", "belobog"],
+        "tags": ["anomaly", "electric", "assist:evasive"],
+        "join": ["electric", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "pseudoRole": "subdps",
@@ -272,7 +272,7 @@
         "rank": "S",
         "limited": true,
         "tier": 2.5,
-        "tags": ["attack", "electric", "section6", "assist:defensive"],
+        "tags": ["attack", "electric", "assist:defensive"],
         "join": ["stun", "anomaly"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
@@ -288,7 +288,7 @@
         "rank": "S",
         "limited": true,
         "tier": 1.5,
-        "tags": ["attack", "ice", "mockingbird", "assist:defensive"],
+        "tags": ["attack", "ice", "assist:defensive"],
         "join": ["stun", "ice"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
@@ -305,8 +305,8 @@
         "rank": "S",
         "limited": true,
         "tier": 2,
-        "tags": ["anomaly", "physical", "pubsec", "assist:defensive"],
-        "join": ["anomaly", "pubsec"],
+        "tags": ["anomaly", "physical", "assist:defensive"],
+        "join": ["anomaly", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {},
         "faction": "PubSec"
@@ -319,7 +319,7 @@
         "rank": "S",
         "limited": true,
         "tier": 1,
-        "tags": ["stun", "fire", "yunkui", "assist:defensive"],
+        "tags": ["stun", "fire", "assist:defensive"],
         "join": ["attack", "rupture"],
         "synergy": { "units": [], "tags": ["rupture"], "avoid": [] },
         "mechanics": {
@@ -337,8 +337,8 @@
         "rank": "S",
         "limited": false,
         "tier": 2,
-        "tags": ["stun", "fire", "belobog", "assist:defensive"],
-        "join": ["fire", "belobog", "rupture"],
+        "tags": ["stun", "fire", "assist:defensive"],
+        "join": ["fire", "faction", "rupture"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "buffs": { "chains": 1 },
@@ -353,7 +353,7 @@
         "image": "./assets/characters/komano.webp",
         "rank": "A",
         "tier": 1,
-        "tags": ["rupture", "fire", "spookshack", "assist:defensive"],
+        "tags": ["rupture", "fire", "assist:defensive"],
         "join": ["support", "stun"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
@@ -368,8 +368,8 @@
         "rank": "S",
         "limited": true,
         "tier": 0.5,
-        "tags": ["stun", "fire", "calydon", "assist:defensive"],
-        "join": ["attack", "calydon"],
+        "tags": ["stun", "fire", "assist:defensive"],
+        "join": ["attack", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "buffs": { "fire": 2, "ice": 2 },
@@ -384,7 +384,7 @@
         "rank": "S",
         "limited": true,
         "tier": 0,
-        "tags": ["support", "ether", "spookshack", "assist:defensive"],
+        "tags": ["support", "ether", "assist:defensive"],
         "join": ["rupture", "stun"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
@@ -401,8 +401,8 @@
         "image": "./assets/characters/lucy.webp",
         "rank": "A",
         "tier": 2,
-        "tags": ["support", "fire", "calydon", "assist:defensive"],
-        "join": ["fire", "calydon", "rupture"],
+        "tags": ["support", "fire", "assist:defensive"],
+        "join": ["fire", "faction", "rupture"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "buffs": { "atk": 2 }
@@ -416,8 +416,8 @@
         "rank": "S",
         "limited": false,
         "tier": 1,
-        "tags": ["stun", "ice", "victoria", "assist:defensive"],
-        "join": ["ice", "victoria", "anomaly"],
+        "tags": ["stun", "ice", "assist:defensive"],
+        "join": ["ice", "faction", "anomaly"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "buffs": { "stun-multiplier": 2 },
@@ -432,8 +432,8 @@
         "rank": "S",
         "limited": true,
         "tier": 0,
-        "tags": ["anomaly", "ice", "section6", "title", "assist:defensive"],
-        "join": ["support", "section6"],
+        "tags": ["anomaly", "ice", "title", "assist:defensive"],
+        "join": ["support", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "elementalVariant": true,
@@ -450,8 +450,8 @@
         "rank": "S",
         "limited": true,
         "tier": 0,
-        "tags": ["stun", "ether", "aod", "assist:defensive"],
-        "join": ["anomaly", "aod"], 
+        "tags": ["stun", "ether", "assist:defensive"],
+        "join": ["anomaly", "faction"], 
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "pseudoRole": "anomaly",
@@ -470,8 +470,8 @@
         "rank": "S",
         "limited": false,
         "tier": 3.5,
-        "tags": ["attack", "physical", "hares", "assist:defensive"],
-        "join": ["physical", "hares"],
+        "tags": ["attack", "physical", "assist:defensive"],
+        "join": ["physical", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {},
         "faction": "Cunning Hares"
@@ -482,8 +482,8 @@
         "image": "./assets/characters/nicole.webp",
         "rank": "A",
         "tier": 1,
-        "tags": ["support", "ether", "hares", "assist:defensive"],
-        "join": ["ether", "hares"],
+        "tags": ["support", "ether", "assist:defensive"],
+        "join": ["ether", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "buffs": { "ether": 1 },
@@ -499,7 +499,7 @@
         "rank": "S",
         "limited": true,
         "tier": 1,
-        "tags": ["attack", "fire", "obol", "assist:defensive"],
+        "tags": ["attack", "fire", "assist:defensive"],
         "join": ["stun", "support"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
@@ -517,8 +517,8 @@
         "image": "./assets/characters/pan-yinhu.webp",
         "rank": "A",
         "tier": 1,
-        "tags": ["defense", "physical", "yunkui", "assist:defensive"],
-        "join": ["rupture", "yunkui"],
+        "tags": ["defense", "physical", "assist:defensive"],
+        "join": ["rupture", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "buffs": { "sheer": 2 },
@@ -532,8 +532,8 @@
         "image": "./assets/characters/piper.webp",
         "rank": "A",
         "tier": 1.5,
-        "tags": ["anomaly", "physical", "calydon", "assist:defensive"],
-        "join": ["physical", "calydon"],
+        "tags": ["anomaly", "physical", "assist:defensive"],
+        "join": ["physical", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {},
         "faction": "Sons of Calydon"
@@ -545,7 +545,7 @@
         "rank": "S",
         "limited": true,
         "tier": 0.5,
-        "tags": ["anomaly", "ice", "krampus", "assist:defensive"],
+        "tags": ["anomaly", "ice", "assist:defensive"],
         "join": ["stun", "anomaly"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
@@ -560,8 +560,8 @@
         "image": "./assets/characters/pulchra.webp",
         "rank": "A",
         "tier": 1.5,
-        "tags": ["stun", "physical", "calydon", "assist:evasive"],
-        "join": ["attack", "rupture", "calydon"],
+        "tags": ["stun", "physical", "assist:evasive"],
+        "join": ["attack", "rupture", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "onfield": false,
@@ -577,8 +577,8 @@
         "rank": "S",
         "limited": true,
         "tier": 2,
-        "tags": ["stun", "electric", "pubsec", "assist:defensive"],
-        "join": ["attack", "pubsec"],
+        "tags": ["stun", "electric", "assist:defensive"],
+        "join": ["attack", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "buffs": { "stun-multiplier": 2 }
@@ -592,8 +592,8 @@
         "rank": "S",
         "limited": false,
         "tier": 2.5,
-        "tags": ["support", "electric", "victoria", "assist:evasive"],
-        "join": ["victoria", "electric"],
+        "tags": ["support", "electric", "assist:evasive"],
+        "join": ["faction", "electric"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "damage": { "ultimate:strong": 2 },
@@ -609,7 +609,7 @@
         "rank": "S",
         "limited": true,
         "tier": 0.5,
-        "tags": ["attack", "electric", "silver", "assist:defensive"],
+        "tags": ["attack", "electric", "assist:defensive"],
         "join": ["stun", "support"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
@@ -626,7 +626,7 @@
         "rank": "S",
         "limited": true,
         "tier": 0.5,
-        "tags": ["attack", "electric", "obol", "assist:defensive"],
+        "tags": ["attack", "electric", "assist:defensive"],
         "join": ["attack"],
         "synergy": { "units": ["Nekomata"], "tags": [], "avoid": [] },
         "mechanics": {
@@ -641,8 +641,8 @@
         "image": "./assets/characters/seth.webp",
         "rank": "A",
         "tier": 3.5,
-        "tags": ["defense", "electric", "pubsec", "assist:defensive"],
-        "join": ["electric", "pubsec"],
+        "tags": ["defense", "electric", "assist:defensive"],
+        "join": ["electric", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "buffs": { "anomaly": 1 },
@@ -659,8 +659,8 @@
         "rank": "S",
         "limited": false,
         "tier": 2,
-        "tags": ["attack", "fire", "obol", "assist:defensive"],
-        "join": ["fire", "obol"],
+        "tags": ["attack", "fire", "assist:defensive"],
+        "join": ["fire", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {},
         "faction": "Obol Squad"
@@ -671,8 +671,8 @@
         "image": "./assets/characters/soukaku.webp",
         "rank": "A",
         "tier": 1.5,
-        "tags": ["support", "ice", "section6", "assist:defensive"],
-        "join": ["ice", "section6"],
+        "tags": ["support", "ice", "assist:defensive"],
+        "join": ["ice", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "pseudoRole": "anomaly",
@@ -687,8 +687,8 @@
         "rank": "S",
         "limited": true,
         "tier": 0.5,
-        "tags": ["support", "physical", "aod", "assist:defensive"],
-        "join": ["attack", "aod"],
+        "tags": ["support", "physical", "assist:defensive"],
+        "join": ["attack", "faction"],
         "synergy": { "units": ["aria"], "tags": [], "avoid": [] },
         "mechanics": {
             "buffs": { "atk": 3, "stun-multiplier": 2 },
@@ -703,7 +703,7 @@
         "rank": "S",
         "limited": true,
         "tier": 0.5,
-        "tags": ["stun", "electric", "obol", "assist:defensive"],
+        "tags": ["stun", "electric", "assist:defensive"],
         "join": ["attack", "electric"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
@@ -723,7 +723,7 @@
         "rank": "S",
         "limited": true,
         "tier": 0.5,
-        "tags": ["anomaly", "ether", "mockingbird", "assist:defensive"],
+        "tags": ["anomaly", "ether", "assist:defensive"],
         "join": ["anomaly", "ether"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
@@ -741,7 +741,7 @@
         "rank": "S",
         "limited": true,
         "tier": 1,
-        "tags": ["anomaly", "electric", "section6", "assist:defensive"],
+        "tags": ["anomaly", "electric", "assist:defensive"],
         "join": ["electric", "anomaly"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
@@ -759,7 +759,7 @@
         "rank": "S",
         "limited": true,
         "tier": 0,
-        "tags": ["attack", "physical", "yunkui", "title", "assist:defensive"],
+        "tags": ["attack", "physical", "title", "assist:defensive"],
         "join": ["support", "defense"],
         "synergy": { "units": ["Dialyn"], "tags": [], "avoid": [] },
         "mechanics": {
@@ -777,7 +777,7 @@
         "rank": "S",
         "limited": true,
         "tier": 0.5,
-        "tags": ["rupture", "ice", "spookshack", "assist:defensive"],
+        "tags": ["rupture", "ice", "assist:defensive"],
         "join": ["stun", "support"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
@@ -793,7 +793,7 @@
         "rank": "S",
         "limited": true,
         "tier": 0,
-        "tags": ["rupture", "ether", "yunkui", "title", "assist:defensive"],
+        "tags": ["rupture", "ether", "title", "assist:defensive"],
         "join": ["stun", "support", "defense"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
@@ -811,8 +811,8 @@
         "rank": "S",
         "limited": true,
         "tier": 0,
-        "tags": ["support", "physical", "spookshack", "assist:defensive"],
-        "join": ["anomaly", "spookshack"],
+        "tags": ["support", "physical", "assist:defensive"],
+        "join": ["anomaly", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "damage": { "aftershock": true },
@@ -829,7 +829,7 @@
         "rank": "S",
         "limited": true,
         "tier": 0.5,
-        "tags": ["defense", "ice", "krampus", "assist:defensive"],
+        "tags": ["defense", "ice", "assist:defensive"],
         "join": ["attack", "anomaly", "support"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
@@ -847,8 +847,8 @@
         "rank": "S",
         "limited": true,
         "tier": 2.5,
-        "tags": ["attack", "ether", "pubsec", "assist:evasive"],
-        "join": ["support", "pubsec"],
+        "tags": ["attack", "ether", "assist:evasive"],
+        "join": ["support", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {},
         "faction": "PubSec"

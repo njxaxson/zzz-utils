@@ -8,22 +8,7 @@ const FILTERS_STORAGE_KEY = 'zzz-char-summary-filters';
 const ROSTER_STORAGE_KEY = 'zzz-roster';
 const ROLES = ['attack', 'stun', 'anomaly', 'support', 'defense', 'rupture'];
 
-const FACTION_MAP = {
-    'spookshack': 'Spook Shack',
-    'hares': 'Cunning Hares',
-    'belobog': 'Belobog Heavy Industries',
-    'aod': 'Angels of Delusion',
-    'lyra': 'Lyra',
-    'krampus': 'Krampus',
-    'calydon': 'Sons of Calydon',
-    'pubsec': 'PubSec',
-    'victoria': 'Victoria Housekeeping',
-    'section6': 'Section 6',
-    'mockingbird': 'Mockingbird',
-    'yunkui': 'Yunkui',
-    'obol': 'Obol Squad',
-    'silver': 'Silver'
-};
+
 
 let ownedUnitIds = new Set();
 
@@ -301,7 +286,7 @@ function buildAbilityLine(unit) {
     if (!unit.join) return '';
 
     const reqs = unit.join.map(j => {
-        if (FACTION_MAP[j]) return FACTION_MAP[j];
+        if (j === 'faction') return unit.faction;
         if (j === 'assist:defensive') return 'Defensive Assist';
         if (j === 'assist:evasive') return 'Evasive Assist';
         return cap(j);
