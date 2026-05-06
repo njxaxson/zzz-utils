@@ -221,20 +221,33 @@
         .char-synergy {
             font-family: 'Rajdhani', sans-serif;
             font-size: 0.8rem;
-            font-weight: 500;
-            color: var(--text-muted);
+            font-weight: 600;
+            color: var(--text-secondary);
             line-height: 1.4;
         }
 
         .char-synergy .unit-ref {
             color: var(--text-primary);
-            font-weight: 600;
+            font-weight: 700;
         }
 
         .char-synergy strong {
+            color: var(--text-primary);
+            font-weight: 700;
+        }
+
+        .char-synergy .mech-label {
             color: var(--text-secondary);
             font-weight: 600;
         }
+
+        /* Elemental coloring for mechanics text */
+        .char-synergy .element-fire { color: var(--element-fire-light); }
+        .char-synergy .element-ice { color: var(--element-ice-light); }
+        .char-synergy .element-electric { color: var(--element-electric-light); }
+        .char-synergy .element-physical { color: var(--element-physical-light); }
+        .char-synergy .element-ether { color: var(--element-ether-light); }
+        .char-synergy .element-wind { color: var(--element-wind-light); }
 
         /* Roster toggle — sized to match .dropdown-toggle */
         .roster-toggle {

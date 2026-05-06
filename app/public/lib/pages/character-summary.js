@@ -251,7 +251,15 @@ function buildCard(unit) {
         `<span class="char-tag element-${element}">${element}</span>`,
         `<span class="char-tag">${role}</span>`,
         `<span class="char-tag">${assist}</span>`
-    ].join('');
+    ];
+    
+    // Add Sub-DPS tag if present in pseudoRole
+    const pseudoRoles = unit.mechanics?.pseudoRole ? unit.mechanics.pseudoRole.split(',').map(r => r.trim()) : [];
+    if (pseudoRoles.includes('subdps')) {
+        tags.push(`<span class="char-tag">Sub-DPS</span>`);
+    }
+    
+    const tagsHtml = tags.join('');
 
     const abilityHtml = buildAbilityLine(unit);
     const synergyHtml = buildSynergyLine(unit);
@@ -277,7 +285,7 @@ function buildCard(unit) {
         <div class="tier-indicator ${tierClass}">T${tier}</div>
     </div>
     <div class="char-card-body">
-        <div class="char-tags">${tags}</div>${abilityHtml}${synergyHtml}
+        <div class="char-tags">${tagsHtml}</div>${abilityHtml}${synergyHtml}
     </div>
 </div>`;
 }
@@ -303,12 +311,112 @@ function buildAbilityLine(unit) {
 
 function buildSynergyLine(unit) {
     const parts = [];
-    const isSubDPS = unit.synergy?.tags?.includes('subdps');
+    const mechanics = unit.mechanics || {};
+    
+    // Check for non-subdps pseudoRoles
+    const pseudoRoles = mechanics.pseudoRole ? mechanics.pseudoRole.split(',').map(r => r.trim()) : [];
+    const nonSubDPSRoles = pseudoRoles.filter(r => r !== 'subdps');
 
-    if (isSubDPS) {
-        parts.push('<strong>Sub-DPS.</strong>');
+    // Pseudo-role line (non-subdps roles only, subdps is shown as a tag)
+    if (nonSubDPSRoles.length > 0) {
+        const roleText = nonSubDPSRoles.map(r => cap(r)).join(', ');
+        parts.push(`<span class="mech-label">Pseudo-role:</span> ${roleText}`);
     }
 
+    // Buffs
+    const buffs = [];
+    if (mechanics.buffs) {
+        if (mechanics.buffs.atk) buffs.push(formatMechanic('Attack', mechanics.buffs.atk));
+        if (mechanics.buffs.anomaly) buffs.push(formatMechanic('Anomaly Buildup', mechanics.buffs.anomaly));
+        if (mechanics.buffs.ap) buffs.push(formatMechanic('Anomaly Proficiency', mechanics.buffs.ap));
+        if (mechanics.buffs.am) buffs.push(formatMechanic('Anomaly Mastery', mechanics.buffs.am));
+        if (mechanics.buffs.aftershock) buffs.push(formatMechanic('Aftershock', mechanics.buffs.aftershock));
+        if (mechanics.buffs.abloom) buffs.push(formatMechanic('Abloom', mechanics.buffs.abloom));
+        if (mechanics.buffs.chain) buffs.push(formatMechanic('Chain Attacks', mechanics.buffs.chain));
+        if (mechanics.buffs.sheer) buffs.push(formatMechanic('Sheer Damage', mechanics.buffs.sheer));
+        if (mechanics.buffs.pen) buffs.push(formatMechanic('PEN', mechanics.buffs.pen));
+        if (mechanics.buffs['stun-multiplier']) buffs.push(formatMechanic('Stun Multiplier', mechanics.buffs['stun-multiplier']));
+        if (mechanics.buffs.cr) buffs.push(formatMechanic('Crit Rate', mechanics.buffs.cr));
+        if (mechanics.buffs.cd) buffs.push(formatMechanic('Crit Damage', mechanics.buffs.cd));
+        if (mechanics.buffs.disorders) buffs.push(formatMechanic('Disorders', mechanics.buffs.disorders));
+        
+        // Elemental buffs
+        if (mechanics.buffs.ice) buffs.push(formatElementalMechanic('Ice Damage', mechanics.buffs.ice, 'ice'));
+        if (mechanics.buffs.fire) buffs.push(formatElementalMechanic('Fire Damage', mechanics.buffs.fire, 'fire'));
+        if (mechanics.buffs.electric) buffs.push(formatElementalMechanic('Electric Damage', mechanics.buffs.electric, 'electric'));
+        if (mechanics.buffs.ether) buffs.push(formatElementalMechanic('Ether Damage', mechanics.buffs.ether, 'ether'));
+        if (mechanics.buffs.physical) buffs.push(formatElementalMechanic('Physical Damage', mechanics.buffs.physical, 'physical'));
+    }
+    if (buffs.length > 0) {
+        parts.push(`<span class="mech-label">Buffs:</span> ${buffs.join(', ')}`);
+    }
+
+    // Debuffs
+    const debuffs = [];
+    if (mechanics.debuffs) {
+        if (mechanics.debuffs.defense) debuffs.push(formatMechanic('Defense Shred', mechanics.debuffs.defense));
+        if (mechanics.debuffs.recovery) debuffs.push(formatMechanic('Delayed Stun Recovery', mechanics.debuffs.recovery));
+        
+        // Elemental debuffs
+        if (mechanics.debuffs.ice) debuffs.push(formatElementalMechanic('Ice Defense Shred', mechanics.debuffs.ice, 'ice'));
+        if (mechanics.debuffs.fire) debuffs.push(formatElementalMechanic('Fire Defense Shred', mechanics.debuffs.fire, 'fire'));
+        if (mechanics.debuffs.electric) debuffs.push(formatElementalMechanic('Electric Defense Shred', mechanics.debuffs.electric, 'electric'));
+        if (mechanics.debuffs.ether) debuffs.push(formatElementalMechanic('Ether Defense Shred', mechanics.debuffs.ether, 'ether'));
+        if (mechanics.debuffs.physical) debuffs.push(formatElementalMechanic('Physical Defense Shred', mechanics.debuffs.physical, 'physical'));
+    }
+    if (debuffs.length > 0) {
+        parts.push(`<span class="mech-label">Debuffs:</span> ${debuffs.join(', ')}`);
+    }
+
+    // Kit (damage types + utility merged)
+    const kitItems = [];
+    
+    // Damage types
+    if (mechanics.damage) {
+        if (mechanics.damage.polarity) kitItems.push(formatMechanic('Polarities', mechanics.damage.polarity));
+        if (mechanics.damage.abloom) kitItems.push(formatMechanic('Abloom', mechanics.damage.abloom));
+        if (mechanics.damage.aftershock) kitItems.push(formatMechanic('Aftershock', mechanics.damage.aftershock));
+        if (mechanics.damage.totalize) kitItems.push(formatMechanic('Totalize', mechanics.damage.totalize));
+        const chainVal = normalizeValue(mechanics.damage.chain);
+        if (chainVal > 1) kitItems.push(formatMechanic('Chain Attacks', mechanics.damage.chain));
+    }
+    
+    // Utility
+    if (mechanics.utility) {
+        const ultimatesVal = normalizeValue(mechanics.utility.ultimates);
+        if (ultimatesVal === 3) {
+            kitItems.push(formatMechanic('Generates Ultimates', mechanics.utility.ultimates));
+        } else if (ultimatesVal >= 1) {
+            kitItems.push(formatMechanic('Generates Decibels', mechanics.utility.ultimates));
+        }
+        
+        const quickAssistsVal = normalizeValue(mechanics.utility['quick-assists']);
+        if (quickAssistsVal >= 2) kitItems.push(formatMechanic('Quick-Assists', mechanics.utility['quick-assists']));
+        
+        const chainsVal = normalizeValue(mechanics.utility.chains);
+        if (chainsVal >= 2) kitItems.push(formatMechanic('Chain Attacks', mechanics.utility.chains));
+        
+        if (mechanics.utility.shields) kitItems.push(formatMechanic('Shields', mechanics.utility.shields));
+        if (mechanics.utility['heal:team']) kitItems.push(formatMechanic('Team Healing', mechanics.utility['heal:team']));
+        if (mechanics.utility.kaleidoscope) kitItems.push(formatMechanic('Kaleidoscope', mechanics.utility.kaleidoscope));
+        if (mechanics.utility.veils) kitItems.push(formatMechanic('Ether Veils', mechanics.utility.veils));
+    }
+    
+    if (kitItems.length > 0) {
+        parts.push(`<span class="mech-label">Kit:</span> ${kitItems.join('; ')}`);
+    }
+
+    // Scaling
+    const scaling = [];
+    if (mechanics.scaling) {
+        if (mechanics.scaling.disorders) scaling.push('Disorders');
+        if (mechanics.scaling.veils) scaling.push('Ether Veils');
+    }
+    if (scaling.length > 0) {
+        parts.push(`<span class="mech-label">Scales with:</span> ${scaling.join(', ')}`);
+    }
+
+    // Synergy text (from synergy block)
     if (unit.synergy) {
         const { units, tags } = unit.synergy;
 
@@ -334,7 +442,30 @@ function buildSynergyLine(unit) {
     if (parts.length === 0) return '';
 
     return `
-        <div class="char-synergy">${parts.join(' ')}</div>`;
+        <div class="char-synergy">${parts.join('<br>')}</div>`;
+}
+
+function normalizeValue(val) {
+    if (val === true) return 1;
+    if (typeof val === 'number') return val;
+    return 0;
+}
+
+function formatMechanic(name, value) {
+    const val = normalizeValue(value);
+    if (val === 3) {
+        return `<strong>${name}</strong>`;
+    }
+    return name;
+}
+
+function formatElementalMechanic(name, value, element) {
+    const val = normalizeValue(value);
+    const colorClass = `element-${element}`;
+    if (val === 3) {
+        return `<strong><span class="${colorClass}">${name}</span></strong>`;
+    }
+    return `<span class="${colorClass}">${name}</span>`;
 }
 
 function cap(str) {

@@ -628,7 +628,7 @@
         "tier": 0.5,
         "tags": ["attack", "electric", "assist:defensive"],
         "join": ["attack"],
-        "synergy": { "units": ["Nekomata"], "tags": [], "avoid": [] },
+        "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "damage": { "ultimate:strong": 3 },
             "scaling": { "attacker": 3 }
