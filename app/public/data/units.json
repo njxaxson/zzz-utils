@@ -14,7 +14,8 @@
             "utility": { "disorders": 2 },
             "scaling": { "am": 3 }
         },
-        "faction": "Spook Shack"
+        "faction": "Spook Shack",
+        "displayText": "Literal bunny girl is a strong physical anomaly unit."
     },
     {
         "id": "anby",
@@ -26,7 +27,8 @@
         "join": ["electric", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {},
-        "faction": "Cunning Hares"
+        "faction": "Cunning Hares",
+        "displayText": "As your first unit, Anby is a basic electric stunner."
     },
     {
         "id": "anton",
@@ -40,7 +42,8 @@
         "mechanics": {
             "scaling": { "quick-assists": true }
         },
-        "faction": "Belobog Heavy Industries"
+        "faction": "Belobog Heavy Industries",
+        "displayText": "Basic electric attacker if you have no one else. Has some quirky synergy with Astra."
     },
     {
         "id": "aria",
@@ -56,7 +59,8 @@
             "damage": { "enhanced": 2, "abloom": 2 },
             "scaling": { "veils": 2 }
         },
-        "faction": "Angels of Delusion"
+        "faction": "Angels of Delusion",
+        "displayText": "Intelligent construct masquerading as a human, Aria is top-tier primary ether anomaly DPS."
     },
     {
         "id": "astra",
@@ -73,7 +77,8 @@
             "buffs": { "atk": 3, "cd": 3 },
             "utility": { "quick-assists": 3, "chains": 2, "heal:team": true }
         },
-        "faction": "Stars of Lyra"
+        "faction": "Stars of Lyra",
+        "displayText": "The best generalist support in the game, Astra can round out any team."
     },
     {
         "id": "banyue",
@@ -89,7 +94,8 @@
             "utility": { "interrupt-resistance": 2 },
             "scaling": { "interrupt-resistance": 2 }
         },
-        "faction": "Krampus"
+        "faction": "Krampus",
+        "displayText": "Combo-heavy unit that operates best when you play with a high level of technical skill."
     },
     {
         "id": "ben",
@@ -105,7 +111,8 @@
             "scaling": { "def": 3 },
             "onfield": true
         },
-        "faction": "Belobog Heavy Industries"
+        "faction": "Belobog Heavy Industries",
+        "displayText": "Oddly enough, Ben is best used when built as a crit DPS rather than defense agent."
     },
     {
         "id": "billy",
@@ -117,7 +124,8 @@
         "join": ["physical", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {},
-        "faction": "Cunning Hares"
+        "faction": "Cunning Hares",
+        "displayText": "One of your starting characters, Billy actually has a very high skill ceiling."
     },
     {
         "id": "sbilly",
@@ -133,7 +141,8 @@
             "utility": { "heal:self": true }
         },
         "faction": "Cunning Hares",
-        "available": false
+        "available": false,
+        "displayText": "Starlight Knight supreme."
     },
     {
         "id": "burnice",
@@ -150,7 +159,8 @@
             "onfield": false,
             "damage": { "abloom": 1 }
         },
-        "faction": "Sons of Calydon"
+        "faction": "Sons of Calydon",
+        "displayText": "This ditzy Calydon bartender is an off-field fire anomaly sub-DPS."
     },
     {
         "id": "caesar",
@@ -167,7 +177,8 @@
             "buffs": { "atk": 2 },
             "utility": { "shields": 2, "interrupt-resistance": 2 }
         },
-        "faction": "Sons of Calydon"
+        "faction": "Sons of Calydon",
+        "displayText": "For those who struggle with the combat, Caesar's shielding and attack interrupts can make it easier to power through fights."
     },
     {
         "id": "cissia",
@@ -185,7 +196,8 @@
             "debuffs": { "electric": 2 },
             "utility": { "daze": 1, "veils" : 1 }
         },
-        "faction": "PubSec"
+        "faction": "PubSec",
+        "displayText": "Snake girl is an electric sub-DPS primarily designed to work with Seed."
     },
     {
         "id": "corin",
@@ -197,7 +209,8 @@
         "join": ["physical", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {},
-        "faction": "Victoria Housekeeping"
+        "faction": "Victoria Housekeeping",
+        "displayText": "Basic physical attack agent. Can put up some good numbers with skilled play and good supporting teammates."
     },
     {
         "id": "dialyn",
@@ -215,7 +228,8 @@
             "utility": { "ultimates": 3 },
             "scaling": { "cr": 3 }
         },
-        "faction": "Krampus"
+        "faction": "Krampus",
+        "displayText": "Hands-down the best stun agent in the game; she can provide free ultimates for teammates."
     },
     {
         "id": "ellen",
@@ -228,7 +242,8 @@
         "join": ["ice", "faction", "stun"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {},
-        "faction": "Victoria Housekeeping"
+        "faction": "Victoria Housekeeping",
+        "displayText": "Shark girl is a fan-favorite ice attacker. She's a bit outdated, but hey, ZZZ is all about style."
     },
     {
         "id": "evelyn",
@@ -245,7 +260,8 @@
             "damage": { "chain": 3, "ultimate:strong": 1 },
             "scaling": { "chains": 3, "recovery": 1 }
         },
-        "faction": "Stars of Lyra"
+        "faction": "Stars of Lyra",
+        "displayText": "This fire attacker specializes in chain attacks and does well when paired with her faction member Astra."
     },
     {
         "id": "grace",
@@ -262,7 +278,8 @@
             "damage": { "abloom": 1 },
             "scaling": { "pen": true }
         },
-        "faction": "Belobog Heavy Industries"
+        "faction": "Belobog Heavy Industries",
+        "displayText": "Gearhead who throws electric grenades, Grace is typically used as an anomaly sub-DPS when you don't have a better alternative."
     },
     {
         "id": "harumasa",
@@ -279,7 +296,8 @@
             "damage": { "aftershock": 1 },
             "scaling": { "anomaly": 2 }
         },
-        "faction": "Section 6"
+        "faction": "Section 6",
+        "displayText": "One of the most difficult characters to master, Harumasa struggles to keep up with endgame content without high levels of investment."
     },
     {
         "id": "hugo",
@@ -295,7 +313,8 @@
             "damage": { "totalize": 3 },
             "onfield": false
         },
-        "faction": "Mockingbird"
+        "faction": "Mockingbird",
+        "displayText": "This ice attacker lives for stuns, when he can do very large amounts of burst damage. Give him two stunners."
     },
     {
         "id": "jane-doe",
@@ -309,7 +328,8 @@
         "join": ["anomaly", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {},
-        "faction": "PubSec"
+        "faction": "PubSec",
+        "displayText": "Sensuous rat lady is an older physical anomaly unit that remains a fan favorite."
     },
     {
         "id": "ju-fufu",
@@ -328,7 +348,8 @@
             "buffs": { "cd": 3 },
             "utility": { "ultimates" : 1 }
         },
-        "faction": "Yunkui Summit"
+        "faction": "Yunkui Summit",
+        "displayText": "Smol tiger lady will remind you that she is your senior. An off-field stun agent that refunds decibels and boosts crit damage."
     },
     {
         "id": "koleda",
@@ -344,7 +365,8 @@
             "buffs": { "chains": 1 },
             "utility": { "daze": 1 }
         },
-        "faction": "Belobog Heavy Industries"
+        "faction": "Belobog Heavy Industries",
+        "displayText": "CEO of Belobog, this maniac likes to smash things. Has the fastest stun rate of any agent."
     },
     {
         "id": "komano",
@@ -359,7 +381,8 @@
         "mechanics": {
             "utility": { "heal:self": true }
         },
-        "faction": "Spook Shack"
+        "faction": "Spook Shack",
+        "displayText": "Beefy dog that wit big fire sword. Big damage from his repeated counterattacks after defensive assists. One of the best A-rank DPS agents."
     },
     {
         "id": "lighter",
@@ -375,7 +398,8 @@
             "buffs": { "fire": 2, "ice": 2 },
             "debuffs": { "recovery": 3 }
         },
-        "faction": "Sons of Calydon"
+        "faction": "Sons of Calydon",
+        "displayText": "The original coolest man alive. Excellent stun unit that buffs fire and ice damage."
     },
     {
         "id": "lucia",
@@ -393,7 +417,8 @@
             "utility": { "veils": true },
             "scaling": { "hp": 3 }
         },
-        "faction": "Spook Shack"
+        "faction": "Spook Shack",
+        "displayText": "Goat lady is GOAT support for rupture teams. Not so useful for attackers or anomaly, though."
     },
     {
         "id": "lucy",
@@ -407,7 +432,8 @@
         "mechanics": {
             "buffs": { "atk": 2 }
         },
-        "faction": "Sons of Calydon"
+        "faction": "Sons of Calydon",
+        "displayText": "Basic generalist support unit. Her W-engine is one of the best A-rank engines for S-rank support units."
     },
     {
         "id": "lycaon",
@@ -423,7 +449,8 @@
             "buffs": { "stun-multiplier": 2 },
             "debuffs": { "ice": 2 }
         },
-        "faction": "Victoria Housekeeping"
+        "faction": "Victoria Housekeeping",
+        "displayText": "Unlocking his potential vision opens Lycaon up as an anomaly-compatible stunner."
     },
     {
         "id": "miyabi",
@@ -440,7 +467,8 @@
             "damage": { "enhanced": 3, "ultimate:strong": 2 },
             "scaling": { "disorders": 3, "cr": 3, "cd": 3 }
         },
-        "faction": "Section 6"
+        "faction": "Section 6",
+        "displayText": "Void Hunter Hoshimi Miyabi reporting for duty. An anomaly agent built like an attacker, Miyabi has a low skill floor but a very high skill ceiling and can produce some of the highest damage output in the game with precise technical play."
     },
     {
         "id": "nangong",
@@ -461,7 +489,8 @@
             "utility": { "disorders": 2, "daze": true },
             "scaling": { "am": 3 }
         },
-        "faction": "Angels of Delusion"
+        "faction": "Angels of Delusion",
+        "displayText": "Top-tier stunner for anomaly teams that practically serves as an anomaly agent herself."
     },
     {
         "id": "nekomata",
@@ -474,7 +503,8 @@
         "join": ["physical", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {},
-        "faction": "Cunning Hares"
+        "faction": "Cunning Hares",
+        "displayText": "Cat girl is the bane of 50/50s everywhere. Her best use is as a low-energy-consumption teammate for Seed, but even that is pushing it."
     },
     {
         "id": "nicole",
@@ -489,7 +519,8 @@
             "buffs": { "ether": 1 },
             "debuffs": { "defense": 3 }
         },
-        "faction": "Cunning Hares"
+        "faction": "Cunning Hares",
+        "displayText": "Everyone loves Nicole. Great support agent that specializes in shredding enemy defense, even for an A-rank."
     },
     {
         "id": "orphie",
@@ -508,7 +539,8 @@
             "damage": { "aftershock": 3 },
             "buffs": { "atk": 2 }
         },
-        "faction": "Obol Squad"
+        "faction": "Obol Squad",
+        "displayText": "Clumsy off-field attack agent that does aftershock damage and buffs teammates. Not recommended as an on-field DPS."
     },
     {
         "id": "pan",
@@ -524,7 +556,8 @@
             "buffs": { "sheer": 2 },
             "utility": { "quick-assists": true }
         },
-        "faction": "Yunkui Summit"
+        "faction": "Yunkui Summit",
+        "displayText": "Standard rupture support agent if you don't have Lucia. Not useful outside of rupture teams."
     },
     {
         "id": "piper",
@@ -536,7 +569,8 @@
         "join": ["physical", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {},
-        "faction": "Sons of Calydon"
+        "faction": "Sons of Calydon",
+        "displayText": "Spin-to-win. A physical anomaly agent that is one of the best A-rank DPS agents."
     },
     {
         "id": "promeia",
@@ -552,7 +586,8 @@
             "damage": { "abloom": 3, "enhanced": 1 },
             "buffs" : { "abloom": 3 }
         },
-        "faction": "Krampus"
+        "faction": "Krampus",
+        "displayText": "She's not Batman, but she's got that vibe. Strong ice anomaly agent that goes a different route from Miyabi."
     },
     {
         "id": "pulchra",
@@ -568,7 +603,8 @@
             "damage": { "aftershock": 2 },
             "utility": { "quick-assists": true }
         },
-        "faction": "Sons of Calydon"
+        "faction": "Sons of Calydon",
+        "displayText": "Specializes in off-field aftershock daze and damage; not well-suited for on-field play."
     },
     {
         "id": "qingyi",
@@ -583,7 +619,8 @@
         "mechanics": {
             "buffs": { "stun-multiplier": 2 }
         },
-        "faction": "PubSec"
+        "faction": "PubSec",
+        "displayText": "On-field electric stun agent is surprisingly good for Yixuan, even though they have no natural team alliance."
     },
     {
         "id": "rina",
@@ -600,7 +637,8 @@
             "buffs": { "pen": 3 },
             "scaling": { "ap": true }
         },
-        "faction": "Victoria Housekeeping"
+        "faction": "Victoria Housekeeping",
+        "displayText": "Electric support agent that specializes in buffing PEN. Sadly, she is currently very underpowered for modern endgame."
     },
     {
         "id": "sanby",
@@ -616,7 +654,8 @@
             "damage": { "aftershock": 2 },
             "buffs": { "aftershock": 3 }
         },
-        "faction": "Silver Squad"
+        "faction": "Silver Squad",
+        "displayText": "Premier electric DPS, Silver Soldier Anby wants aftershock teammates like Trigger and Orphie to maximize her damage potential."
     },
     {
         "id": "seed",
@@ -633,7 +672,8 @@
             "damage": { "ultimate:strong": 3 },
             "scaling": { "attacker": 3 }
         },
-        "faction": "Obol Squad"
+        "faction": "Obol Squad",
+        "displayText": "Electric attack agent that demands a second attack agent on the team. Can also work well on relatively low-investment teams."
     },
     {
         "id": "seth",
@@ -649,7 +689,8 @@
             "utility": { "shields": true, "quick-assists": true },
             "onfield": true
         },
-        "faction": "PubSec"
+        "faction": "PubSec",
+        "displayText": "A defense agent that boosts anomaly teams; although underpowered for modern endgame."
     },
     {
         "id": "soldier-11",
@@ -663,7 +704,8 @@
         "join": ["fire", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {},
-        "faction": "Obol Squad"
+        "faction": "Obol Squad",
+        "displayText": "This fire attacker can make a suitable DPS when you don't have alternatives. Her damage ceiling is highly dependent on your attack timing; it is worthwhile to practice with her to get it right."
     },
     {
         "id": "soukaku",
@@ -678,7 +720,8 @@
             "pseudoRole": "anomaly",
             "buffs": { "atk": 3, "ice": 3 }
         },
-        "faction": "Section 6"
+        "faction": "Section 6",
+        "displayText": "An ice support that is best built like an anomaly agent. She can also generate disorders with Miyabi even though they are both ice, because Miyabi is technically 'frost' instead of ice."
     },
     {
         "id": "sunna",
@@ -694,7 +737,8 @@
             "buffs": { "atk": 3, "stun-multiplier": 2 },
             "utility": { "veils": 3, "daze": 2 }
         },
-        "faction": "Angels of Delusion"
+        "faction": "Angels of Delusion",
+        "displayText": "Ether veil spammer that is a best-in-slot teammate for both Angels of Delusion faction mates Nangong and Aria, as well as Ye Shunguang."
     },
     {
         "id": "trigger",
@@ -713,7 +757,8 @@
             "debuffs": { "defense": 2 },
             "scaling": { "cr": 3 }
         },
-        "faction": "Obol Squad"
+        "faction": "Obol Squad",
+        "displayText": "Off-field electric aftershock stun agent that can shred defense with her W-engine."
     },
     {
         "id": "vivian",
@@ -732,7 +777,8 @@
             "damage": { "abloom": 3 },
             "scaling": { "am": 2 }
         },
-        "faction": "Mockingbird"
+        "faction": "Mockingbird",
+        "displayText": "Great ether anomaly sub-DPS that can help generate disorders in dual-anomaly teams. Simps for Phaethon."
     },
     {
         "id": "yanagi",
@@ -749,7 +795,8 @@
             "utility": { "disorders": 2 },
             "scaling": { "pen": true }
         },
-        "faction": "Section 6"
+        "faction": "Section 6",
+        "displayText": "Premier electric anomaly primary DPS, this disorder-generation queen is great teammate for Miyabi."
     },
     {
         "id" : "ysg",
@@ -768,7 +815,8 @@
             "utility": { "stunless": true },
             "scaling": { "ultimates": 3, "veils": 2 }
         },
-        "faction": "Yunkui Summit"
+        "faction": "Yunkui Summit",
+        "displayText": "Void Hunter Ye Shunguang is currently the strongest DPS agent in the game. Wants lots of ether veils to help push her into her enlightened state."
     },
     {
         "id": "yidhari",
@@ -783,7 +831,8 @@
         "mechanics": {
             "utility": { "veils": true, "heal:self": true }
         },
-        "faction": "Spook Shack"
+        "faction": "Spook Shack",
+        "displayText": "Octomommy with big hammer, this ice rupture agent is effective against a wide range of endgame content."
     },
     {
         "id": "yixuan",
@@ -801,7 +850,8 @@
             "damage": { "enhanced": 2, "ultimate:double": 3, "ultimate:strong": 1 },
             "scaling": { "ultimates": 2 }
         },
-        "faction": "Yunkui Summit"
+        "faction": "Yunkui Summit",
+        "displayText": "Grandmaster Yixuan is one of the strongest DPS agents in the game and can even brute force nearly every boss in endgame content."
     },
     {
         "id": "yuzuha",
@@ -820,7 +870,8 @@
             "utility": { "kaleidoscope": true, "quick-assists": 2, "daze": true },
             "scaling": { "ap": 2 }
         },
-        "faction": "Spook Shack"
+        "faction": "Spook Shack",
+        "displayText": "Hands-down the best support agent for anomaly teams. Her smug face can even change her element to match a teammate."
     },
     {
         "id": "zhao",
@@ -837,7 +888,8 @@
             "utility": { "heal:team": 2, "veils": 2 },
             "scaling": { "hp": 2 }
         },
-        "faction": "Krampus"
+        "faction": "Krampus",
+        "displayText": "Bunny boss has big sword, big buffs, and ether veil generation. Ice defense that can also provide teamwide healing."
     },
     {
         "id": "zhu-yuan",
@@ -851,6 +903,7 @@
         "join": ["support", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {},
-        "faction": "PubSec"
+        "faction": "PubSec",
+        "displayText": "Best cop out there. A bit outdated for endgame content, she is one of the few DPS agents without a defensive assist."
     }
 ]

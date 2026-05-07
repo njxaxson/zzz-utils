@@ -262,6 +262,7 @@ function buildCard(unit) {
     const tagsHtml = tags.join('');
 
     const abilityHtml = buildAbilityLine(unit);
+    const displayTextHtml = buildDisplayTextLine(unit);
     const synergyHtml = buildSynergyLine(unit);
     const titledBadge = isTitled ? '<span class="titled-badge">VH/GM</span>' : '';
     const isPreview = unit.available === false;
@@ -285,7 +286,7 @@ function buildCard(unit) {
         <div class="tier-indicator ${tierClass}">T${tier}</div>
     </div>
     <div class="char-card-body">
-        <div class="char-tags">${tagsHtml}</div>${abilityHtml}${synergyHtml}
+        <div class="char-tags">${tagsHtml}</div>${abilityHtml}${displayTextHtml}${synergyHtml}
     </div>
 </div>`;
 }
@@ -307,6 +308,13 @@ function buildAbilityLine(unit) {
             <span class="ability-label">Teammates:</span>
             <span class="ability-reqs">${reqsHtml}</span>
         </div>`;
+}
+
+function buildDisplayTextLine(unit) {
+    const displayText = typeof unit.displayText === 'string' ? unit.displayText.trim() : '';
+    if (!displayText) return '';
+
+    return `<div class="char-display-text">${displayText}</div>`;
 }
 
 function buildSynergyLine(unit) {
