@@ -138,6 +138,7 @@
         "join": ["stun", "support", "defense"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
+            "damage": { "chains": 2 },
             "utility": { "heal:self": true }
         },
         "faction": "Cunning Hares",
