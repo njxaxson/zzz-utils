@@ -142,7 +142,7 @@
             "utility": { "heal:self": true }
         },
         "faction": "Cunning Hares",
-        "available": true,
+        "available": false,
         "displayText": "Starlight Knight supreme."
     },
     {
@@ -512,7 +512,7 @@
         "name": "Norma",
         "image": "./assets/characters/norma.webp",
         "rank": "S",
-        "limited": false,
+        "limited": true,
         "tier": 0.5,
         "tags": ["stun", "fire", "esd", "assist:defensive"],
         "join": ["attack", "rupture"],
@@ -640,7 +640,9 @@
         "join": ["support", "stun"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {},
-        "faction": "Phaethon"
+        "faction": "Phaethon",
+        "available" : false,
+        "displayText" : "Proxy made manifest? We shall see!"
     },
     {
         "id": "qingyi",
@@ -801,7 +803,7 @@
         "id": "velina",
         "name": "Velina",
         "aliases": ["Vel"],
-        "image": "./assets/characters/vivian.webp",
+        "image": "./assets/characters/velina.webp",
         "rank": "S",
         "limited": true,
         "tier": 0.5,

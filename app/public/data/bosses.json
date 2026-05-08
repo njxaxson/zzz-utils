@@ -171,9 +171,9 @@
         "shillIntensity": 2
     },
     {
-        "id": "mutant",
-        "name": "Mutant",
-        "shortName": "Mutant",
+        "id": "horizon",
+        "name": "Scorched Horizon",
+        "shortName": "Scorched Horizon",
         "image": "./assets/bosses/mutant.webp",
         "weaknesses": ["wind", "ice"],
         "resistances": ["electric"],
@@ -182,7 +182,6 @@
         "assists": 2,
         "favored": ["Promeia"],
         "shillIntensity": 1,
-        "available": false,
         "mechanics": {
             "anomaly:state": "wind"
         }
