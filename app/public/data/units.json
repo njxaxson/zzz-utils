@@ -142,7 +142,7 @@
             "utility": { "heal:self": true }
         },
         "faction": "Cunning Hares",
-        "available": false,
+        "available": true,
         "displayText": "Starlight Knight supreme."
     },
     {
@@ -508,6 +508,26 @@
         "displayText": "Cat girl is the bane of 50/50s everywhere. Her best use is as a low-energy-consumption teammate for Seed, but even that is pushing it."
     },
     {
+        "id": "norma",
+        "name": "Norma",
+        "image": "./assets/characters/norma.webp",
+        "rank": "S",
+        "limited": false,
+        "tier": 0.5,
+        "tags": ["stun", "fire", "esd", "assist:defensive"],
+        "join": ["attack", "rupture"],
+        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {
+            "damage" : { "chain" : 3 },
+            "buffs" : { "stun-multiplier" : 2 },
+            "utility" : { "ultimates" : 1 },
+            "scaling" : { "quick-assists" : 2 }
+        },
+        "available" : false,
+        "faction": "External Strategy Department",
+        "displayText" : "Whacky bangboo engineer fires missiles at enemies and specializes in chain attacks and decibel refunds. She can convert some quick assists into chain attacks."
+    },
+    {
         "id": "nicole",
         "name": "Nicole",
         "image": "./assets/characters/nicole.webp",
@@ -576,6 +596,7 @@
     {
         "id": "promeia",
         "name": "Promeia",
+        "aliases": ["Prom"],
         "image": "./assets/characters/promeia.webp",
         "rank": "S",
         "limited": true,
@@ -606,6 +627,20 @@
         },
         "faction": "Sons of Calydon",
         "displayText": "Specializes in off-field aftershock daze and damage; not well-suited for on-field play."
+    },
+    {
+        "id": "pyrois",
+        "name": "Pyrois",
+        "aliases": ["Belle", "Wise", "Phaethon"],
+        "image": "./assets/characters/pyrois.webp",
+        "rank": "S",
+        "limited": false,
+        "tier": 1.5,
+        "tags": ["attack", "ether", "phaethon", "assist:evasive"],
+        "join": ["support", "stun"],
+        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {},
+        "faction": "Phaethon"
     },
     {
         "id": "qingyi",
@@ -711,6 +746,7 @@
     {
         "id": "soukaku",
         "name": "Soukaku",
+        "aliases": ["SKK"],
         "image": "./assets/characters/soukaku.webp",
         "rank": "A",
         "tier": 1.5,
@@ -762,6 +798,25 @@
         "displayText": "Off-field electric aftershock stun agent that can shred defense with her W-engine."
     },
     {
+        "id": "velina",
+        "name": "Velina",
+        "aliases": ["Vel"],
+        "image": "./assets/characters/vivian.webp",
+        "rank": "S",
+        "limited": true,
+        "tier": 0.5,
+        "tags": ["anomaly", "wind", "esd", "assist:defensive"],
+        "join": ["anomaly", "wind"],
+        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {
+            "pseudoRole": "subdps",
+            "damage": { "abloom": 2 }
+        },
+        "faction": "External Strategy Department",
+        "available": false,
+        "displayText" : "Tall anomaly gentlelady sub-DPS with oversized fan creates on-field tornado traps."
+    },
+    {
         "id": "vivian",
         "name": "Vivian",
         "aliases": ["Viv"],
@@ -784,6 +839,7 @@
     {
         "id": "yanagi",
         "name": "Yanagi",
+        "aliases": ["Nagi"],
         "image": "./assets/characters/yanagi.webp",
         "rank": "S",
         "limited": true,
@@ -802,7 +858,7 @@
     {
         "id" : "ysg",
         "name" : "Ye Shunguong",
-        "aliases": ["YSG"],
+        "aliases": ["YSG","Shungus"],
         "image": "./assets/characters/ysg.webp",
         "rank": "S",
         "limited": true,
