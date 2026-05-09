@@ -853,13 +853,13 @@ async function main() {
     });
 
     // ========================================================================
-    // TEST 34: Promeia ice vortex dominance on Mutant
+    // TEST 34: Promeia ice vortex dominance on Scorched Horizon
     // ========================================================================
-    run('TEST 34: Promeia teams dominate Mutant; outscore Miyabi teams', () => {
+    run('TEST 34: Promeia teams dominate Scorched Horizon; outscore Miyabi teams', () => {
         const teams = scoreForTeamString(
             'Lycaon/Promeia/Soukaku,Nangong/Promeia/Yuzuha,Lighter/Promeia/Burnice,Miyabi/Vivian/Yuzuha,Nangong/Miyabi/Yuzuha',
             allUnits, { preview: true });
-        for (const b of withBosses(bosses, 'Mutant')) {
+        for (const b of withBosses(bosses, 'Horizon')) {
             const m = scoreMapForBoss(teams, b);
             const lps = m.get('Lycaon / Promeia / Soukaku');
             const npy = m.get('Nangong / Promeia / Yuzuha');
@@ -877,12 +877,12 @@ async function main() {
     });
 
     // ========================================================================
-    // TEST 35: Lighter/Promeia/Burnice abloom synergy on Mutant
+    // TEST 35: Lighter/Promeia/Burnice abloom synergy on Scorched Horizon
     // ========================================================================
-    run('TEST 35: Lighter/Promeia/Burnice competitive on Mutant (abloom + vortex)', () => {
+    run('TEST 35: Lighter/Promeia/Burnice competitive on Scorched Horizon (abloom + vortex)', () => {
         const teams = scoreForTeamString(
             'Lighter/Promeia/Burnice', allUnits, { preview: true });
-        for (const b of withBosses(bosses, 'Mutant')) {
+        for (const b of withBosses(bosses, 'Horizon')) {
             const m = scoreMapForBoss(teams, b);
             const lpb = m.get('Lighter / Burnice / Promeia');
             assert(lpb > 380, `${b.name}: LPB (${lpb}) expected > 380 (abloom + dual vortex)`);
@@ -890,31 +890,31 @@ async function main() {
     });
 
     // ========================================================================
-    // TEST 36: Miyabi weakness on Mutant vs strength on Sacrifice Bringer
+    // TEST 36: Miyabi weakness on Horizon vs strength on Sacrifice Bringer
     // ========================================================================
-    run('TEST 36: Miyabi/Vivian/Yuzuha much stronger on Bringer than Mutant', () => {
+    run('TEST 36: Miyabi/Vivian/Yuzuha much stronger on Bringer than Horizon', () => {
         const teams = scoreForTeamString(
             'Miyabi/Vivian/Yuzuha', allUnits, { preview: true });
-        const mutants = withBosses(bosses, 'Mutant');
+        const horizons = withBosses(bosses, 'Horizon');
         const bringers = withBosses(bosses, 'Sacrifice');
-        for (const mb of mutants) {
-            const mutantScore = scoreTeamForBoss(teams[0].team, mb, {});
+        for (const hb of horizons) {
+            const horizonScore = scoreTeamForBoss(teams[0].team, hb, {});
             for (const bb of bringers) {
                 const bringerScore = scoreTeamForBoss(teams[0].team, bb, {});
                 assert(bringerScore > 300, `${bb.name}: MVY (${bringerScore}) expected > 300`);
-                assert(bringerScore > mutantScore + 50,
-                    `MVY on Bringer (${bringerScore}) should beat Mutant (${mutantScore}) by 50+`);
+                assert(bringerScore > horizonScore + 50,
+                    `MVY on Bringer (${bringerScore}) should beat Horizon (${horizonScore}) by 50+`);
             }
         }
     });
 
     // ========================================================================
-    // TEST 37: Polarity providers mitigate Miyabi on Mutant
+    // TEST 37: Polarity providers mitigate Miyabi on Horizon
     // ========================================================================
-    run('TEST 37: Nangong/Miyabi/Yuzuha > Miyabi/Vivian/Yuzuha on Mutant (polarity mitigation)', () => {
+    run('TEST 37: Nangong/Miyabi/Yuzuha > Miyabi/Vivian/Yuzuha on Horizon (polarity mitigation)', () => {
         const teams = scoreForTeamString(
             'Nangong/Miyabi/Yuzuha,Miyabi/Vivian/Yuzuha', allUnits, { preview: true });
-        for (const b of withBosses(bosses, 'Mutant')) {
+        for (const b of withBosses(bosses, 'Horizon')) {
             const m = scoreMapForBoss(teams, b);
             const nmy = m.get('Nangong / Miyabi / Yuzuha');
             const mvy = m.get('Miyabi / Vivian / Yuzuha');
@@ -924,12 +924,12 @@ async function main() {
     });
 
     // ========================================================================
-    // TEST 38: Non-anomaly teams unaffected by vortex on Mutant
+    // TEST 38: Non-anomaly teams unaffected by vortex on Horizon
     // ========================================================================
-    run('TEST 38: Attack/rupture teams on Mutant — no accidental vortex bonuses', () => {
+    run('TEST 38: Attack/rupture teams on Scorched Horizon — no accidental vortex bonuses', () => {
         const teams = scoreForTeamString(
             'Lighter/Evelyn/Astra,Lycaon/Zhu Yuan/Nicole', allUnits, { preview: true });
-        for (const b of withBosses(bosses, 'Mutant')) {
+        for (const b of withBosses(bosses, 'Horizon')) {
             const m = scoreMapForBoss(teams, b);
             for (const [label, s] of m) {
                 assert(s > 0, `${b.name}: ${label} (${s}) should not be disqualified as a non-anomaly team`);
@@ -938,7 +938,7 @@ async function main() {
     });
 
     // ========================================================================
-    // TEST 39: Regression — existing compositions unchanged on non-Mutant bosses
+    // TEST 39: Regression — existing compositions unchanged on non-Horizon bosses
     // ========================================================================
     run('TEST 39: Key compositions identical on Sacrifice Bringer (no vortex regression)', () => {
         const teams = scoreForTeamString(

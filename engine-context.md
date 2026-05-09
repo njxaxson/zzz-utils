@@ -8,7 +8,6 @@ This document provides domain knowledge for the ZZZ team scoring engine (`app/pu
 
 This document captures gameplay mechanics and design decisions. Specific scoring numbers mentioned are illustrative only and may differ from the current implementation — always consult the code for exact values.
 
-
 ## Game Fundamentals
 
 ### Elements
@@ -52,8 +51,8 @@ When two different-element anomalies are applied to the same target simultaneous
 | Non-wind element | Tier | Relative weight |
 |----|----|----|
 | Ice | High | 3 |
-| Fire | Medium | 2 |
-| Physical, Ether, Electric | Low | 1 |
+| Fire, Physical | Medium | 2 |
+| Ether, Electric | Low | 1 |
 | Elemental variants (Frost, Auric Ink, Honed Edge) | Flat/negligible | \~0.08 |
 
 Same-element pairs (including wind+wind) produce no reaction.
@@ -70,7 +69,7 @@ Polarity disorders are a subclass of disorders. Any buff that targets disorders 
 
 Units range from M0W0 to M6W5.
 
-* **Mindscapes (M0–M6):** Each pull beyond the first adds a mindscape. M1/M2/M4/M6 add unique abilities; M3/M5 increase skill levels. M6 S-ranks are extremely powerful but require heavy investment. For many DPS units, M2 is a substantial power spike (e.g., M2 Miyabi generates her own disorder fuel, reducing teammate dependency).
+* **Mindscapes (M0–M6):** Each pull beyond the first adds a mindscape. M1/M2/M4/M6 add unique abilities; M3/M5 increase skill levels. M6 S-ranks are extremely powerful but require heavy investment. For many limited DPS units, M2 is a substantial power spike (e.g., M2 Miyabi generates her own disorder fuel, reducing teammate dependency).
 * **Weapons (W0–W5):** W0 = no signature weapon; W1 = signature weapon equipped (often \~20% DPS increase). W2–W5 provide diminishing stat returns. For non-DPS agents, even W1 may not be worth the investment.
 * **Potential Silhouettes (P0–P6):** Supplemental buffs unlocked at M0+. P1/P2 add new capabilities and even potentially new joins to expand their legal teammates; P3–P6 are stat increases. Impact varies by unit (e.g., P6 SAnby is significant; P6 Grace is negligible). For units with available silhouettes, the algorithm assumes P6.
 
@@ -85,7 +84,6 @@ A small number of "flex" units (e.g., Nicole, Lucy) provide enough value even wi
 ### Defensive Assists
 
 When an enemy telegraphs an attack (gold flash), the player can switch in a teammate. Each unit carries either `assist:defensive` or `assist:evasive` in their tags. Some bosses require a minimum number of defensive assist units; teams that don't meet the requirement are disqualified. Boss `assists` field specifies the requirement (0 = no requirement, 3 = all three must be defensive).
-
 
 ## Team Archetypes
 
@@ -128,7 +126,6 @@ Hugo converts accumulated stun time into damage (totalize mechanic). More stun u
 
 There is technically the possibility to have hybrid attack+anomaly compositions; the classic example is the long-outdated  Grace/Harumasa/Rina team. This "monoshock" team — named because it is a triple-electric team whose strategy is to keep ongoing shock bonuses during the whole fight — is no longer all that competitive, but hybrid anomaly+attack compositions are technically still possible and can be used in some niche cases.  The “monoshock” moniker is typically used to refer to these hybrid anomaly/attacker teams (because of the original team that met this composition) but it does not need to be a triple-electric team; it is just a nickname for an unusual hybrid archetype.
 
-
 ## Notable Units Reference
 
 | Unit | Tier | Role | Key Mechanics | Notes |
@@ -149,13 +146,13 @@ There is technically the possibility to have hybrid attack+anomaly compositions;
 | **Lycaon** | T1 | Stun (Ice) | `debuffs.ice:2, buffs.stun-multiplier:2` | At P1+, `join` expands to anomaly agents. Ice defense shred benefits Miyabi/Promeia. Budget Nangong alternative. |
 | **Cissia** | T1.5 | Attack (Electric) + SubDPS | `buffs.cr:1, debuffs.electric:2, utility.daze:1` | Seed's ideal partner. Can function support-like on electric teams. |
 | **Vivian** | T0.5 | Anomaly (Ether) + SubDPS | `damage.abloom:3, scaling.am:2, onfield:false` | Was Miyabi's best partner before Nangong. Still strong but dropped from T0. |
-| **Promeia** | T0.5 | Anomaly (Ice) | `damage.abloom:3, buffs.abloom:3, debuffs.defense:2` | Ice anomaly with tier-3 vortex. Abloom buffer. Direct Miyabi alternative on Mutant — pure ice vortex vs. frost variant. |
+| **Promeia** | T0.5 | Anomaly (Ice) | `damage.abloom:3, buffs.abloom:3, debuffs.defense:2` | Ice anomaly with tier-3 vortex. Abloom buffer. Direct Miyabi alternative on Scaled Horizon — pure ice vortex vs. frost variant. |
 
 ### SubDPS Units
 
 Units with `pseudoRole: "subdps"` need a main DPS teammate (any DPS without subdps tag). SubDPS units receive 50% tier multiplier but still benefit from offensive buffs and stun infrastructure. They do NOT receive implicit ultimates scaling (ultimates are a limited resource reserved for the primary DPS), but DO receive quick-assists baseline. (These are engine scoring mechanics that will be explained later.)
 
-Current subdps units: Burnice (fire anomaly), Grace (electric anomaly), Vivian (ether anomaly), Orphie (fire attack, also pseudosupport), Cissia (electric attack).
+Example subdps units: Burnice (fire anomaly), Grace (electric anomaly), Vivian (ether anomaly), Orphie (fire attack, also pseudosupport), Cissia (electric attack).
 
 ### Support Classification
 
@@ -167,23 +164,22 @@ Conceptually, many support agents are effectively designed to be either speciali
 | **Conditional** | Zhao (YSG/attack/anomaly), Nicole (defense shred, avoid rupture), Sunna (AoD/YSG, veils), Rina (electric PEN) | Strong in niche, weak/useless elsewhere |
 | **Universal** | Astra (ATK+CD, chains), Caesar (ATK, shields, pseudo-stun), Lucy (ATK, fire) | Work with almost any team, although not necessarily are the optimal support unit |
 
-
 ## Boss Reference
 
 ### Notable Bosses
 
 | Boss | Weak | Resist | Shill | Anti | Assists | Key Mechanics |
 |----|----|----|----|----|----|----|
-| **Discordant Solo** | ether | ice, fire | anomaly | rupture | 2 | `shillIntensity:2`. Favors Aria, Sunna, Nangong. Sunna's ether veil stacking creates unique multiplicative debuffs — this boss was designed to require Sunna. One of only two bosses with dual resistance. |
-| **Sacrifice Bringer** | ice | physical | anomaly | — | 0 | `shillIntensity:2`. Favors Miyabi. Vulnerable to Freeze status; Miyabi trivializes this fight. |
+| **Discordant Solo** | ether, wind | ice, fire | anomaly | rupture | 2 | `shillIntensity:2`. Favors Aria, Sunna, Nangong. Sunna's ether veil stacking creates unique multiplicative debuffs — this boss was designed to require Sunna. One of only two bosses with dual resistance. |
+| **Sacrifice Bringer** | ice | physical | anomaly | — | 0 | `shillIntensity:2`. Favors Miyabi. Vulnerable to Freeze status; Miyabi or trivializes this fight. |
 | **Sanguine Sweeper** | electric, ether | fire | anomaly | rupture | 2 | `shillIntensity:2`. Favors Nangong. Benefits heavily from stunners on anomaly teams. |
 | **Primordial Nightmare** | physical | ice, ether | attack | rupture, anomaly | 0 | Favors YSG. Anti-rupture AND anti-anomaly — only attack teams viable. Dual resistance. |
 | **Wandering Hunter** | fire, ice | physical | rupture | anomaly, attack | 2 | Anti-anomaly AND anti-attack — only rupture teams viable. Physical resistance hurts YSG from trying to brute force it. |
 | **The Defiler** | electric, physical | ice | attack | anomaly | 2 | Attack-shill. Anti-anomaly. Ice resistance hurts Miyabi. |
-| **Thrall & Sobek** | ice, physical | electric | stun | anomaly | 2 | Stun shill is a **hard requirement** — teams without a stunner are disqualified. |
-| **Typhon Slugger** | electric | fire | — | — | 3 | All three units must have `assist:defensive`. Fire resistance. No shill. |
+| **Thrall & Sobek** | ice, physical, \n wind | electric | stun | anomaly | 2 | Stun shill is a **hard requirement** — teams without a stunner are disqualified. |
+| **Typhon Slugger** | electric, wind | fire | — | — | 3 | All three units must have `assist:defensive`. Fire resistance. No shill. |
 | **Miasma Priest** | ether | ice | rupture | — | 2 | Ice resistance hurts Miyabi. Rupture shill means rupture teams get bonus. |
-| **Mutant** | wind, ice | electric | anomaly | — | 2 | `mechanics["anomaly:state"]: "wind"`. Permanent self-applied wind anomaly. All team anomalies react with the boss (vortex for non-wind, nothing for same-element). Disorders replaced by vortex; polarity disorder damage severely reduced. Designed to favor Promeia and ice/fire anomaly teams over Miyabi. Favored: Promeia. |
+| **Scorched Horizon** | wind, ice | electric | anomaly | — | 2 | `mechanics["anomaly:state"]: "wind"`. Permanent self-applied wind anomaly. All team anomalies react with the boss (vortex for non-wind, nothing for same-element). Disorders replaced by vortex; polarity disorder damage severely reduced. Designed to favor Promeia  over Miyabi. |
 
 ### Shill Behavior
 
@@ -193,7 +189,6 @@ Conceptually, many support agents are effectively designed to be either speciali
 ### Shill Intensity
 
 Bosses with `shillIntensity > 1` (Solo, Bringer, Sweeper) have fight mechanics that make their favored units disproportionately valuable. The first favored unit gets the full amplified bonus; additional favored units receive diminishing returns.
-
 
 ## Data Model
 
@@ -216,7 +211,8 @@ Bosses with `shillIntensity > 1` (Solo, Bringer, Sweeper) have fight mechanics t
     "damage": { "enhanced": 2, "abloom": 2 },
     "scaling": { "veils": 2 }
   },
-  "faction": "Angels of Delusion"
+  "faction": "Angels of Delusion",
+  "displayText" : "Free character text"
 }
 ```
 
@@ -232,7 +228,8 @@ Bosses with `shillIntensity > 1` (Solo, Bringer, Sweeper) have fight mechanics t
 * `available` — (optional, default `true`) When `false`, unit is unreleased. Added to JSON with preliminary data for pre-release testing.
 * `synergy` — Synergy configuration (see below)
 * `mechanics` — Mechanics object (see below)
-* `faction` — Faction name (informational)
+* `faction` — Faction name (used as part of team construction with the `faction` keyword in the join array.
+* `displayText` — Free text that is displayed on the character summary
 
 ### Synergy Object
 
@@ -318,8 +315,6 @@ All fields are optional. Values are weighted: `true` (or 1) = minor, `2` = stron
 * `mechanics` — (optional) Boss-specific mechanical gimmicks. Currently supports:
   * `"anomaly:state": "<element>"` — Boss permanently has the specified element's anomaly applied. Changes how anomaly reactions work against this boss (see Anomaly Reactions section).
 
-
-
 ## Engine Architecture: Five-Layer Scoring
 
 ### Design Evolution
@@ -329,7 +324,6 @@ The original scoring engine relied on hardcoded composition rules, synergy tags,
 ### Layer Overview
 
 The scoring engine evaluates a team of 3 units against a boss through five sequential layers, producing a raw score that is then adjusted by a teamwork multiplier:
-
 
 
 1. **Layer 1: Disqualifications** — Hard failures that return score -1: boss `anti` matching team's DPS archetype, resisted DPS element, insufficient defensive assists, no DPS, non-DPS shill role missing. Minimal and deliberately narrow.
@@ -420,7 +414,6 @@ Within the five-layer architecture, lenient mode affects:
 * L2: Tier penalties for low-tier units are reduced
 * L5: `synergy.avoid` pairs apply large penalties instead of disqualification
 
-
 ## Scoring Engine Design Principles
 
 These principles govern how the mechanics-driven engine evaluates teams. They are grouped thematically for reference.
@@ -473,7 +466,7 @@ These principles govern how the mechanics-driven engine evaluates teams. They ar
 
 **Stunner Value Discount on Stunless Teams (P16):** When all DPS are stunless (YSG), stunner tier/rank bonuses are multiplied by 0.4. Their L4 contributions (stun-multiplier, ultimates) still score normally.
 
-**synergy.avoid as Near-Disqualification (P17):** Explicit `avoid` annotations represent game-mechanically-rooted anti-synergy that is hard (or excessively complicated) to model via mechanics (e.g., Dialyn + Pan Yinhu). Normal mode: disqualification. Lenient mode: massive penalty.
+**synergy.avoid as Near-Disqualification (P17):** Explicit `avoid` annotations represent game-mechanically-rooted anti-synergy that is hard (or excessively complicated) to model via mechanics. Normal mode: disqualification. Lenient mode: massive penalty.
 
 ### Anomaly-Specific Rules
 
@@ -503,7 +496,6 @@ These principles govern how the mechanics-driven engine evaluates teams. They ar
 
 **Shill Is a Bonus, Not a Penalty (P27):** DPS shill matching gives a flat bonus. No penalty for mismatching. Non-DPS shills (stun) remain hard requirements.
 
-
 ## Wheelchair Compositions
 
 Powerful support/utility pairings that uplift almost any compatible DPS:
@@ -514,7 +506,6 @@ Powerful support/utility pairings that uplift almost any compatible DPS:
 * **Dialyn + Lucia** — Definitive rupture wheelchair. Free ultimates + stun + rupture specialist support. Best-in-slot for all rupture agents.
 
 These emerge naturally from the mechanics engine — their high scores are evidence of well-modeled mechanics.
-
 
 ## Scoring Results Scale
 
@@ -529,7 +520,6 @@ Rough boundaries for team quality:
 
 These boundaries are approximate and shift as the scoring algorithms are tuned.
 
-
 ## DPS Bucketing and Diversity Selection
 
 (This section describes `app/public/lib/common/dps-buckets.js`, which consumes team scores as inputs — not the scoring engine itself.)
@@ -538,13 +528,11 @@ When optimizing 3 teams for Deadly Assault's 3 bosses, raw top scores tend to be
 
 Results are grouped by which type of DPS is assigned to each boss (considering role, element, and power tier). The algorithm selects one representative from each distinct DPS assignment pattern, preferring the highest-scoring realization. The webapp provides a toggle between this diversity-aware view (default) and the raw score-sorted view.
 
-
 ## Diagnostic Tooling
 
 ### Debugging Workflow
 
 When investigating a scoring issue, the typical workflow may include any of the following diagnostic tool commands:
-
 
 
 1. **Reproduce the issue** — Use `node matchups` with explicit teams to see the scores:
@@ -617,7 +605,6 @@ The test suite contains assertion-based test cases that verify scoring behavior.
 **Adding a test case:**
 
 
-
 1. Add a new `run('TEST N: description', () => { ... })` block before the Summary section
 2. Use `scoreForTeamString('Unit1/Unit2/Unit3,Unit4/Unit5/Unit6', allUnits)` to parse teams
 3. Use `withBosses(bosses, 'BossName')` to filter bosses
@@ -637,13 +624,11 @@ node agent-matchups.mjs -7
 
 The first command produces a top-20-per-boss report across all bosses. The second produces per-agent files in `matchups/`. Together, these provide a complete picture for manual review.
 
-
 There is a `scoring-baseline.txt` file that can be compared to. It establishes the baseline list of matchups and scores so that there is what to compare to when making changes. The `scoring-diff.js` script can be used to compare two scores files and highlight what actually changed.
 
+## Latest Mechanics
 
-## Currently Unreleased Mechanics
-
-The game is currently in version 2.7, but the scoring engine has been prepared for the 2.8 release. This is a summary of the differences between what is currently available in game vs. what has been implemented in advance of the next version. 
+The game is currently in version 2.8. This is a summary of the key changes in recent updates to the scoring engine.
 
 ### Wind Element and Vortex (Implemented for 2.8)
 
@@ -655,25 +640,24 @@ The **Wind** element was added in version 2.8 alongside a full anomaly reaction 
 * `VORTEX_BASE` (16) × tier = per-agent vortex bonus in L4
 * `POLARITY_VORTEX_DISCOUNT` (0.25) reduces polarity damage on anomaly-state bosses
 * `computeAnomalyReactions(team, boss)` resolves per-agent reactions (vortex, disorder, or none) from team composition + boss anomaly state
-* Boss `mechanics["anomaly:state"]` drives the anomaly-state system; currently only Mutant uses it
+* Boss `mechanics["anomaly:state"]` drives the anomaly-state system; currently only Scorched Horizon uses it
 * Vortex is also a need-fulfillment key in `NEED_FULFILLMENT_KEYS`
 
-**Future wind agents** (e.g., Velina, speculated for 3.0) will trigger vortex against normal bosses when paired with non-wind anomaly teammates, using the same `computeAnomalyReactions` system.
-
+**Future wind agents** (e.g., Velina, confirmed wind anomaly agent for 3.0) will trigger vortex against normal bosses when paired with non-wind anomaly teammates, using the same `computeAnomalyReactions` system.
 
 The following units are already modeled in `units.json` as preview units (`available=false`):
 
 ### Promeia (2.8 first banner)
 
-Ice anomaly DPS (`available: false` — preview). Key mechanics:
+Ice anomaly DPS (just released). Key mechanics:
 
 * Abloom buffer — `buffs.abloom: 3`, directly empowers teammates with abloom damage (Burnice, Vivian, Grace)
 * Abloom self-damage — `damage.abloom: 3`, benefits from her own abloom buffs
 * Defense debuff — `debuffs.defense: 2`, contributes to diametric synergy
 * Stun-synergy anomaly — benefits from stun windows (like Aria), emergent from mechanics
 * Ice anomaly with vortex tier 3 against anomaly-state bosses — the strongest vortex contributor
-* Positioned as a direct alternative to Miyabi against Mutant: pure ice anomaly (tier 3 vortex) vs. frost variant (tier 0.08 vortex)
+* Positioned as a direct alternative to Miyabi against Scorched Horizon: pure ice anomaly (tier 3 vortex) vs. frost variant (tier 0.08 vortex)
 
-### Starlight Billy (2.8 second banner)
+### Starlight Billy (2.8 second banner, upcoming)
 
 Conventional physical rupture agent. Expected to be strong against Fiend, Thrall, and Defiler. Best-in-slot teammates: Dialyn + Lucia (like every rupture agent), with Ju Fufu and Pan as alternatives. Should slot cleanly into existing rupture scoring without engine changes.
