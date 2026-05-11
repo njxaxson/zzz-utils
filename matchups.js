@@ -108,9 +108,6 @@ async function main() {
         const shillStr = boss.shill || "none";
         const antiStr = boss.anti?.join(", ") || "none";
 
-        console.log(boss.name);
-        console.log(`  Weak: ${weakStr} | Resist: ${resistStr} | Shill: ${shillStr} | Anti: ${antiStr} | Assists: ${boss.assists}`);
-
         const viableTeams = [];
         for (const { label, team } of teamEntries) {
             if (!options.teams && options.include && options.include.length > 0) {
@@ -125,7 +122,10 @@ async function main() {
                 viableTeams.push({ label, team, score });
             }
         }
-
+        if(viableTeams.length == 0 && options.omit) continue; //do not display
+        
+        console.log(boss.name);
+        console.log(`  Weak: ${weakStr} | Resist: ${resistStr} | Shill: ${shillStr} | Anti: ${antiStr} | Assists: ${boss.assists}`);
         viableTeams.sort((a, b) => b.score - a.score);
         console.log(`  Viable teams: ${viableTeams.length}`);
 

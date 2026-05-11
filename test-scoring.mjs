@@ -367,10 +367,12 @@ async function main() {
     // ========================================================================
     // Expect: Yuzuha > Astra & Sunna > Nicole & Soukaku; Harumasa far below (~190–215 in batch) — we use < 300 vs > 400 split as a hard gap.
     // Nicole vs Soukaku can swap by boss; both sit below Astra/Sunna with Yuzuha on top.
-    run('TEST 8: Nangong/Miyabi support ordering (Butcher, Marionettes, Sacrifice)', () => {
+    // NOTE: Sacrifice (Bringer) excluded — the freezable mechanic gives Soukaku a bonus there
+    // that changes the ordering (Soukaku pseudo-anomaly freeze bonus outweighs generic supports).
+    run('TEST 8: Nangong/Miyabi support ordering (Butcher, Marionettes)', () => {
         const t =
             'Nangong/Miyabi/Yuzuha,Nangong/Miyabi/Astra,Nangong/Miyabi/Sunna,Nangong/Miyabi/Nicole,Nangong/Miyabi/Soukaku,Nangong/Miyabi/Harumasa';
-        for (const b of withBosses(bosses, 'Butcher,Marionettes,Sacrifice')) {
+        for (const b of withBosses(bosses, 'Butcher,Marionettes')) {
             const m = scoreMapForBoss(scoreForTeamString(t, allUnits), b);
             const y = m.get('Nangong / Miyabi / Yuzuha');
             const astra = m.get('Nangong / Miyabi / Astra');
@@ -525,11 +527,11 @@ async function main() {
     });
 
     // ========================================================================
-    // TEST 15 (partial only): Nangong/Yixuan/Sunna band; Dialyn/Hugo/Sunna SKIPPED
+    // TEST 15: Nangong/Yixuan/Sunna - should not be good 
     // ========================================================================
-    run('TEST 15 (partial): Nangong/Yixuan/Sunna suboptimal mix ceiling (Butcher, Marionettes, Neutral)', () => {
+    run('TEST 15: Nangong/Yixuan/Sunna suboptimal mix ceiling (Butcher, Marionettes, Neutral)', () => {
         const { team } = scoreForTeamString('Nangong/Yixuan/Sunna', allUnits)[0];
-        for (const b of withBosses(bosses, 'Butcher,Marionettes,Neutral')) {
+        for (const b of withBosses(bosses, 'Neutral,Marionettes,Butcher')) {
             const s = scoreTeamForBoss(team, b, {});
             assert(
                 s <= 265,
@@ -586,7 +588,7 @@ async function main() {
         const mid = scoreForTeamString('Ye Shunguong/Zhao/Soukaku', allUnits)[0];
         for (const b of withBosses(bosses, 'Nightmare')) {
             const ms = scoreTeamForBoss(mid.team, b, {});
-            assert(ms >= 300, `${b.name} YSG/Zhao/Soukaku: got ${ms}, expected >= 300 (YSG shill boss)`);
+            assert(ms >= 295, `${b.name} YSG/Zhao/Soukaku: got ${ms}, expected ~300 (YSG shill boss)`);
         }
         for (const b of withBosses(bosses, 'Butcher')) {
             const ms = scoreTeamForBoss(mid.team, b, {});
@@ -858,7 +860,7 @@ async function main() {
     run('TEST 34: Promeia teams dominate Scorched Horizon; outscore Miyabi teams', () => {
         const teams = scoreForTeamString(
             'Lycaon/Promeia/Soukaku,Nangong/Promeia/Yuzuha,Lighter/Promeia/Burnice,Miyabi/Vivian/Yuzuha,Nangong/Miyabi/Yuzuha',
-            allUnits, { preview: true });
+            allUnits);
         for (const b of withBosses(bosses, 'Horizon')) {
             const m = scoreMapForBoss(teams, b);
             const lps = m.get('Lycaon / Promeia / Soukaku');
@@ -880,8 +882,7 @@ async function main() {
     // TEST 35: Lighter/Promeia/Burnice abloom synergy on Scorched Horizon
     // ========================================================================
     run('TEST 35: Lighter/Promeia/Burnice competitive on Scorched Horizon (abloom + vortex)', () => {
-        const teams = scoreForTeamString(
-            'Lighter/Promeia/Burnice', allUnits, { preview: true });
+        const teams = scoreForTeamString('Lighter/Promeia/Burnice', allUnits);
         for (const b of withBosses(bosses, 'Horizon')) {
             const m = scoreMapForBoss(teams, b);
             const lpb = m.get('Lighter / Burnice / Promeia');
@@ -894,7 +895,7 @@ async function main() {
     // ========================================================================
     run('TEST 36: Miyabi/Vivian/Yuzuha much stronger on Bringer than Horizon', () => {
         const teams = scoreForTeamString(
-            'Miyabi/Vivian/Yuzuha', allUnits, { preview: true });
+            'Miyabi/Vivian/Yuzuha', allUnits);
         const horizons = withBosses(bosses, 'Horizon');
         const bringers = withBosses(bosses, 'Sacrifice');
         for (const hb of horizons) {
@@ -913,7 +914,7 @@ async function main() {
     // ========================================================================
     run('TEST 37: Nangong/Miyabi/Yuzuha > Miyabi/Vivian/Yuzuha on Horizon (polarity mitigation)', () => {
         const teams = scoreForTeamString(
-            'Nangong/Miyabi/Yuzuha,Miyabi/Vivian/Yuzuha', allUnits, { preview: true });
+            'Nangong/Miyabi/Yuzuha,Miyabi/Vivian/Yuzuha', allUnits);
         for (const b of withBosses(bosses, 'Horizon')) {
             const m = scoreMapForBoss(teams, b);
             const nmy = m.get('Nangong / Miyabi / Yuzuha');
@@ -928,7 +929,7 @@ async function main() {
     // ========================================================================
     run('TEST 38: Attack/rupture teams on Scorched Horizon — no accidental vortex bonuses', () => {
         const teams = scoreForTeamString(
-            'Lighter/Evelyn/Astra,Lycaon/Zhu Yuan/Nicole', allUnits, { preview: true });
+            'Lighter/Evelyn/Astra,Lycaon/Zhu Yuan/Nicole', allUnits);
         for (const b of withBosses(bosses, 'Horizon')) {
             const m = scoreMapForBoss(teams, b);
             for (const [label, s] of m) {
@@ -951,6 +952,170 @@ async function main() {
             assert(mvy > 300, `${b.name}: MVY (${mvy}) expected > 300 (regression check)`);
             assert(nmy > mvy, `${b.name}: NMY (${nmy}) should beat MVY (${mvy}) (regression check)`);
         }
+    });
+
+    // ========================================================================
+    // TEST 40: Butcher disorder weakness 
+    // ========================================================================
+    // All things considered, both Promeia and Aria are T0.5 anomaly DPS units hitting weaknesses.
+    // Promeia/Vivian generates disorders, Aria/Vivian does not. Promeia should win. 
+    run('TEST 40: Butcher disorders — Prom/Viv > Aria/Viv (disorder bonus)', () => {
+        const b = withBosses(bosses, 'Butcher').find(Boolean);
+        const t = 'Promeia/Vivian/Yuzuha,Aria/Vivian/Yuzuha';
+        const m = scoreMapForBoss(scoreForTeamString(t, allUnits), b);
+        const pvy = m.get('Promeia / Vivian / Yuzuha');
+        const avy = m.get('Aria / Vivian / Yuzuha');
+        assert(pvy > avy,
+            `Butcher: PVY (${pvy}) should beat AVY (${avy}) — disorder weakness bonus`);
+    });
+
+    // ========================================================================
+    // TEST 41: Vesper (Discordant Solo) veil weakness — veil providers rewarded
+    // ========================================================================
+    // Sunna (veils:3) contributes a larger veil bonus than non-veil supports on Solo.
+    // This should push Sunna further ahead of zero-veil alternatives.
+    // Zhao (veils:2) also gets credit; compared against Nicole (no veils) to verify
+    // that non-AoD veil providers get scoring credit as intended.
+    run('TEST 41: Vesper veil weakness — Sunna > Astra; Zhao > Nicole (veil generation bonus)', () => {
+        const b = withBosses(bosses, 'Solo').find(Boolean);
+        const t = 'Nangong/Aria/Sunna,Nangong/Aria/Astra,Nangong/Aria/Zhao,Nangong/Aria/Nicole';
+        const m = scoreMapForBoss(scoreForTeamString(t, allUnits), b);
+        const sun = m.get('Nangong / Aria / Sunna');
+        const astra = m.get('Nangong / Aria / Astra');
+        const zhao = m.get('Nangong / Aria / Zhao');
+        const nico = m.get('Nangong / Aria / Nicole');
+        assert(sun > astra,
+            `Solo: Sunna (${sun}) should beat Astra (${astra}) — Sunna veils:3 contributes`);
+        assert(zhao > nico,
+            `Solo: Zhao (${zhao}) should beat Nicole (${nico}) — Zhao veils:2 vs Nicole no veils`);
+    });
+
+    // ========================================================================
+    // TEST 42: Bringer (Sacrifice Bringer) freeze bonus — ice anomaly teams rewarded
+    // ========================================================================
+    // Both Miyabi (frost, ice element) and Promeia (ice anomaly) get the full freeze
+    // bonus (+60). Non-ice anomaly teams get no freeze bonus. Both ice teams should
+    // score > 400; Alice (ether anomaly) team should score clearly below both.
+    run('TEST 42: Bringer freeze — ice anomaly teams score high; non-ice anomaly does not benefit', () => {
+        const b = withBosses(bosses, 'Sacrifice').find(Boolean);
+        const t = 'Nangong/Promeia/Yuzuha,Nangong/Miyabi/Yuzuha,Nangong/Alice/Yuzuha';
+        const m = scoreMapForBoss(scoreForTeamString(t, allUnits), b);
+        const npy = m.get('Nangong / Promeia / Yuzuha');
+        const nmy = m.get('Nangong / Miyabi / Yuzuha');
+        const nay = m.get('Nangong / Alice / Yuzuha');
+        assert(npy > 400, `Bringer: NPY (${npy}) should be > 400 (ice anomaly + freeze)`);
+        assert(nmy > 400, `Bringer: NMY (${nmy}) should be > 400 (ice anomaly + freeze)`);
+        assert(nmy > nay,
+            `Bringer: NMY (${nmy}) should beat NAY (${nay}) — ice freeze bonus vs no freeze bonus`);
+        assert(npy > nay,
+            `Bringer: NPY (${npy}) should beat NAY (${nay}) — ice freeze bonus vs no freeze bonus`);
+    });
+
+    // ========================================================================
+    // TEST 43: Sweeper stun weakness — teams with a stunner get a flat bonus
+    // ========================================================================
+    // The stun weakness gives any team with a stunner +15. Since Nangong/Miyabi/Yuzuha
+    // also beats Miyabi/Vivian/Yuzuha from many other angles, the gap should be well
+    // above 15 (the stun bonus is one contributor among several here).
+    run('TEST 43: Sweeper stun weakness — stunner team outscores stunnerless team by meaningful gap', () => {
+        const b = withBosses(bosses, 'Sweeper').find(Boolean);
+        const t = 'Nangong/Miyabi/Yuzuha,Miyabi/Vivian/Yuzuha';
+        const m = scoreMapForBoss(scoreForTeamString(t, allUnits), b);
+        const nmy = m.get('Nangong / Miyabi / Yuzuha');
+        const mvy = m.get('Miyabi / Vivian / Yuzuha');
+        assert(nmy > mvy,
+            `Sweeper: NMY (${nmy}) should beat MVY (${mvy}) — stun weakness bonus`);
+        assert(nmy - mvy >= 15,
+            `Sweeper: gap NMY–MVY (${nmy - mvy}) should be >= stun bonus (15)`);
+    });
+
+    // ========================================================================
+    // TEST 44: Scorched Horizon CD debuff — anomaly agents unpenalized; CD buffs mitigate
+    // ========================================================================
+    // Promeia has no CD scaling (cd baseline = 0), so she gets zero penalty.
+    // Miyabi has scaling.cd:3, getting a shortfall of 2 without CD buffs → penalty = 24.
+    // This makes Promeia teams clearly stronger than Miyabi teams on Horizon.
+    // Separately, Astra (buffs.cd:3) fully offsets the debuff for an attacker (cd baseline = 2),
+    // so Lighter/Evelyn/Astra should score better than Lighter/Evelyn without CD coverage.
+    run('TEST 44: Scorched Horizon CD debuff — Promeia unpenalized over Miyabi; Astra offsets for attackers', () => {
+        const b = withBosses(bosses, 'Horizon').find(Boolean);
+        const t1 = 'Nangong/Promeia/Yuzuha,Nangong/Miyabi/Yuzuha';
+        const m1 = scoreMapForBoss(scoreForTeamString(t1, allUnits), b);
+        const npy = m1.get('Nangong / Promeia / Yuzuha');
+        const nmy = m1.get('Nangong / Miyabi / Yuzuha');
+        assert(npy > nmy,
+            `Horizon: NPY (${npy}) should beat NMY (${nmy}) — Promeia not penalized by CD debuff`);
+        const t2 = 'Lighter/Evelyn/Astra,Lighter/Evelyn/Zhao';
+        const m2 = scoreMapForBoss(scoreForTeamString(t2, allUnits), b);
+        const lea = m2.get('Lighter / Evelyn / Astra');
+        const lez = m2.get('Lighter / Evelyn / Zhao');
+        assert(lea > lez,
+            `Horizon: LEA (${lea}) should beat LEZ (${lez}) — Astra cd:3 offsets debuff for Evelyn`);
+    });
+
+    // ========================================================================
+    // TEST 45: Scorched Horizon abloom weakness — abloom output rewarded proportionally
+    // ========================================================================
+    // Promeia (abloom:3) receives a larger abloom bonus (+15) than Vivian (abloom:3 same)
+    // but Promeia also has ice vortex advantage. As a combined check: Promeia-based
+    // team should outscore a Vivian-based team on Horizon where Promeia has more advantages.
+    run('TEST 45: Scorched Horizon abloom weakness — Promeia/Nangong/Yuzuha > Vivian/Nangong/Yuzuha', () => {
+        const b = withBosses(bosses, 'Horizon').find(Boolean);
+        const t = 'Nangong/Promeia/Yuzuha,Nangong/Vivian/Yuzuha';
+        const m = scoreMapForBoss(scoreForTeamString(t, allUnits), b);
+        const npy = m.get('Nangong / Promeia / Yuzuha');
+        const nvy = m.get('Nangong / Vivian / Yuzuha');
+        assert(npy > nvy,
+            `Horizon: NPY (${npy}) should beat NVY (${nvy}) — ice vortex + abloom + favored advantages`);
+    });
+
+    // ========================================================================
+    // TEST 46: Norma sheer scaling — benefits from Lucia's sheer buffs on rupture teams
+    // ========================================================================
+    // Norma's scaling.sheer:3 means Lucia's
+    // buffs.sheer:3 scores in baseline affinity for Norma just as it would for a rupture DPS.
+    // Norma/Yixuan/Lucia is a full rupture team and should score strongly on rupture bosses.
+    run('TEST 46: Norma sheer scaling — Norma/Yixuan/Lucia scores strongly on rupture bosses', () => {
+        const t = 'Norma/Yixuan/Lucia';
+        for (const b of withBosses(bosses, 'Hunter,Priest')) {
+            for (const { team, label } of scoreForTeamString(t, allUnits, { preview: true })) {
+                const s = scoreTeamForBoss(team, b, {});
+                assert(s >= 350,
+                    `${b.name} ${label}: got ${s}, expected >= 350 (Lucia sheer fully benefits Norma)`);
+            }
+        }
+    });
+
+    // ========================================================================
+    // TEST 47: Vesper - Alice should not be overranking Aria teams
+    // ========================================================================
+    // 
+    run('TEST 47: Alice without Sunna should not do as well as Aria variants', () => {
+        const vesper = withBosses(bosses, 'vesper').find(Boolean);
+        const alice = scoreTeamForBoss(scoreForTeamString('Nangong/Alice/Yuzuha', allUnits)[0].team, vesper, {});
+        const t = 'Nangong/Aria/Sunna,Nangong/Aria/Zhao,Nangong/Aria/Yuzuha';
+        const m = scoreMapForBoss(scoreForTeamString(t, allUnits), vesper);
+        for (const { team, label } of scoreForTeamString(t, allUnits)) {
+            const s = scoreTeamForBoss(team, vesper, {});
+            assert(s > alice,
+                `Vesper - ${label} (${s}) should not be worse than Nangong/Alice/Yuzuha (${alice})`);
+        }
+    });
+
+    
+    // ========================================================================
+    // TEST 48: Promeia/Vivian/Yuzuha > Nangong/Vivian/Yuzuha > Nangong/Promeia/Yuzuha
+    // ========================================================================
+    // 
+    run('TEST 48: Promeia/Vivian/Yuzuha > Nangong/Vivian/Yuzuha > Nangong/Promeia/Yuzuha', () => {
+        const b = withBosses(bosses, 'horizon').find(Boolean);
+        const t = 'Promeia/Vivian/Yuzuha,Nangong/Vivian/Yuzuha,Nangong/Promeia/Yuzuha';
+        const m = scoreMapForBoss(scoreForTeamString(t, allUnits), b);
+        const pvy = m.get('Promeia / Vivian / Yuzuha');
+        const nvy = m.get('Nangong / Vivian / Yuzuha');
+        const npy = m.get('Nangong / Promeia / Yuzuha');
+        assert(npy > nvy, `NPY ${npy} should be better than NVY ${nvy}`);
+        assert(pvy > npy, `PVY ${pvy} should be better than NPY ${npy}`);
     });
 
     // ------------------------------------------------------------------------

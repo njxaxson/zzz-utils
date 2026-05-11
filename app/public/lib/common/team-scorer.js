@@ -41,6 +41,15 @@ const MULT = {
 
 const RUPTURE_ATK_EFFICIENCY = 0.33;
 
+const BOSS_WEAK = {
+    DISORDER_PER_UNIT: 8,
+    VEIL_PER_UNIT: 8,
+    STUN_BONUS: 15,
+    ABLOOM_PER_UNIT: 5,
+    FREEZE_BONUS: 60,
+    CD_DEBUFF_PER_UNIT: 12,
+};
+
 const BURST_DAMAGE_TYPES = ['enhanced', 'ultimate:strong', 'ultimate:double', 'chain', 'totalize'];
 const NEED_FULFILLMENT_KEYS = [
     'disorders', 'ablooms', 'chains', 'ultimates', 'veils',
@@ -414,6 +423,7 @@ function getBuffRelevance(key, consumer) {
         case 'anomaly':
             return roles.includes('anomaly') ? 1 : 0;
         case 'sheer':
+            if (consumer.mechanics?.scaling?.sheer) return 1;
             return roles.includes('rupture') ? 1 : 0;
         case 'pen':
             return (dps && !roles.includes('rupture')) ? 1 : 0;
@@ -993,6 +1003,92 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
         }
     }
     
+    // --- Boss-specific weakness mechanics ---
+    const weakMechanic = boss.mechanics?.weak;
+
+    // Disorders weakness (e.g. Butcher): bonus scales with team disorder generation
+    if (weakMechanic === 'disorders') {
+        let totalDisorderScore = 0;
+        for (const unit of team) {
+            totalDisorderScore += w(unit.mechanics?.utility?.disorders);
+        }
+        if (teamHasImplicitDisorders(team)) totalDisorderScore += 2;
+        if (totalDisorderScore > 0) {
+            const bonus = Math.round(totalDisorderScore * BOSS_WEAK.DISORDER_PER_UNIT);
+            score += bonus;
+            if (debug) console.log(`    Boss weak(disorders): total=${totalDisorderScore} → +${bonus}`);
+        }
+    }
+
+    // Veils weakness (e.g. Vesper): bonus scales with total veil supply on team
+    if (weakMechanic === 'veils') {
+        let totalVeils = 0;
+        for (const unit of team) {
+            totalVeils += w(unit.mechanics?.utility?.veils);
+        }
+        if (totalVeils > 0) {
+            const bonus = Math.round(totalVeils * BOSS_WEAK.VEIL_PER_UNIT);
+            score += bonus;
+            if (debug) console.log(`    Boss weak(veils): total=${totalVeils} → +${bonus}`);
+        }
+    }
+
+    // Stun weakness (e.g. Sweeper): flat bonus when team has at least one stunner
+    if (weakMechanic === 'stun') {
+        if (team.some(isStun)) {
+            score += BOSS_WEAK.STUN_BONUS;
+            if (debug) console.log(`    Boss weak(stun): stunner present → +${BOSS_WEAK.STUN_BONUS}`);
+        }
+    }
+
+    // Abloom weakness (e.g. Scorched Horizon): bonus scales with total abloom output on team
+    if (weakMechanic === 'abloom') {
+        let totalAbloom = 0;
+        for (const unit of team) {
+            totalAbloom += w(unit.mechanics?.damage?.abloom);
+        }
+        if (totalAbloom > 0) {
+            const bonus = Math.round(totalAbloom * BOSS_WEAK.ABLOOM_PER_UNIT);
+            score += bonus;
+            if (debug) console.log(`    Boss weak(abloom): total=${totalAbloom} → +${bonus}`);
+        }
+    }
+
+    // Freezable boss (e.g. Sacrifice Bringer): ice anomaly agents get a large bonus.
+    // Applies to any ice anomaly agent regardless of elemental variant.
+    // Pseudo-anomaly agents (e.g. Soukaku) receive half the bonus.
+    if (boss.mechanics?.freezable) {
+        for (const unit of team) {
+            if (isAnomaly(unit) && getElement(unit) === 'ice') {
+                const isPseudo = !unit.tags.includes('anomaly');
+                const bonus = isPseudo ? Math.round(BOSS_WEAK.FREEZE_BONUS * 0.5) : BOSS_WEAK.FREEZE_BONUS;
+                score += bonus;
+                if (debug) console.log(`    Boss freezable: ${unit.name}${isPseudo ? ' (pseudo, ×0.5)' : ''} → +${bonus}`);
+            }
+        }
+    }
+
+    // CD debuff (e.g. Scorched Horizon): each DPS unit with non-zero CD scaling is penalized
+    // when the boss's CD debuff exceeds the team's total CD buff supply.
+    // Penalty = shortfall × CD_DEBUFF_PER_UNIT, where shortfall = max(0, cdBaseline - effectiveCd).
+    // effectiveCd = cdBaseline + teamCdSupply - cdDebuff.
+    const cdDebuffVal = w(boss.mechanics?.debuffs?.cd);
+    if (cdDebuffVal > 0) {
+        const teamCdSupply = team.reduce((sum, u) => sum + w(u.mechanics?.buffs?.cd), 0);
+        for (const unit of dpsUnits) {
+            const cdBaseline = w(getEffectiveScaling(unit).cd);
+            if (cdBaseline > 0) {
+                const effectiveCd = cdBaseline + teamCdSupply - cdDebuffVal;
+                const shortfall = Math.max(0, cdBaseline - effectiveCd);
+                if (shortfall > 0) {
+                    const penalty = Math.round(shortfall * BOSS_WEAK.CD_DEBUFF_PER_UNIT);
+                    score -= penalty;
+                    if (debug) console.log(`    Boss CD debuff: ${unit.name} baseline=${cdBaseline} supply=${teamCdSupply} effective=${effectiveCd.toFixed(1)} shortfall=${shortfall.toFixed(1)} → -${penalty}`);
+                }
+            }
+        }
+    }
+
     // --- DPS element weakness/resistance ---
     const l3Reactions = computeAnomalyReactions(team, boss);
     for (const unit of dpsUnits) {
@@ -1060,7 +1156,7 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
             if (!pr) continue;
             const pseudoRoles = pr.split(',').map(s => s.trim());
             for (const antiType of boss.anti) {
-                if (pseudoRoles.includes(antiType)) {
+                if (pseudoRoles.includes(antiType) && unit._activatedRoles.includes(antiType)) {
                     score -= 30;
                     if (debug) console.log(`    ${unit.name} pseudo-role '${antiType}' matches boss anti: -30`);
                 }

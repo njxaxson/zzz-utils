@@ -9,7 +9,10 @@
         "shill": "anomaly",
         "anti": [],
         "assists": 0,
-        "favored": []
+        "favored": [],
+        "mechanics": {
+            "weak" : "disorders"
+        }
     },
     {
         "id": "ucc",
@@ -69,8 +72,10 @@
         "shill": "anomaly",
         "anti": [],
         "assists": 0,
-        "favored": ["Miyabi"],
-        "shillIntensity": 2
+        "favored": [],
+        "mechanics" : {
+            "freezable" : true
+        }
     },
     {
         "id": "priest",
@@ -142,7 +147,7 @@
         "shill": "attack",
         "anti": ["rupture", "anomaly"],
         "assists": 0,
-        "favored": ["Ye Shunguong"]
+        "favored": []
     },
     {
         "id": "vesper",
@@ -155,7 +160,10 @@
         "anti": ["rupture"],
         "assists": 2,
         "favored": ["Aria", "Sunna", "Nangong"],
-        "shillIntensity": 2
+        "shillIntensity": 1,
+        "mechanics": {
+            "weak" : "veils"
+        }
     },
     {
         "id": "sweeper",
@@ -167,8 +175,10 @@
         "shill": "anomaly",
         "anti": ["rupture"],
         "assists": 2,
-        "favored": ["Nangong"],
-        "shillIntensity": 2
+        "favored": [],
+        "mechanics": {
+            "weak" : "stun"
+        }
     },
     {
         "id": "horizon",
@@ -180,10 +190,12 @@
         "shill": "anomaly",
         "anti": [],
         "assists": 2,
-        "favored": ["Promeia"],
+        "favored": [],
         "shillIntensity": 1,
         "mechanics": {
-            "anomaly:state": "wind"
+            "anomaly:state": "wind",
+            "weak" : "abloom",
+            "debuffs" : { "cd" : 2 }
         }
     }
 ]

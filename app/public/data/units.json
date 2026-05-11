@@ -54,7 +54,7 @@
         "tier": 0.5,
         "tags": ["anomaly", "ether", "assist:defensive"],
         "join": ["stun", "support"],
-        "synergy": { "units": ["sunna"], "tags": [], "avoid": [] },
+        "synergy": { "units": ["sunna", "nangong"], "tags": [], "avoid": [] },
         "mechanics": {
             "damage": { "enhanced": 2, "abloom": 2 },
             "scaling": { "veils": 2 }
@@ -481,7 +481,7 @@
         "tier": 0,
         "tags": ["stun", "ether", "assist:defensive"],
         "join": ["anomaly", "faction"], 
-        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "synergy": { "units": ["Aria"], "tags": [], "avoid": [] },
         "mechanics": {
             "pseudoRole": "anomaly",
             "damage": { "polarity": true, "abloom": true },
@@ -514,18 +514,17 @@
         "rank": "S",
         "limited": true,
         "tier": 0.5,
-        "tags": ["stun", "fire", "esd", "assist:defensive"],
+        "tags": ["stun", "fire", "assist:defensive"],
         "join": ["attack", "rupture"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "damage" : { "chain" : 3 },
             "buffs" : { "stun-multiplier" : 2 },
-            "utility" : { "ultimates" : 1 },
-            "scaling" : { "quick-assists" : 2 }
+            "scaling" : { "quick-assists" : 2, "sheer": 3 }
         },
         "available" : false,
         "faction": "External Strategy Department",
-        "displayText" : "Whacky bangboo engineer fires missiles at enemies and specializes in chain attacks and decibel refunds. She can convert some quick assists into chain attacks."
+        "displayText" : "Whacky bangboo engineer fires missiles at enemies. She can convert some quick assists into chain attacks and converts sheer damage buffs back into attack damage."
     },
     {
         "id": "nicole",
@@ -771,7 +770,7 @@
         "tier": 0.5,
         "tags": ["support", "physical", "assist:defensive"],
         "join": ["attack", "faction"],
-        "synergy": { "units": ["aria"], "tags": [], "avoid": [] },
+        "synergy": { "units": ["Aria"], "tags": [], "avoid": [] },
         "mechanics": {
             "buffs": { "atk": 3, "stun-multiplier": 2 },
             "utility": { "veils": 3, "daze": 2 }
@@ -807,7 +806,7 @@
         "rank": "S",
         "limited": true,
         "tier": 0.5,
-        "tags": ["anomaly", "wind", "esd", "assist:defensive"],
+        "tags": ["anomaly", "wind", "assist:defensive"],
         "join": ["anomaly", "wind"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
