@@ -56,7 +56,15 @@ const NEED_FULFILLMENT_KEYS = [
     'quick-assists', 'interrupt-resistance', 'vortex'
 ];
 
-const VORTEX_TIERS = { ice: 4, fire: 2, physical: 2, ether: 1, electric: 1 };
+const VORTEX_TIERS = { 
+    //Base elements
+    "ice": 4, "fire": 2, "physical": 2, "ether": 1, "electric": 1,
+    //Variants
+    "ice:frost" : 0.001, 
+    "ether:auricInk" : 0.8, 
+    "physical:honedEdge" : 0.8,
+    "ether:timeflow" : 7 //TODO Adjust as needed for Remielle
+};
 const VORTEX_DEFAULT_TIER = 0.001;
 const VORTEX_BASE = 17;
 const POLARITY_VORTEX_DISCOUNT = 0.35;
@@ -194,13 +202,17 @@ function isStunlessUnit(unit) {
     return unit.mechanics?.utility?.stunless === true;
 }
 
+function getElementVariant(unit) {
+    const base = getElement(unit);
+    return unit.mechanics?.elementalVariant 
+        ? base + ':' + unit.mechanics?.elementalVariant 
+        : base;
+}
+
 function teamHasImplicitDisorders(team) {
     const anomalyAgents = team.filter(u => getEffectiveRoles(u).includes('anomaly'));
     if (anomalyAgents.length < 2) return false;
-    const elements = anomalyAgents.map(u => {
-        const base = getElement(u);
-        return u.mechanics?.elementalVariant ? base + '-variant' : base;
-    });
+    const elements = anomalyAgents.map(u => getElementVariant(u));
     return new Set(elements).size >= 2;
 }
 
@@ -220,18 +232,14 @@ function isVortexBoss(boss) {
     return state === 'wind';
 }
 
-function getAnomalyElement(unit) {
-    const base = getElement(unit);
-    return unit.mechanics?.elementalVariant ? base + '-variant' : base;
-}
-
 function getVortexTierForElement(unit, bossAnomaly) {
-    if (unit.mechanics?.elementalVariant) return VORTEX_DEFAULT_TIER;
-    const el = getElement(unit);
-    if (el === 'wind' && bossAnomaly && bossAnomaly !== 'wind') {
+    const base = getElement(unit);
+    if (base === 'wind' && bossAnomaly && bossAnomaly !== 'wind') {
         return VORTEX_TIERS[bossAnomaly] ?? VORTEX_DEFAULT_TIER;
     }
-    return VORTEX_TIERS[el] ?? VORTEX_DEFAULT_TIER;
+    //otherwise:
+    const element = getElementVariant(unit)
+    return VORTEX_TIERS[element] ?? VORTEX_DEFAULT_TIER;
 }
 
 function computeAnomalyReactions(team, boss) {
@@ -240,7 +248,7 @@ function computeAnomalyReactions(team, boss) {
     const reactions = new Map();
 
     for (const unit of anomalyAgents) {
-        const element = getAnomalyElement(unit);
+        const element = getElement(unit);
         let bestVortexTier = 0;
         let hasDisorder = false;
 
@@ -255,7 +263,7 @@ function computeAnomalyReactions(team, boss) {
         } else {
             for (const partner of anomalyAgents) {
                 if (partner === unit) continue;
-                const partnerEl = getAnomalyElement(partner);
+                const partnerEl = getElement(partner);
                 if (element === partnerEl) continue;
 
                 if (element === 'wind' || partnerEl === 'wind') {

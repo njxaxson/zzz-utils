@@ -464,7 +464,7 @@
         "join": ["support", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
-            "elementalVariant": true,
+            "elementalVariant": "frost",
             "damage": { "enhanced": 3, "ultimate:strong": 2 },
             "scaling": { "disorders": 3, "cr": 3, "cd": 3 }
         },
@@ -868,7 +868,7 @@
         "join": ["support", "defense"],
         "synergy": { "units": ["Dialyn"], "tags": [], "avoid": [] },
         "mechanics": {
-            "elementalVariant": true,
+            "elementalVariant": "honedEdge",
             "damage": { "ultimate:strong": 3, "ultimate:double": 3 },
             "utility": { "stunless": true },
             "scaling": { "ultimates": 3, "veils": 2 }
@@ -904,7 +904,7 @@
         "join": ["stun", "support", "defense"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
-            "elementalVariant": true,
+            "elementalVariant": "auricInk",
             "damage": { "enhanced": 2, "ultimate:double": 3, "ultimate:strong": 1 },
             "scaling": { "ultimates": 2 }
         },
