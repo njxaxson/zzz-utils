@@ -664,6 +664,24 @@
         "displayText": "On-field electric stun agent is surprisingly good for Yixuan, even though they have no natural team alliance."
     },
     {
+        "id": "ramiel",
+        "name": "Remielle",
+        "aliases" : ["Rem", "Ram", "Dan", "RD"],
+        "image": null,
+        "rank": "S",
+        "limited": true,
+        "tier": 0,
+        "tags": ["anomaly", "ether", "title", "assist:defensive"],
+        "join": ["anomaly", "support"],
+        "synergy": { "units": [], "tags": ["wind"], "avoid": [] },
+        "mechanics": {
+            "elementalVariant" : true
+        },
+        "available" : false,
+        "faction": "Guard of Staves",
+        "displayText": "First-generation void hunter."
+    },
+    {
         "id": "rina",
         "name": "Rina",
         "image": "./assets/characters/rina.webp",
