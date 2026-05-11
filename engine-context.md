@@ -26,7 +26,7 @@ Some exceptionally powerful characters - “titled” units Miyabi, Yixuan, and 
 | Yixuan | Ether | Auric Ink | Auric Ink + Ether = disorder (rarely relevant) |
 | YSG | Physical | Honed Edge | Honed Edge + Physical = disorder (rarely relevant) |
 
-The `mechanics.elementalVariant` flag marks this; right now only titled units have elemental variants but it could be expanded to others in the future. Currently a boolean, it is used in disorder generation checks and vortex tier determination. Elemental variant units receive only flat/negligible vortex damage (`VORTEX_DEFAULT_TIER = 0.08`) regardless of their base element — a deliberate design choice that limits their synergy with the wind/vortex mechanic.
+The `mechanics.elementalVariant` variable marks this; right now only titled units have elemental variants but it could be expanded to others in the future. It is used in disorder generation checks and vortex tier determination. Some elemental variant units receive only flat/negligible vortex damage in comparison to their base element — a deliberate design choice that limits or enhances their synergy with the wind/vortex mechanic. For example, Remielle, a future ether anomaly void hunter, may be released with a unique elemental variant that has particularly strong synergy with wind.
 
 ### Roles
 
@@ -53,7 +53,7 @@ When two different-element anomalies are applied to the same target simultaneous
 | Ice | High | 3 |
 | Fire, Physical | Medium | 2 |
 | Ether, Electric | Low | 1 |
-| Elemental variants (Frost, Auric Ink, Honed Edge) | Flat/negligible | \~0.08 |
+| Elemental variants (Frost, Auric Ink, Honed Edge) | Flat/negligible | <1 |
 
 Same-element pairs (including wind+wind) produce no reaction.
 
@@ -102,7 +102,7 @@ Attackers need stun windows to deal damage. The stunner creates vulnerability pe
 **Modern meta:** Stunner (Nangong/Lycaon) + Anomaly DPS + Support (Yuzuha/Sunna)
 **Classic:** Anomaly DPS + Anomaly SubDPS (Vivian/Burnice) + Support (Yuzuha)
 
-Nangong's release fundamentally changed anomaly team building. As a T0 hybrid stun/anomaly unit, Nangong provides anomaly buffs, extended stun windows, and polarity disorder triggers — making `Nangong/<Anomaly DPS>/Yuzuha` the strongest anomaly template, replacing `<Anomaly DPS>/Vivian/Yuzuha`. Lycaon (at P1+) serves as a budget alternative with ice defense shred.
+Nangong's release fundamentally changed anomaly team building. As a T0 hybrid stun/anomaly unit, Nangong provides anomaly buffs, extended stun windows, and polarity disorder triggers — making `Nangong/<Anomaly DPS>/Yuzuha` the strongest anomaly template, replacing `<Anomaly DPS>/Vivian/Yuzuha`. Lycaon (at P1+) serves as a budget alternative with ice defense shred. Interestingly enough, Promeia is the latest anomaly agent and she prefers Vivian over Nangong because of the higher quantity of abloom-specific damage, which Promeia buffs. So both compositions exist in modern play.
 
 **Disorder generation:** When two anomaly-typed units of different elements are on the same team, they naturally generate disorders for bonus damage; unless one of them is wind, in which they generate a vortex instead. Disorders are especially critical for units with transformative scaling that is based on disorders, such as Miyabi who converts disorders into enhanced attacks.
 
@@ -301,7 +301,13 @@ All fields are optional. Values are weighted: `true` (or 1) = minor, `2` = stron
   "assists": 2,
   "favored": ["Aria", "Sunna", "Nangong"],
   "shillIntensity": 2,
-  "available": true
+  "available": true,
+  "mechanics" : {
+    "freezable" : false, 
+    "weak" : "abloom", 
+    "anomaly:state" : "wind",
+    "debuffs" : { "cd" : 2 } 
+  }
 }
 ```
 
@@ -314,6 +320,9 @@ All fields are optional. Values are weighted: `true` (or 1) = minor, `2` = stron
 * `available` — (optional, default `true`) When `false`, boss is unreleased
 * `mechanics` — (optional) Boss-specific mechanical gimmicks. Currently supports:
   * `"anomaly:state": "<element>"` — Boss permanently has the specified element's anomaly applied. Changes how anomaly reactions work against this boss (see Anomaly Reactions section).
+  * `freezable` - indicates that the boss is particularly vulnerable to ice anomalies and gives ice anomaly units a very significant bonus. Pseudoanomalies get half of that bonus. 
+  * `weak` - indicates that the boss is weak to a specific type of damage or utility, such as disorders, abloom, or ether veils. Different damage types may get different bonuses; some nominal and some more significant. 
+  * `debuffs` - this boss inflicts a very specific debuff against the team. Currently, only Scorched Horizon does this and inflicts a Critical Damage debuff (CD) that penalizes DPS agents that rely on CD (checked by looking at their scaling - explicit or implicit - and seeing if the team can mitigate the CD debuff with its own CD buffs or not). 
 
 ## Engine Architecture: Five-Layer Scoring
 
@@ -635,8 +644,8 @@ The game is currently in version 2.8. This is a summary of the key changes in re
 The **Wind** element was added in version 2.8 alongside a full anomaly reaction system:
 
 * `ELEMENTS` array now includes `'wind'`
-* `VORTEX_TIERS` maps element → vortex damage tier (ice: 3, fire: 2, physical/ether/electric: 1)
-* `VORTEX_DEFAULT_TIER` (0.08) covers all elemental variants
+* `VORTEX_TIERS` maps element → vortex damage tier (ice: 3, fire: 2, etc.)
+* `VORTEX_DEFAULT_TIER` (0.08) covers any untagged element (for code safety only)
 * `VORTEX_BASE` (16) × tier = per-agent vortex bonus in L4
 * `POLARITY_VORTEX_DISCOUNT` (0.25) reduces polarity damage on anomaly-state bosses
 * `computeAnomalyReactions(team, boss)` resolves per-agent reactions (vortex, disorder, or none) from team composition + boss anomaly state
@@ -645,19 +654,17 @@ The **Wind** element was added in version 2.8 alongside a full anomaly reaction 
 
 **Future wind agents** (e.g., Velina, confirmed wind anomaly agent for 3.0) will trigger vortex against normal bosses when paired with non-wind anomaly teammates, using the same `computeAnomalyReactions` system.
 
-The following units are already modeled in `units.json` as preview units (`available=false`):
+These upcoming units are already modeled in `units.json` as preview units (`available=false`):
 
 ### Promeia (2.8 first banner)
 
 Ice anomaly DPS (just released). Key mechanics:
 
 * Abloom buffer — `buffs.abloom: 3`, directly empowers teammates with abloom damage (Burnice, Vivian, Grace)
-* Abloom self-damage — `damage.abloom: 3`, benefits from her own abloom buffs
-* Defense debuff — `debuffs.defense: 2`, contributes to diametric synergy
-* Stun-synergy anomaly — benefits from stun windows (like Aria), emergent from mechanics
-* Ice anomaly with vortex tier 3 against anomaly-state bosses — the strongest vortex contributor
-* Positioned as a direct alternative to Miyabi against Scorched Horizon: pure ice anomaly (tier 3 vortex) vs. frost variant (tier 0.08 vortex)
+* Abloom self-buff — `damage.abloom: 3`, benefits from her own abloom buffs
+* Stun-synergy anomaly — benefits from stun windows (like Aria), emergent from mechanics due to having an enhanced attack
+* Positioned as a direct alternative to Miyabi against Scorched Horizon: pure ice anomaly (strong vortex tier of 3) vs. frost variant (weak vortex tier of 0.001)
 
 ### Starlight Billy (2.8 second banner, upcoming)
 
-Conventional physical rupture agent. Expected to be strong against Fiend, Thrall, and Defiler. Best-in-slot teammates: Dialyn + Lucia (like every rupture agent), with Ju Fufu and Pan as alternatives. Should slot cleanly into existing rupture scoring without engine changes.
+Conventional physical rupture agent; only real feature is that he has relatively strong chain attacks. Expected to be strong against Fiend, Thrall, and Defiler. Best-in-slot teammates: Dialyn + Lucia (like every rupture agent), with Ju Fufu and Pan as alternatives. Should slot cleanly into existing rupture scoring without engine changes.  Norma, an upcoming stun agent that can uniquely benefit from sheer damage buffs, will likely pair well with him as an alternative to the current suite of rupture stunners. 
