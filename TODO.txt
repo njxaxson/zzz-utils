@@ -9,5 +9,8 @@ FUNCTIONALITY:
 - Create a DA duel page that lets you pick a boss and your three-person team so that you can see what the actual score is. 
 
 PREVIEW:
-- Start debugging Norma and Velina (they need finalization). Norma sheer scaling may prevent her from being teamed with attack agents. 
+- Start debugging Norma and Velina (their mechanics are not yet finalized; still too early to pin down). 
+  - Norma sheer scaling may prevent her from being teamed with attack agents. 
+  - This has been tuned by scaling sheer=1 and atk=3 so that buffs don't get wasted but don't get overcredited like they would for a rupture DPS. 
+  - Needs to be calibrated and doublechecked but seems okay for now. 
 
