@@ -304,7 +304,7 @@ function teamHasDisorderGenerationFromReactions(team, reactions) {
     return teamHasAnyDisorder(reactions) || teamHasPolarity(team);
 }
 
-function hasSubDPSRole(unit) {
+export function hasSubDPSRole(unit) {
     const pr = unit.mechanics?.pseudoRole;
     return pr ? pr.split(',').map(s => s.trim()).includes('subdps') : false;
 }

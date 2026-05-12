@@ -4,7 +4,7 @@
  */
 
 import { getTeams, sortTeamByRole, getTeamLabel } from '../common/team-builder.js';
-import { scoreTeamForBoss, isDPS, isStun, isSupport, isDefense, getElement } from '../common/team-scorer.js';
+import { scoreTeamForBoss, isDPS, isStun, isSupport, isDefense, getElement, hasSubDPSRole } from '../common/team-scorer.js';
 import { 
     initRoster, getUnitStates, getAllUnits,
     getInitials, getUnitElement, getCharacterImageUrl
@@ -30,7 +30,7 @@ function teamHasMatchingDPS(team, targetElement, targetDpsType) {
         const unitElement = getElement(unit);
         const unitDpsType = getDpsTypeForUnit(unit);
         
-        if (unitElement === targetElement && unitDpsType === targetDpsType) {
+        if (unitElement === targetElement && unitDpsType === targetDpsType && !hasSubDPSRole(unit)) {
             return true;
         }
     }
@@ -712,50 +712,9 @@ function selectBestTeams(teams, availableUnits) {
                 .filter(teamData => teamHasMatchingDPS(teamData.team, element, dpsType));
             
             if (matchingTeams.length === 0) continue;
-            
-            let rankedTeams = [];
-            
-            if (dpsType === 'anomaly') {
-                // Special handling for anomaly: prioritize DPS + support matching element
-                // Then sort by global team score, with special scoring for dual anomaly as final tiebreaker
-                rankedTeams = matchingTeams
-                    .map(teamData => ({
-                        ...teamData,
-                        hasPreferredPairing: hasPreferredAnomalyPairing(teamData.team, element),
-                        anomalySpecialScore: scoreAnomalyTeamSpecial(teamData.team, element)
-                    }))
-                    .sort((a, b) => {
-                        // Primary: has preferred pairing (DPS + support)
-                        if (a.hasPreferredPairing !== b.hasPreferredPairing) {
-                            return b.hasPreferredPairing - a.hasPreferredPairing;
-                        }
-                        // Secondary: global team score
-                        if (a.score !== b.score) {
-                            return b.score - a.score;
-                        }
-                        // Tertiary: special anomaly scoring (dual anomaly, subdps handling)
-                        return b.anomalySpecialScore - a.anomalySpecialScore;
-                    });
-            } else {
-                // For attack/rupture: prioritize DPS + stun matching element
-                // Then sort by global team score
-                rankedTeams = matchingTeams
-                    .map(teamData => ({
-                        ...teamData,
-                        hasPreferredPairing: hasPreferredAttackRupturePairing(teamData.team, element)
-                    }))
-                    .sort((a, b) => {
-                        // Primary: has preferred pairing (DPS + stun)
-                        if (a.hasPreferredPairing !== b.hasPreferredPairing) {
-                            return b.hasPreferredPairing - a.hasPreferredPairing;
-                        }
-                        // Secondary: global team score (this ensures Koleda/Komano/Lucia beats Koleda/Komano/Lucy)
-                        return b.score - a.score;
-                    });
-            }
-            
+       
             // Take up to teamsPerArchetype teams for this archetype
-            const teamsToAdd = rankedTeams.slice(0, filters.teamsPerArchetype);
+            const teamsToAdd = matchingTeams.slice(0, filters.teamsPerArchetype);
             
             for (const teamData of teamsToAdd) {
                 grid[element][dpsType].push({
