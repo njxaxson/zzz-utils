@@ -44,6 +44,40 @@ async function loadComponent(componentPath, targetSelector) {
  * Initializes the header with proper active state and page title
  * @param {string} pageId - The current page identifier
  */
+function initMobileNav() {
+    const toggle = document.querySelector('.nav-toggle');
+    const nav = document.getElementById('site-nav');
+    if (!toggle || !nav) return;
+
+    const mobileQuery = window.matchMedia('(max-width: 768px)');
+
+    function setOpen(open) {
+        nav.classList.toggle('is-open', open);
+        toggle.setAttribute('aria-expanded', String(open));
+        toggle.setAttribute('aria-label', open ? 'Close navigation menu' : 'Open navigation menu');
+    }
+
+    function closeMenu() {
+        setOpen(false);
+    }
+
+    toggle.addEventListener('click', () => {
+        setOpen(!nav.classList.contains('is-open'));
+    });
+
+    nav.querySelectorAll('.nav-link').forEach(link => {
+        link.addEventListener('click', closeMenu);
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeMenu();
+    });
+
+    mobileQuery.addEventListener('change', (e) => {
+        if (!e.matches) closeMenu();
+    });
+}
+
 function initHeader(pageId) {
     // Set active nav link
     const navLinks = document.querySelectorAll('.site-nav .nav-link');
@@ -58,6 +92,8 @@ function initHeader(pageId) {
     if (pageTitle && PAGE_TITLES[pageId]) {
         pageTitle.textContent = PAGE_TITLES[pageId];
     }
+
+    initMobileNav();
 }
 
 /**
