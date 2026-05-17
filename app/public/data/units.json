@@ -383,7 +383,7 @@
             "utility": { "heal:self": true }
         },
         "faction": "Spook Shack",
-        "displayText": "Beefy dog that wit big fire sword. Big damage from his repeated counterattacks after defensive assists. One of the best A-rank DPS agents."
+        "displayText": "Beefy dog with big fire sword. Big damage from his repeated counterattacks after defensive assists. One of the best A-rank DPS agents."
     },
     {
         "id": "lighter",
