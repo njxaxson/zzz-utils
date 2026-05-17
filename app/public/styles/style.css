@@ -4072,11 +4072,16 @@ button#simulate-btn:disabled,
     color: var(--text-primary);
 }
 
+.rec-reasons {
+    list-style: disc;
+    padding-left: 1.2rem;
+    margin: 0 0 0.75rem 0;
+}
+
 .rec-reason {
     color: var(--text-secondary);
     font-size: 0.85rem;
     line-height: 1.4;
-    margin: 0 0 0.75rem 0;
 }
 
 /* Recommended Unit List */

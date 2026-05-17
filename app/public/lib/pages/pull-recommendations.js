@@ -104,31 +104,46 @@ function sortRecommendationUnits(units, bannerIndexMap) {
  * @param {Map<string, number>} bannerIndexMap
  */
 function applyBannerRecommendationOrdering(recommendations, bumpWindowIds, bannerIndexMap) {
+    const PRIORITY_RANK = { 'High': 2, 'Medium': 1, 'Low': 0 };
     const bumpSet = new Set(bumpWindowIds);
     const decorated = recommendations.map((rec, origIdx) => {
         const units = sortRecommendationUnits(rec.units, bannerIndexMap);
         const touchesBumpWindow = units.some(u => bumpSet.has(u.id));
+        // Banner bump only applies within the same priority tier — it cannot promote
+        // a Medium recommendation above a High one.
         const sortScore = rec.score + (touchesBumpWindow ? BANNER_CARD_SCORE_BUMP : 0);
-        return { rec: { ...rec, units }, sortScore, origIdx };
+        const priorityRank = PRIORITY_RANK[rec.priority] ?? 0;
+        return { rec: { ...rec, units }, sortScore, priorityRank, origIdx };
     });
     decorated.sort((a, b) => {
+        // Primary sort: priority tier (High > Medium > Low)
+        if (b.priorityRank !== a.priorityRank) return b.priorityRank - a.priorityRank;
+        // Secondary: banner-bumped score within the same priority
         if (b.sortScore !== a.sortScore) return b.sortScore - a.sortScore;
         return a.origIdx - b.origIdx;
     });
     return decorated.map(d => d.rec);
 }
 
-/** Best gap priority for a unit across all gaps (calibrated scores). */
+/**
+ * Best gap priority for a unit across all gaps.
+ * Reads gap.priority set by the engine's assignPriority(), which uses relative
+ * thresholds for loaded rosters — ensures tile verdicts match recommendation labels.
+ */
 function bannerTileVerdictClass(unitId, allGaps) {
+    const RANK = { 'High': 2, 'Medium': 1, 'Low': 0 };
     let best = -1;
+    let bestPriority = null;
     for (const gap of allGaps) {
         if (!gap.units?.some(u => u.id === unitId)) continue;
-        if (gap.score > best) best = gap.score;
+        const rank = RANK[gap.priority] ?? -1;
+        if (rank > best) {
+            best = rank;
+            bestPriority = gap.priority;
+        }
     }
-    if (best < 0) return 'no';
-    if (best >= 70) return 'high';
-    if (best >= 40) return 'medium';
-    return 'low';
+    if (bestPriority === null) return 'no';
+    return bestPriority.toLowerCase();
 }
 
 function verdictLabel(verdictClass) {
@@ -383,13 +398,16 @@ function createRecommendationCard(rec, activeSet, upcomingSet) {
         createRecUnitCard(unit, activeSet, upcomingSet)
     ).join('');
 
+    const allReasons = [rec.reason, ...(rec.additionalReasons?.map(r => r.reason) ?? [])];
+    const reasonsHtml = `<ul class="rec-reasons">${allReasons.map(r => `<li class="rec-reason">${r}</li>`).join('')}</ul>`;
+
     return `
         <div class="pull-rec-card priority-${priorityClass}">
             <div class="rec-header">
                 <span class="priority-badge priority-${priorityClass}">${rec.priority}</span>
                 <span class="rec-title">${rec.title}</span>
             </div>
-            <p class="rec-reason">${rec.reason}</p>
+            ${reasonsHtml}
             <div class="rec-unit-list">
                 ${unitsHtml}
             </div>

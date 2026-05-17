@@ -129,7 +129,10 @@ async function main() {
             const rec = recommendations[i];
             const priorityTag = rec.priority === 'High' ? '🔴 HIGH' : rec.priority === 'Medium' ? '🟡 MED ' : '🟢 LOW ';
             console.log(`  #${i + 1} [${priorityTag}] ${rec.title}  (raw: ${rec.rawScore}, cal: ${rec.score})`);
-            console.log(`     ${rec.reason}`);
+            const allReasons = [rec.reason, ...(rec.additionalReasons?.map(r => r.reason) ?? [])];
+            for (const r of allReasons) {
+                console.log(`     • ${r}`);
+            }
             console.log(`     Suggested: ${rec.units.map(u => `${u.name} T${u.tier}${u.available === false ? ' (upcoming)' : ''}`).join(', ')}`);
             console.log();
         }
