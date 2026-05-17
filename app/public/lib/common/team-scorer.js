@@ -870,7 +870,7 @@ function scoreInherentQuality(team, { lenient = false, debug = false, boss = nul
         }
 
         const totalizeWeight = w(unit.mechanics?.damage?.totalize);
-        if (totalizeWeight > 0) {
+        if (totalizeWeight > 1) { //totalize penalty is only relevant if that is the key component of the kit. If it's only a small portion of the output, no need to penalize so heavily.
             const teammates = team.filter(t => t !== unit);
             let stunInfra = 0;
             for (const t of teammates) {
@@ -883,7 +883,7 @@ function scoreInherentQuality(team, { lenient = false, debug = false, boss = nul
                 }
             }
 
-            if (stunInfra < 2) {
+            if (stunInfra < 2) { 
                 const deficit = 2 - stunInfra;
                 const penalty = Math.round(totalizeWeight * MULT.TOTALIZE_PENALTY * deficit * (1 + deficit));
                 score -= penalty;

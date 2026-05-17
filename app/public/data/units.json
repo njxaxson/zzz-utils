@@ -638,7 +638,9 @@
         "tags": ["attack", "ether", "phaethon", "assist:evasive"],
         "join": ["support", "stun"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
-        "mechanics": {},
+        "mechanics": {
+            "damage": { "totalize": 1 }
+        },
         "faction": "Phaethon",
         "available" : false,
         "displayText" : "Proxy made manifest? We shall see!"
