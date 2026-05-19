@@ -146,6 +146,12 @@ function mechanicsFitScore(supplier, consumer) {
         if (supplyDmg > 0 && MECHANIC_DAMAGE_TYPES.has(dmgType)) score += supplyDmg * dw * 2;
     }
 
+    // Vortex buff → anomaly consumers (contextual bonus; no reactions context here,
+    // so gate on consumer being anomaly as a conservative proxy).
+    if (w(sBuf.vortex) > 0 && isAnoDPS) {
+        score += w(sBuf.vortex) * 2;
+    }
+
     if (isAnoDPS && w(cScaling.disorders) > 0) {
         const sRoles = getEffectiveRoles(supplier);
         const sIsAno = supplier.tags.includes('anomaly') || sRoles.includes('anomaly');

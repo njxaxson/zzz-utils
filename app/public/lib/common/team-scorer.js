@@ -37,6 +37,7 @@ const MULT = {
     TOTALIZE_PENALTY: 38,
     DISORDER_BONUS: 12,
     DIAMETRIC: 3,
+    VORTEX_BUFF: 4,
 };
 
 const RUPTURE_ATK_EFFICIENCY = 0.33;
@@ -67,6 +68,10 @@ const VORTEX_TIERS = {
 };
 const VORTEX_DEFAULT_TIER = 0.001;
 const VORTEX_BASE = 17;
+// Normalisation base for tier scaling in vortex buff affinity.
+// Uses max among stable base elements (ice=4), not Remielle's placeholder tier (7),
+// so that ice consumers receive full credit (tierScale=1.0) with the current roster.
+const MAX_VORTEX_TIER = 4;
 const POLARITY_VORTEX_DISCOUNT = 0.35;
 const NATURALLY_AVAILABLE_NEEDS = new Set(['ultimates', 'chains']);
 const STAT_SCALING_KEYS = ['am', 'ap', 'cr', 'cd', 'hp', 'def', 'pen', 'sheer'];
@@ -487,7 +492,9 @@ function computeBuffUtilization(supplier, team) {
     if (isDPS(supplier)) {
         const buffs = supplier.mechanics?.buffs || {};
         const debuffs = supplier.mechanics?.debuffs || {};
-        const GENERIC_DPS_BUFFS = new Set(['atk', 'cr', 'cd', 'pen', 'stun-multiplier']);
+        // vortex is a contextual situational bonus, not a must-use designed mechanic.
+        // Exclude it from cohesion evaluation; the positive signal comes from L4 baseline affinity.
+        const GENERIC_DPS_BUFFS = new Set(['atk', 'cr', 'cd', 'pen', 'stun-multiplier', 'vortex']);
         const evaluatableBuffs = Object.entries(buffs).filter(
             ([key, value]) => !GENERIC_DPS_BUFFS.has(key) && w(value) >= 2
         );
@@ -1263,6 +1270,21 @@ function scoreBaselineAffinity(supplier, consumer, debug, options = {}) {
         }
     }
 
+    // Vortex buff → anomaly agents that actually generate vortex reactions this fight.
+    // Tier-scaled so ice-vortex consumers (Promeia) benefit more than lower-tier ones.
+    if (supplierBuffs.vortex) {
+        const reaction = options?.reactions?.get(consumer);
+        if (reaction?.bestVortexTier > 0) {
+            const cw = resolveBaselineWeight(consumer, 'anomaly-affinity');
+            if (cw > 0) {
+                const tierScale = reaction.bestVortexTier / MAX_VORTEX_TIER;
+                const val = w(supplierBuffs.vortex) * cw * tierScale * MULT.VORTEX_BUFF;
+                score += val;
+                dbg('vortex-buff', val);
+            }
+        }
+    }
+
     // Sheer buffs → rupture agents
     if (supplierBuffs.sheer) {
         const cw = resolveBaselineWeight(consumer, 'sheer');
@@ -1573,6 +1595,7 @@ function scoreMechanicalSynergy(team, debug, options = {}) {
         hasDisorderGeneration: hasDisorderGen,
         disorderBuffDiscount,
         boss,
+        reactions,
     };
 
     if (debug) console.log('\n  LAYER 4: MECHANICAL SYNERGY');

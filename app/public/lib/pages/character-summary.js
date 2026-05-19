@@ -347,7 +347,8 @@ function buildSynergyLine(unit) {
         if (mechanics.buffs.cr) buffs.push(formatMechanic('Crit Rate', mechanics.buffs.cr));
         if (mechanics.buffs.cd) buffs.push(formatMechanic('Crit Damage', mechanics.buffs.cd));
         if (mechanics.buffs.disorders) buffs.push(formatMechanic('Disorders', mechanics.buffs.disorders));
-        
+        if (mechanics.buffs.vortex) buffs.push(formatMechanic('Vortex', mechanics.buffs.vortex));
+
         // Elemental buffs
         if (mechanics.buffs.ice) buffs.push(formatElementalMechanic('Ice Damage', mechanics.buffs.ice, 'ice'));
         if (mechanics.buffs.fire) buffs.push(formatElementalMechanic('Fire Damage', mechanics.buffs.fire, 'fire'));

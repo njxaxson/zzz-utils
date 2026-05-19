@@ -147,6 +147,7 @@ There is technically the possibility to have hybrid attack+anomaly compositions;
 | **Cissia** | T1.5 | Attack (Electric) + SubDPS | `buffs.cr:1, debuffs.electric:2, utility.daze:1` | Seed's ideal partner. Can function support-like on electric teams. |
 | **Vivian** | T0.5 | Anomaly (Ether) + SubDPS | `damage.abloom:3, scaling.am:2, onfield:false` | Was Miyabi's best partner before Nangong. Still strong but dropped from T0. |
 | **Promeia** | T0.5 | Anomaly (Ice) | `damage.abloom:3, buffs.abloom:3, debuffs.defense:2` | Ice anomaly with tier-3 vortex. Abloom buffer. Direct Miyabi alternative on Scaled Horizon — pure ice vortex vs. frost variant. |
+| **Jane Doe** | T1.5 | Anomaly (Physical) | `buffs.vortex:3` | Physical anomaly with a retroactive vortex buff. Contextual bonus — no cohesion penalty when inactive. When Jane causes a physical anomaly that triggers a vortex, the vortex is considered a critical hit and gets the crit damage modifier. This is modeled as a generic vortex buff rather than to complexly model a narrow game mechanic, and so it provides a modest boost to average out its actual value. |
 
 ### SubDPS Units
 
@@ -272,7 +273,7 @@ All fields are optional. Values are weighted: `true` (or 1) = minor, `2` = stron
 * `elementalVariant` — Marks units with alternate element tracking. Currently boolean; may become a named string for vortex mechanics.
 * `onfield` — Explicit on-field demand override. Defaults: attack/anomaly/rupture/stun = `true`; support/defense = `false`. When a unit's pseudoRole activates as a different role, on-field status is derived from the activated role unless explicitly overridden.
 * `damage` — Distinctive damage types. Keys: `enhanced`, `ultimate:strong`, `ultimate:double`, `chain`, `aftershock`, `abloom`, `polarity`, `totalize`.
-* `buffs` — What the unit buffs for teammates. Keys: `atk`, `anomaly`, `aftershock`, `chain`, `sheer`, `pen`, `stun-multiplier`, `cr`, `cd`, and element names.
+* `buffs` — What the unit buffs for teammates. Keys: `atk`, `anomaly`, `aftershock`, `abloom`, `chain`, `sheer`, `pen`, `stun-multiplier`, `cr`, `cd`, `disorders`, element names, and `vortex`. The `vortex` key is a **contextual bonus** — it is excluded from DPS cohesion evaluation (added to `GENERIC_DPS_BUFFS`) and scores in L4 baseline affinity only when consumers actually generate vortex reactions this fight, tier-scaled so high-tier vortex generators (ice) receive proportionally more benefit.
 * `debuffs` — What the unit debuffs on enemies. Keys: `defense`, `recovery`, and element names.
 * `utility` — Non-stat team contributions. Keys: `disorders`, `quick-assists`, `chains`, `ultimates`, `heal:team`, `heal:self`, `shields`, `interrupt-resistance`, `kaleidoscope`, `veils`, `daze`, `stunless`.
 * `scaling` — What the unit benefits from. Overrides role baseline when present. Non-stat keys go through Need Fulfillment; stat keys enhance Baseline Affinity.

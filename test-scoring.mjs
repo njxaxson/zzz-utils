@@ -1118,6 +1118,27 @@ async function main() {
         assert(pvy > npy, `PVY ${pvy} should be better than NPY ${npy}`);
     });
 
+    // ========================================================================
+    // TEST 49: Jane vortex buff on Scorched Horizon
+    // ========================================================================
+    // Compares Jane against Piper on Scorched Horizon. The vortex buff effect 
+    // should create a bigger gap than on Butcher.
+    run('TEST 49: Jane vortex buff — Jane > Piper on Scorched Horizon', () => {
+        const t = "Alice/Jane/Yuzuha,Alice/Piper/Yuzuha"
+        let b = withBosses(bosses, 'Horizon').find(Boolean);
+        let m = scoreMapForBoss(scoreForTeamString(t, allUnits), b);
+        let j = m.get('Alice / Jane Doe / Yuzuha');
+        let p = m.get('Alice / Piper / Yuzuha');
+        assert(j > p, `Horizon: Jane (${j}) should beat Piper (${p}) due to vortex buff`);
+        const hdiff = j - p;
+        b = withBosses(bosses, 'Butcher').find(Boolean);
+        m = scoreMapForBoss(scoreForTeamString(t, allUnits), b);
+        j = m.get('Alice / Jane Doe / Yuzuha');
+        p = m.get('Alice / Piper / Yuzuha');
+        const fdiff = j - p;
+        assert(hdiff > fdiff, `Difference between Jane and Piper should be more pronounced on Horizon than Butcher because of vortex buff`);
+    });
+
     // ------------------------------------------------------------------------
     // Summary
     // ------------------------------------------------------------------------

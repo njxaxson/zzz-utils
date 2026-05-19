@@ -324,11 +324,13 @@
         "image": "./assets/characters/jane-doe.webp",
         "rank": "S",
         "limited": true,
-        "tier": 2,
+        "tier": 1.5,
         "tags": ["anomaly", "physical", "assist:defensive"],
         "join": ["anomaly", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
-        "mechanics": {},
+        "mechanics": {
+            "buffs" : { "vortex" : 3 }
+        },
         "faction": "PubSec",
         "displayText": "Sensuous rat lady is an older physical anomaly unit that remains a fan favorite."
     },
