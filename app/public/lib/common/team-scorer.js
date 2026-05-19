@@ -65,7 +65,7 @@ const VORTEX_TIERS = {
     "ice:frost" : 0.001, 
     "ether:auricInk" : 0.8, 
     "physical:honedEdge" : 0.8,
-    "ether:timeflow" : 7 //TODO Adjust as needed for Remielle
+    "ether:lumens" : 7 //TODO Adjust as needed for Remielle
 };
 const VORTEX_DEFAULT_TIER = 0.001;
 const VORTEX_BASE = 17;

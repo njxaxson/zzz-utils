@@ -675,7 +675,7 @@
         "join": ["anomaly", "support"],
         "synergy": { "units": [], "tags": ["wind"], "avoid": [] },
         "mechanics": {
-            "elementalVariant" : true
+            "elementalVariant" : "lumens"
         },
         "available" : false,
         "faction": "Guard of Staves",
