@@ -675,7 +675,9 @@
         "join": ["anomaly", "support"],
         "synergy": { "units": [], "tags": ["wind"], "avoid": [] },
         "mechanics": {
-            "elementalVariant" : "lumens"
+            "elementalVariant" : "lumens",
+            "damage" : { "abloom" : 2, "ultimate:strong" : 3 },
+            "buffs" : { "vortex" : 3 }
         },
         "available" : false,
         "faction": "Guard of Staves",
@@ -751,6 +753,21 @@
         },
         "faction": "PubSec",
         "displayText": "A defense agent that boosts anomaly teams; although underpowered for modern endgame."
+    },
+        {
+        "id": "sigrid",
+        "name": "Sigrid",
+        "image": "./assets/characters/sigrid.webp",
+        "rank": "S",
+        "limited": true,
+        "tier": 1,
+        "tags": ["stun", "ice", "assist:defensive"],
+        "join": ["ice", "anomaly"],
+        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {},
+        "available" : false,
+        "faction": "Roscaelifer Knights",
+        "displayText": "Horse lady with spear. "
     },
     {
         "id": "soldier-11",
