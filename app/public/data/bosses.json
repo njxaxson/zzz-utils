@@ -190,7 +190,7 @@
         "shill": "anomaly",
         "anti": [],
         "assists": 2,
-        "favored": [],
+        "favored": ["Velina"],
         "shillIntensity": 1,
         "mechanics": {
             "anomaly:state": "wind",

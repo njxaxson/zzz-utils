@@ -841,8 +841,10 @@ function scoreInherentQuality(team, { lenient = false, debug = false, boss = nul
         if (forcedSecondary) forcedSecondaryUnits.add(unit);
         let tierMult = (isSecondaryAttacker || isSecondaryAnomaly || forcedSecondary) ? 0.5 : 1.0;
         const unitReaction = reactions.get(unit);
+        const onElementWeakness = boss?.weaknesses?.includes(getElement(unit));
         const reactionDisabled = isSubDPS && isAnomaly(unit) &&
-            !(unitReaction?.bestVortexTier > 0 || unitReaction?.hasDisorder);
+            !(unitReaction?.bestVortexTier > 0 || unitReaction?.hasDisorder) &&
+            !onElementWeakness;
         if (reactionDisabled) {
             tierMult *= 0.5;
             reactionDisabledUnits.add(unit);
@@ -1113,7 +1115,8 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
             const isSubDPS = hasSubDPSRole(unit);
             const unitReaction = l3Reactions.get(unit);
             const reactionDisabled = isSubDPS && isAnomaly(unit) &&
-                !(unitReaction?.bestVortexTier > 0 || unitReaction?.hasDisorder);
+                !(unitReaction?.bestVortexTier > 0 || unitReaction?.hasDisorder) &&
+                !boss.weaknesses.includes(element);
             let bonus = isSRank(unit)
                 ? (isSubDPS ? 25 : 40)
                 : (isSubDPS ? 10 : 20);
