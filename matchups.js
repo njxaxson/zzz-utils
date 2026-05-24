@@ -52,53 +52,53 @@ async function main() {
     // ============================================================================
     // MAIN EXECUTION
     // ============================================================================
-
-    console.log("===== Team Matchups - All Bosses =====\n");
-    console.log(`Full roster: ${allUnits.length} characters\n`);
-
+    if(!options.omit) {
+        console.log("===== Team Matchups - All Bosses =====\n");
+        console.log(`Full roster: ${allUnits.length} characters\n`);
+    }
     let teamEntries;
 
     if (options.teams) {
         const { teams: parsedTeams, warnings } = parseTeams(options.teams, allUnits, { preview: options.preview });
         for (const w of warnings) console.warn(`WARNING: ${w}`);
         teamEntries = parsedTeams;
-        console.log(`Explicit teams: ${teamEntries.length}\n`);
+        if(!options.omit) console.log(`Explicit teams: ${teamEntries.length}\n`);
     } else {
         const { availableUnits, universalUnits } = buildAvailableUnits(allUnits, options, roster);
 
-        if (options.include && options.include.length > 0) {
+        if (options.include && options.include.length > 0 && !options.omit) {
             console.log(`Teams must include at least one of: ${options.include.join(', ')}`);
         }
 
         if (options.units || options.onlyMine) {
-            console.log(`Whitelist active: ${availableUnits.length} units`);
+            if(!options.omit) console.log(`Whitelist active: ${availableUnits.length} units`);
         }
-        console.log(`Using ${availableUnits.length} units\n`);
+        if(!options.omit) console.log(`Using ${availableUnits.length} units\n`);
 
         const { threeCharTeams, teamLabels, extendedCount, universalUnitObjects } = buildTeams(availableUnits, universalUnits);
 
-        if (universalUnitObjects.length > 0) {
+        if (universalUnitObjects.length > 0 && !options.omit) {
             console.log(`Universal units: ${universalUnitObjects.map(u => u.name).join(", ")}`);
             if (extendedCount > 0) {
                 console.log(`Extended ${extendedCount} teams using universal units`);
             }
         }
 
-        console.log(`Total 3-character teams: ${teamLabels.length}\n`);
+        if(!options.omit) console.log(`Total 3-character teams: ${teamLabels.length}\n`);
 
         teamEntries = teamLabels.map(label => ({ label, team: threeCharTeams[label] }));
     }
 
-    console.log("=".repeat(60) + "\n");
+    if(!options.omit) console.log("=".repeat(60) + "\n");
 
     // Filter bosses
     let filteredBosses = bosses;
     if (options.bosses) {
         filteredBosses = filterBosses(bosses, options.bosses);
-        console.log(`Boss filter: "${options.bosses}" (${filteredBosses.length} matches)\n`);
+        if(!options.omit) console.log(`Boss filter: "${options.bosses}" (${filteredBosses.length} matches)\n`);
     } else if (options.queryBosses) {
         filteredBosses = filterBosses(bosses, options.queryBosses.join(','));
-        console.log(`Bosses from share URL: ${filteredBosses.map(b => b.name).join(', ')} (${filteredBosses.length} matches)\n`);
+        if(!options.omit) console.log(`Bosses from share URL: ${filteredBosses.map(b => b.name).join(', ')} (${filteredBosses.length} matches)\n`);
     }
 
     // Process each boss
@@ -125,9 +125,9 @@ async function main() {
         if(viableTeams.length == 0 && options.omit) continue; //do not display
         
         console.log(boss.name);
-        console.log(`  Weak: ${weakStr} | Resist: ${resistStr} | Shill: ${shillStr} | Anti: ${antiStr} | Assists: ${boss.assists}`);
+        if(!options.omit) console.log(`  Weak: ${weakStr} | Resist: ${resistStr} | Shill: ${shillStr} | Anti: ${antiStr} | Assists: ${boss.assists}`);
         viableTeams.sort((a, b) => b.score - a.score);
-        console.log(`  Viable teams: ${viableTeams.length}`);
+        if(!options.omit) console.log(`  Viable teams: ${viableTeams.length}`);
 
         const topTeams = viableTeams.slice(0, options.depth);
         let currentRank = 1;
