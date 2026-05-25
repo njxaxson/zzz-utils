@@ -39,12 +39,6 @@ async function main() {
             //     "tags" : ["defense", "ether", "pubsec"],
             //     "join" : ["attack", "ether", "pubsec"]
             // },
-            {
-                "name" : "Promeia",
-                "rank" : "S",
-                "tags" : ["anomaly", "ice", "krampus"],
-                "join" : ["stun", "defense"]
-            },
         ]
     });
 
@@ -79,7 +73,7 @@ async function main() {
         ].indexOf(unit.name) != -1);
 
         //valid = valid && team.every(unit => unit.tags.includes("fire"));
-        valid = valid && team.every(unit => unit.tags.includes("ice"));
+        //valid = valid && team.every(unit => unit.tags.includes("ice"));
         //valid = valid && team.every(unit => unit.tags.includes("electric"));
         //valid = valid && team.every(unit => unit.tags.includes("physical"));
         //valid = valid && team.every(unit => unit.tags.includes("ether"));
