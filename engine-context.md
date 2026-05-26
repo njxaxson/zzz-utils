@@ -93,16 +93,16 @@ These are the common gameplay patterns that the engine recognizes through its me
 
 **Typical:** Stunner + Attacker + Support/Defense
 
-Attackers need stun windows to deal damage. The stunner creates vulnerability periods; the support amplifies the attacker's output during those windows. Double attacker is viable when one has `subdps` pseudoRole.
+Attackers need stun windows to deal damage. The stunner creates vulnerability periods; the support amplifies the attacker's output during those windows. Double attacker is viable in some scenarios, such as when one has `subdps` pseudoRole.
 
-**Stunless Exception (YSG):** YSG has a built-in stun damage multiplier, so she doesn't need a stunner. Her ideal composition is double-support (YSG + 2 supports). Having a stunner with YSG is suboptimal — except Dialyn, who provides free ultimate attacks. YSG's double-ultimate is the highest burst damage in the game, making Dialyn's ultimate provision uniquely valuable.
+**Stunless Exception (YSG):** YSG receives the same stun damage multiplier even when the enemy is stunned; so inflicting stuns does not actually increase her damage output like it would for other attackers. (She does signficantly benefit from any increase to the stun damage multiplier, though, for this same reason - the increased multiplier is applied all of the time, not just during stun windows.) Her ideal composition is double-support (YSG + 2 supports). Having a stunner with YSG is suboptimal — except Dialyn, who provides free ultimate attacks and a stun multiplier increase. YSG's double-ultimate is the highest burst damage in the game, making Dialyn's ultimate provision uniquely valuable.
 
 ### Anomaly Teams
 
 **Modern meta:** Stunner (Nangong/Lycaon) + Anomaly DPS + Support (Yuzuha/Sunna)
 **Classic:** Anomaly DPS + Anomaly SubDPS (Vivian/Burnice) + Support (Yuzuha)
 
-Nangong's release fundamentally changed anomaly team building. As a T0 hybrid stun/anomaly unit, Nangong provides anomaly buffs, extended stun windows, and polarity disorder triggers — making `Nangong/<Anomaly DPS>/Yuzuha` the strongest anomaly template, replacing `<Anomaly DPS>/Vivian/Yuzuha`. Lycaon (at P1+) serves as a budget alternative with ice defense shred. Interestingly enough, Promeia is the latest anomaly agent and she prefers Vivian over Nangong because of the higher quantity of abloom-specific damage, which Promeia buffs. So both compositions exist in modern play.
+Nangong's release fundamentally changed anomaly team building. As a T0 hybrid stun/anomaly unit, Nangong provides anomaly buffs, extended stun windows, and polarity disorder triggers — making `Nangong/<Anomaly DPS>/Yuzuha` the strongest anomaly template, replacing `<Anomaly DPS>/Vivian/Yuzuha`. Lycaon (at P1+) serves as a budget alternative with ice defense shred. Interestingly enough, Promeia is the latest anomaly agent and in some cases she prefers Vivian over Nangong because of the higher quantity of abloom-specific damage, which Promeia buffs. So both compositions exist in modern play.
 
 **Disorder generation:** When two anomaly-typed units of different elements are on the same team, they naturally generate disorders for bonus damage; unless one of them is wind, in which they generate a vortex instead. Disorders are especially critical for units with transformative scaling that is based on disorders, such as Miyabi who converts disorders into enhanced attacks.
 
@@ -112,19 +112,19 @@ Nangong's release fundamentally changed anomaly team building. As a T0 hybrid st
 
 Rupture deals Sheer damage that **ignores enemy defense**. This means defense debuffs (Nicole's 40% defense shred) are useless for rupture teams, and PEN ratio is irrelevant. The primary support is Lucia (specialist, +1200 Sheer) or Pan Yinhu (A-rank specialist).
 
-**Synergistic stunners:** Dialyn and Ju Fufu (who has `synergy.tags: ["rupture"]`) are preferred over generic stunners. Dialyn's free ultimates are particularly valuable. Ordering: Dialyn > Ju Fufu > Astra for rupture teams.
+**Synergistic stunners:** Dialyn and Ju Fufu (who has `synergy.tags: ["rupture"]`) are preferred over generic stunners. Dialyn's free ultimates are particularly valuable. Ordering: Dialyn > Ju Fufu > Astra for rupture teams. Norma, an upcoming stun unit, has a unique feature that allows her to convert sheer damage buffs from Lucia or Pan back into her own personal attack buffs, and will likely make her the second-best stunner for rupture teams after Dialyn.
 
 ### Totalize Teams (Hugo)
 
 **Typical:** DPS + Double Stunner
 
-Hugo converts accumulated stun time into damage (totalize mechanic). More stun uptime = more totalize damage. Hugo prefers two stunners over a stunner + support, even if the second stunner is low-tier. Hugo is marked `onfield: false` because he enters briefly for chain attacks and totalize bursts, then returns field time to his stunners.
+Hugo converts accumulated stun time into damage (totalize mechanic). More stun uptime = more totalize damage. Hugo prefers two stunners over a stunner + support, even if the second stunner is low-tier. Hugo is marked `onfield: false` because he enters briefly for chain attacks and totalize bursts, then returns field time to his stunners.  Pyrois, a free agent who will be available in an upcoming release, also deals totalize damage, although is not as reliant upon it as Hugo as his main damage output.
 
 ### “Monoshock” Teams
 
-**Typical:** Same-element Stunner + Anomaly + Attacker (all three share one element)
+**Typical but not essential:** Anomaly + Attacker + Stunner or Support
 
-There is technically the possibility to have hybrid attack+anomaly compositions; the classic example is the long-outdated  Grace/Harumasa/Rina team. This "monoshock" team — named because it is a triple-electric team whose strategy is to keep ongoing shock bonuses during the whole fight — is no longer all that competitive, but hybrid anomaly+attack compositions are technically still possible and can be used in some niche cases.  The “monoshock” moniker is typically used to refer to these hybrid anomaly/attacker teams (because of the original team that met this composition) but it does not need to be a triple-electric team; it is just a nickname for an unusual hybrid archetype.
+There is technically the possibility to have hybrid attack+anomaly compositions; the classic example is the long-outdated  Grace/Harumasa/Rina team. This "monoshock" team — named because it is a triple-electric team whose strategy is to keep ongoing shock bonuses during the whole fight — is no longer all that competitive, but hybrid anomaly+attack compositions *are* technically still possible and can be used in some niche cases.  The “monoshock” moniker is typically used to refer to these hybrid anomaly/attacker teams (because of the original team that met this composition) but it does not need to be a triple-electric team; it is just a nickname for an unusual hybrid archetype.
 
 ## Notable Units Reference
 
@@ -162,8 +162,8 @@ Conceptually, many support agents are effectively designed to be either speciali
 | Type | Units | Notes |
 |----|----|----|
 | **Specialists** | Lucia (rupture), Yuzuha (anomaly), Pan Yinhu (rupture) | Are typically found in best available teams for their archetype |
-| **Conditional** | Zhao (YSG/attack/anomaly), Nicole (defense shred, avoid rupture), Sunna (AoD/YSG, veils), Rina (electric PEN) | Strong in niche, weak/useless elsewhere |
-| **Universal** | Astra (ATK+CD, chains), Caesar (ATK, shields, pseudo-stun), Lucy (ATK, fire) | Work with almost any team, although not necessarily are the optimal support unit |
+| **Conditional** | Zhao (YSG), Nicole (defense shred, avoid rupture), Sunna (AoD/YSG, veils), Rina (electric PEN) | Strong in niche, weak/useless elsewhere |
+| **Universal** | Astra (ATK+CD, chains), Caesar (ATK, shields, pseudo-stun), Lucy (ATK, fire) | Work with almost any team, although not necessarily as the optimal support unit |
 
 ## Boss Reference
 
@@ -171,10 +171,10 @@ Conceptually, many support agents are effectively designed to be either speciali
 
 | Boss | Weak | Resist | Shill | Anti | Assists | Key Mechanics |
 |----|----|----|----|----|----|----|
-| **Discordant Solo** | ether, wind | ice, fire | anomaly | rupture | 2 | `shillIntensity:2`. Favors Aria, Sunna, Nangong. Sunna's ether veil stacking creates unique multiplicative debuffs — this boss was designed to require Sunna. One of only two bosses with dual resistance. |
-| **Sacrifice Bringer** | ice | physical | anomaly | — | 0 | `shillIntensity:2`. Favors Miyabi. Vulnerable to Freeze status; Miyabi or trivializes this fight. |
-| **Sanguine Sweeper** | electric, ether | fire | anomaly | rupture | 2 | `shillIntensity:2`. Favors Nangong. Benefits heavily from stunners on anomaly teams. |
-| **Primordial Nightmare** | physical | ice, ether | attack | rupture, anomaly | 0 | Favors YSG. Anti-rupture AND anti-anomaly — only attack teams viable. Dual resistance. |
+| **Discordant Solo** | ether, wind | ice, fire | anomaly | rupture | 2 | Favors Aria, Sunna, Nangong. Sunna's ether veil stacking creates unique multiplicative debuffs — this boss was designed to require Sunna. One of only two bosses with dual resistance. |
+| **Sacrifice Bringer** | ice | physical | anomaly | — | 0 | Favors Miyabi and Promeia. Vulnerable to Freeze status; Miyabi/Promeia trivializes this fight. |
+| **Sanguine Sweeper** | electric, ether | fire | anomaly | rupture | 2 | Benefits heavily from stunners on anomaly teams. |
+| **Primordial Nightmare** | physical | ice, ether | attack | rupture, anomaly | 0 | Heavily shills YSG: Anti-rupture AND anti-anomaly — only attack teams viable. Dual resistance against ice and ether was designed to lock out brute force attempts from Miyabi and Yixuan. |
 | **Wandering Hunter** | fire, ice | physical | rupture | anomaly, attack | 2 | Anti-anomaly AND anti-attack — only rupture teams viable. Physical resistance hurts YSG from trying to brute force it. |
 | **The Defiler** | electric, physical | ice | attack | anomaly | 2 | Attack-shill. Anti-anomaly. Ice resistance hurts Miyabi. |
 | **Thrall & Sobek** | ice, physical, \n wind | electric | stun | anomaly | 2 | Stun shill is a **hard requirement** — teams without a stunner are disqualified. |
@@ -189,7 +189,7 @@ Conceptually, many support agents are effectively designed to be either speciali
 
 ### Shill Intensity
 
-Bosses with `shillIntensity > 1` (Solo, Bringer, Sweeper) have fight mechanics that make their favored units disproportionately valuable. The first favored unit gets the full amplified bonus; additional favored units receive diminishing returns.
+Bosses with `shillIntensity > 1` have fight mechanics that make their favored units disproportionately valuable. The first favored unit gets the full amplified bonus; additional favored units receive diminishing returns. At the moment, this is no longer in use as it has been replaced by mechanics-driven scoring instead.
 
 ## Data Model
 
@@ -244,7 +244,7 @@ Bosses with `shillIntensity > 1` (Solo, Bringer, Sweeper) have fight mechanics t
 
 * `synergy.units` — Named partnerships scored in Layer 5. Currently only used for **Angels of Delusion** (Aria/Nangong/Sunna) whose faction cohesion is deliberately strong. All other unit synergies are expressed through mechanics.
 * `synergy.tags` — Largely retired. Only Ju Fufu retains `["rupture"]` as a stopgap for rupture-team optimization that is not easily modeled in mechanics.
-* `synergy.avoid` — Largely retired. Used to express conflicts that cannot easily be modeled. For example, Dialyn and Pan cannot be used on the same team because they invalidate each others' buffs due to teammate ordering, which is not something that is currently modeled.
+* `synergy.avoid` — Largely retired. Used to express conflicts that cannot easily be modeled.
 
 ### Unit Mechanics Object
 
@@ -254,7 +254,7 @@ The `mechanics` object describes what is **distinctive** about a unit beyond its
 {
   "mechanics": {
     "pseudoRole": "anomaly",
-    "elementalVariant": true,
+    "elementalVariant": "variant-type",
     "onfield": false,
     "damage": { "polarity": true, "abloom": true },
     "buffs": { "anomaly": 3 },
@@ -270,15 +270,15 @@ All fields are optional. Values are weighted: `true` (or 1) = minor, `2` = stron
 **Fields:**
 
 * `pseudoRole` — Secondary roles, comma-separated: `"subdps"`, `"anomaly"`, `"stun"`, `"support"`, `"attack"`, `"defense"`. DPS pseudo-roles require team context to activate (see Role Activation). Non-DPS pseudo-roles always activate.
-* `elementalVariant` — Marks units with alternate element tracking. Currently boolean; may become a named string for vortex mechanics.
+* `elementalVariant` — Marks units with alternate element tracking.
 * `onfield` — Explicit on-field demand override. Defaults: attack/anomaly/rupture/stun = `true`; support/defense = `false`. When a unit's pseudoRole activates as a different role, on-field status is derived from the activated role unless explicitly overridden.
-* `damage` — Distinctive damage types. Keys: `enhanced`, `ultimate:strong`, `ultimate:double`, `chain`, `aftershock`, `abloom`, `polarity`, `totalize`.
+* `damage` — Distinctive damage types. Keys: `enhanced`, `ultimate:strong`, `ultimate:double`, `chain`, `aftershock`, `abloom`, `polarity`, `totalize`, etc.
 * `buffs` — What the unit buffs for teammates. Keys: `atk`, `anomaly`, `aftershock`, `abloom`, `chain`, `sheer`, `pen`, `stun-multiplier`, `cr`, `cd`, `disorders`, element names, and `vortex`. The `vortex` key is a **contextual bonus** — it is excluded from DPS cohesion evaluation (added to `GENERIC_DPS_BUFFS`) and scores in L4 baseline affinity only when consumers actually generate vortex reactions this fight, tier-scaled so high-tier vortex generators (ice) receive proportionally more benefit.
 * `debuffs` — What the unit debuffs on enemies. Keys: `defense`, `recovery`, and element names.
 * `utility` — Non-stat team contributions. Keys: `disorders`, `quick-assists`, `chains`, `ultimates`, `heal:team`, `heal:self`, `shields`, `interrupt-resistance`, `kaleidoscope`, `veils`, `daze`, `stunless`.
 * `scaling` — What the unit benefits from. Overrides role baseline when present. Non-stat keys go through Need Fulfillment; stat keys enhance Baseline Affinity.
 
-**Override rule:** When `scaling` is present, it replaces the role-baseline scaling for Need Fulfillment. An attacker with no `scaling` gets baseline (cr:2, cd:2). An attacker with `scaling: { "ultimates": 3 }` scales ONLY with ultimates through Need Fulfillment. ***{TODO: This might be incorrect!!!}*** Baseline Affinity rules (ATK, defense shred, element matching, stun infrastructure) still apply regardless.
+**Override rule:** When `scaling` is present, it replaces the role-baseline scaling for Need Fulfillment. An attacker with no `scaling` gets baseline (cr:2, cd:2). An attacker with `scaling: { "ultimates": 3 }` scales ONLY with ultimates through Need Fulfillment. ***{TODO: This is almost certainly incorrect!!! But it hasn’t been changed because scoring currently works as-is; but it may need to change in the future!}*** Baseline Affinity rules (ATK, defense shred, element matching, stun infrastructure) still apply regardless.
 
 **Role baselines (implicit when no explicit scaling):**
 
@@ -321,9 +321,9 @@ All fields are optional. Values are weighted: `true` (or 1) = minor, `2` = stron
 * `available` — (optional, default `true`) When `false`, boss is unreleased
 * `mechanics` — (optional) Boss-specific mechanical gimmicks. Currently supports:
   * `"anomaly:state": "<element>"` — Boss permanently has the specified element's anomaly applied. Changes how anomaly reactions work against this boss (see Anomaly Reactions section).
-  * `freezable` - indicates that the boss is particularly vulnerable to ice anomalies and gives ice anomaly units a very significant bonus. Pseudoanomalies get half of that bonus. 
-  * `weak` - indicates that the boss is weak to a specific type of damage or utility, such as disorders, abloom, or ether veils. Different damage types may get different bonuses; some nominal and some more significant. 
-  * `debuffs` - this boss inflicts a very specific debuff against the team. Currently, only Scorched Horizon does this and inflicts a Critical Damage debuff (CD) that penalizes DPS agents that rely on CD (checked by looking at their scaling - explicit or implicit - and seeing if the team can mitigate the CD debuff with its own CD buffs or not). 
+  * `freezable` - indicates that the boss is particularly vulnerable to ice anomalies and gives ice anomaly units a very significant bonus. Pseudoanomalies get half of that bonus.
+  * `weak` - indicates that the boss is weak to a specific type of damage or utility, such as disorders, stuns, ablooms, or ether veils. Different damage types may get different bonuses; some nominal and some more significant.  TODO: This may need to change to an array to accomodate multiple forms of damage type weakness.
+  * `debuffs` - this boss inflicts a very specific debuff against the team. Currently, only Scorched Horizon does this and inflicts a Critical Damage debuff (CD) that penalizes DPS agents that rely on CD (checked by looking at their scaling - explicit or implicit - and seeing if the team can mitigate the CD debuff with its own CD buffs or not). TODO: Butcher debuffs daze accumulation, hurting stunner-based teams. 
 
 ## Engine Architecture: Five-Layer Scoring
 
@@ -341,7 +341,7 @@ The scoring engine evaluates a team of 3 units against a boss through five seque
 3. **Layer 2: Inherent Quality** — Individual unit power independent of team context. DPS tier/rank scored at full weight; support/defense/stun tier/rank scored at reduced weight gated by buff utilization. Titled units receive a bonus. SubDPS units receive 50% tier multiplier.
 4. **Layer 3: Boss Matchup** — Element weakness/resistance scoring, shill preference bonuses, favored unit bonuses (amplified by `shillIntensity`), defensive assist bonus.
 5. **Layer 4: Mechanical Synergy** — The core of the engine. Pairwise directional evaluation of all teammate pairs using the `mechanics` object. Components:
-   * **Baseline Affinity**: Broad stat interactions (ATK/CR/CD help DPS; anomaly buffs help anomaly agents; defense/element debuffs help damage contributors; stun infrastructure helps attackers/rupture)
+   * **Baseline Affinity**: Broad stat interactions (e.g. ATK/CR/CD help attackers; anomaly buffs help anomaly agents; defense/element debuffs help damage contributors; stun infrastructure helps attackers/rupture, etc.)
    * **Damage Amplification**: Supplier buffs a damage type the consumer deals
    * **Need Fulfillment**: Supplier provides something the consumer explicitly scales with (highest-value matches)
    * **Stun Emergence**: Consumer has burst damage that benefits from stun infrastructure
@@ -438,9 +438,9 @@ These principles govern how the mechanics-driven engine evaluates teams. They ar
 
 **Wasting Buffs = Wasting DPS Potential (P3):** When a DPS provides buffs (SAnby's aftershock buff, Cissia's electric debuff), teammates must consume them. Unused buffs indicate the DPS was fielded in the wrong team, and the engine applies a cohesion penalty proportional to the unused buff weight.
 
-**CR/CD Role Asymmetry (P9):** CR/CD are critical for attackers and rupture. For anomaly agents, damage comes primarily from ATK/AP/disorders, not crits — CR/CD return only 0.3 weight. Exception: Miyabi has effectively 100% crit rate and explicit `scaling: { cr: 3, cd: 3 }`, making CR/CD fully valuable for her.
+**CR/CD Role Asymmetry (P9):** CR/CD are critical for attackers and rupture. For anomaly agents, damage comes primarily from ATK/AP/disorders/vortex, not crits — CR/CD return only 0.3 weight. Exception: Miyabi has effectively 100% crit rate and explicit `scaling: { cr: 3, cd: 3 }`, making CR/CD fully valuable for her.
 
-**Stun Multiplier Is a Real Buff (P12):** The `stun-multiplier` buff (Dialyn, Sunna, Lycaon) increases damage during stun windows. It benefits all DPS units, not just specific archetypes. Scored in baseline affinity.
+**Stun Multiplier Is a Real Buff (P12):** The `stun-multiplier` buff (Dialyn, Sunna, Lycaon, etc) increases damage during stun windows. It benefits all DPS units, not just specific archetypes. Scored in baseline affinity.
 
 ### Need Fulfillment and Scaling
 
@@ -456,7 +456,7 @@ These principles govern how the mechanics-driven engine evaluates teams. They ar
 * *Transformative* (scaling feeds enhanced attack frequency): Miyabi's `scaling.disorders:3` + `damage.enhanced:3`. Disorders are converted into enhanced attack resources. Missing this is very impactful — the unit will function at a significant gap from their potential damage ceiling.
 * *Constant* (steady stat amplification): Alice/Vivian's `scaling.am` converts AM into AP passively. This means that bonuses to AM benefit both AM and AP for these units, not just AM.  So for these units, buffs to AM are twice as valuable as other common buffs.
 
-**Ultimates Are a Primary DPS Resource (P28):** Free ultimates (Dialyn, Ju Fufu) are limited — only one unit gets them per stun window. SubDPS units receive implicit ultimates scaling, but additional ultimates scaling above the implicit scaling only goes to the primary DPS. For example - anything that boosts ultimate damage will benefit a subDPS, because they implicitly improve when ultimates occur. But Dialyn’s free ultimates are only going to the primary DPS, because it is a highly limited resource and you want to allocate it to the optimal damage dealer. By comparison, quick assists are NOT limited and benefit all DPS including subdps.
+**Ultimates Are a Primary DPS Resource (P28):** Free ultimates (Dialyn, Ju Fufu, etc) are limited — only one unit gets them per stun window. SubDPS units receive implicit ultimates scaling, but additional ultimates scaling above the implicit scaling only goes to the primary DPS. For example - anything that boosts ultimate damage will benefit a subDPS, because they implicitly improve when ultimates occur. But Dialyn’s free ultimates are only going to the primary DPS, because it is a highly limited resource and you want to allocate it to the optimal damage dealer. By comparison, quick assists are NOT limited and benefit all DPS including subdps.
 
 **Ultimates Provision Scales with Burst Potential (P13):** Free ultimates are worth more for high-burst DPS (Evelyn 4000% multiplier ultimate vs. a basic 1000% ultimate). Scaled by consumer's `getMaxBurstWeight`.
 
@@ -482,7 +482,7 @@ These principles govern how the mechanics-driven engine evaluates teams. They ar
 
 **Anomaly Reactions Are Boss-Context-Dependent (P15):** When two anomaly-typed units of different elements are on the same team, both receive a reaction bonus. Against normal bosses, team-side pairs react independently: wind+non-wind = vortex; non-wind+non-wind = disorder. Against anomaly-state bosses, the boss intercepts all applied anomalies — each agent reacts with the boss (one reaction per agent), and team-side reactions are suppressed. Units with explicit `scaling.disorders` (Miyabi) are excluded from the implicit bonus to prevent double-counting with need fulfillment.
 
-**Vortex Rewards Element-Specific Tiers (P29):** Vortex bonuses are tiered by element: ice highest, fire medium, physical/ether/electric low, elemental variants negligible. This creates meaningful differentiation between ice anomaly agents (Promeia, Soukaku) and frost-variant agents (Miyabi) against wind-anomaly-state bosses.
+**Vortex Rewards Element-Specific Tiers (P29):** Vortex bonuses are tiered by element: ice highest, fire medium, physical/ether/electric low, elemental variants with custom rates. This creates meaningful differentiation between ice anomaly agents (Promeia, Soukaku) and frost-variant agents (Miyabi) against wind-anomaly-state bosses, because frost has a miniscule vortex damage multiplier while ice has one of the highest.
 
 **Boss Anomaly State Suppresses Team-Side Reactions (P30):** A boss with permanent self-applied anomaly intercepts and consumes every team-applied anomaly. This suppresses all team-side disorder/vortex generation between agents. Each agent reacts directly with the boss's anomaly only.
 
@@ -492,7 +492,7 @@ These principles govern how the mechanics-driven engine evaluates teams. They ar
 
 **Dual-Anomaly Teams Are Inherently Cohesive (P24):** Primary anomaly DPS + off-field anomaly subdps of different element = inherently cohesive. No cohesion penalty for the subdps "not providing buffs."
 
-**Totalize and Stun Dependency (P11):** Totalize units (Hugo) convert stun time into damage. They want double-stun teams. The engine applies non-linear penalties when stun infrastructure is below 2.0 credits (proper stunner = 1.0, pseudo-stunner = 0.9, high-daze support = 0.4).
+**Totalize and Stun Dependency (P11):** Totalize units convert stun time into damage. They want double-stun teams. For agents heavily dependent on totalize (e.g. Hugo), the engine applies non-linear penalties when stun infrastructure is below 2.0 credits (proper stunner = 1.0, pseudo-stunner = 0.9, high-daze support = 0.4). For agents who deal some totalize damage but it is not an essential part of their damage output (e.g. Pyrois), then this penalty is waived. 
 
 ### Structural Principles
 
@@ -500,7 +500,7 @@ These principles govern how the mechanics-driven engine evaluates teams. They ar
 
 **Quick-Assists Baseline Value (P18):** Quick-assists are useful but not transformative. Implicit scaling baseline is 0.25 — modest need fulfillment credit. Units with explicit `scaling['quick-assists']` override this.
 
-**Defense Element Irrelevance (P20):** Pure defense units provide value through buffs and utility, not damage. Element resistance penalties are removed for defense units. A small on-element bonus is retained. Despite the name, defense units’ value typically does not come from defensive strategies as the game does not really reward defensive approaches and instead heavily rewards aggressive offense. So even though some units are ‘defense’ units, their primary purpose is an alternate form of support agent that is typically capable of slightly higher damage output; albeit a negligible difference for modeling purposes. For example, T4 fire defense unit Ben converts his defense stat into an critical damage multiplier.
+**Support Element Irrelevance (P20):** Pure support and defense units provide value through buffs and utility, not damage. Element resistance penalties are removed for support and defense units. For defense agents, a small on-element bonus is retained (unlike support agents, defense agents can deal small quantities of material damage). Despite the name, defense units’ value typically does not come from defensive strategies as the game does not really reward defensive approaches and instead heavily rewards aggressive offense. So even though some units are ‘defense’ units, their primary purpose is an alternate form of support agent that is typically capable of slightly higher damage output; albeit a negligible difference for modeling purposes. For example, T4 fire defense unit Ben converts his defense stat into a critical damage multiplier, and players who actually run Ben typically build him as a DPS rather than a support. 
 
 **Element Resistance and SubDPS/PseudoSupport Handling (P21):** Standard subdps units are disqualified when resisted, like any DPS. Only pseudosupports bypass disqualification (they still contribute as supports when their damage element is resisted), but receive a damage-proportional penalty.
 
@@ -510,10 +510,11 @@ These principles govern how the mechanics-driven engine evaluates teams. They ar
 
 Powerful support/utility pairings that uplift almost any compatible DPS:
 
-* **Astra + Nicole** — Universal attack/anomaly wheelchair. ATK buff + defense shred = massive damage differential. Not for rupture (defense shred useless).
-* **Nangong + Sunna** — Attack/anomaly wheelchair, although better for anomaly. Anomaly procs + stun + ATK buff + stun multiplier. Not for rupture.
-* **Nangong + Yuzuha** — Anomaly-specific wheelchair. Stun + anomaly buffs + kaleidoscope element flex. Replaced Vivian's slot in the top anomaly template.
-* **Dialyn + Lucia** — Definitive rupture wheelchair. Free ultimates + stun + rupture specialist support. Best-in-slot for all rupture agents.
+* **Astra + Nicole** — Universal attack/anomaly wheelchair, although better for attack. ATK buff + defense shred = massive damage differential. Not for rupture (defense shred useless).
+* **Nangong + Sunna** — Attack/anomaly wheelchair, although better for Aria specifically than others. Anomaly procs + stun buffs amd benefits + ATK buff + stun multiplier. Not for rupture.
+* **Nangong + Yuzuha** — Anomaly-specific wheelchair. Stun buffs and benefits + ATK buff + anomaly buffs + kaleidoscope element flex to help disorder generation. Replaced Vivian's slot in the top anomaly template.
+* **Vivian + Yuzuha** — Anomaly-specific wheelchair (for non-ether anomaly agents). ATK buff + anomaly buffs + lots of disorder generation.
+* **Dialyn + Lucia** — Definitive rupture wheelchair. Free ultimates + stun + rupture specialist support. Best-in-slot for all rupture agents.  (The upcoming stunner Norma may also form a wheelchair with Lucia.) 
 
 These emerge naturally from the mechanics engine — their high scores are evidence of well-modeled mechanics.
 
@@ -668,4 +669,4 @@ Ice anomaly DPS (just released). Key mechanics:
 
 ### Starlight Billy (2.8 second banner, upcoming)
 
-Conventional physical rupture agent; only real feature is that he has relatively strong chain attacks. Expected to be strong against Fiend, Thrall, and Defiler. Best-in-slot teammates: Dialyn + Lucia (like every rupture agent), with Ju Fufu and Pan as alternatives. Should slot cleanly into existing rupture scoring without engine changes.  Norma, an upcoming stun agent that can uniquely benefit from sheer damage buffs, will likely pair well with him as an alternative to the current suite of rupture stunners. 
+Conventional physical rupture agent; only real feature is that he has relatively strong chain attacks. Expected to be strong against Fiend, Thrall, and Defiler. Best-in-slot teammates: Dialyn + Lucia (like every rupture agent), with Ju Fufu and Pan as alternatives. Should slot cleanly into existing rupture scoring without engine changes.  Norma, an upcoming stun agent that can uniquely benefit from sheer damage buffs, will likely pair well with him as an alternative to the current suite of rupture stunners.

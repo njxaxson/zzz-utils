@@ -1,3 +1,8 @@
+TWEAKS:
+- Alice scales on disorders. Need to implement and check that. 
+- Butcher debuffs daze accumulation. Need to implement and check that. 
+- Ben should be given a pseudorole: attacker, maybe. 
+
 TOOLING:
 - Scoring diff script to ignore trailing changes that push units off the bottom of the list
 

@@ -160,7 +160,6 @@
         "anti": ["rupture"],
         "assists": 2,
         "favored": ["Aria", "Sunna", "Nangong"],
-        "shillIntensity": 1,
         "mechanics": {
             "weak" : "veils"
         }
@@ -191,7 +190,6 @@
         "anti": [],
         "assists": 2,
         "favored": ["Velina"],
-        "shillIntensity": 1,
         "mechanics": {
             "anomaly:state": "wind",
             "weak" : "abloom",
