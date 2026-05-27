@@ -650,8 +650,11 @@ function detectStunnerGap(gaps, stunnerQuality, ownedStunners, dpsQuality, unown
 function detectSubdpsGap(gaps, dpsQuality, ownedSubdps, unownedLimitedS, sortCandidatesFn) {
     const anomBest = getBestTier(ownedSubdps.anomaly);
     const anomSubdpsQuality = anomBest !== null ? tierToQuality(anomBest) : 0;
-    if (dpsQuality.anomaly >= 50 && anomSubdpsQuality < 50) {
+    if (dpsQuality.anomaly >= 50 && anomSubdpsQuality < 40) {
         const score = anomSubdpsQuality === 0 ? 45 : 35;
+        const reason = anomSubdpsQuality === 0
+            ? 'Anomaly teams perform best with two anomaly agents — you need a sub-DPS partner'
+            : 'Anomaly teams perform best with two anomaly agents — your current sub-DPS is too weak to reliably fill this role';
         const candidates = sortCandidatesFn(
             unownedLimitedS.filter(u => u.tags.includes('anomaly') && isSubdps(u))
         );
@@ -659,7 +662,7 @@ function detectSubdpsGap(gaps, dpsQuality, ownedSubdps, unownedLimitedS, sortCan
             gaps.push({
                 id: 'subdps-anomaly',
                 title: 'Anomaly Sub-DPS',
-                reason: 'Anomaly teams perform best with two anomaly agents — you need a sub-DPS partner',
+                reason,
                 score,
                 units: candidates
             });
@@ -950,6 +953,27 @@ function detectMechanicalSynergies(gaps, ownedUnits, unownedLimitedS, dpsQuality
         u.rank === 'S' && (u.tags.includes('support') || u.tags.includes('defense') || u.tags.includes('stun'))
     );
 
+    // Precompute the best existing fit an owned non-DPS provides per (DPS id, team slot).
+    // Used to suppress non-DPS candidates whose role+synergy is already covered by an owned unit.
+    // Slot is 'stun' for stunners, 'support' for everything else (support/defense).
+    const ownedStunUnits = ownedUnits.filter(u => u.tags.includes('stun'));
+    const ownedSupportDefUnits = ownedUnits.filter(u =>
+        u.tags.includes('support') || u.tags.includes('defense')
+    );
+    const bestOwnedFitForDPS = new Map();
+    for (const dps of ownedSRankDPS) {
+        const stunFits = ownedStunUnits
+            .filter(u => u.id !== dps.id)
+            .map(u => mechanicsFitScore(u, dps));
+        const supportFits = ownedSupportDefUnits
+            .filter(u => u.id !== dps.id)
+            .map(u => mechanicsFitScore(u, dps));
+        bestOwnedFitForDPS.set(dps.id, {
+            stun: stunFits.length > 0 ? Math.max(...stunFits) : 0,
+            support: supportFits.length > 0 ? Math.max(...supportFits) : 0
+        });
+    }
+
     // First pass: score every qualifying candidate against ALL of their owned pairings,
     // not just the best — so a stunner like Dialyn can register synergy with both YSG
     // and Yixuan independently, even if one pair scores slightly higher than the other.
@@ -976,6 +1000,15 @@ function detectMechanicalSynergies(gaps, ownedUnits, unownedLimitedS, dpsQuality
             if (fit < 15) continue; // generic ATK+CD alone scores ~14; real mechanics (stun+defense, aftershock, ultimates) score 15+
             const pairScore = Math.min(45, Math.round(fit * 2.5));
             if (pairScore < 15) continue;
+
+            // Redundancy check for non-DPS candidates: if an already-owned unit in the same
+            // team slot provides equal or better fit with this DPS, the synergy is covered.
+            if (!isDPSCandidate) {
+                const slot = candidate.tags.includes('stun') ? 'stun' : 'support';
+                const bestExisting = bestOwnedFitForDPS.get(owned.id)?.[slot] ?? 0;
+                if (bestExisting >= fit) continue;
+            }
+
             qualifyingPairs.push({ name: owned.name, id: owned.id, fit, score: pairScore });
         }
         if (qualifyingPairs.length === 0) continue;

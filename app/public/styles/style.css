@@ -3940,13 +3940,13 @@ button#simulate-btn:disabled,
 
 /* Border matches recommendation tier (same hues as .pull-rec-card priority stripes) */
 .banner-unit-tile.verdict-high {
-    border-color: #e74c3c;
+    border-color: #0FFF50;
 }
 .banner-unit-tile.verdict-medium {
-    border-color: #f39c12;
+    border-color: #4CBB17;
 }
 .banner-unit-tile.verdict-low {
-    border-color: #2ecc71;
+    border-color: #00A36C;
 }
 .banner-unit-tile.verdict-no {
     border-color: #e74c3c;
@@ -3996,9 +3996,9 @@ button#simulate-btn:disabled,
     letter-spacing: 0.04em;
 }
 
-.banner-unit-tile.verdict-high .banner-tile-verdict { color: #e74c3c; }
-.banner-unit-tile.verdict-medium .banner-tile-verdict { color: #f39c12; }
-.banner-unit-tile.verdict-low .banner-tile-verdict { color: #2ecc71; }
+.banner-unit-tile.verdict-high .banner-tile-verdict { color: #0FFF50; }
+.banner-unit-tile.verdict-medium .banner-tile-verdict { color: #4CBB17; }
+.banner-unit-tile.verdict-low .banner-tile-verdict { color: #00A36C; }
 .banner-unit-tile.verdict-no .banner-tile-verdict { color: #e74c3c; }
 
 /* Recommendation Cards */

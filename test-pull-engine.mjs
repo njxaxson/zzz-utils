@@ -320,5 +320,51 @@ await runTest(18, '11h: Candidate ranking by element match', () => {
     }
 });
 
+// TEST 19
+// Regression: exact roster from diagnostic output.
+// Bug 1 — Burnice (T1.5) is owned, so the subdps-anomaly gap should not fire and
+//          Vivian should not surface as a top-10 recommendation via that gap.
+// Bug 2 — Trigger (T0.5, electric off-field aftershock stunner) is already owned and
+//          provides strictly better mechanical fit with SAnby than Ju Fufu does.
+//          The mech-synergy-sanby gap must not exist; Ju Fufu's only remaining signal
+//          should be the lower-weight rupture-tag affinity gap, not the mechanical one.
+await runTest(19, 'Loaded roster: subdps-anomaly and mech-synergy-sanby bugs fixed', () => {
+    const rosterNames = [
+        // Limited S (18)
+        'Astra', 'Banyue', 'Burnice', 'Caesar', 'Cissia', 'Ellen', 'Jane Doe',
+        'Lighter', 'Lucia', 'Miyabi', 'Orphie', 'SAnby', 'Seed', 'Trigger',
+        'Ye Shunguong', 'Yidhari', 'Yuzuha', 'Zhao',
+        // Standard S (6)
+        'Grace', 'Koleda', 'Lycaon', 'Nekomata', 'Rina', 'Soldier 11',
+        // A-rank (13)
+        'Anby', 'Anton', 'Ben', 'Billy', 'Corin', 'Komano', 'Lucy',
+        'Nicole', 'Pan Yinhu', 'Piper', 'Pulchra', 'Seth', 'Soukaku'
+    ];
+    const { unitStates, ownedUnits } = buildSyntheticRoster(allUnits, rosterNames);
+    const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 10 });
+
+    // Bug 1: subdps-anomaly gap should not fire — Burnice (T1.5, quality 40) meets the threshold
+    assert(!hasGap(result, 'subdps-anomaly'),
+        'subdps-anomaly gap should not fire when Burnice (T1.5) is owned');
+
+    // Bug 1 corollary: Vivian should not appear in top-10 recommendations via the sub-DPS gap
+    const top10UnitIds = new Set(result.recommendations.flatMap(r => r.units.map(u => u.id)));
+    assert(!top10UnitIds.has('vivian'),
+        'Vivian should not appear in top-10 recommendations — Burnice already covers anomaly sub-DPS');
+
+    // Bug 2: the mechanical synergy gap pairing Ju Fufu with SAnby should not exist —
+    // Trigger already provides equal or better off-field aftershock stunner fit for SAnby.
+    assert(!hasGap(result, 'mech-synergy-sanby'),
+        'mech-synergy-sanby gap should not exist — Trigger already covers this mechanical role');
+
+    // Bug 2 corollary: if Ju Fufu still appears (e.g. via rupture-tag affinity), its score
+    // must be LOW priority only — the inflated mech-synergy score (Medium) must be gone.
+    const juFufuRec = result.recommendations.find(r => r.units.some(u => u.id === 'ju-fufu'));
+    if (juFufuRec) {
+        assert(juFufuRec.priority === 'Low',
+            `Ju Fufu recommendation should be Low priority only, got ${juFufuRec.priority} — mech-synergy-sanby may still be inflating its score`);
+    }
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed > 0 ? 1 : 0);
