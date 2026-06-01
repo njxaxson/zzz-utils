@@ -1,5 +1,5 @@
 TWEAKS:
-- Alice scales on disorders. Need to implement and check that. 
+- Alice scales on disorders. Need to implement and check that. RESULT: it distorts results a bit too much; not worth fixing right now. 
 - Butcher debuffs daze accumulation. Need to implement and check that. 
 - Ben should be given a pseudorole: attacker, maybe. 
 

@@ -148,6 +148,7 @@ There is technically the possibility to have hybrid attack+anomaly compositions;
 | **Vivian** | T0.5 | Anomaly (Ether) + SubDPS | `damage.abloom:3, scaling.am:2, onfield:false` | Was Miyabi's best partner before Nangong. Still strong but dropped from T0. |
 | **Promeia** | T0.5 | Anomaly (Ice) | `damage.abloom:3, buffs.abloom:3, debuffs.defense:2` | Ice anomaly with tier-3 vortex. Abloom buffer. Direct Miyabi alternative on Scaled Horizon — pure ice vortex vs. frost variant. |
 | **Jane Doe** | T1.5 | Anomaly (Physical) | `buffs.vortex:3` | Physical anomaly with a retroactive vortex buff. Contextual bonus — no cohesion penalty when inactive. When Jane causes a physical anomaly that triggers a vortex, the vortex is considered a critical hit and gets the crit damage modifier. This is modeled as a generic vortex buff rather than to complexly model a narrow game mechanic, and so it provides a modest boost to average out its actual value. |
+| Norma | T0.5 | Stun (Fire) | `damage.chains, scaling.sheer, scaling.quick-assists` | Norma is a stunner designed as a subdps. She is intended to work with attack and rupture teams. She has two unique features: she can upgrade quick assists into chain attacks (a huge damage boost when paired with Astra) and she converts sheer buffs into ATK (so huge damage boost when paired with Lucia).  She also has chain attack damage modifiers almost as high as Evelyn. This gives her two very capable wheelchair compositions for attack and rupture.  |
 
 ### SubDPS Units
 
@@ -323,7 +324,7 @@ All fields are optional. Values are weighted: `true` (or 1) = minor, `2` = stron
   * `"anomaly:state": "<element>"` — Boss permanently has the specified element's anomaly applied. Changes how anomaly reactions work against this boss (see Anomaly Reactions section).
   * `freezable` - indicates that the boss is particularly vulnerable to ice anomalies and gives ice anomaly units a very significant bonus. Pseudoanomalies get half of that bonus.
   * `weak` - indicates that the boss is weak to a specific type of damage or utility, such as disorders, stuns, ablooms, or ether veils. Different damage types may get different bonuses; some nominal and some more significant.  TODO: This may need to change to an array to accomodate multiple forms of damage type weakness.
-  * `debuffs` - this boss inflicts a very specific debuff against the team. Currently, only Scorched Horizon does this and inflicts a Critical Damage debuff (CD) that penalizes DPS agents that rely on CD (checked by looking at their scaling - explicit or implicit - and seeing if the team can mitigate the CD debuff with its own CD buffs or not). TODO: Butcher debuffs daze accumulation, hurting stunner-based teams. 
+  * `debuffs` - this boss inflicts a very specific debuff against the team. Currently, only Scorched Horizon does this and inflicts a Critical Damage debuff (CD) that penalizes DPS agents that rely on CD (checked by looking at their scaling - explicit or implicit - and seeing if the team can mitigate the CD debuff with its own CD buffs or not). TODO: Butcher debuffs daze accumulation, hurting stunner-based teams.
 
 ## Engine Architecture: Five-Layer Scoring
 
@@ -492,7 +493,7 @@ These principles govern how the mechanics-driven engine evaluates teams. They ar
 
 **Dual-Anomaly Teams Are Inherently Cohesive (P24):** Primary anomaly DPS + off-field anomaly subdps of different element = inherently cohesive. No cohesion penalty for the subdps "not providing buffs."
 
-**Totalize and Stun Dependency (P11):** Totalize units convert stun time into damage. They want double-stun teams. For agents heavily dependent on totalize (e.g. Hugo), the engine applies non-linear penalties when stun infrastructure is below 2.0 credits (proper stunner = 1.0, pseudo-stunner = 0.9, high-daze support = 0.4). For agents who deal some totalize damage but it is not an essential part of their damage output (e.g. Pyrois), then this penalty is waived. 
+**Totalize and Stun Dependency (P11):** Totalize units convert stun time into damage. They want double-stun teams. For agents heavily dependent on totalize (e.g. Hugo), the engine applies non-linear penalties when stun infrastructure is below 2.0 credits (proper stunner = 1.0, pseudo-stunner = 0.9, high-daze support = 0.4). For agents who deal some totalize damage but it is not an essential part of their damage output (e.g. Pyrois), then this penalty is waived.
 
 ### Structural Principles
 
@@ -500,7 +501,7 @@ These principles govern how the mechanics-driven engine evaluates teams. They ar
 
 **Quick-Assists Baseline Value (P18):** Quick-assists are useful but not transformative. Implicit scaling baseline is 0.25 — modest need fulfillment credit. Units with explicit `scaling['quick-assists']` override this.
 
-**Support Element Irrelevance (P20):** Pure support and defense units provide value through buffs and utility, not damage. Element resistance penalties are removed for support and defense units. For defense agents, a small on-element bonus is retained (unlike support agents, defense agents can deal small quantities of material damage). Despite the name, defense units’ value typically does not come from defensive strategies as the game does not really reward defensive approaches and instead heavily rewards aggressive offense. So even though some units are ‘defense’ units, their primary purpose is an alternate form of support agent that is typically capable of slightly higher damage output; albeit a negligible difference for modeling purposes. For example, T4 fire defense unit Ben converts his defense stat into a critical damage multiplier, and players who actually run Ben typically build him as a DPS rather than a support. 
+**Support Element Irrelevance (P20):** Pure support and defense units provide value through buffs and utility, not damage. Element resistance penalties are removed for support and defense units. For defense agents, a small on-element bonus is retained (unlike support agents, defense agents can deal small quantities of material damage). Despite the name, defense units’ value typically does not come from defensive strategies as the game does not really reward defensive approaches and instead heavily rewards aggressive offense. So even though some units are ‘defense’ units, their primary purpose is an alternate form of support agent that is typically capable of slightly higher damage output; albeit a negligible difference for modeling purposes. For example, T4 fire defense unit Ben converts his defense stat into a critical damage multiplier, and players who actually run Ben typically build him as a DPS rather than a support.
 
 **Element Resistance and SubDPS/PseudoSupport Handling (P21):** Standard subdps units are disqualified when resisted, like any DPS. Only pseudosupports bypass disqualification (they still contribute as supports when their damage element is resisted), but receive a damage-proportional penalty.
 
@@ -514,7 +515,8 @@ Powerful support/utility pairings that uplift almost any compatible DPS:
 * **Nangong + Sunna** — Attack/anomaly wheelchair, although better for Aria specifically than others. Anomaly procs + stun buffs amd benefits + ATK buff + stun multiplier. Not for rupture.
 * **Nangong + Yuzuha** — Anomaly-specific wheelchair. Stun buffs and benefits + ATK buff + anomaly buffs + kaleidoscope element flex to help disorder generation. Replaced Vivian's slot in the top anomaly template.
 * **Vivian + Yuzuha** — Anomaly-specific wheelchair (for non-ether anomaly agents). ATK buff + anomaly buffs + lots of disorder generation.
-* **Dialyn + Lucia** — Definitive rupture wheelchair. Free ultimates + stun + rupture specialist support. Best-in-slot for all rupture agents.  (The upcoming stunner Norma may also form a wheelchair with Lucia.) 
+* **Dialyn + Lucia** — Definitive rupture wheelchair. Free ultimates + stun + rupture specialist support. Best-in-slot for all rupture agents.  (The upcoming stunner Norma may also form a wheelchair with Lucia.)
+* Upcoming: Norma/Astra | Norma/Lucia - Stun+Support that self-reinforces with Norma acting as a secondary DPS for attack and rupture teams due to Norma’s interactions with quick assists and sheer buffs. 
 
 These emerge naturally from the mechanics engine — their high scores are evidence of well-modeled mechanics.
 
@@ -667,6 +669,6 @@ Ice anomaly DPS (just released). Key mechanics:
 * Stun-synergy anomaly — benefits from stun windows (like Aria), emergent from mechanics due to having an enhanced attack
 * Positioned as a direct alternative to Miyabi against Scorched Horizon: pure ice anomaly (strong vortex tier of 3) vs. frost variant (weak vortex tier of 0.001)
 
-### Starlight Billy (2.8 second banner, upcoming)
+### Starlight Billy (2.8 second banner)
 
 Conventional physical rupture agent; only real feature is that he has relatively strong chain attacks. Expected to be strong against Fiend, Thrall, and Defiler. Best-in-slot teammates: Dialyn + Lucia (like every rupture agent), with Ju Fufu and Pan as alternatives. Should slot cleanly into existing rupture scoring without engine changes.  Norma, an upcoming stun agent that can uniquely benefit from sheer damage buffs, will likely pair well with him as an alternative to the current suite of rupture stunners.

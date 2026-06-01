@@ -519,6 +519,7 @@
         "join": ["attack", "rupture"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
+            "pseudoRole" : "subdps",
             "damage" : { "chain" : 3 },
             "buffs" : { "stun-multiplier" : 2 },
             "scaling" : { "quick-assists" : 2, "sheer": 1, "atk" : 3}
