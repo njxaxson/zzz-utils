@@ -117,7 +117,8 @@ function initializeUnitStates() {
     for (const unit of allUnits) {
         if (!unitStates[unit.id]) {
             const isAvailable = unit.available !== false;
-            const defaultOwned = isAvailable && (unit.rank === 'A' || (unit.rank === 'S' && !unit.limited));
+            //exclude Pyrois by default because he is only available for people who have sufficiently advanced the story
+            const defaultOwned = isAvailable && (unit.rank === 'A' || (unit.rank === 'S' && !unit.limited && unit.id !== 'pyrois'));
             const defaultUniversal = isAvailable && unit.id === 'nicole';
             unitStates[unit.id] = {
                 owned: defaultOwned,

@@ -12,7 +12,9 @@
  * Limited S-ranks default to NOT owned, everything else defaults to owned
  */
 function getDefaultOwned(unit) {
-    return unit.rank === 'A' || (unit.rank === 'S' && !unit.limited);
+    //exclude Pyrois because he is only available for people who have sufficiently advanced the story,
+    // and to ensure backwards compatibility with older links
+    return unit.rank === 'A' || (unit.rank === 'S' && !unit.limited && unit.id !== 'pyrois'); 
 }
 
 /**
