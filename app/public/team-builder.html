@@ -3,7 +3,59 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Showcase Zenless Zone Zero team compositions from your roster for different elements and archetypes.">
+    <meta name="robots" content="index, follow">
+    <meta name="theme-color" content="#0a0a0f">
+    <link rel="canonical" href="https://njxaxson.github.io/zzz-utils/team-builder.html">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="ZZZ Utils">
+    <meta property="og:title" content="ZZZ Team Builder">
+    <meta property="og:description" content="Showcase Zenless Zone Zero team compositions from your roster for different elements and archetypes">
+    <meta property="og:url" content="https://njxaxson.github.io/zzz-utils/team-builder.html">
+    <meta property="og:image" content="https://njxaxson.github.io/zzz-utils/assets/sitelogo.png">
+    <meta property="og:locale" content="en_US">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="ZZZ Team Builder">
+    <meta name="twitter:description" content="Showcase Zenless Zone Zero team compositions from your roster for different elements and archetypes.">
+    <meta name="twitter:image" content="https://njxaxson.github.io/zzz-utils/assets/sitelogo.png">
     <title>ZZZ Team Builder</title>
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@graph": [
+            {
+                "@type": "WebApplication",
+                "name": "ZZZ Team Builder",
+                "url": "https://njxaxson.github.io/zzz-utils/team-builder.html",
+                "description": "Showcase Zenless Zone Zero team compositions from your roster for different elements and archetypes.",
+                "applicationCategory": "GameApplication",
+                "operatingSystem": "Any",
+                "inLanguage": "en",
+                "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+                "about": {
+                    "@type": "VideoGame",
+                    "name": "Zenless Zone Zero",
+                    "alternateName": "ZZZ",
+                    "publisher": {
+                        "@type": "Organization",
+                        "name": "HoYoverse"
+                    }
+                },
+                "author": {
+                    "@type": "Person",
+                    "name": "njxaxson"
+                }
+            },
+            {
+                "@type": "BreadcrumbList",
+                "itemListElement": [
+                    { "@type": "ListItem", "position": 1, "name": "ZZZ Utils", "item": "https://njxaxson.github.io/zzz-utils/" },
+                    { "@type": "ListItem", "position": 2, "name": "Team Builder", "item": "https://njxaxson.github.io/zzz-utils/team-builder.html" }
+                ]
+            }
+        ]
+    }
+    </script>
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
     <link rel="stylesheet" href="styles/style.css">
     <!-- Pako compression library for roster sharing -->
@@ -19,7 +71,7 @@
             <!-- Filter Section - Collapsible -->
             <details class="filter-section collapsible-filter" id="filter-section" open>
                 <summary class="filter-header">
-                    <h3>Team Filters</h3>
+                    <h2>Team Filters</h2>
                     <span class="filter-toggle-hint">Configure filters to find specific team compositions.</span>
                 </summary>
                 
@@ -196,7 +248,7 @@
             <!-- Results Section -->
             <section class="results-section" id="results-section" style="display: none;">
                 <div class="results-header">
-                    <h3>Team Combinations</h3>
+                    <h2>Team Combinations</h2>
                     <span class="results-count" id="results-count"></span>
                 </div>
                 <div class="teams-grid" id="teams-grid">

@@ -219,7 +219,7 @@ function displayResults(context, results, includeRefunds) {
     // Target info
     const targetInfoDiv = document.getElementById('target-info');
     targetInfoDiv.innerHTML = `
-        <h4>Target</h4>
+        <h3>Target</h3>
         <div class="stat-line">
             <span class="stat-label">Target S-Rank</span>
             <span class="stat-value success">${target}</span>
@@ -232,7 +232,7 @@ function displayResults(context, results, includeRefunds) {
 
     // S-Limited results
     const sLimitedDiv = document.getElementById('s-limited');
-    let sLimitedHtml = '<h4>Featured S-Rank Distribution</h4><div class="distribution-table">';
+    let sLimitedHtml = '<h3>Featured S-Rank Distribution</h3><div class="distribution-table">';
     const chartData = [];
     const chartLabels = [];
     
@@ -254,7 +254,7 @@ function displayResults(context, results, includeRefunds) {
     // S-Standard results
     const sStandardDiv = document.getElementById('s-standard');
     if (showStandardInput.checked) {
-        let sStandardHtml = '<h4>Standard S-Rank Distribution</h4><div class="distribution-table">';
+        let sStandardHtml = '<h3>Standard S-Rank Distribution</h3><div class="distribution-table">';
         const standardChartLabels = [];
         const standardChartData = [];
         for (const key in s_standard) {
@@ -298,7 +298,7 @@ function displayResults(context, results, includeRefunds) {
     // Stats
     const statsDiv = document.getElementById('stats');
     statsDiv.innerHTML = `
-        <h4>Statistics</h4>
+        <h3>Statistics</h3>
         <div class="stat-line">
             <span class="stat-label">Average pulls executed</span>
             <span class="stat-value success">${avgP}</span>

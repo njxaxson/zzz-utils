@@ -3,7 +3,59 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Calculate how many Zenless Zone Zero discs you need on average to hit your target main stat and substat rolls.">
+    <meta name="robots" content="index, follow">
+    <meta name="theme-color" content="#0a0a0f">
+    <link rel="canonical" href="https://njxaxson.github.io/zzz-utils/disc-calculator.html">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="ZZZ Utils">
+    <meta property="og:title" content="ZZZ Disc Calculator">
+    <meta property="og:description" content="Calculate how many Zenless Zone Zero discs you need on average to hit your target main stat and substat rolls.">
+    <meta property="og:url" content="https://njxaxson.github.io/zzz-utils/disc-calculator.html">
+    <meta property="og:image" content="https://njxaxson.github.io/zzz-utils/assets/sitelogo.png">
+    <meta property="og:locale" content="en_US">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="ZZZ Disc Calculator">
+    <meta name="twitter:description" content="Calculate how many Zenless Zone Zero discs you need on average to hit your target main stat and substat rolls.">
+    <meta name="twitter:image" content="https://njxaxson.github.io/zzz-utils/assets/sitelogo.png">
     <title>ZZZ Disc Calculator</title>
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@graph": [
+            {
+                "@type": "WebApplication",
+                "name": "ZZZ Disc Calculator",
+                "url": "https://njxaxson.github.io/zzz-utils/disc-calculator.html",
+                "description": "Calculate how many Zenless Zone Zero discs you need on average to hit your target main stat and substat rolls.",
+                "applicationCategory": "GameApplication",
+                "operatingSystem": "Any",
+                "inLanguage": "en",
+                "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+                "about": {
+                    "@type": "VideoGame",
+                    "name": "Zenless Zone Zero",
+                    "alternateName": "ZZZ",
+                    "publisher": {
+                        "@type": "Organization",
+                        "name": "HoYoverse"
+                    }
+                },
+                "author": {
+                    "@type": "Person",
+                    "name": "njxaxson"
+                }
+            },
+            {
+                "@type": "BreadcrumbList",
+                "itemListElement": [
+                    { "@type": "ListItem", "position": 1, "name": "ZZZ Utils", "item": "https://njxaxson.github.io/zzz-utils/" },
+                    { "@type": "ListItem", "position": 2, "name": "Disc Calculator", "item": "https://njxaxson.github.io/zzz-utils/disc-calculator.html" }
+                ]
+            }
+        ]
+    }
+    </script>
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
     <link rel="stylesheet" href="styles/style.css">
 </head>
@@ -14,7 +66,7 @@
         <main>
             <!-- Calculator Section -->
             <section class="calculator-section">
-                <h3>Disc Target Configuration</h3>
+                <h2>Disc Target Configuration</h2>
                 <p class="section-description">
                     Configure your ideal disc to calculate how many discs you'll need to generate on average.
                 </p>
@@ -95,18 +147,18 @@
 
             <!-- Results Section -->
             <section class="results-section" id="results-section" style="display: none;">
-                <h3>Simulation Results</h3>
+                <h2>Simulation Results</h2>
                 <div class="results-content">
                     <div class="results-text">
                         <!-- Summary Block -->
                         <div class="result-block">
-                            <h4>Target Configuration</h4>
+                            <h3>Target Configuration</h3>
                             <div id="target-summary"></div>
                         </div>
 
                         <!-- Statistics Block -->
                         <div class="result-block">
-                            <h4>Statistics</h4>
+                            <h3>Statistics</h3>
                             <div class="stat-line">
                                 <span class="stat-label">Average Discs Required</span>
                                 <span class="stat-value" id="result-average">—</span>
@@ -119,7 +171,7 @@
 
                         <!-- Interpretation Block -->
                         <div class="result-block interpretation-block">
-                            <h4>Interpretation</h4>
+                            <h3>Interpretation</h3>
                             <p id="result-interpretation"></p>
                         </div>
                     </div>

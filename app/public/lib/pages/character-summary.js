@@ -278,7 +278,7 @@ function buildCard(unit) {
         ${avatarHtml}
         <div class="char-identity">
             <div class="char-name-row">
-                <h4 class="char-name">${unit.name}</h4>
+                <div class="char-name">${unit.name}</div>
                 ${titledBadge}
             </div>
             <div class="char-subtitle">${rankHtml} · ${faction}</div>

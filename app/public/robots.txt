@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://njxaxson.github.io/zzz-utils/sitemap.xml
