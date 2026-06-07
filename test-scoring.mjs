@@ -1197,6 +1197,89 @@ async function main() {
         }
     });
 
+    // ========================================================================
+    // TEST 54: Ramiel triple-anomaly teams score 400+ on neutral
+    // ========================================================================
+    // Ramiel with 2 other primary anomaly units unlocks her max ATK buff (atk:4).
+    // Combined with vortex/disorder reactions, these teams should exceed 400.
+    run('TEST 54: Ramiel triple-anomaly team scores 400+ on neutral (VRP)', () => {
+        const b = NEUTRAL_BOSS;
+        const { team, label } = scoreForTeamString('Velina/Remielle/Promeia', allUnits, { preview: true })[0];
+        const s = scoreTeamForBoss(team, b, {});
+        assert(s >= 400, `${label}: got ${s}, expected >= 400 (triple-anomaly Ramiel team)`);
+    });
+
+    // ========================================================================
+    // TEST 55: Ramiel triple-anomaly >> Nangong/Ramiel wheelchair
+    // ========================================================================
+    // VRP should dominate NRY by 140+ points. NRY is viable (Nangong/Yuzuha
+    // infrastructure keeps it afloat) but clearly suboptimal for Ramiel because
+    // her conditional ATK buff = 0 as the sole primary anomaly.
+    run('TEST 55: Velina/Ramiel/Promeia >> Nangong/Ramiel/Yuzuha (140+ gap)', () => {
+        const b = NEUTRAL_BOSS;
+        const vrp = scoreTeamForBoss(scoreForTeamString('Velina/Remielle/Promeia', allUnits, { preview: true })[0].team, b, {});
+        const nry = scoreTeamForBoss(scoreForTeamString('Nangong/Remielle/Yuzuha', allUnits, { preview: true })[0].team, b, {});
+        assert(vrp - nry >= 140, `Gap VRP(${vrp}) - NRY(${nry}) = ${vrp - nry}, expected >= 140`);
+        assert(nry < vrp * 0.75, `NRY(${nry}) should be < 75% of VRP(${vrp})`);
+    });
+
+    // ========================================================================
+    // TEST 56: Ramiel wheelchair structures are penalized vs Miyabi
+    // ========================================================================
+    // Ramiel/Astra/Nicole: Ramiel is the only anomaly, no reactions, no buff.
+    // Miyabi/Astra/Nicole: titled anomaly hypercarry wheelchair — should score much higher.
+    run('TEST 56: Miyabi/Astra/Nicole >> Ramiel/Astra/Nicole on neutral', () => {
+        const b = NEUTRAL_BOSS;
+        const man = scoreTeamForBoss(scoreForTeamString('Miyabi/Astra/Nicole', allUnits)[0].team, b, {});
+        const ran = scoreTeamForBoss(scoreForTeamString('Remielle/Astra/Nicole', allUnits, { preview: true })[0].team, b, {});
+        assert(man > ran, `MAN(${man}) should beat RAN(${ran}) — Miyabi wheelchair >> Ramiel wheelchair`);
+    });
+
+    // ========================================================================
+    // TEST 57: Miyabi existing teams unaffected by changes
+    // ========================================================================
+    // Regression guard: Miyabi has no conditionalBuffs, so none of these changes
+    // should alter her top team scores. Wheelchair should still be CONVENTIONAL.
+    run('TEST 57: Miyabi/Astra/Nicole wheelchair still CONVENTIONAL (regression guard)', () => {
+        const b = NEUTRAL_BOSS;
+        const man = scoreTeamForBoss(scoreForTeamString('Miyabi/Astra/Nicole', allUnits)[0].team, b, {});
+        const nmy = scoreTeamForBoss(scoreForTeamString('Nangong/Miyabi/Yuzuha', allUnits)[0].team, b, {});
+        assert(man >= 300, `MAN: got ${man}, expected >= 300 (Miyabi wheelchair still CONVENTIONAL)`);
+        assert(nmy > man, `NMY(${nmy}) should still beat MAN(${man})`);
+    });
+
+    // ========================================================================
+    // TEST 58: Ramiel conditional buff scaling — triple-anomaly best
+    // ========================================================================
+    // Triple anomaly (VRP) should outscore 2-anomaly (ARY). NRY has stun
+    // infrastructure from Nangong which legitimately outweighs ATK:2 buff,
+    // so we only validate VRP > ARY and VRP > NRY ordering.
+    run('TEST 58: Ramiel conditional buff scaling — triple > 2-anomaly', () => {
+        const b = NEUTRAL_BOSS;
+        const ary = scoreTeamForBoss(scoreForTeamString('Alice/Remielle/Yuzuha', allUnits, { preview: true })[0].team, b, {});
+        const vrp = scoreTeamForBoss(scoreForTeamString('Velina/Remielle/Promeia', allUnits, { preview: true })[0].team, b, {});
+        assert(vrp > ary, `Triple anomaly VRP(${vrp}) should beat 2-anomaly ARY(${ary})`);
+        const nry = scoreTeamForBoss(scoreForTeamString('Nangong/Remielle/Yuzuha', allUnits, { preview: true })[0].team, b, {});
+        assert(vrp > nry, `Triple anomaly VRP(${vrp}) should beat wheelchair NRY(${nry})`);
+    });
+
+    // ========================================================================
+    // TEST 59: Ramiel anti-patterns score below triple-anomaly
+    // ========================================================================
+    // Non-anomaly Ramiel teams have atk:0 + underutilization penalty, no
+    // reactions, and UNCONVENTIONAL_VIABLE structure. They should score
+    // significantly below triple-anomaly teams.
+    run('TEST 59: Ramiel non-anomaly teams score well below triple-anomaly', () => {
+        const b = NEUTRAL_BOSS;
+        const vrp = scoreTeamForBoss(scoreForTeamString('Velina/Remielle/Promeia', allUnits, { preview: true })[0].team, b, {});
+        const nrs = scoreTeamForBoss(scoreForTeamString('Nangong/Remielle/Sunna', allUnits, { preview: true })[0].team, b, {});
+        const rya = scoreTeamForBoss(scoreForTeamString('Remielle/Yuzuha/Astra', allUnits, { preview: true })[0].team, b, {});
+        assert(nrs < vrp * 0.60, `NRS(${nrs}) should be < 60% of VRP(${vrp})`);
+        assert(rya < vrp * 0.60, `RYA(${rya}) should be < 60% of VRP(${vrp})`);
+        assert(nrs < 350, `NRS: got ${nrs}, expected < 350 (solo anomaly, no ATK buff)`);
+        assert(rya < 350, `RYA: got ${rya}, expected < 350 (no anomaly partner)`);
+    });
+
     // ------------------------------------------------------------------------
     // Summary
     // ------------------------------------------------------------------------

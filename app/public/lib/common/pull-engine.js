@@ -855,8 +855,8 @@ function detectAnomalyPartnerGap(gaps, ownedUnits, ownedDPS, ownedSubdps, unowne
     const ownedAnomalySubdps = ownedSubdps.anomaly;
     const ownedPseudoAnomaly = ownedUnits.filter(u => {
         if (isSubdps(u)) return false;
-        const pr = u.mechanics?.pseudoRole || '';
-        return pr.split(',').map(s => s.trim()).includes('anomaly');
+        const pr = u.mechanics?.pseudoRole;
+        return Array.isArray(pr) && pr.some(entry => (typeof entry === 'string' ? entry : entry?.role) === 'anomaly');
     });
     const disorderPartners = [...ownedAnomalySubdps, ...ownedPseudoAnomaly];
 
@@ -882,8 +882,8 @@ function detectAnomalyPartnerGap(gaps, ownedUnits, ownedDPS, ownedSubdps, unowne
     const candidates = unownedLimitedS
         .filter(u => {
             const isAnoSubdps = isSubdps(u) && u.tags.includes('anomaly');
-            const pr = u.mechanics?.pseudoRole || '';
-            const isPseudoAnomaly = pr.split(',').map(s => s.trim()).includes('anomaly') && !isSubdps(u);
+            const pr = u.mechanics?.pseudoRole;
+            const isPseudoAnomaly = Array.isArray(pr) && pr.some(entry => (typeof entry === 'string' ? entry : entry?.role) === 'anomaly') && !isSubdps(u);
             return isAnoSubdps || isPseudoAnomaly;
         })
         .sort((a, b) => {

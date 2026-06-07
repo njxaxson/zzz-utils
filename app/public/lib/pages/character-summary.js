@@ -254,7 +254,9 @@ function buildCard(unit) {
     ];
     
     // Add Sub-DPS tag if present in pseudoRole
-    const pseudoRoles = unit.mechanics?.pseudoRole ? unit.mechanics.pseudoRole.split(',').map(r => r.trim()) : [];
+    const pseudoRoles = Array.isArray(unit.mechanics?.pseudoRole)
+        ? unit.mechanics.pseudoRole.map(e => typeof e === 'string' ? e : e?.role)
+        : [];
     if (pseudoRoles.includes('subdps')) {
         tags.push(`<span class="char-tag">Sub-DPS</span>`);
     }
@@ -322,8 +324,10 @@ function buildSynergyLine(unit) {
     const mechanics = unit.mechanics || {};
     
     // Check for non-subdps pseudoRoles
-    const pseudoRoles = mechanics.pseudoRole ? mechanics.pseudoRole.split(',').map(r => r.trim()) : [];
-    const nonSubDPSRoles = pseudoRoles.filter(r => r !== 'subdps');
+    const pseudoRoleNames = Array.isArray(mechanics.pseudoRole)
+        ? mechanics.pseudoRole.map(e => typeof e === 'string' ? e : e?.role)
+        : [];
+    const nonSubDPSRoles = pseudoRoleNames.filter(r => r !== 'subdps');
 
     // Pseudo-role line (non-subdps roles only, subdps is shown as a tag)
     if (nonSubDPSRoles.length > 0) {

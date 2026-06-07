@@ -155,7 +155,7 @@
         "join": ["anomaly", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
-            "pseudoRole": "subdps",
+            "pseudoRole": ["subdps"],
             "onfield": false,
             "damage": { "abloom": 1 }
         },
@@ -173,7 +173,7 @@
         "join": ["faction", "assist:defensive"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
-            "pseudoRole": "stun",
+            "pseudoRole": ["stun"],
             "buffs": { "atk": 2 },
             "utility": { "shields": 2, "interrupt-resistance": 2 }
         },
@@ -191,10 +191,10 @@
         "join": ["stun", "electric"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
-            "pseudoRole": "subdps",
-            "buffs" : { "cr" : 1 },
+            "pseudoRole": ["subdps"],
+            "buffs": { "cr": 1 },
             "debuffs": { "electric": 2 },
-            "utility": { "daze": 1, "veils" : 1 }
+            "utility": { "daze": 1, "veils": 1 }
         },
         "faction": "PubSec",
         "displayText": "Snake girl is an electric sub-DPS primarily designed to work with Seed."
@@ -274,7 +274,7 @@
         "join": ["electric", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
-            "pseudoRole": "subdps",
+            "pseudoRole": ["subdps"],
             "damage": { "abloom": 1 },
             "scaling": { "pen": true }
         },
@@ -328,7 +328,7 @@
         "join": ["anomaly", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
-            "buffs" : { "vortex" : 3 }
+            "buffs": { "vortex": 3 }
         },
         "faction": "PubSec",
         "displayText": "Sensuous rat lady is an older physical anomaly unit that remains a fan favorite. She has unique synergy with the vortex mechanic."
@@ -348,7 +348,7 @@
             "onfield": false,
             "damage": { "aftershock": true },
             "buffs": { "cd": 3 },
-            "utility": { "ultimates" : 1 }
+            "utility": { "ultimates": 1 }
         },
         "faction": "Yunkui Summit",
         "displayText": "Smol tiger lady will remind you that she is your senior. An off-field stun agent that refunds decibels and boosts crit damage."
@@ -481,10 +481,10 @@
         "limited": true,
         "tier": 0,
         "tags": ["stun", "ether", "assist:defensive"],
-        "join": ["anomaly", "faction"], 
+        "join": ["anomaly", "faction"],
         "synergy": { "units": ["Aria"], "tags": [], "avoid": [] },
         "mechanics": {
-            "pseudoRole": "anomaly",
+            "pseudoRole": [{"role":"anomaly","when":{"countTag":"anomaly","minCount":1}}],
             "damage": { "polarity": true, "abloom": true },
             "buffs": { "anomaly": 3 },
             "debuffs": { "recovery": 3 },
@@ -519,14 +519,15 @@
         "join": ["attack", "rupture"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
-            "pseudoRole" : "subdps",
-            "damage" : { "chain" : 3 },
-            "buffs" : { "stun-multiplier" : 2 },
-            "scaling" : { "quick-assists" : 2, "sheer": 1, "atk" : 3}
+            "pseudoRole": ["subdps"],
+            "damage": { "chain": 3 },
+            "buffs": { "stun-multiplier": 2 },
+            "debuffs": { "recovery": 2 },
+            "scaling": { "quick-assists": 2, "sheer": 1, "atk": 3 }
         },
-        "available" : false,
+        "available": false,
         "faction": "External Strategy Department",
-        "displayText" : "Whacky bangboo engineer fires missiles at enemies. She can convert some quick assists into chain attacks and converts sheer damage buffs back into attack damage."
+        "displayText": "Whacky bangboo engineer fires missiles at enemies. She can convert some quick assists into chain attacks and converts sheer damage buffs back into attack damage."
     },
     {
         "id": "nicole",
@@ -556,7 +557,7 @@
         "join": ["stun", "support"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
-            "pseudoRole": "support,subdps",
+            "pseudoRole": ["support", "subdps"],
             "onfield": false,
             "damage": { "aftershock": 3 },
             "buffs": { "atk": 2 },
@@ -608,7 +609,7 @@
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "damage": { "abloom": 3, "enhanced": 1 },
-            "buffs" : { "abloom": 3 }
+            "buffs": { "abloom": 3 }
         },
         "faction": "Krampus",
         "displayText": "She's not Batman, but she's got that vibe. Very strong ice anomaly agent that goes a different route from Miyabi. In certain scenarios, she can be even better than Miyabi."
@@ -666,20 +667,25 @@
     {
         "id": "ramiel",
         "name": "Remielle",
-        "aliases" : ["Rem", "Ram", "Dan", "RD"],
+        "aliases": ["Rem", "Ram", "Dan", "RD"],
         "image": null,
         "rank": "S",
         "limited": true,
         "tier": 0,
         "tags": ["anomaly", "ether", "title", "assist:defensive"],
-        "join": ["anomaly", "support"],
-        "synergy": { "units": [], "tags": ["wind"], "avoid": [] },
+        "join": ["anomaly", "faction"],
+        "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
-            "elementalVariant" : "lumens",
-            "damage" : { "abloom" : 2, "ultimate:strong" : 3 },
-            "buffs" : { "vortex" : 3 }
+            "pseudoRole": [
+                "dps",
+                {"role":"support","when":{"countTag":"anomaly","minCount":3}}
+            ],
+            "elementalVariant": "lumens",
+            "conditionalBuffs": {
+                "atk": { "countTag": "anomaly", "levels": [0, 0, 2, 4] }
+            }
         },
-        "available" : false,
+        "available": false,
         "faction": "Guard of Staves",
         "displayText": "First-generation void hunter."
     },
@@ -754,7 +760,7 @@
         "faction": "PubSec",
         "displayText": "A defense agent that boosts anomaly teams; although underpowered for modern endgame."
     },
-        {
+    {
         "id": "sigrid",
         "name": "Sigrid",
         "image": "./assets/characters/sigrid.webp",
@@ -765,7 +771,7 @@
         "join": ["ice", "anomaly"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {},
-        "available" : false,
+        "available": false,
         "faction": "Roscaelifer Knights",
         "displayText": "Horse lady with spear. "
     },
@@ -795,7 +801,7 @@
         "join": ["ice", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
-            "pseudoRole": "anomaly",
+            "pseudoRole": [{"role":"anomaly","when":{"countTag":"anomaly","minCount":1}}],
             "buffs": { "atk": 3, "ice": 3 }
         },
         "faction": "Section 6",
@@ -841,7 +847,7 @@
     {
         "id": "velina",
         "name": "Velina",
-        "aliases": ["Vel"],
+        "aliases": ["Vel", "Veli"],
         "image": "./assets/characters/velina.webp",
         "rank": "S",
         "limited": true,
@@ -850,7 +856,7 @@
         "join": ["anomaly", "wind"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
-            "pseudoRole": "subdps",
+            "pseudoRole": ["subdps"],
             "damage": { "abloom": 2 },
             "utility": { "daze": 2 },
             "scaling": { "er": 3 }
@@ -871,7 +877,7 @@
         "join": ["anomaly", "ether"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
-            "pseudoRole": "subdps",
+            "pseudoRole": ["subdps"],
             "onfield": false,
             "damage": { "abloom": 3 },
             "scaling": { "am": 2 }
@@ -891,6 +897,7 @@
         "join": ["electric", "anomaly"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
+            "pseudoRole": [{ "role": "subdps", "when": { "hasUnit": "miyabi" } }],
             "damage": { "polarity": 2 },
             "utility": { "disorders": 2 },
             "scaling": { "pen": true }
@@ -899,9 +906,9 @@
         "displayText": "Premier electric anomaly agent, this disorder-generation queen is great teammate for Miyabi. Suitable both as a primary or secondary DPS."
     },
     {
-        "id" : "ysg",
-        "name" : "Ye Shunguong",
-        "aliases": ["YSG","Shungus"],
+        "id": "ysg",
+        "name": "Ye Shunguong",
+        "aliases": ["YSG", "Shungus"],
         "image": "./assets/characters/ysg.webp",
         "rank": "S",
         "limited": true,

@@ -39,7 +39,7 @@ Every unit has a primary role in their `tags` array:
 * **Support** — Buffs teammates and provides utility; negligible personal damage
 * **Defense** — Provides shields, healing, damage mitigation and often buff teammates; negligible personal damage
 
-The first three (attack, anomaly, rupture) are **DPS roles**. Units can have additional roles via `pseudoRole` in their mechanics data (see Role Activation below).
+The first three (attack, anomaly, rupture) are **DPS roles**. Units can have additional roles via `pseudoRole` in their mechanics data — either always-active (plain strings) or conditionally activated (objects with `when` conditions). See Role Activation below.
 
 ### Anomaly Reactions
 
@@ -101,8 +101,11 @@ Attackers need stun windows to deal damage. The stunner creates vulnerability pe
 
 **Modern meta:** Stunner (Nangong/Lycaon) + Anomaly DPS + Support (Yuzuha/Sunna)
 **Classic:** Anomaly DPS + Anomaly SubDPS (Vivian/Burnice) + Support (Yuzuha)
+**Triple-anomaly (Remielle):** Anomaly DPS + Remielle (pseudo-support) + Anomaly DPS/SubDPS
 
 Nangong's release fundamentally changed anomaly team building. As a T0 hybrid stun/anomaly unit, Nangong provides anomaly buffs, extended stun windows, and polarity disorder triggers — making `Nangong/<Anomaly DPS>/Yuzuha` the strongest anomaly template, replacing `<Anomaly DPS>/Vivian/Yuzuha`. Lycaon (at P1+) serves as a budget alternative with ice defense shred. Interestingly enough, Promeia is the latest anomaly agent and in some cases she prefers Vivian over Nangong because of the higher quantity of abloom-specific damage, which Promeia buffs. So both compositions exist in modern play.
+
+Remielle introduces a third archetype: **triple-anomaly** teams where all three units have the primary `anomaly` tag. Remielle's `support` pseudo-role is **conditional** — it only activates when the team has 3+ primary anomaly units. On a triple-anomaly team she provides the game's highest ATK buff (engine value 4) to all teammates and is classified as support for L1.5 structure. On non-triple-anomaly teams (e.g., Nangong/Remielle/Yuzuha), her support identity doesn't activate: the team has no effective support, structure degrades, and her conditional ATK buff resolves to 0 (only 1 primary anomaly = Remielle herself). Traditional anomaly wheelchairs are strongly suboptimal for Remielle.
 
 **Disorder generation:** When two anomaly-typed units of different elements are on the same team, they naturally generate disorders for bonus damage; unless one of them is wind, in which they generate a vortex instead. Disorders are especially critical for units with transformative scaling that is based on disorders, such as Miyabi who converts disorders into enhanced attacks.
 
@@ -140,7 +143,7 @@ There is technically the possibility to have hybrid attack+anomaly compositions;
 | **SAnby** | T0.5 | Attack (Electric) | `damage.aftershock:2, buffs.aftershock:3` | Buffs aftershock teammates (Trigger, Orphie). Teams without aftershock consumers waste her buff. |
 | **Seed** | T1 | Attack (Electric) | `join: ["attack"]` | Requires a second attacker. Best with Cissia (burst duo) or Orphie. |
 | **Harumasa** | T1.5 | Attack (Electric) | `synergy.tags: ["anomaly"]` | Currently the only attack agent who supports hybrid anomaly/attack compositions. |
-| **Soukaku** | T1.5 | Support (Ice) + pseudoAnomaly | `buffs.ice:3, atk:3` | Ice specialist only. Frost/ice disorder with Miyabi. On-field status derived dynamically from role activation. |
+| **Soukaku** | T1.5 | Support (Ice) + conditional pseudoAnomaly | `buffs.ice:3, atk:3` | Ice specialist only. Anomaly pseudo-role activates conditionally (`when: { countTag: "anomaly", minCount: 1 }`). On-field status derived dynamically from role activation. |
 | **Orphie** | T1 | Attack (Fire) + pseudoSupport/SubDPS | `buffs.atk:2, damage.aftershock:3` | Support-like attacker. Scored as T1 support (not T1 DPS) in L2. Cannot satisfy attack shill as pseudosupport. SubDPS still benefits from stun bonuses. |
 | **Caesar** | T0 | Defense + pseudoStun | `buffs.atk:2, utility.shields:2` | Pseudo-stun always activates. Provides daze + ATK buff + interrupt resistance. |
 | **Lycaon** | T1 | Stun (Ice) | `debuffs.ice:2, buffs.stun-multiplier:2` | At P1+, `join` expands to anomaly agents. Ice defense shred benefits Miyabi/Promeia. Budget Nangong alternative. |
@@ -148,11 +151,12 @@ There is technically the possibility to have hybrid attack+anomaly compositions;
 | **Vivian** | T0.5 | Anomaly (Ether) + SubDPS | `damage.abloom:3, scaling.am:2, onfield:false` | Was Miyabi's best partner before Nangong. Still strong but dropped from T0. |
 | **Promeia** | T0.5 | Anomaly (Ice) | `damage.abloom:3, buffs.abloom:3, debuffs.defense:2` | Ice anomaly with tier-3 vortex. Abloom buffer. Direct Miyabi alternative on Scaled Horizon — pure ice vortex vs. frost variant. |
 | **Jane Doe** | T1.5 | Anomaly (Physical) | `buffs.vortex:3` | Physical anomaly with a retroactive vortex buff. Contextual bonus — no cohesion penalty when inactive. When Jane causes a physical anomaly that triggers a vortex, the vortex is considered a critical hit and gets the crit damage modifier. This is modeled as a generic vortex buff rather than to complexly model a narrow game mechanic, and so it provides a modest boost to average out its actual value. |
-| Norma | T0.5 | Stun (Fire) | `damage.chains, scaling.sheer, scaling.quick-assists` | Norma is a stunner designed as a subdps. She is intended to work with attack and rupture teams. She has two unique features: she can upgrade quick assists into chain attacks (a huge damage boost when paired with Astra) and she converts sheer buffs into ATK (so huge damage boost when paired with Lucia).  She also has chain attack damage modifiers almost as high as Evelyn. This gives her two very capable wheelchair compositions for attack and rupture.  |
+| Norma | T0.5 | Stun (Fire) | `damage.chains, scaling.sheer, scaling.quick-assists` | Norma is a stunner designed as a subdps. She is intended to work with attack and rupture teams. She has two unique features: she can upgrade quick assists into chain attacks (a huge damage boost when paired with Astra) and she converts sheer buffs into ATK (so huge damage boost when paired with Lucia).  She also has chain attack damage modifiers almost as high as Evelyn. This gives her two very capable wheelchair compositions for attack and rupture. |
+| **Remielle** | Titled T0 | Anomaly (Ether/Lumens) + `pseudoRole: ["dps", conditional "support"]` | `conditionalBuffs.atk: [0,0,2,4]` by anomaly count | Her ATK buff and support identity both scale with team composition. `support` pseudo-role activates only on triple-anomaly teams (`when: { countTag: "anomaly", minCount: 3 }`); `dps` always activates. On a triple-anomaly team: support activates → L1.5 sees support → CONVENTIONAL structure; scored as forced-secondary DPS in L2 (split kit). On non-triple teams: support doesn't activate → no effective support → structure degrades; ATK buff resolves to 0 with penalty. Best teams: Velina/Remielle/Promeia (vortex+disorder), Alice/Vivian/Remielle. |
 
 ### SubDPS Units
 
-Units with `pseudoRole: "subdps"` need a main DPS teammate (any DPS without subdps tag). SubDPS units receive 50% tier multiplier but still benefit from offensive buffs and stun infrastructure. They do NOT receive implicit ultimates scaling (ultimates are a limited resource reserved for the primary DPS), but DO receive quick-assists baseline. (These are engine scoring mechanics that will be explained later.)
+Units with `pseudoRole: ["subdps"]` need a main DPS teammate (any DPS without subdps tag). SubDPS units receive 50% tier multiplier but still benefit from offensive buffs and stun infrastructure. They do NOT receive implicit ultimates scaling (ultimates are a limited resource reserved for the primary DPS), but DO receive quick-assists baseline. (These are engine scoring mechanics that will be explained later.)
 
 Example subdps units: Burnice (fire anomaly), Grace (electric anomaly), Vivian (ether anomaly), Orphie (fire attack, also pseudosupport), Cissia (electric attack).
 
@@ -255,7 +259,7 @@ The `mechanics` object describes what is **distinctive** about a unit beyond its
 ```json
 {
   "mechanics": {
-    "pseudoRole": "anomaly",
+    "pseudoRole": ["subdps", { "role": "anomaly", "when": { "countTag": "anomaly", "minCount": 1 } }],
     "elementalVariant": "variant-type",
     "onfield": false,
     "damage": { "polarity": true, "abloom": true },
@@ -271,7 +275,11 @@ All fields are optional. Values are weighted: `true` (or 1) = minor, `2` = stron
 
 **Fields:**
 
-* `pseudoRole` — Secondary roles, comma-separated: `"subdps"`, `"anomaly"`, `"stun"`, `"support"`, `"attack"`, `"defense"`. DPS pseudo-roles require team context to activate (see Role Activation). Non-DPS pseudo-roles always activate.
+* `pseudoRole` — Secondary roles as a mixed JSON array of strings (always active) and objects (conditionally active). Plain strings like `"subdps"`, `"stun"`, `"dps"` always activate. Conditional entries use the format `{ "role": "<role>", "when": { ... } }`. Two condition types are supported:
+  * `{ "countTag": "<tag>", "minCount": <n> }` — activates when the team has at least `minCount` units whose `tags` array contains `countTag` (including self).
+  * `{ "hasUnit": "<unitId>" }` — activates when a specific unit (by `id`) is on the team.
+    Examples: `["subdps"]` (always), `[{ "role": "anomaly", "when": { "countTag": "anomaly", "minCount": 1 } }]` (needs an anomaly teammate), `[{ "role": "subdps", "when": { "hasUnit": "miyabi" } }]` (subdps only when Miyabi is present), `["dps", { "role": "support", "when": { "countTag": "anomaly", "minCount": 3 } }]` (dps always, support only on triple-anomaly). The special `"dps"` pseudo-role marks a unit as a primary DPS participant for L2 scoring, overriding exclusion based on support/defense roles.
+* `conditionalBuffs` — Buff values that scale with team composition. Each key maps to `{ countTag, levels }`: `countTag` is a primary tag to count across all teammates (including self), and `levels` is a 0-indexed array where `levels[count]` is the effective buff value (capped at the last element). Use `Math.max(...levels)` as the ceiling for penalty calculations. This field is processed before L4 baseline affinity and replaces `buffs` for the same key.
 * `elementalVariant` — Marks units with alternate element tracking.
 * `onfield` — Explicit on-field demand override. Defaults: attack/anomaly/rupture/stun = `true`; support/defense = `false`. When a unit's pseudoRole activates as a different role, on-field status is derived from the activated role unless explicitly overridden.
 * `damage` — Distinctive damage types. Keys: `enhanced`, `ultimate:strong`, `ultimate:double`, `chain`, `aftershock`, `abloom`, `polarity`, `totalize`, etc.
@@ -399,18 +407,22 @@ The strength of the diametric pair determines a **cohesion floor**: the team's c
 
 At the start of scoring, each unit's activated roles are computed and cached as `_activatedRoles`. All role-checking functions (`isDPS`, `isAttacker`, `isAnomaly`, `isRupture`, `isSupport`, `isDefense`, `isStun`) check `_activatedRoles` first, falling back to tags when activated roles haven't been computed (e.g., during team formation).
 
-**DPS pseudo-roles** (attack, anomaly, rupture) only activate when a teammate's primary tags include that same DPS type. This prevents units from "casting themselves" into roles the team doesn't support.
+**Pseudo-role activation is data-driven.** Each pseudo-role entry is either a plain string (always activates) or an object with a `when` condition (activates only when the team meets the threshold). There are no hard-coded activation rules in the engine — all conditional logic lives in the unit data.
 
-**Non-DPS pseudo-roles** (stun, support, defense, subdps) always activate unconditionally.
+**Effective role wrappers:** For scoring functions that classify units by role in a team context, `isEffectiveSupport(unit)` and `isEffectiveDefense(unit)` check both base tags AND activated pseudo-roles. These are used by `scoreTeamStructure`, `scoreInherentQuality`, `checkDisqualifications`, and `computeTeamworkMultiplier`. The base `isSupport`/`isDefense` functions only check tags and `_activatedRoles`.
 
 Examples:
 
-* Soukaku (`pseudoRole: "anomaly"`, tags: support) on a Miyabi team: Miyabi has `anomaly` tag → Soukaku's anomaly activates → she participates in disorder generation
-* Soukaku on a Lycaon/Yixuan team: no `anomaly` tag → anomaly does NOT activate → she's a pure support
-* Nangong (`pseudoRole: "anomaly"`, tags: stun) on Nangong/YSG/Sunna: no `anomaly` tag → Nangong is just a stunner
-* Caesar (`pseudoRole: "stun"`, tags: defense): pseudo-stun always activates unconditionally
+* Soukaku (`pseudoRole: [{ role: "anomaly", when: { countTag: "anomaly", minCount: 1 } }]`, tags: support) on a Miyabi team: team has anomaly unit → condition met → anomaly activates → she participates in disorder generation
+* Soukaku on a Lycaon/Yixuan team: no `anomaly`-tagged unit → condition not met → anomaly does NOT activate → she's a pure support
+* Nangong (`pseudoRole: [{ role: "anomaly", when: { countTag: "anomaly", minCount: 1 } }]`, tags: stun) on Nangong/YSG/Sunna: no `anomaly`-tagged unit → Nangong is just a stunner
+* Caesar (`pseudoRole: ["stun"]`, tags: defense): pseudo-stun is a plain string → always activates unconditionally
+* Remielle (`pseudoRole: ["dps", { role: "support", when: { countTag: "anomaly", minCount: 3 } }]`, tags: anomaly): On a triple-anomaly team (3 anomaly tags): `dps` always activates, `support` condition met → both activate → she's DPS + support → forced-secondary in L2, classified as support in L1.5 structure. On a non-triple-anomaly team (e.g., Nangong/Remielle/Yuzuha with only 1 anomaly tag): `dps` activates, `support` does NOT → she's pure DPS → team has no effective support → structure degrades.
+* Yanagi (`pseudoRole: [{ role: "subdps", when: { hasUnit: "miyabi" } }]`, tags: anomaly) on Miyabi/Yanagi/Yuzuha: Miyabi is present → subdps activates → Yanagi is treated as anomaly subdps instead of primary DPS. On Nangong/Yanagi/Yuzuha: no Miyabi → subdps does NOT activate → Yanagi is a standard primary anomaly DPS.
 
 **On-field derivation:** When a unit's pseudoRole activates as a different role, on-field status is derived from the activated role's default unless the unit has an explicit `mechanics.onfield` override. For example, Soukaku has no explicit `onfield` flag — when her anomaly pseudoRole activates, she's on-field (anomaly default); when it doesn't, she's off-field (support default).
+
+`dps` pseudo-role: The `"dps"` pseudo-role (as a plain string) always activates. It marks a unit as a primary DPS participant for L2 tier/rank scoring, overriding the normal exclusion of support/defense units from the DPS scoring loop. Units whose pseudo-role definitions include both `dps` and `support` (even conditionally) are always treated as forced-secondary in L2 — their kit is inherently split between personal DPS and team support, so they never receive full primary DPS credit.
 
 ### Scoring Ripple Effects of Role Activation
 
@@ -484,7 +496,7 @@ These principles govern how the mechanics-driven engine evaluates teams. They ar
 
 **A Pseudorole IS a Role (P25):** Activated pseudoroles become the unit's identity for scoring. All role functions check `_activatedRoles` first. See Role Activation section for full implications across L1–L3.
 
-**Pseudo-DPS Role Activation Requires Team Context (P23):** DPS pseudo-roles (attack, anomaly, rupture) only activate when a teammate has that DPS type in primary tags. Non-DPS pseudo-roles (stun, support, defense, subdps) always activate.
+**Pseudo-Role Activation Is Data-Driven (P23):** Pseudo-role activation conditions are specified per-entry in the unit data. Plain string entries always activate. Object entries with `when` conditions activate only when the team meets the condition (`countTag`/`minCount` for tag-counting, or `hasUnit` for specific unit presence). There are no hard-coded activation rules in the engine.
 
 **Tier Degradation Rates Differ by Role (P8):** DPS tier quality matters enormously (T2 DPS = significant compromise). Stunner tier matters less (stun is stun). Support/defense tier matters least (buffs are buffs). Penalty curves are steeper for DPS.
 
@@ -522,6 +534,8 @@ These principles govern how the mechanics-driven engine evaluates teams. They ar
 
 **Shill Is a Bonus, Not a Penalty (P27):** DPS shill matching gives a flat bonus. No penalty for mismatching. Non-DPS shills (stun) remain hard requirements.
 
+**Conditional Buffs Are Team-Composition-Dependent (P30):** Some units provide buffs that scale with team composition (e.g., Remielle's ATK buff scales with the number of primary `anomaly` teammates). These are modeled via `conditionalBuffs` — resolved at score time using the actual team. Units with unmaximized conditional buffs incur an underutilization penalty in L4, analogous to SAnby's aftershock buff being wasted without an aftershock consumer. The penalty is generic: `(1 - resolved/max) * max * 0.35` per buff key, summed across all conditional buffs on the unit.
+
 ## Wheelchair Compositions
 
 Powerful support/utility pairings that uplift almost any compatible DPS:
@@ -531,7 +545,7 @@ Powerful support/utility pairings that uplift almost any compatible DPS:
 * **Nangong + Yuzuha** — Anomaly-specific wheelchair. Stun buffs and benefits + ATK buff + anomaly buffs + kaleidoscope element flex to help disorder generation. Replaced Vivian's slot in the top anomaly template.
 * **Vivian + Yuzuha** — Anomaly-specific wheelchair (for non-ether anomaly agents). ATK buff + anomaly buffs + lots of disorder generation.
 * **Dialyn + Lucia** — Definitive rupture wheelchair. Free ultimates + stun + rupture specialist support. Best-in-slot for all rupture agents.  (The upcoming stunner Norma may also form a wheelchair with Lucia.)
-* Upcoming: Norma/Astra | Norma/Lucia - Stun+Support that self-reinforces with Norma acting as a secondary DPS for attack and rupture teams due to Norma’s interactions with quick assists and sheer buffs. 
+* Upcoming: Norma/Astra | Norma/Lucia - Stun+Support that self-reinforces with Norma acting as a secondary DPS for attack and rupture teams due to Norma’s interactions with quick assists and sheer buffs.
 
 These emerge naturally from the mechanics engine — their high scores are evidence of well-modeled mechanics.
 
@@ -656,34 +670,4 @@ There is a `scoring-baseline.txt` file that can be compared to. It establishes t
 
 ## Latest Mechanics
 
-The game is currently in version 2.8. This is a summary of the key changes in recent updates to the scoring engine.
-
-### Wind Element and Vortex (Implemented for 2.8)
-
-The **Wind** element was added in version 2.8 alongside a full anomaly reaction system:
-
-* `ELEMENTS` array now includes `'wind'`
-* `VORTEX_TIERS` maps element → vortex damage tier (ice: 3, fire: 2, etc.)
-* `VORTEX_DEFAULT_TIER` (0.08) covers any untagged element (for code safety only)
-* `VORTEX_BASE` (16) × tier = per-agent vortex bonus in L4
-* `POLARITY_VORTEX_DISCOUNT` (0.25) reduces polarity damage on anomaly-state bosses
-* `computeAnomalyReactions(team, boss)` resolves per-agent reactions (vortex, disorder, or none) from team composition + boss anomaly state
-* Boss `mechanics["anomaly:state"]` drives the anomaly-state system; currently only Scorched Horizon uses it
-* Vortex is also a need-fulfillment key in `NEED_FULFILLMENT_KEYS`
-
-**Future wind agents** (e.g., Velina, confirmed wind anomaly agent for 3.0) will trigger vortex against normal bosses when paired with non-wind anomaly teammates, using the same `computeAnomalyReactions` system.
-
-These upcoming units are already modeled in `units.json` as preview units (`available=false`):
-
-### Promeia (2.8 first banner)
-
-Ice anomaly DPS (just released). Key mechanics:
-
-* Abloom buffer — `buffs.abloom: 3`, directly empowers teammates with abloom damage (Burnice, Vivian, Grace)
-* Abloom self-buff — `damage.abloom: 3`, benefits from her own abloom buffs
-* Stun-synergy anomaly — benefits from stun windows (like Aria), emergent from mechanics due to having an enhanced attack
-* Positioned as a direct alternative to Miyabi against Scorched Horizon: pure ice anomaly (strong vortex tier of 3) vs. frost variant (weak vortex tier of 0.001)
-
-### Starlight Billy (2.8 second banner)
-
-Conventional physical rupture agent; only real feature is that he has relatively strong chain attacks. Expected to be strong against Fiend, Thrall, and Defiler. Best-in-slot teammates: Dialyn + Lucia (like every rupture agent), with Ju Fufu and Pan as alternatives. Should slot cleanly into existing rupture scoring without engine changes.  Norma, an upcoming stun agent that can uniquely benefit from sheer damage buffs, will likely pair well with him as an alternative to the current suite of rupture stunners.
+The latest mechanics updates were related to Ramiel for the upcoming 3.1 release and reflect the need to have conditional buffs and conditional pseudorole activation.  Most of the necessary changes to support patch 3.0 (still unreleased) were implemented ahead of time in 2.8. 

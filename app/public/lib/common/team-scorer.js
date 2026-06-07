@@ -65,7 +65,7 @@ const VORTEX_TIERS = {
     "ice:frost" : 0.001, 
     "ether:auricInk" : 0.8, 
     "physical:honedEdge" : 0.8,
-    "ether:lumens" : 7 //TODO Adjust as needed for Remielle
+    "ether:lumens" : 4.1
 };
 const VORTEX_DEFAULT_TIER = 0.001;
 const VORTEX_BASE = 17;
@@ -114,6 +114,14 @@ export function isDefense(unit) {
 export function isStun(unit) {
     if (unit._activatedRoles) return unit._activatedRoles.includes('stun');
     return unit.tags.includes("stun");
+}
+
+function isEffectiveSupport(unit) {
+    return isSupport(unit) || unit._activatedRoles?.includes('support');
+}
+
+function isEffectiveDefense(unit) {
+    return isDefense(unit) || unit._activatedRoles?.includes('defense');
 }
 
 export function isNonDPS(unit) {
@@ -225,6 +233,50 @@ function w(value) {
     return 0;
 }
 
+function resolveConditionalBuffValue(supplier, team, buffKey) {
+    const cb = supplier.mechanics?.conditionalBuffs?.[buffKey];
+    if (!cb) return null;
+    const count = team.filter(u => u.tags.includes(cb.countTag)).length;
+    const idx = Math.min(count, cb.levels.length - 1);
+    return cb.levels[idx];
+}
+
+function getEffectiveBuffValue(supplier, team, buffKey) {
+    const conditional = resolveConditionalBuffValue(supplier, team, buffKey);
+    if (conditional !== null) return conditional;
+    return w(supplier.mechanics?.buffs?.[buffKey]);
+}
+
+function computeConditionalBuffPenalty(supplier, team) {
+    const cb = supplier.mechanics?.conditionalBuffs;
+    if (!cb) return 0;
+    let totalPenalty = 0;
+    for (const [buffKey, config] of Object.entries(cb)) {
+        const maxLevel = Math.max(...config.levels);
+        if (maxLevel <= 0) continue;
+        const resolved = resolveConditionalBuffValue(supplier, team, buffKey);
+        if (resolved >= maxLevel) continue;
+        const efficiency = resolved / maxLevel;
+        totalPenalty += (1 - efficiency) * maxLevel * 0.35;
+    }
+    return totalPenalty;
+}
+
+function pseudoRoleName(entry) {
+    return typeof entry === 'string' ? entry : entry?.role;
+}
+
+function isPseudoRoleActive(entry, team) {
+    if (typeof entry === 'string') return true;
+    if (!entry?.when) return true;
+    const when = entry.when;
+    if (when.hasUnit !== undefined) {
+        return team.some(u => u.id === when.hasUnit);
+    }
+    const count = team.filter(u => u.tags.includes(when.countTag)).length;
+    return count >= when.minCount;
+}
+
 export function getEffectiveRoles(unit) {
     if (unit._activatedRoles) return unit._activatedRoles;
     const roles = [];
@@ -232,9 +284,10 @@ export function getEffectiveRoles(unit) {
         if (unit.tags.includes(role)) roles.push(role);
     }
     const pseudoRole = unit.mechanics?.pseudoRole;
-    if (pseudoRole) {
-        for (const pr of pseudoRole.split(',').map(s => s.trim())) {
-            if (pr && !roles.includes(pr)) roles.push(pr);
+    if (Array.isArray(pseudoRole)) {
+        for (const entry of pseudoRole) {
+            const name = pseudoRoleName(entry);
+            if (name && !roles.includes(name)) roles.push(name);
         }
     }
     return roles;
@@ -246,14 +299,12 @@ function computeActivatedRoles(unit, team) {
         if (unit.tags.includes(role)) roles.push(role);
     }
     const pseudoRole = unit.mechanics?.pseudoRole;
-    if (pseudoRole) {
-        for (const pr of pseudoRole.split(',').map(s => s.trim())) {
-            if (!pr || roles.includes(pr)) continue;
-            if (DPS_ROLES.includes(pr)) {
-                const hasActivator = team.some(t => t !== unit && t.tags.includes(pr));
-                if (!hasActivator) continue;
-            }
-            roles.push(pr);
+    if (Array.isArray(pseudoRole)) {
+        for (const entry of pseudoRole) {
+            const name = pseudoRoleName(entry);
+            if (!name || roles.includes(name)) continue;
+            if (!isPseudoRoleActive(entry, team)) continue;
+            roles.push(name);
         }
     }
     return roles;
@@ -375,7 +426,8 @@ function teamHasDisorderGenerationFromReactions(team, reactions) {
 
 export function hasSubDPSRole(unit) {
     const pr = unit.mechanics?.pseudoRole;
-    return pr ? pr.split(',').map(s => s.trim()).includes('subdps') : false;
+    if (!Array.isArray(pr)) return false;
+    return pr.some(entry => pseudoRoleName(entry) === 'subdps');
 }
 
 function isForcedSecondaryDPS(unit, sameTypeUnits) {
@@ -451,8 +503,8 @@ function resolveBaselineWeight(consumer, category) {
             if (roles.includes('attack') || roles.includes('rupture')) return 1;
             if (roles.includes('anomaly')) return 0.5;
             if (roles.includes('stun')) {
-                const pseudo = consumer.mechanics?.pseudoRole || '';
-                if (DPS_ROLES.some(r => pseudo.includes(r))) return 0.5;
+                const pseudo = consumer.mechanics?.pseudoRole;
+                if (Array.isArray(pseudo) && pseudo.some(entry => DPS_ROLES.includes(pseudoRoleName(entry)))) return 0.5;
             }
             return 0;
         case 'defense':
@@ -554,7 +606,14 @@ function computeBuffUtilization(supplier, team) {
     const nConsumers = consumers.length;
 
     if (isDPS(supplier)) {
-        const buffs = supplier.mechanics?.buffs || {};
+        const buffs = { ...(supplier.mechanics?.buffs || {}) };
+        const conditionalBuffs = supplier.mechanics?.conditionalBuffs;
+        if (conditionalBuffs) {
+            for (const [key] of Object.entries(conditionalBuffs)) {
+                const val = resolveConditionalBuffValue(supplier, team, key);
+                if (val > 0) buffs[key] = val;
+            }
+        }
         const debuffs = supplier.mechanics?.debuffs || {};
         // vortex is a contextual situational bonus, not a must-use designed mechanic.
         // Exclude it from cohesion evaluation; the positive signal comes from L4 baseline affinity.
@@ -593,7 +652,14 @@ function computeBuffUtilization(supplier, team) {
         return 0.65 + 0.35 * rawUtil;
     }
 
-    const buffs = supplier.mechanics?.buffs || {};
+    const buffs = { ...(supplier.mechanics?.buffs || {}) };
+    const conditionalBuffsNonDPS = supplier.mechanics?.conditionalBuffs;
+    if (conditionalBuffsNonDPS) {
+        for (const [key] of Object.entries(conditionalBuffsNonDPS)) {
+            const val = resolveConditionalBuffValue(supplier, team, key);
+            if (val > 0) buffs[key] = val;
+        }
+    }
     const debuffs = supplier.mechanics?.debuffs || {};
     const utility = supplier.mechanics?.utility || {};
     let totalWeight = 0;
@@ -686,7 +752,7 @@ function checkDisqualifications(team, boss, debug) {
         return -1;
     }
 
-    const pureDpsCount = dpsUnits.filter(u => !isSupport(u) && !isDefense(u) && !isStun(u)).length;
+    const pureDpsCount = dpsUnits.filter(u => !isEffectiveSupport(u) && !isEffectiveDefense(u) && !isStun(u)).length;
     if (pureDpsCount >= 3) {
         if (debug) console.log('  DISQUALIFIED: Triple DPS');
         return -1;
@@ -705,7 +771,7 @@ function checkDisqualifications(team, boss, debug) {
     const bossResistances = getBossResistances(boss);
     for (const unit of dpsUnits) {
         if (bossResistances.includes(getElement(unit))) {
-            if (isSupport(unit) || isDefense(unit)) continue;
+            if (isEffectiveSupport(unit) || isEffectiveDefense(unit)) continue;
             if (debug) console.log(`  DISQUALIFIED: ${unit.name} element resisted by boss`);
             return -1;
         }
@@ -739,11 +805,11 @@ const FIELD_TIME = {
 };
 
 function scoreTeamStructure(team, debug) {
-    const attackers = team.filter(u => isAttacker(u) && !isSupport(u) && !isDefense(u) && !isStun(u));
-    const anomalyUnits = team.filter(u => isAnomaly(u) && !isSupport(u) && !isDefense(u) && !isStun(u));
-    const ruptureUnits = team.filter(u => isRupture(u) && !isSupport(u) && !isDefense(u) && !isStun(u));
+    const attackers = team.filter(u => isAttacker(u) && !isEffectiveSupport(u) && !isEffectiveDefense(u) && !isStun(u));
+    const anomalyUnits = team.filter(u => isAnomaly(u) && !isEffectiveSupport(u) && !isEffectiveDefense(u) && !isStun(u));
+    const ruptureUnits = team.filter(u => isRupture(u) && !isEffectiveSupport(u) && !isEffectiveDefense(u) && !isStun(u));
     const stunUnits = team.filter(isStun);
-    const supportLike = team.filter(u => isSupport(u) || isDefense(u));
+    const supportLike = team.filter(u => isEffectiveSupport(u) || isEffectiveDefense(u));
     const dpsUnits = team.filter(isDPS);
 
     const nAtk = attackers.length;
@@ -867,6 +933,14 @@ function scoreTeamStructure(team, debug) {
         return STRUCTURE.UNCONVENTIONAL_NO_INTERACTION;
     }
 
+    // Pseudo-DPS-support provides hidden DPS capability (e.g. Ramiel: anomaly DPS with support pseudo-role)
+    if (supportLike.some(u => getEffectiveRoles(u).includes('dps'))) {
+        if (nStun >= 1 || nSup >= 2) {
+            if (debug) console.log('    Structure: UNCONVENTIONAL viable (pseudo-DPS-support team)');
+            return STRUCTURE.UNCONVENTIONAL_VIABLE;
+        }
+    }
+
     // --- EVERYTHING ELSE: PENALTY ---
     if (debug) console.log(`    Structure: WILDLY UNCONVENTIONAL (atk=${nAtk} ano=${nAno} rup=${nRup} stun=${nStun} sup=${nSup})`);
     return STRUCTURE.WILDLY_UNCONVENTIONAL;
@@ -880,12 +954,16 @@ function scoreInherentQuality(team, { lenient = false, debug = false, boss = nul
     let score = 0;
     const reactions = computeAnomalyReactions(team, boss);
 
-    const dpsUnits = team.filter(u => isDPS(u) && !isSupport(u) && !isDefense(u) && !isStun(u));
-    const attackers = team.filter(u => isAttacker(u) && !isSupport(u) && !isDefense(u) && !isStun(u));
-    const anomalyUnits = team.filter(u => isAnomaly(u) && !isSupport(u) && !isDefense(u) && !isStun(u));
-    const supportUnits = team.filter(isSupport);
+    const dpsUnits = team.filter(u => {
+        if (!isDPS(u)) return false;
+        if (getEffectiveRoles(u).includes('dps')) return true;
+        return !isEffectiveSupport(u) && !isEffectiveDefense(u) && !isStun(u);
+    });
+    const attackers = team.filter(u => isAttacker(u) && !isEffectiveSupport(u) && !isEffectiveDefense(u) && !isStun(u));
+    const anomalyUnits = team.filter(u => isAnomaly(u) && !isEffectiveSupport(u) && !isEffectiveDefense(u) && !isStun(u));
+    const supportUnits = team.filter(isEffectiveSupport);
     const stunUnits = team.filter(isStun);
-    const defenseUnits = team.filter(isDefense);
+    const defenseUnits = team.filter(isEffectiveDefense);
 
     if (debug) console.log('\n  LAYER 2: INHERENT QUALITY');
 
@@ -901,7 +979,14 @@ function scoreInherentQuality(team, { lenient = false, debug = false, boss = nul
             attackers.filter(a => a !== unit).length > 0;
         const isSecondaryAnomaly = isSubDPS && isAnomaly(unit) &&
             anomalyUnits.filter(a => a !== unit).length > 0;
+        const hasDualDPSSupport = (() => {
+            const pr = unit.mechanics?.pseudoRole;
+            if (!Array.isArray(pr)) return false;
+            const names = pr.map(pseudoRoleName);
+            return names.includes('dps') && (names.includes('support') || names.includes('defense'));
+        })();
         const forcedSecondary =
+            hasDualDPSSupport ||
             (isAttacker(unit) && isForcedSecondaryDPS(unit, attackers)) ||
             (isAnomaly(unit) && isForcedSecondaryDPS(unit, anomalyUnits)) ||
             (isRupture(unit) && isForcedSecondaryDPS(unit, team.filter(isRupture)));
@@ -1062,7 +1147,7 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
     if (bossShill) {
         const isDPSShill = DPS_ROLES.includes(bossShill);
         if (isDPSShill) {
-            const hasShilledDPS = dpsUnits.some(u => u.tags.includes(bossShill) && !isSupport(u) && !isDefense(u));
+            const hasShilledDPS = dpsUnits.some(u => u.tags.includes(bossShill) && !isEffectiveSupport(u) && !isEffectiveDefense(u));
             if (hasShilledDPS) {
                 score += 15;
                 if (debug) console.log(`    Shill match (${bossShill}): +15`);
@@ -1264,11 +1349,9 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
     if (bossAnti.length > 0) {
         for (const unit of team) {
             if (isDPS(unit)) continue;
-            const pr = unit.mechanics?.pseudoRole;
-            if (!pr) continue;
-            const pseudoRoles = pr.split(',').map(s => s.trim());
+            const activatedRoles = unit._activatedRoles || [];
             for (const antiType of bossAnti) {
-                if (pseudoRoles.includes(antiType) && unit._activatedRoles.includes(antiType)) {
+                if (activatedRoles.includes(antiType) && !unit.tags.includes(antiType)) {
                     score -= 30;
                     if (debug) console.log(`    ${unit.name} pseudo-role '${antiType}' matches boss anti: -30`);
                 }
@@ -1289,7 +1372,7 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
     for (const unit of team) {
         const element = getElement(unit);
         if (!bossResistances.includes(element)) continue;
-        if (!isSupport(unit) && !isDefense(unit)) continue;
+        if (!isEffectiveSupport(unit) && !isEffectiveDefense(unit)) continue;
         const damage = unit.mechanics?.damage || {};
         const maxDamage = Math.max(0, ...Object.values(damage).map(v =>
             typeof v === 'object' ? Math.max(...Object.values(v).map(Number)) : Number(v) || 0
@@ -1331,12 +1414,13 @@ function scoreBaselineAffinity(supplier, consumer, debug, options = {}) {
         if (debug && val > 0) console.log(`        ${cat}: ${val.toFixed(1)}`);
     };
 
-    // ATK buffs → all DPS
-    if (supplierBuffs.atk) {
+    // ATK buffs → all DPS (supports conditional buffs)
+    const effectiveAtk = getEffectiveBuffValue(supplier, options.team || [], 'atk');
+    if (effectiveAtk > 0) {
         const cw = resolveBaselineWeight(consumer, 'atk');
         if (cw > 0) {
             const isRup = consumerRoles.includes('rupture');
-            const supply = isRup ? w(supplierBuffs.atk) * RUPTURE_ATK_EFFICIENCY : w(supplierBuffs.atk);
+            const supply = isRup ? effectiveAtk * RUPTURE_ATK_EFFICIENCY : effectiveAtk;
             const val = supply * cw * MULT.ATK_BUFF;
             score += val;
             dbg('atk', val);
@@ -1621,7 +1705,7 @@ function countDiametricPairs(consumer, team, { antiRupture = false } = {}) {
     for (const s of suppliers) {
         const buffs = s.mechanics?.buffs || {};
         const debuffs = s.mechanics?.debuffs || {};
-        const atkCdWeight = Math.max(w(buffs.atk), w(buffs.cd));
+        const atkCdWeight = Math.max(getEffectiveBuffValue(s, team, 'atk'), w(buffs.cd));
         if (atkCdWeight > 0) atkCdSuppliers.set(s.name, atkCdWeight);
         const defWeight = w(debuffs.defense);
         if (defWeight > 0) defDebuffSuppliers.set(s.name, defWeight);
@@ -1693,6 +1777,7 @@ function scoreMechanicalSynergy(team, debug, options = {}) {
         disorderBuffDiscount,
         boss,
         reactions,
+        team,
     };
 
     if (debug) console.log('\n  LAYER 4: MECHANICAL SYNERGY');
@@ -1792,6 +1877,15 @@ function scoreMechanicalSynergy(team, debug, options = {}) {
         totalScore += score;
     }
 
+    // Conditional buff underutilization penalty — applied once per supplier
+    for (const supplier of team) {
+        const penalty = computeConditionalBuffPenalty(supplier, team);
+        if (penalty > 0) {
+            totalScore -= penalty;
+            if (debug) console.log(`    Conditional underutil penalty: ${supplier.name} -${penalty.toFixed(2)}`);
+        }
+    }
+
     if (debug) console.log(`    Layer 4 total: ${totalScore.toFixed(1)}`);
 
     return totalScore;
@@ -1870,7 +1964,9 @@ function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs =
         const buffs = unit.mechanics?.buffs || {};
         const debuffs = unit.mechanics?.debuffs || {};
         const utility = unit.mechanics?.utility || {};
+        const conditionalBuffs = unit.mechanics?.conditionalBuffs || {};
         const hasBuffContributions = Object.keys(buffs).length > 0 || Object.keys(debuffs).length > 0
+            || Object.keys(conditionalBuffs).length > 0
             || (!isDPS(unit) && NEED_FULFILLMENT_KEYS.some(k => w(utility[k]) > 0))
             || isStun(unit);
         if (!hasBuffContributions && isDPS(unit)) {
@@ -1935,7 +2031,7 @@ function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs =
 
         let util = computeBuffUtilization(unit, team);
         const pseudo = unit.mechanics?.pseudoRole;
-        if (pseudo && !isDPS(unit)) {
+        if (Array.isArray(pseudo) && pseudo.length > 0 && !isDPS(unit)) {
             const unitBuffs = unit.mechanics?.buffs || {};
             let statBuffWeight = 0, statBuffEffective = 0;
             const teammates = team.filter(t => t !== unit);
@@ -1950,8 +2046,10 @@ function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs =
             }
             const buffAlignment = statBuffWeight > 0 ? statBuffEffective / statBuffWeight : 1;
             if (buffAlignment < 0.5) {
-                for (const pr of pseudo.split(',').map(s => s.trim())) {
-                    if (DPS_ROLES.includes(pr) && !(unit._activatedRoles || []).includes(pr)) {
+                const activated = unit._activatedRoles || [];
+                for (const entry of pseudo) {
+                    const name = pseudoRoleName(entry);
+                    if (DPS_ROLES.includes(name) && !activated.includes(name)) {
                         util *= 0.65;
                         break;
                     }
@@ -2033,7 +2131,7 @@ export function scoreTeamForBoss(team, boss, options = {}) {
     if (debug) console.log('\n  LAYER 1.5: TEAM STRUCTURE');
     let structureScore = scoreTeamStructure(team, debug);
     if (structureScore === STRUCTURE.CONVENTIONAL_BONUS) {
-        const supLike = team.filter(u => isSupport(u) || isDefense(u));
+        const supLike = team.filter(u => isEffectiveSupport(u) || isEffectiveDefense(u));
         for (const sup of supLike) {
             const util = computeBuffUtilization(sup, team);
             if (util < 0.5) {
