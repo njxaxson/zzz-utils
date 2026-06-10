@@ -25,13 +25,13 @@ const GRID_DPS_TYPES = DPS_ROLES;
  * Check if a team has a DPS unit that matches BOTH the target element AND DPS type.
  * e.g., for Ice Anomaly, we need a unit that is both ice element AND anomaly role.
  */
-function teamHasMatchingDPS(team, targetElement, targetDpsType) {
+function teamHasMatchingDPS(team, targetElement, targetDpsType, allowSubDPS = false) {
     for (const unit of team) {
         const unitElement = getElement(unit);
         const unitDpsType = getDpsTypeForUnit(unit);
         
-        if (unitElement === targetElement && unitDpsType === targetDpsType && !hasSubDPSRole(unit)) {
-            return true;
+        if (unitElement === targetElement && unitDpsType === targetDpsType) {
+            return allowSubDPS || !hasSubDPSRole(unit);
         }
     }
     return false;
@@ -566,55 +566,62 @@ function getAvailableUnits() {
 }
 
 function applyUserFilters(teams) {
-    return teams.filter(({ label, team }) => {
-        // Filter: Element (at least 2 units with selected element)
-        if (filters.elements.length > 0) {
-            const hasMatchingElement = filters.elements.some(element => {
-                const count = team.filter(u => u.tags.includes(element)).length;
-                return count >= 2;
-            });
-            if (!hasMatchingElement) return false;
-        }
-        
+    const applyElementFilter = (teamList, minCount) =>
+        teamList.filter(({ label, team }) => {
+            if (filters.elements.length === 0) return true;
+            return filters.elements.some(element =>
+                team.filter(u => u.tags.includes(element)).length >= minCount
+            );
+        });
+
+    // Apply all non-element filters first, then layer on the element filter
+    const nonElementFiltered = teams.filter(({ label, team }) => {
         // Filter: DPS Role (at least one unit with selected role)
         if (filters.dpsRoles.length > 0) {
-            const hasDpsRole = team.some(u => 
+            const hasDpsRole = team.some(u =>
                 filters.dpsRoles.some(role => u.tags.includes(role))
             );
             if (!hasDpsRole) return false;
         }
-        
+
         // Filter: Minimum S-Ranks
         if (filters.minSRank > 0) {
             const sRankCount = team.filter(u => u.rank === 'S').length;
             if (sRankCount < filters.minSRank) return false;
         }
-        
+
         // Filter: Maximum Tier
         if (filters.maxTier < 99) {
             const hasHighTier = team.some(u => u.tier > filters.maxTier);
             if (hasHighTier) return false;
         }
-        
+
         // Filter: Must Include (at least one of the selected units)
         if (filters.mustInclude.length > 0) {
-            const hasRequiredUnit = team.some(u => 
+            const hasRequiredUnit = team.some(u =>
                 filters.mustInclude.includes(u.id)
             );
             if (!hasRequiredUnit) return false;
         }
-        
+
         // Filter: Exclude (none of the excluded units)
         if (filters.exclude.length > 0) {
-            const hasExcludedUnit = team.some(u => 
+            const hasExcludedUnit = team.some(u =>
                 filters.exclude.includes(u.id)
             );
             if (hasExcludedUnit) return false;
         }
-        
+
         return true;
     });
+
+    if (filters.elements.length === 0) return nonElementFiltered;
+
+    // Prefer teams with 2+ units of a selected element; fall back to 1+ if none exist
+    const strictPass = applyElementFilter(nonElementFiltered, 2);
+    return strictPass.length > 0 ? strictPass : applyElementFilter(nonElementFiltered, 1);
 }
+
 
 function selectBestTeams(teams, availableUnits) {
     if (teams.length === 0) return [];
@@ -622,7 +629,7 @@ function selectBestTeams(teams, availableUnits) {
     // Determine available elements and DPS types based on filters and roster
     const availableElements = getAvailableElements(availableUnits);
     const availableDpsTypes = getAvailableDpsTypes(availableUnits);
-    
+
     // Use a neutral boss for global scoring (no element bias)
     const neutralBoss = {
         name: 'neutral',
@@ -726,7 +733,7 @@ function selectBestTeams(teams, availableUnits) {
             }
         }
     }
-    
+        
     // Second pass: Fill remaining empty archetypes (or add more teams to archetypes below limit)
     for (const teamData of scoredTeams) {
         if (usedTeams.has(teamData.label)) continue;
@@ -753,40 +760,68 @@ function selectBestTeams(teams, availableUnits) {
             if (assigned) break;
         }
     }
+
+    // Third pass: Fill any still-empty cells by reusing already-assigned teams.
+    // This allows the same team to appear in multiple grid cells rather than
+    // leaving a cell blank just because the best match was claimed elsewhere.
+    for (const element of availableElements) {
+        for (const dpsType of availableDpsTypes) {
+            if (grid[element][dpsType].length > 0) continue;
+
+            for (const teamData of scoredTeams) {
+                if (teamHasMatchingDPS(teamData.team, element, dpsType, true)) {
+                    grid[element][dpsType].push({
+                        ...teamData,
+                        element,
+                        dpsType
+                    });
+                    if (grid[element][dpsType].length >= filters.teamsPerArchetype) break;
+                }
+            }
+        }
+    }
     
-    // Step 3: Collect all teams from grid
-    const candidateTeams = new Map(); // label -> teamData
+    // Step 3: Collect all teams from grid.
+    // A team may appear in multiple cells (different element/dpsType) when it was
+    // reused by the third pass to fill an otherwise-empty cell, so we key by the
+    // combination of label + cell coordinates rather than label alone.
+    const candidateTeams = [];
+    const seenKeys = new Set();
     
     for (const element of Object.keys(grid)) {
         for (const dpsType of Object.keys(grid[element])) {
             const cellTeams = grid[element][dpsType];
             for (const teamData of cellTeams) {
-                if (teamData && !candidateTeams.has(teamData.label)) {
-                    candidateTeams.set(teamData.label, teamData);
+                if (teamData) {
+                    const key = `${teamData.label}|${teamData.element}|${teamData.dpsType}`;
+                    if (!seenKeys.has(key)) {
+                        seenKeys.add(key);
+                        candidateTeams.push(teamData);
+                    }
                 }
             }
         }
     }
     
     // Step 4: Ensure minimum team count by adding top teams not yet included
+    const includedLabels = new Set(candidateTeams.map(t => t.label));
     let nextTeamIndex = 0;
-    while (candidateTeams.size < MIN_TEAMS_TO_SHOW && nextTeamIndex < scoredTeams.length) {
+    while (includedLabels.size < MIN_TEAMS_TO_SHOW && nextTeamIndex < scoredTeams.length) {
         const teamData = scoredTeams[nextTeamIndex];
-        if (!candidateTeams.has(teamData.label)) {
-            // Assign element/dpsType based on team composition
+        if (!includedLabels.has(teamData.label)) {
             const element = getTeamElements(teamData.team)[0];
             const dpsType = getTeamDpsType(teamData.team);
-            candidateTeams.set(teamData.label, {
+            candidateTeams.push({
                 ...teamData,
                 element,
                 dpsType
             });
+            includedLabels.add(teamData.label);
         }
         nextTeamIndex++;
     }
     
-    // Convert to array and return (already sorted by score)
-    return Array.from(candidateTeams.values());
+    return candidateTeams;
 }
 
 /**
