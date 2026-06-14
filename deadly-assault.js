@@ -13,7 +13,7 @@ import { buildAvailableUnits } from './lib/roster-builder.js';
 import { filterBosses } from './lib/boss-filter.js';
 import { buildTeams } from './lib/team-pipeline.js';
 import { parseTeams } from './lib/team-parser.js';
-import { scoreTeamForBoss } from './app/public/lib/common/team-scorer.js';
+import { scoreTeamForBoss, getBossWeaknesses, getBossResistances, getBossShill, getBossAnti, getBossAssists } from './app/public/lib/common/team-scorer.js';
 import { findExclusiveCombinations, teamsOverlap } from './app/public/lib/common/team-builder.js';
 import { rawScorePassesFilter } from './lib/score-filter.js';
 import { ELEMENTS, DPS_ROLES } from './app/public/lib/common/constants.js';
@@ -263,8 +263,8 @@ async function main() {
             const dpsType = dps.tags.find(t => DPS_ROLES.includes(t));
 
             const matchingBosses = bossData.filter(boss => {
-                const weaknessMatch = boss.weaknesses.includes(dpsElement);
-                const notAnti = !boss.anti || !boss.anti.includes(dpsType);
+                const weaknessMatch = getBossWeaknesses(boss).includes(dpsElement);
+                const notAnti = !getBossAnti(boss).includes(dpsType);
                 return weaknessMatch && notAnti;
             });
 
@@ -343,11 +343,11 @@ async function main() {
     console.log("Selected Bosses:");
     for (const boss of selectedBossObjects) {
         if (DEBUG) {
-            const weakStr = boss.weaknesses.join(", ") || "none";
-            const resStr = boss.resistances.join(", ") || "none";
-            const shillStr = boss.shill || "none";
+            const weakStr = getBossWeaknesses(boss).join(", ") || "none";
+            const resStr = getBossResistances(boss).join(", ") || "none";
+            const shillStr = getBossShill(boss) || "none";
             console.log(`  ${boss.name}`);
-            console.log(`    Weak: ${weakStr} | Resist: ${resStr} | Shill: ${shillStr} | Assists: ${boss.assists}`);
+            console.log(`    Weak: ${weakStr} | Resist: ${resStr} | Shill: ${shillStr} | Assists: ${getBossAssists(boss)}`);
         } else {
             console.log(`  - ${boss.name}`);
         }

@@ -34,12 +34,14 @@ import { scoreTeamForBoss } from './app/public/lib/common/team-scorer.js';
 /** Neutral synthetic boss: same as `matchups.js` (full roster has no "neutral" in JSON as a real boss in some builds — appended at runtime). */
 const NEUTRAL_BOSS = {
     name: 'Synthetic Neutral Boss',
-    weaknesses: [],
-    resistances: [],
-    shill: null,
-    anti: [],
     favored: [],
-    assists: 0
+    mechanics: {
+        weaknesses: [],
+        resistances: [],
+        shill: null,
+        anti: [],
+        assists: 0
+    }
 };
 
 // ---------------------------------------------------------------------------

@@ -13,7 +13,7 @@ import { buildAvailableUnits } from './lib/roster-builder.js';
 import { filterBosses } from './lib/boss-filter.js';
 import { buildTeams } from './lib/team-pipeline.js';
 import { parseTeams } from './lib/team-parser.js';
-import { scoreTeamForBoss } from './app/public/lib/common/team-scorer.js';
+import { scoreTeamForBoss, getBossWeaknesses, getBossResistances, getBossShill, getBossAnti, getBossAssists } from './app/public/lib/common/team-scorer.js';
 import { rawScorePassesFilter } from './lib/score-filter.js';
 
 const options = parseArgs({
@@ -40,12 +40,14 @@ async function main() {
 
     const NEUTRAL_BOSS = {
         name: 'Synthetic Neutral Boss',
-        weaknesses: [],
-        resistances: [],
-        shill: null,
-        anti: [],
         favored: [],
-        assists: 0
+        mechanics: {
+            weaknesses: [],
+            resistances: [],
+            shill: null,
+            anti: [],
+            assists: 0
+        }
     };
     bosses.push(NEUTRAL_BOSS);
 
@@ -103,10 +105,10 @@ async function main() {
 
     // Process each boss
     for (const boss of filteredBosses) {
-        const weakStr = boss.weaknesses.join(", ") || "none";
-        const resistStr = boss.resistances.join(", ") || "none";
-        const shillStr = boss.shill || "none";
-        const antiStr = boss.anti?.join(", ") || "none";
+        const weakStr = getBossWeaknesses(boss).join(", ") || "none";
+        const resistStr = getBossResistances(boss).join(", ") || "none";
+        const shillStr = getBossShill(boss) || "none";
+        const antiStr = getBossAnti(boss).join(", ") || "none";
 
         const viableTeams = [];
         for (const { label, team } of teamEntries) {
@@ -125,7 +127,7 @@ async function main() {
         if(viableTeams.length == 0 && options.omit) continue; //do not display
         
         console.log(boss.name);
-        if(!options.omit) console.log(`  Weak: ${weakStr} | Resist: ${resistStr} | Shill: ${shillStr} | Anti: ${antiStr} | Assists: ${boss.assists}`);
+        if(!options.omit) console.log(`  Weak: ${weakStr} | Resist: ${resistStr} | Shill: ${shillStr} | Anti: ${antiStr} | Assists: ${getBossAssists(boss)}`);
         viableTeams.sort((a, b) => b.score - a.score);
         if(!options.omit) console.log(`  Viable teams: ${viableTeams.length}`);
 

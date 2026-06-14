@@ -12,7 +12,7 @@ import { buildAvailableUnits } from './lib/roster-builder.js';
 import { filterBosses } from './lib/boss-filter.js';
 import { buildTeams } from './lib/team-pipeline.js';
 import { parseTeams } from './lib/team-parser.js';
-import { scoreTeamForBoss } from './app/public/lib/common/team-scorer.js';
+import { scoreTeamForBoss, getBossWeaknesses, getBossResistances, getBossShill, getBossAssists } from './app/public/lib/common/team-scorer.js';
 import { teamsOverlap } from './app/public/lib/common/team-builder.js';
 import {
     isPrimaryDps, unitFingerprint, getTeamDpsBuckets,
@@ -173,10 +173,10 @@ async function main() {
     console.log("===== DA Buckets — Diversity Algorithm Test =====\n");
     console.log("Selected Bosses:");
     for (const boss of selectedBossObjects) {
-        const weakStr = boss.weaknesses.join(", ") || "none";
-        const resStr = boss.resistances.join(", ") || "none";
+        const weakStr = getBossWeaknesses(boss).join(", ") || "none";
+        const resStr = getBossResistances(boss).join(", ") || "none";
         console.log(`  ${boss.name}`);
-        console.log(`    Weak: ${weakStr} | Resist: ${resStr} | Shill: ${boss.shill || 'none'} | Assists: ${boss.assists}`);
+        console.log(`    Weak: ${weakStr} | Resist: ${resStr} | Shill: ${getBossShill(boss) || 'none'} | Assists: ${getBossAssists(boss)}`);
     }
     console.log();
 

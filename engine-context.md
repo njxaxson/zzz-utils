@@ -172,16 +172,17 @@ Conceptually, many support agents are effectively designed to be either speciali
 
 | Boss | Weak | Resist | Shill | Anti | Assists | Key Mechanics |
 |----|----|----|----|----|----|----|
-| **Discordant Solo** | ether, wind | ice, fire | anomaly | rupture | 2 | Favors Aria, Sunna, Nangong. Sunna's ether veil stacking creates unique multiplicative debuffs — this boss was designed to require Sunna. One of only two bosses with dual resistance. |
+| **Dead End Butcher** (Notorious) | ice, ether | — | anomaly | — | 0 | Weak to disorders. Debuffs daze accumulation (`debuffs.daze:2`), penalizing attack/rupture teams; mitigated by high-daze stunners. Anomaly teams unaffected. |
+| **Discordant Solo** | ether, wind | ice, fire | anomaly | rupture | 2 | Favors Aria, Sunna, Nangong. Weak to ether veils. Sunna's ether veil stacking creates unique multiplicative debuffs — this boss was designed to require Sunna. One of only two bosses with dual resistance. |
 | **Sacrifice Bringer** | ice | physical | anomaly | — | 0 | Favors Miyabi and Promeia. Vulnerable to Freeze status; Miyabi/Promeia trivializes this fight. |
-| **Sanguine Sweeper** | electric, ether | fire | anomaly | rupture | 2 | Benefits heavily from stunners on anomaly teams. |
+| **Sanguine Sweeper** | electric, ether | fire | anomaly | rupture | 2 | Weak to stun. Benefits heavily from stunners on anomaly teams. |
 | **Primordial Nightmare** | physical | ice, ether | attack | rupture, anomaly | 0 | Heavily shills YSG: Anti-rupture AND anti-anomaly — only attack teams viable. Dual resistance against ice and ether was designed to lock out brute force attempts from Miyabi and Yixuan. |
 | **Wandering Hunter** | fire, ice | physical | rupture | anomaly, attack | 2 | Anti-anomaly AND anti-attack — only rupture teams viable. Physical resistance hurts YSG from trying to brute force it. |
 | **The Defiler** | electric, physical | ice | attack | anomaly | 2 | Attack-shill. Anti-anomaly. Ice resistance hurts Miyabi. |
-| **Thrall & Sobek** | ice, physical, \n wind | electric | stun | anomaly | 2 | Stun shill is a **hard requirement** — teams without a stunner are disqualified. |
+| **Thrall & Sobek** | ice, physical, wind | electric | stun | anomaly | 2 | Stun shill is a **hard requirement** — teams without a stunner are disqualified. |
 | **Typhon Slugger** | electric, wind | fire | — | — | 3 | All three units must have `assist:defensive`. Fire resistance. No shill. |
 | **Miasma Priest** | ether | ice | rupture | — | 2 | Ice resistance hurts Miyabi. Rupture shill means rupture teams get bonus. |
-| **Scorched Horizon** | wind, ice | electric | anomaly | — | 2 | `mechanics["anomaly:state"]: "wind"`. Permanent self-applied wind anomaly. All team anomalies react with the boss (vortex for non-wind, nothing for same-element). Disorders replaced by vortex; polarity disorder damage severely reduced. Designed to favor Promeia  over Miyabi. |
+| **Scorched Horizon** | wind, ice | electric | anomaly | — | 2 | `mechanics["anomaly:state"]: "wind"`. Permanent self-applied wind anomaly. All team anomalies react with the boss (vortex for non-wind, nothing for same-element). Disorders replaced by vortex; polarity disorder damage severely reduced. Also debuffs CD (`debuffs.cd:2`). Designed to favor Promeia over Miyabi. |
 
 ### Shill Behavior
 
@@ -296,35 +297,38 @@ All fields are optional. Values are weighted: `true` (or 1) = minor, `2` = stron
   "name": "Discordant Solo",
   "shortName": "Discordant Solo",
   "image": "./assets/bosses/solo.webp",
-  "weaknesses": ["ether"],
-  "resistances": ["ice", "fire"],
-  "shill": "anomaly",
-  "anti": ["rupture"],
-  "assists": 2,
   "favored": ["Aria", "Sunna", "Nangong"],
-  "shillIntensity": 2,
   "available": true,
-  "mechanics" : {
-    "freezable" : false, 
-    "weak" : "abloom", 
-    "anomaly:state" : "wind",
-    "debuffs" : { "cd" : 2 } 
+  "mechanics": {
+    "weaknesses": ["ether", "wind"],
+    "resistances": ["ice", "fire"],
+    "shill": "anomaly",
+    "anti": ["rupture"],
+    "assists": 2,
+    "shillIntensity": 2,
+    "anomaly:state": "wind",
+    "weak": ["veils"],
+    "debuffs": { "cd": 2 }
   }
 }
 ```
 
-* `weaknesses` / `resistances` — Element arrays
-* `shill` — DPS archetype or non-DPS role the boss prefers
-* `anti` — DPS archetypes disqualified against this boss
-* `assists` — Required number of defensive assist units
-* `favored` — Named units with enhanced bonuses on this boss
-* `shillIntensity` — (optional, default 1) Amplifies favored unit bonuses
+* `favored` — Named units with enhanced bonuses on this boss (top-level; not overridden by mechanics)
 * `available` — (optional, default `true`) When `false`, boss is unreleased
-* `mechanics` — (optional) Boss-specific mechanical gimmicks. Currently supports:
+* `mechanics` — Boss mechanics block. All gameplay properties live here:
+  * `weaknesses` / `resistances` — Element arrays
+  * `shill` — DPS archetype or non-DPS role the boss prefers
+  * `anti` — DPS archetypes disqualified against this boss
+  * `assists` — Required number of defensive assist units
+  * `shillIntensity` — (optional, default 1) Amplifies favored unit bonuses
   * `"anomaly:state": "<element>"` — Boss permanently has the specified element's anomaly applied. Changes how anomaly reactions work against this boss (see Anomaly Reactions section).
-  * `freezable` - indicates that the boss is particularly vulnerable to ice anomalies and gives ice anomaly units a very significant bonus. Pseudoanomalies get half of that bonus.
-  * `weak` - indicates that the boss is weak to a specific type of damage or utility, such as disorders, stuns, ablooms, or ether veils. Different damage types may get different bonuses; some nominal and some more significant.  TODO: This may need to change to an array to accomodate multiple forms of damage type weakness.
-  * `debuffs` - this boss inflicts a very specific debuff against the team. Currently, only Scorched Horizon does this and inflicts a Critical Damage debuff (CD) that penalizes DPS agents that rely on CD (checked by looking at their scaling - explicit or implicit - and seeing if the team can mitigate the CD debuff with its own CD buffs or not). TODO: Butcher debuffs daze accumulation, hurting stunner-based teams.
+  * `freezable` — Boss is particularly vulnerable to ice anomalies; ice anomaly units receive a very significant bonus. Pseudo-anomaly agents get half the bonus.
+  * `weak` — Array of mechanic weaknesses. Each entry gives teams that leverage that mechanic a bonus. Supported values: `"disorders"`, `"veils"`, `"stun"`, `"abloom"`. (Array format allows a boss to be weak to multiple mechanics simultaneously.)
+  * `debuffs` — Boss inflicts debuffs on the player team. Supported keys:
+    * `"cd"` — Critical Damage debuff. Penalizes DPS agents that scale with CD when the boss's CD debuff exceeds the team's total CD buff supply.
+    * `"daze"` — Daze debuff. Slows daze accumulation, making stun windows harder to trigger. Penalizes attack and rupture DPS proportionally to the shortfall between the debuff level and team daze supply. High-daze stunners mitigate the effect. Anomaly DPS are not penalized since their damage is less stun-window-dependent. Unlike anti-shill, this penalty can be fully eliminated by bringing a sufficiently high-daze stunner.
+
+**Boss property accessors:** All boss gameplay properties are accessed via exported helper functions (`getBossWeaknesses`, `getBossResistances`, `getBossShill`, `getBossAnti`, `getBossAssists`, `getBossShillIntensity`) from `team-scorer.js`. These centralize access and are designed to support boss variation resolution transparently in the future.
 
 ## Engine Architecture: Five-Layer Scoring
 

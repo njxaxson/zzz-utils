@@ -7,7 +7,7 @@ import {
     getTeams, sortTeamByRole, getTeamLabel,
     extendTeamsWithUniversalUnits, findExclusiveCombinations, teamsOverlap 
 } from '../common/team-builder.js';
-import { scoreTeamForBoss } from '../common/team-scorer.js';
+import { scoreTeamForBoss, getBossWeaknesses } from '../common/team-scorer.js';
 import { createStrengthLabelHtml } from '../common/strength-rating.js';
 import { 
     decodeBosses, getBossesFromUrl, generateShareUrlWithBosses 
@@ -150,7 +150,7 @@ function renderBossSection() {
 function createBossCard(boss) {
     const isSelected = selectedBosses.includes(boss.id);
     const initials = getInitials(boss.shortName);
-    const weaknessClass = getWeaknessGradientClass(boss.weaknesses);
+    const weaknessClass = getWeaknessGradientClass(getBossWeaknesses(boss));
     const imageUrl = getBossImageUrl(boss.id);
     
     const avatarHtml = imageUrl
@@ -161,7 +161,7 @@ function createBossCard(boss) {
         <button type="button" class="boss-card ${weaknessClass} ${isSelected ? 'selected' : ''}" 
                 data-boss-id="${boss.id}" 
                 aria-pressed="${isSelected}"
-                aria-label="${boss.shortName} - Weak to ${boss.weaknesses.join(', ')}">
+                aria-label="${boss.shortName} - Weak to ${getBossWeaknesses(boss).join(', ')}">
             <div class="boss-avatar">
                 ${avatarHtml}
             </div>
@@ -385,10 +385,10 @@ function calculateOptimalTeams() {
         
         // DEBUG: Log boss info
         console.group(`👹 Scoring teams for: ${boss.name}`);
-        console.log('   Weaknesses:', boss.weaknesses);
-        console.log('   Resistances:', boss.resistances);
-        console.log('   Shill:', boss.shill || 'none');
-        console.log('   Anti:', boss.anti || 'none');
+        console.log('   Weaknesses:', getBossWeaknesses(boss));
+        console.log('   Resistances:', boss.mechanics?.resistances ?? []);
+        console.log('   Shill:', boss.mechanics?.shill || 'none');
+        console.log('   Anti:', boss.mechanics?.anti || 'none');
         
         const disqualifiedTeams = [];
         
@@ -624,7 +624,7 @@ function createResultSlide(combo, index, bosses) {
     // Create 3 columns - one per boss/team assignment
     const columnsHtml = combo.assignments.map(assignment => {
         const boss = bosses.find(b => b.name === assignment.boss);
-        const weaknessClass = getWeaknessGradientClass(boss.weaknesses);
+        const weaknessClass = getWeaknessGradientClass(getBossWeaknesses(boss));
         const teamHtml = assignment.team.map(unit => createResultUnitCard(unit)).join('');
         const imageUrl = getBossImageUrl(boss.id);
         const initials = getInitials(boss.shortName);

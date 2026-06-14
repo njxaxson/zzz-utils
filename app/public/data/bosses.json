@@ -4,14 +4,15 @@
         "name": "Notorious Dead End Butcher",
         "shortName": "Dead End Butcher",
         "image": "./assets/bosses/butcher.webp",
-        "weaknesses": ["ice", "ether"],
-        "resistances": [],
-        "shill": "anomaly",
-        "anti": [],
-        "assists": 0,
         "favored": [],
         "mechanics": {
-            "weak" : "disorders"
+            "weaknesses": ["ice", "ether"],
+            "resistances": [],
+            "shill": "anomaly",
+            "anti": [],
+            "assists": 0,
+            "weak": ["disorders"],
+            "debuffs": { "daze": 2 }
         }
     },
     {
@@ -19,62 +20,70 @@
         "name": "Unknown Corruption Complex",
         "shortName": "Corruption Complex",
         "image": "./assets/bosses/ucc.webp",
-        "weaknesses": ["electric", "ether"],
-        "resistances": [],
-        "shill": null,
-        "anti": [],
-        "assists": 0,
-        "favored": []
+        "favored": [],
+        "mechanics": {
+            "weaknesses": ["electric", "ether"],
+            "resistances": [],
+            "shill": null,
+            "anti": [],
+            "assists": 0
+        }
     },
     {
         "id": "marionettes",
         "name": "Notorious Marionettes",
         "shortName": "Marionettes",
         "image": "./assets/bosses/marionette.webp",
-        "weaknesses": ["ice", "ether"],
-        "resistances": [],
-        "shill": null,
-        "anti": [],
-        "assists": 0,
-        "favored": []
+        "favored": [],
+        "mechanics": {
+            "weaknesses": ["ice", "ether"],
+            "resistances": [],
+            "shill": null,
+            "anti": [],
+            "assists": 0
+        }
     },
     {
         "id": "pompey",
         "name": "Notorious Pompey",
         "shortName": "Pompey",
         "image": "./assets/bosses/pompey.webp",
-        "weaknesses": ["fire"],
-        "resistances": ["electric"],
-        "shill": null,
-        "anti": [],
-        "assists": 0,
-        "favored": []
+        "favored": [],
+        "mechanics": {
+            "weaknesses": ["fire"],
+            "resistances": ["electric"],
+            "shill": null,
+            "anti": [],
+            "assists": 0
+        }
     },
     {
         "id": "typhon",
         "name": "Typhon Slugger",
         "shortName": "Typhon Slugger",
         "image": "./assets/bosses/typhon.webp",
-        "weaknesses": ["electric", "wind"],
-        "resistances": ["fire"],
-        "shill": null,
-        "anti": [],
-        "assists": 3,
-        "favored": []
+        "favored": [],
+        "mechanics": {
+            "weaknesses": ["electric", "wind"],
+            "resistances": ["fire"],
+            "shill": null,
+            "anti": [],
+            "assists": 3
+        }
     },
     {
         "id": "bringer",
         "name": "Sacrifice Bringer",
         "shortName": "Sacrifice Bringer",
         "image": "./assets/bosses/bringer.webp",
-        "weaknesses": ["ice"],
-        "resistances": ["physical"],
-        "shill": "anomaly",
-        "anti": [],
-        "assists": 0,
         "favored": [],
-        "mechanics" : {
-            "freezable" : true
+        "mechanics": {
+            "weaknesses": ["ice"],
+            "resistances": ["physical"],
+            "shill": "anomaly",
+            "anti": [],
+            "assists": 0,
+            "freezable": true
         }
     },
     {
@@ -82,86 +91,98 @@
         "name": "Miasma Priest",
         "shortName": "Miasma Priest",
         "image": "./assets/bosses/priest.webp",
-        "weaknesses": ["ether"],
-        "resistances": ["ice"],
-        "shill": "rupture",
-        "anti": [],
-        "assists": 2,
-        "favored": []
+        "favored": [],
+        "mechanics": {
+            "weaknesses": ["ether"],
+            "resistances": ["ice"],
+            "shill": "rupture",
+            "anti": [],
+            "assists": 2
+        }
     },
     {
         "id": "fiend",
         "name": "Miasmic Fiend Unfathomable",
         "shortName": "Miasmic Fiend",
         "image": "./assets/bosses/fiend.webp",
-        "weaknesses": ["ether", "physical"],
-        "resistances": ["fire"],
-        "shill": "anomaly",
-        "anti": [],
-        "assists": 0,
-        "favored": []
+        "favored": [],
+        "mechanics": {
+            "weaknesses": ["ether", "physical"],
+            "resistances": ["fire"],
+            "shill": "anomaly",
+            "anti": [],
+            "assists": 0
+        }
     },
     {
         "id": "defiler",
         "name": "The Defiler",
         "shortName": "The Defiler",
         "image": "./assets/bosses/defiler.webp",
-        "weaknesses": ["electric", "physical"],
-        "resistances": ["ice"],
-        "shill": "attack",
-        "anti": ["anomaly"],
-        "assists": 2,
-        "favored": []
+        "favored": [],
+        "mechanics": {
+            "weaknesses": ["electric", "physical"],
+            "resistances": ["ice"],
+            "shill": "attack",
+            "anti": ["anomaly"],
+            "assists": 2
+        }
     },
     {
         "id": "hunter",
         "name": "Wandering Hunter",
         "shortName": "Wandering Hunter",
         "image": "./assets/bosses/hunter.webp",
-        "weaknesses": ["fire", "ice"],
-        "resistances": ["physical"],
-        "shill": "rupture",
-        "anti": ["anomaly", "attack"],
-        "assists": 2,
-        "favored": []
+        "favored": [],
+        "mechanics": {
+            "weaknesses": ["fire", "ice"],
+            "resistances": ["physical"],
+            "shill": "rupture",
+            "anti": ["anomaly", "attack"],
+            "assists": 2
+        }
     },
     {
         "id": "thrall",
         "name": "Thrall & Sobek",
         "shortName": "Thrall & Sobek",
         "image": "./assets/bosses/thrall.webp",
-        "weaknesses": ["ice", "physical", "wind"],
-        "resistances": ["electric"],
-        "shill": "stun",
-        "anti": ["anomaly"],
-        "assists": 2,
-        "favored": []
+        "favored": [],
+        "mechanics": {
+            "weaknesses": ["ice", "physical", "wind"],
+            "resistances": ["electric"],
+            "shill": "stun",
+            "anti": ["anomaly"],
+            "assists": 2
+        }
     },
     {
         "id": "nightmare",
         "name": "Primordial Nightmare",
         "shortName": "Primordial Nightmare",
         "image": "./assets/bosses/nightmare.webp",
-        "weaknesses": ["physical"],
-        "resistances": ["ice", "ether"],
-        "shill": "attack",
-        "anti": ["rupture", "anomaly"],
-        "assists": 0,
-        "favored": []
+        "favored": [],
+        "mechanics": {
+            "weaknesses": ["physical"],
+            "resistances": ["ice", "ether"],
+            "shill": "attack",
+            "anti": ["rupture", "anomaly"],
+            "assists": 0
+        }
     },
     {
         "id": "vesper",
         "name": "Discordant Solo",
         "shortName": "Discordant Solo",
         "image": "./assets/bosses/solo.webp",
-        "weaknesses": ["ether", "wind"],
-        "resistances": ["ice", "fire"],
-        "shill": "anomaly",
-        "anti": ["rupture"],
-        "assists": 2,
         "favored": ["Aria", "Sunna", "Nangong"],
         "mechanics": {
-            "weak" : "veils"
+            "weaknesses": ["ether", "wind"],
+            "resistances": ["ice", "fire"],
+            "shill": "anomaly",
+            "anti": ["rupture"],
+            "assists": 2,
+            "weak": ["veils"]
         }
     },
     {
@@ -169,14 +190,14 @@
         "name": "Sanguine Sweeper",
         "shortName": "Sanguine Sweeper",
         "image": "./assets/bosses/sweeper.webp",
-        "weaknesses": ["electric", "ether"],
-        "resistances": ["fire", "wind"],
-        "shill": "anomaly",
-        "anti": ["rupture"],
-        "assists": 2,
         "favored": [],
         "mechanics": {
-            "weak" : "stun"
+            "weaknesses": ["electric", "ether"],
+            "resistances": ["fire", "wind"],
+            "shill": "anomaly",
+            "anti": ["rupture"],
+            "assists": 2,
+            "weak": ["stun"]
         }
     },
     {
@@ -184,17 +205,16 @@
         "name": "Scorched Horizon",
         "shortName": "Scorched Horizon",
         "image": "./assets/bosses/mutant.webp",
-        "weaknesses": ["wind", "ice"],
-        "resistances": ["electric"],
-        "shill": "anomaly",
-        "anti": [],
-        "assists": 2,
         "favored": ["Velina"],
         "mechanics": {
+            "weaknesses": ["wind", "ice"],
+            "resistances": ["electric"],
+            "shill": "anomaly",
+            "anti": [],
+            "assists": 2,
             "anomaly:state": "wind",
-            "weak" : "abloom",
-            "debuffs" : { "cd" : 2 }
+            "weak": ["abloom"],
+            "debuffs": { "cd": 2 }
         }
     }
 ]
-

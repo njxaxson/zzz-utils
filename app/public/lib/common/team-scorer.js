@@ -49,6 +49,7 @@ const BOSS_WEAK = {
     ABLOOM_PER_UNIT: 5,
     FREEZE_BONUS: 60,
     CD_DEBUFF_PER_UNIT: 12,
+    DAZE_DEBUFF_PER_UNIT: 10,
 };
 
 const BURST_DAMAGE_TYPES = ['enhanced', 'ultimate:strong', 'ultimate:double', 'chain', 'totalize'];
@@ -150,6 +151,20 @@ export function isOnField(unit) {
     const activated = unit._activatedRoles || [];
     return activated.some(r => DPS_ROLES.includes(r) || r === 'stun');
 }
+
+// ============================================================================
+// BOSS ACCESSORS
+// These functions centralize access to boss properties that were moved into
+// the mechanics block. Using accessors here allows Phase 2 variation
+// resolution to be added transparently without touching call sites.
+// ============================================================================
+
+export function getBossWeaknesses(boss) { return boss.mechanics?.weaknesses ?? []; }
+export function getBossResistances(boss) { return boss.mechanics?.resistances ?? []; }
+export function getBossShill(boss) { return boss.mechanics?.shill ?? null; }
+export function getBossAnti(boss) { return boss.mechanics?.anti ?? []; }
+export function getBossAssists(boss) { return boss.mechanics?.assists ?? 0; }
+export function getBossShillIntensity(boss) { return boss.mechanics?.shillIntensity ?? 1; }
 
 // ============================================================================
 // MECHANICS HELPERS
@@ -628,8 +643,9 @@ function checkDisqualifications(team, boss, debug) {
         return -1;
     }
 
-    if (boss.anti && boss.anti.length > 0) {
-        for (const antiType of boss.anti) {
+    const bossAnti = getBossAnti(boss);
+    if (bossAnti.length > 0) {
+        for (const antiType of bossAnti) {
             if (dpsUnits.some(u => u.tags.includes(antiType))) {
                 if (debug) console.log(`  DISQUALIFIED: DPS matches boss anti-type ${antiType}`);
                 return -1;
@@ -637,17 +653,19 @@ function checkDisqualifications(team, boss, debug) {
         }
     }
 
+    const bossResistances = getBossResistances(boss);
     for (const unit of dpsUnits) {
-        if (boss.resistances.includes(getElement(unit))) {
+        if (bossResistances.includes(getElement(unit))) {
             if (isSupport(unit) || isDefense(unit)) continue;
             if (debug) console.log(`  DISQUALIFIED: ${unit.name} element resisted by boss`);
             return -1;
         }
     }
 
+    const bossAssists = getBossAssists(boss);
     const defensiveAssistCount = team.filter(hasDefensiveAssist).length;
-    if (defensiveAssistCount < boss.assists) {
-        if (debug) console.log(`  DISQUALIFIED: ${defensiveAssistCount}/${boss.assists} defensive assists`);
+    if (defensiveAssistCount < bossAssists) {
+        if (debug) console.log(`  DISQUALIFIED: ${defensiveAssistCount}/${bossAssists} defensive assists`);
         return -1;
     }
 
@@ -841,7 +859,7 @@ function scoreInherentQuality(team, { lenient = false, debug = false, boss = nul
         if (forcedSecondary) forcedSecondaryUnits.add(unit);
         let tierMult = (isSecondaryAttacker || isSecondaryAnomaly || forcedSecondary) ? 0.5 : 1.0;
         const unitReaction = reactions.get(unit);
-        const onElementWeakness = boss?.weaknesses?.includes(getElement(unit));
+        const onElementWeakness = getBossWeaknesses(boss).includes(getElement(unit));
         const reactionDisabled = isSubDPS && isAnomaly(unit) &&
             !(unitReaction?.bestVortexTier > 0 || unitReaction?.hasDisorder) &&
             !onElementWeakness;
@@ -977,6 +995,13 @@ function scoreInherentQuality(team, { lenient = false, debug = false, boss = nul
 
 function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
     let score = 0;
+
+    const bossWeaknesses = getBossWeaknesses(boss);
+    const bossResistances = getBossResistances(boss);
+    const bossShill = getBossShill(boss);
+    const bossAnti = getBossAnti(boss);
+    const bossAssists = getBossAssists(boss);
+    const shillIntensity = getBossShillIntensity(boss);
     
     const dpsUnits = team.filter(isDPS);
     const stunUnits = team.filter(isStun);
@@ -985,26 +1010,25 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
     if (debug) console.log('\n  LAYER 3: BOSS MATCHUP');
 
     // --- Shill preference ---
-    if (boss.shill) {
-        const isDPSShill = DPS_ROLES.includes(boss.shill);
+    if (bossShill) {
+        const isDPSShill = DPS_ROLES.includes(bossShill);
         if (isDPSShill) {
-            const hasShilledDPS = dpsUnits.some(u => u.tags.includes(boss.shill) && !isSupport(u) && !isDefense(u));
+            const hasShilledDPS = dpsUnits.some(u => u.tags.includes(bossShill) && !isSupport(u) && !isDefense(u));
             if (hasShilledDPS) {
                 score += 15;
-                if (debug) console.log(`    Shill match (${boss.shill}): +15`);
+                if (debug) console.log(`    Shill match (${bossShill}): +15`);
             }
         } else {
-            if (!team.some(u => u.tags.includes(boss.shill))) {
-                if (debug) console.log(`    DISQUALIFIED: Missing required role ${boss.shill}`);
+            if (!team.some(u => u.tags.includes(bossShill))) {
+                if (debug) console.log(`    DISQUALIFIED: Missing required role ${bossShill}`);
                 return { score: -1, disqualified: true };
             }
             score += 15;
-            if (debug) console.log(`    Non-DPS shill match (${boss.shill}): +15`);
+            if (debug) console.log(`    Non-DPS shill match (${bossShill}): +15`);
         }
     }
     
     // --- Favored units ---
-    const shillIntensity = boss.shillIntensity ?? 1;
     if (boss.favored && boss.favored.length > 0) {
         let favoredCount = 0;
         for (const unit of team) {
@@ -1021,10 +1045,11 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
     }
     
     // --- Boss-specific weakness mechanics ---
-    const weakMechanic = boss.mechanics?.weak;
+    // mechanics.weak is an array; support legacy single-string entries gracefully.
+    const weakMechanics = [].concat(boss.mechanics?.weak ?? []);
 
     // Disorders weakness (e.g. Butcher): bonus scales with team disorder generation
-    if (weakMechanic === 'disorders') {
+    if (weakMechanics.includes('disorders')) {
         let totalDisorderScore = 0;
         for (const unit of team) {
             totalDisorderScore += w(unit.mechanics?.utility?.disorders);
@@ -1038,7 +1063,7 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
     }
 
     // Veils weakness (e.g. Vesper): bonus scales with total veil supply on team
-    if (weakMechanic === 'veils') {
+    if (weakMechanics.includes('veils')) {
         let totalVeils = 0;
         for (const unit of team) {
             totalVeils += w(unit.mechanics?.utility?.veils);
@@ -1051,7 +1076,7 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
     }
 
     // Stun weakness (e.g. Sweeper): flat bonus when team has at least one stunner
-    if (weakMechanic === 'stun') {
+    if (weakMechanics.includes('stun')) {
         if (team.some(isStun)) {
             score += BOSS_WEAK.STUN_BONUS;
             if (debug) console.log(`    Boss weak(stun): stunner present → +${BOSS_WEAK.STUN_BONUS}`);
@@ -1059,7 +1084,7 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
     }
 
     // Abloom weakness (e.g. Scorched Horizon): bonus scales with total abloom output on team
-    if (weakMechanic === 'abloom') {
+    if (weakMechanics.includes('abloom')) {
         let totalAbloom = 0;
         for (const unit of team) {
             totalAbloom += w(unit.mechanics?.damage?.abloom);
@@ -1106,17 +1131,37 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
         }
     }
 
+    // Daze debuff (e.g. Notorious Dead End Butcher): penalizes attack/rupture teams whose
+    // stun windows are harder to trigger. High-daze stunners mitigate the effect. Anomaly
+    // teams are not penalized — their damage is less window-dependent. The penalty is not a
+    // hard anti-shill and can be fully mitigated by bringing a high-daze stunner.
+    const dazeDebuffVal = w(boss.mechanics?.debuffs?.daze);
+    if (dazeDebuffVal > 0) {
+        const teamDazeSupply = team.reduce((sum, u) => sum + getSupplierDaze(u), 0);
+        const shortfall = Math.max(0, dazeDebuffVal - teamDazeSupply);
+        if (shortfall > 0) {
+            for (const unit of dpsUnits) {
+                const roles = getEffectiveRoles(unit);
+                const isAttackOrRupture = roles.includes('attack') || roles.includes('rupture');
+                if (!isAttackOrRupture || isStunlessUnit(unit)) continue;
+                const penalty = Math.round(shortfall * BOSS_WEAK.DAZE_DEBUFF_PER_UNIT);
+                score -= penalty;
+                if (debug) console.log(`    Boss daze debuff: ${unit.name} supply=${teamDazeSupply} shortfall=${shortfall.toFixed(1)} → -${penalty}`);
+            }
+        }
+    }
+
     // --- DPS element weakness/resistance ---
     const l3Reactions = computeAnomalyReactions(team, boss);
     for (const unit of dpsUnits) {
         const element = getElement(unit);
 
-        if (boss.weaknesses.includes(element)) {
+        if (bossWeaknesses.includes(element)) {
             const isSubDPS = hasSubDPSRole(unit);
             const unitReaction = l3Reactions.get(unit);
             const reactionDisabled = isSubDPS && isAnomaly(unit) &&
                 !(unitReaction?.bestVortexTier > 0 || unitReaction?.hasDisorder) &&
-                !boss.weaknesses.includes(element);
+                !bossWeaknesses.includes(element);
             let bonus = isSRank(unit)
                 ? (isSubDPS ? 25 : 40)
                 : (isSubDPS ? 10 : 20);
@@ -1124,23 +1169,23 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
             score += bonus;
             if (debug) console.log(`    ${unit.name} on-element (${element}): +${bonus}${reactionDisabled ? ' (reaction-disabled)' : ''}`);
 
-            if (isTitled(unit) && boss.shill && DPS_ROLES.includes(boss.shill) && !unit.tags.includes(boss.shill)) {
+            if (isTitled(unit) && bossShill && DPS_ROLES.includes(bossShill) && !unit.tags.includes(bossShill)) {
                 score += 30;
                 if (debug) console.log(`    ${unit.name} titled on-element vs shill mismatch: +30`);
             }
         }
     }
 
-    if (boss.weaknesses.length > 0) {
+    if (bossWeaknesses.length > 0) {
         const primaryDPS = dpsUnits.filter(u => !hasSubDPSRole(u));
-        const onCount = primaryDPS.filter(u => boss.weaknesses.includes(getElement(u))).length;
+        const onCount = primaryDPS.filter(u => bossWeaknesses.includes(getElement(u))).length;
         const offCount = primaryDPS.length - onCount;
 
         if (offCount > 0 && primaryDPS.length > 0) {
             const offRatio = offCount / primaryDPS.length;
-            const singleWeakness = boss.weaknesses.length === 1;
+            const singleWeakness = bossWeaknesses.length === 1;
             const basePenalty = singleWeakness ? 45 : 30;
-            const hasTitled = primaryDPS.some(u => isTitled(u) && !boss.weaknesses.includes(getElement(u)));
+            const hasTitled = primaryDPS.some(u => isTitled(u) && !bossWeaknesses.includes(getElement(u)));
             const titledReduction = hasTitled ? 0.5 : 1.0;
             const applied = Math.round(basePenalty * offRatio * titledReduction);
             score -= lenient ? Math.floor(applied / 2) : applied;
@@ -1151,29 +1196,29 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
     // --- Stunner element ---
     for (const unit of stunUnits) {
         const element = getElement(unit);
-        if (boss.resistances.includes(element)) {
+        if (bossResistances.includes(element)) {
             score -= 80;
             if (debug) console.log(`    ${unit.name} stun element resisted: -80`);
         }
-        if (boss.weaknesses.includes(element)) {
+        if (bossWeaknesses.includes(element)) {
             const util = computeBuffUtilization(unit, team);
             const scaledBonus = Math.round(15 * util);
             score += scaledBonus;
             if (debug) console.log(`    ${unit.name} stun on-element: +${scaledBonus} (util ${Math.round(util * 100)}%)`);
-        } else if (!boss.resistances.includes(element) && boss.weaknesses.length > 0) {
+        } else if (!bossResistances.includes(element) && bossWeaknesses.length > 0) {
             score -= 15;
             if (debug) console.log(`    ${unit.name} stun off-element: -15`);
         }
     }
 
     // --- Pseudo-role vs boss anti-type ---
-    if (boss.anti && boss.anti.length > 0) {
+    if (bossAnti.length > 0) {
         for (const unit of team) {
             if (isDPS(unit)) continue;
             const pr = unit.mechanics?.pseudoRole;
             if (!pr) continue;
             const pseudoRoles = pr.split(',').map(s => s.trim());
-            for (const antiType of boss.anti) {
+            for (const antiType of bossAnti) {
                 if (pseudoRoles.includes(antiType) && unit._activatedRoles.includes(antiType)) {
                     score -= 30;
                     if (debug) console.log(`    ${unit.name} pseudo-role '${antiType}' matches boss anti: -30`);
@@ -1185,7 +1230,7 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
     // --- Defense element ---
     for (const unit of defenseUnits) {
         const element = getElement(unit);
-        if (boss.weaknesses.includes(element)) {
+        if (bossWeaknesses.includes(element)) {
             score += 3;
             if (debug) console.log(`    ${unit.name} defense on-element: +3`);
         }
@@ -1194,7 +1239,7 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
     // --- Damage-relevant resistance for support/defense units ---
     for (const unit of team) {
         const element = getElement(unit);
-        if (!boss.resistances.includes(element)) continue;
+        if (!bossResistances.includes(element)) continue;
         if (!isSupport(unit) && !isDefense(unit)) continue;
         const damage = unit.mechanics?.damage || {};
         const maxDamage = Math.max(0, ...Object.values(damage).map(v =>
@@ -1208,8 +1253,8 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
     }
 
     // --- Defensive assist bonus ---
-    if (boss.assists >= 2) {
-        const extra = team.filter(hasDefensiveAssist).length - boss.assists;
+    if (bossAssists >= 2) {
+        const extra = team.filter(hasDefensiveAssist).length - bossAssists;
         if (extra > 0) {
             score += extra * 3;
             if (debug) console.log(`    Extra defensive assists: +${extra * 3}`);
@@ -1674,14 +1719,15 @@ function scoreMechanicalSynergy(team, debug, options = {}) {
     }
 
     // L4 element modifier: on-element DPS gets boosted, off-element gets discounted
-    if (boss && boss.weaknesses?.length > 0) {
+    const l4Weaknesses = getBossWeaknesses(boss);
+    if (boss && l4Weaknesses.length > 0) {
         for (const consumer of team) {
             const roles = getEffectiveRoles(consumer);
             if (!isDPSByRoles(roles)) continue;
             const element = getElement(consumer);
             const base = consumerScores.get(consumer.name) || 0;
             if (base <= 0) continue;
-            if (boss.weaknesses.includes(element)) {
+            if (l4Weaknesses.includes(element)) {
                 const bonus = base * (ON_ELEMENT_L4 - 1);
                 consumerScores.set(consumer.name, base + bonus);
                 if (debug) console.log(`    L4 element: ${consumer.name} on-element → ×${ON_ELEMENT_L4} on ${base.toFixed(1)} = +${bonus.toFixed(1)}`);
@@ -1968,7 +2014,7 @@ export function scoreTeamForBoss(team, boss, options = {}) {
     score += bossResult.score;
 
     // Layer 4: Mechanical Synergy
-    const antiRupture = boss.anti?.includes('rupture') || false;
+    const antiRupture = getBossAnti(boss).includes('rupture');
     score += scoreMechanicalSynergy(team, debug, { antiRupture, boss });
 
     // Layer 5: Additional Synergies
@@ -1978,7 +2024,7 @@ export function scoreTeamForBoss(team, boss, options = {}) {
     const rawScore = score;
     let maxDiametricPairs = 0;
     let maxDiametricFloor = 0;
-    const antiRuptureBoss = boss.anti?.includes('rupture') || false;
+    const antiRuptureBoss = getBossAnti(boss).includes('rupture');
     for (const unit of team) {
         const { count, floor } = countDiametricPairs(unit, team, { antiRupture: antiRuptureBoss });
         maxDiametricPairs = Math.max(maxDiametricPairs, count);
