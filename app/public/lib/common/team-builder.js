@@ -6,15 +6,10 @@
  */
 
 /**
- * Generates all valid team combinations from a list of units.
- * A team is valid if each unit's "join" conditions are met by at least one teammate.
- * 
- * @param {Array} units - Array of unit objects with id, name, tags, and join properties
- * @returns {Object} Map of team label strings to team arrays
+ * Expands 'faction' join keywords into actual faction values for join validation.
  */
-export function getTeams(units) {
-    // Preprocess: replace 'faction' keyword with actual faction values
-    units = units.map(unit => {
+function expandFactionJoins(units) {
+    return units.map(unit => {
         if (unit.join && unit.join.includes('faction') && unit.faction) {
             return {
                 ...unit,
@@ -24,37 +19,45 @@ export function getTeams(units) {
         }
         return unit;
     });
-    
+}
+
+/**
+ * Checks whether every unit's join conditions are mutually satisfied.
+ * Accepts 2 or 3 units as arguments.
+ */
+export function isValidTeam(...units) {
+    const expanded = expandFactionJoins(units);
+    return expanded.every(unit => {
+        const teammates = expanded.filter(u => u.id !== unit.id);
+        return teammates.some(t => unit.join.some(tag => t.tags.includes(tag)));
+    });
+}
+
+/**
+ * Generates all valid team combinations from a list of units.
+ * A team is valid if each unit's "join" conditions are met by at least one teammate.
+ * 
+ * @param {Array} units - Array of unit objects with id, name, tags, and join properties
+ * @returns {Object} Map of team label strings to team arrays
+ */
+export function getTeams(units) {
     let permutations = {};
     
     for (const unitA of units) {
         for (const unitB of units) {
             if (unitA.id === unitB.id) continue;
             
-            let ab = unitA.join.some(tag => unitB.tags.includes(tag));
-            if (ab) {
-                let ba = unitB.join.some(tag => unitA.tags.includes(tag));
-                if (ba) {
-                    const key = [unitA.id, unitB.id].sort().join('|');
-                    permutations[key] = [unitA, unitB];
-                }
+            if (isValidTeam(unitA, unitB)) {
+                const key = [unitA.id, unitB.id].sort().join('|');
+                permutations[key] = [unitA, unitB];
+            }
+            
+            for (const unitC of units) {
+                if (unitA.id === unitC.id || unitB.id === unitC.id) continue;
                 
-                for (const unitC of units) {
-                    if (unitA.id === unitC.id || unitB.id === unitC.id) continue;
-                    
-                    let ac = unitA.join.some(tag => unitC.tags.includes(tag));
-                    let bc = unitB.join.some(tag => unitC.tags.includes(tag));
-                    let ca = unitC.join.some(tag => unitA.tags.includes(tag));
-                    let cb = unitC.join.some(tag => unitB.tags.includes(tag));
-                    
-                    let a = ab || ac;
-                    let b = ba || bc;
-                    let c = ca || cb;
-                    
-                    if (a && b && c) {
-                        const key = [unitA.id, unitB.id, unitC.id].sort().join('|');
-                        permutations[key] = [unitA, unitB, unitC];
-                    }
+                if (isValidTeam(unitA, unitB, unitC)) {
+                    const key = [unitA.id, unitB.id, unitC.id].sort().join('|');
+                    permutations[key] = [unitA, unitB, unitC];
                 }
             }
         }

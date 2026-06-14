@@ -12,9 +12,11 @@ This document captures gameplay mechanics and design decisions. Specific scoring
 
 ### Elements
 
-The game has six standard elements: **Fire**, **Ice**, **Electric**, **Ether**, **Physical**, and **Wind** (added in version 2.8).
+The game has seven standard elements: **Fire**, **Ice**, **Electric**, **Ether**, **Physical**, **Wind** (added in version 2.8), and **Lumens** (added in version 3.1 with Remielle).
 
-Each element has standard interactions with boss weaknesses and resistances. A DPS unit whose element matches a boss weakness receives a bonus; a DPS unit whose element is resisted by a boss is disqualified (with limited exceptions for pseudosupports).
+Each element has standard interactions with boss weaknesses and resistances. A DPS unit whose element matches a boss weakness receives a bonus; a DPS unit whose element is resisted by a boss is disqualified (with limited exceptions for pseudosupports). Lumens is fully independent of ether — no boss in the current roster has lumens weakness or resistance.
+
+Early alpha suggests lumens may eventually have a unique anomaly reaction ("rebound") instead of disorders or vortex when paired with other elements. That mechanic is unconfirmed and not yet implemented; until then, lumens is scored like any standard non-wind element (disorder with different non-wind elements, vortex with wind).
 
 ### Element Variants
 
@@ -26,7 +28,7 @@ Some exceptionally powerful characters - “titled” units Miyabi, Yixuan, and 
 | Yixuan | Ether | Auric Ink | Auric Ink + Ether = disorder (rarely relevant) |
 | YSG | Physical | Honed Edge | Honed Edge + Physical = disorder (rarely relevant) |
 
-The `mechanics.elementalVariant` variable marks this; right now only titled units have elemental variants but it could be expanded to others in the future. It is used in disorder generation checks and vortex tier determination. Some elemental variant units receive only flat/negligible vortex damage in comparison to their base element — a deliberate design choice that limits or enhances their synergy with the wind/vortex mechanic. For example, Remielle, a future ether anomaly void hunter, may be released with a unique elemental variant that has particularly strong synergy with wind.
+The `mechanics.elementalVariant` variable marks this; right now only titled units have elemental variants but it could be expanded to others in the future. It is used in disorder generation checks and vortex tier determination. Some elemental variant units receive only flat/negligible vortex damage in comparison to their base element — a deliberate design choice that limits or enhances their synergy with the wind/vortex mechanic (e.g., Miyabi's frost variant has near-zero vortex tier).
 
 ### Roles
 
@@ -152,7 +154,7 @@ There is technically the possibility to have hybrid attack+anomaly compositions;
 | **Promeia** | T0.5 | Anomaly (Ice) | `damage.abloom:3, buffs.abloom:3, debuffs.defense:2` | Ice anomaly with tier-3 vortex. Abloom buffer. Direct Miyabi alternative on Scaled Horizon — pure ice vortex vs. frost variant. |
 | **Jane Doe** | T1.5 | Anomaly (Physical) | `buffs.vortex:3` | Physical anomaly with a retroactive vortex buff. Contextual bonus — no cohesion penalty when inactive. When Jane causes a physical anomaly that triggers a vortex, the vortex is considered a critical hit and gets the crit damage modifier. This is modeled as a generic vortex buff rather than to complexly model a narrow game mechanic, and so it provides a modest boost to average out its actual value. |
 | Norma | T0.5 | Stun (Fire) | `damage.chains, scaling.sheer, scaling.quick-assists` | Norma is a stunner designed as a subdps. She is intended to work with attack and rupture teams. She has two unique features: she can upgrade quick assists into chain attacks (a huge damage boost when paired with Astra) and she converts sheer buffs into ATK (so huge damage boost when paired with Lucia).  She also has chain attack damage modifiers almost as high as Evelyn. This gives her two very capable wheelchair compositions for attack and rupture. |
-| **Remielle** | Titled T0 | Anomaly (Ether/Lumens) + `pseudoRole: ["dps", conditional "support"]` | `conditionalBuffs.atk: [0,0,2,4]` by anomaly count | Her ATK buff and support identity both scale with team composition. `support` pseudo-role activates only on triple-anomaly teams (`when: { countTag: "anomaly", minCount: 3 }`); `dps` always activates. On a triple-anomaly team: support activates → L1.5 sees support → CONVENTIONAL structure; scored as forced-secondary DPS in L2 (split kit). On non-triple teams: support doesn't activate → no effective support → structure degrades; ATK buff resolves to 0 with penalty. Best teams: Velina/Remielle/Promeia (vortex+disorder), Alice/Vivian/Remielle. |
+| **Remielle** | Titled T0 | Anomaly (Lumens) + `pseudoRole: ["dps", conditional "support"]` | `conditionalBuffs.atk: [0,0,2,4]` by anomaly count | Lumens anomaly void hunter. Her ATK buff and support identity both scale with team composition. `support` pseudo-role activates only on triple-anomaly teams (`when: { countTag: "anomaly", minCount: 3 }`); `dps` always activates. On a triple-anomaly team: support activates → L1.5 sees support → CONVENTIONAL structure; scored as forced-secondary DPS in L2 (split kit). On non-triple teams: support doesn't activate → no effective support → structure degrades; ATK buff resolves to 0 with penalty. Best teams: Velina/Remielle/Promeia, Alice/Vivian/Remielle. |
 
 ### SubDPS Units
 

@@ -7,6 +7,7 @@
  */
 
 import { ELEMENTS, DPS_ROLES } from './constants.js';
+import { isValidTeam } from './team-builder.js';
 
 // ============================================================================
 // CONSTANTS
@@ -60,18 +61,15 @@ const NEED_FULFILLMENT_KEYS = [
 
 const VORTEX_TIERS = { 
     //Base elements
-    "ice": 4, "fire": 2, "physical": 2, "ether": 1, "electric": 1,
+    "ice": 4, "fire": 2, "physical": 2, "ether": 1, "electric": 1, "lumens": 0,
     //Variants
     "ice:frost" : 0.001, 
     "ether:auricInk" : 0.8, 
-    "physical:honedEdge" : 0.8,
-    "ether:lumens" : 4.1
+    "physical:honedEdge" : 0.8
 };
 const VORTEX_DEFAULT_TIER = 0.001;
 const VORTEX_BASE = 17;
-// Normalisation base for tier scaling in vortex buff affinity.
-// Uses max among stable base elements (ice=4), not Remielle's placeholder tier (7),
-// so that ice consumers receive full credit (tierScale=1.0) with the current roster.
+// Normalisation base for tier scaling in vortex buff affinity (ice=4).
 const MAX_VORTEX_TIER = 4;
 const POLARITY_VORTEX_DISCOUNT = 0.35;
 const NATURALLY_AVAILABLE_NEEDS = new Set(['ultimates', 'chains']);
@@ -257,7 +255,7 @@ function computeConditionalBuffPenalty(supplier, team) {
         const resolved = resolveConditionalBuffValue(supplier, team, buffKey);
         if (resolved >= maxLevel) continue;
         const efficiency = resolved / maxLevel;
-        totalPenalty += (1 - efficiency) * maxLevel * 0.35;
+        totalPenalty += (1 - efficiency) * maxLevel * 7;
     }
     return totalPenalty;
 }
@@ -744,7 +742,22 @@ function computeBuffUtilization(supplier, team) {
 // LAYER 1: DISQUALIFICATIONS
 // ============================================================================
 
+// Sanity check: teams fed to the scorer should normally already be legal
+// (produced by getTeams or extendTeamsWithUniversalUnits), but command-line
+// and test usage can pass arbitrary compositions. This guard prevents
+// illegal teams from receiving a score.
 function checkDisqualifications(team, boss, debug) {
+    const [a, b, c] = team;
+    // A trio is legal if all three joins are mutually satisfied, OR if any
+    // pair forms a mutual join — the odd unit out is treated as a flex slot.
+    const isLegal = c
+        ? isValidTeam(a, b, c) || isValidTeam(a, b) || isValidTeam(a, c) || isValidTeam(b, c)
+        : isValidTeam(a, b);
+    if (!isLegal) {
+        if (debug) console.log('  DISQUALIFIED: Illegal team — no valid join arrangement');
+        return -1;
+    }
+
     const dpsUnits = team.filter(isDPS);
 
     if (dpsUnits.length === 0) {

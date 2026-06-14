@@ -668,11 +668,11 @@
         "id": "ramiel",
         "name": "Remielle",
         "aliases": ["Rem", "Ram", "Dan", "RD"],
-        "image": null,
+        "image": "./assets/characters/ramiel.webp",
         "rank": "S",
         "limited": true,
         "tier": 0,
-        "tags": ["anomaly", "ether", "title", "assist:defensive"],
+        "tags": ["anomaly", "lumens", "title", "assist:defensive"],
         "join": ["anomaly", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
@@ -680,12 +680,11 @@
                 "dps",
                 {"role":"support","when":{"countTag":"anomaly","minCount":3}}
             ],
-            "elementalVariant": "lumens",
             "conditionalBuffs": {
                 "atk": { "countTag": "anomaly", "levels": [0, 0, 2, 4] }
             }
         },
-        "available": false,
+        "available": true,
         "faction": "Guard of Staves",
         "displayText": "First-generation void hunter."
     },

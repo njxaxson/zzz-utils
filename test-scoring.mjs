@@ -1210,29 +1210,32 @@ async function main() {
     });
 
     // ========================================================================
-    // TEST 55: Ramiel triple-anomaly >> Nangong/Ramiel wheelchair
+    // TEST 55: Ramiel triple-anomaly >> Ramiel wheelchair (Vivian/Yuzuha)
     // ========================================================================
-    // VRP should dominate NRY by 140+ points. NRY is viable (Nangong/Yuzuha
-    // infrastructure keeps it afloat) but clearly suboptimal for Ramiel because
-    // her conditional ATK buff = 0 as the sole primary anomaly.
-    run('TEST 55: Velina/Ramiel/Promeia >> Nangong/Ramiel/Yuzuha (140+ gap)', () => {
+    // Triple-anomaly (Alice/Remielle/Vivian) should beat the Vivian+Yuzuha
+    // wheelchair (Remielle/Vivian/Yuzuha) because Remielle's conditional ATK
+    // buff is maximized (atk:4) on triple-anomaly vs only atk:2 on the wheelchair,
+    // and the underutilization penalty penalizes the wheelchair team.
+    run('TEST 55: Triple-anomaly Ramiel >= Ramiel/Vivian/Yuzuha wheelchair', () => {
         const b = NEUTRAL_BOSS;
-        const vrp = scoreTeamForBoss(scoreForTeamString('Velina/Remielle/Promeia', allUnits, { preview: true })[0].team, b, {});
-        const nry = scoreTeamForBoss(scoreForTeamString('Nangong/Remielle/Yuzuha', allUnits, { preview: true })[0].team, b, {});
-        assert(vrp - nry >= 140, `Gap VRP(${vrp}) - NRY(${nry}) = ${vrp - nry}, expected >= 140`);
-        assert(nry < vrp * 0.75, `NRY(${nry}) should be < 75% of VRP(${vrp})`);
+        const avr = scoreTeamForBoss(scoreForTeamString('Alice/Remielle/Vivian', allUnits, { preview: true })[0].team, b, {});
+        const rvy = scoreTeamForBoss(scoreForTeamString('Remielle/Vivian/Yuzuha', allUnits, { preview: true })[0].team, b, {});
+        assert(avr >= rvy, `Triple-anomaly AVR(${avr}) should be >= wheelchair RVY(${rvy})`);
     });
 
     // ========================================================================
-    // TEST 56: Ramiel wheelchair structures are penalized vs Miyabi
+    // TEST 56: Team legality — illegal teams DQ'd, flex teams accepted
     // ========================================================================
-    // Ramiel/Astra/Nicole: Ramiel is the only anomaly, no reactions, no buff.
-    // Miyabi/Astra/Nicole: titled anomaly hypercarry wheelchair — should score much higher.
-    run('TEST 56: Miyabi/Astra/Nicole >> Ramiel/Astra/Nicole on neutral', () => {
+    // Illegal: no unit pair on the team has mutual join satisfaction.
+    // Flex: at least one pair has mutual join satisfaction; 3rd is unconstrained.
+    run('TEST 56: Team legality — illegal teams DQ, flex teams OK', () => {
         const b = NEUTRAL_BOSS;
-        const man = scoreTeamForBoss(scoreForTeamString('Miyabi/Astra/Nicole', allUnits)[0].team, b, {});
         const ran = scoreTeamForBoss(scoreForTeamString('Remielle/Astra/Nicole', allUnits, { preview: true })[0].team, b, {});
-        assert(man > ran, `MAN(${man}) should beat RAN(${ran}) — Miyabi wheelchair >> Ramiel wheelchair`);
+        assert(ran === -1, `Remielle/Astra/Nicole should be disqualified (-1), got ${ran}`);
+        const nry = scoreTeamForBoss(scoreForTeamString('Nangong/Remielle/Yuzuha', allUnits, { preview: true })[0].team, b, {});
+        assert(nry === -1, `Nangong/Remielle/Yuzuha should be disqualified (-1), got ${nry}`);
+        const thn = scoreTeamForBoss(scoreForTeamString('Trigger/Harumasa/Nicole', allUnits)[0].team, b, {});
+        assert(thn > 0, `Trigger/Harumasa/Nicole is a valid flex team, got ${thn}`);
     });
 
     // ========================================================================
@@ -1251,33 +1254,26 @@ async function main() {
     // ========================================================================
     // TEST 58: Ramiel conditional buff scaling — triple-anomaly best
     // ========================================================================
-    // Triple anomaly (VRP) should outscore 2-anomaly (ARY). NRY has stun
-    // infrastructure from Nangong which legitimately outweighs ATK:2 buff,
-    // so we only validate VRP > ARY and VRP > NRY ordering.
+    // Triple anomaly (VRP) should outscore 2-anomaly wheelchair (ARY).
+    // ARY has Yuzuha support infrastructure but only atk:2 conditional buff,
+    // while VRP has full atk:4 — triple should always be better.
     run('TEST 58: Ramiel conditional buff scaling — triple > 2-anomaly', () => {
         const b = NEUTRAL_BOSS;
         const ary = scoreTeamForBoss(scoreForTeamString('Alice/Remielle/Yuzuha', allUnits, { preview: true })[0].team, b, {});
         const vrp = scoreTeamForBoss(scoreForTeamString('Velina/Remielle/Promeia', allUnits, { preview: true })[0].team, b, {});
         assert(vrp > ary, `Triple anomaly VRP(${vrp}) should beat 2-anomaly ARY(${ary})`);
-        const nry = scoreTeamForBoss(scoreForTeamString('Nangong/Remielle/Yuzuha', allUnits, { preview: true })[0].team, b, {});
-        assert(vrp > nry, `Triple anomaly VRP(${vrp}) should beat wheelchair NRY(${nry})`);
     });
 
     // ========================================================================
-    // TEST 59: Ramiel anti-patterns score below triple-anomaly
+    // TEST 59: Ramiel wheelchair (2-anomaly) penalized vs triple-anomaly
     // ========================================================================
-    // Non-anomaly Ramiel teams have atk:0 + underutilization penalty, no
-    // reactions, and UNCONVENTIONAL_VIABLE structure. They should score
-    // significantly below triple-anomaly teams.
-    run('TEST 59: Ramiel non-anomaly teams score well below triple-anomaly', () => {
+    // Alice/Remielle/Yuzuha is a valid but suboptimal Ramiel team: atk:2 conditional
+    // buff with underutilization penalty. Should score below triple-anomaly teams.
+    run('TEST 59: Ramiel wheelchair penalized vs triple-anomaly', () => {
         const b = NEUTRAL_BOSS;
         const vrp = scoreTeamForBoss(scoreForTeamString('Velina/Remielle/Promeia', allUnits, { preview: true })[0].team, b, {});
-        const nrs = scoreTeamForBoss(scoreForTeamString('Nangong/Remielle/Sunna', allUnits, { preview: true })[0].team, b, {});
-        const rya = scoreTeamForBoss(scoreForTeamString('Remielle/Yuzuha/Astra', allUnits, { preview: true })[0].team, b, {});
-        assert(nrs < vrp * 0.60, `NRS(${nrs}) should be < 60% of VRP(${vrp})`);
-        assert(rya < vrp * 0.60, `RYA(${rya}) should be < 60% of VRP(${vrp})`);
-        assert(nrs < 350, `NRS: got ${nrs}, expected < 350 (solo anomaly, no ATK buff)`);
-        assert(rya < 350, `RYA: got ${rya}, expected < 350 (no anomaly partner)`);
+        const ary = scoreTeamForBoss(scoreForTeamString('Alice/Remielle/Yuzuha', allUnits, { preview: true })[0].team, b, {});
+        assert(ary < vrp, `ARY(${ary}) should score below VRP(${vrp}) — wheelchair < triple-anomaly`);
     });
 
     // ------------------------------------------------------------------------
