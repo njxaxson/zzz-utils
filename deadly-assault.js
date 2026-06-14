@@ -127,12 +127,12 @@ async function main() {
     }
 
     const bossFilter = options.bosses || options.queryBosses?.join(',');
-    const SELECTED_BOSSES = filterBosses(bosses, bossFilter).map(b => b.name);
+    const filteredBossObjects = filterBosses(bosses, bossFilter);
 
-    if (SELECTED_BOSSES.length !== 3) {
-        console.error(`ERROR: Boss filter must match exactly 3 bosses. Found ${SELECTED_BOSSES.length}:`);
-        SELECTED_BOSSES.forEach(name => console.log(`  - ${name}`));
-        if (SELECTED_BOSSES.length < 3) {
+    if (filteredBossObjects.length !== 3) {
+        console.error(`ERROR: Boss filter must match exactly 3 bosses. Found ${filteredBossObjects.length}:`);
+        filteredBossObjects.forEach(b => console.log(`  - ${b.name}`));
+        if (filteredBossObjects.length < 3) {
             console.log("\nAvailable bosses:");
             bosses.forEach(b => console.log(`  - ${b.name}`));
         }
@@ -145,15 +145,7 @@ async function main() {
 
     const DEBUG = options.debug;
 
-    const selectedBossObjects = [];
-    for (const bossName of SELECTED_BOSSES) {
-        const boss = bosses.find(b => b.name === bossName);
-        if (!boss) {
-            console.error(`ERROR: Boss "${bossName}" not found in bosses.json`);
-            return;
-        }
-        selectedBossObjects.push(boss);
-    }
+    const selectedBossObjects = filteredBossObjects;
 
     // Explicit teams mode: skip normal pipeline
     if (options.teams) {

@@ -288,9 +288,10 @@ export function isSharedBossesMode() {
  * @param {Array} bossIds - Array of selected boss IDs
  * @returns {string} Full URL with roster and bosses parameters
  */
-export function generateShareUrlWithBosses(unitStates, allUnits, bossIds) {
+export function generateShareUrlWithBosses(unitStates, allUnits, bossIds, bossVariations) {
     const encodedRoster = encodeRoster(unitStates, allUnits);
     const encodedBosses = encodeBosses(bossIds);
+    const encodedVariations = bossVariations ? encodeBossVariations(bossVariations) : '';
     
     // Build URL from current location without existing params
     const url = new URL(window.location.href);
@@ -303,8 +304,60 @@ export function generateShareUrlWithBosses(unitStates, allUnits, bossIds) {
     if (encodedBosses) {
         url.searchParams.set('bosses', encodedBosses);
     }
+
+    if (encodedVariations) {
+        url.searchParams.set('bossVariants', encodedVariations);
+    }
     
     return url.toString();
+}
+
+/**
+ * Encode active boss variations to a URL-safe string.
+ * Format: "bossId:variationId" pairs joined by commas.
+ * Only non-default (non-null) variations are encoded.
+ *
+ * @param {Object} bossVariations - Map of bossId -> variationId
+ * @returns {string} Encoded variations string, or '' if none
+ */
+export function encodeBossVariations(bossVariations) {
+    if (!bossVariations) return '';
+    return Object.entries(bossVariations)
+        .filter(([, v]) => v)
+        .map(([id, v]) => `${id}:${v}`)
+        .join(',');
+}
+
+/**
+ * Decode boss variations from a URL parameter string.
+ *
+ * @param {string} encoded - The encoded variations string (e.g. "butcher:raging")
+ * @param {Array} allBosses - Array of all boss objects (for validation)
+ * @returns {Object} Map of bossId -> variationId for valid pairs
+ */
+export function decodeBossVariations(encoded, allBosses) {
+    if (!encoded) return {};
+    const result = {};
+    const pairs = encoded.split(',').filter(Boolean);
+    for (const pair of pairs) {
+        const colonIdx = pair.indexOf(':');
+        if (colonIdx < 0) continue;
+        const bossId = pair.slice(0, colonIdx).trim();
+        const variationId = pair.slice(colonIdx + 1).trim();
+        const boss = allBosses.find(b => b.id === bossId);
+        if (boss && boss.variations?.[variationId]) {
+            result[bossId] = variationId;
+        }
+    }
+    return result;
+}
+
+/**
+ * Get the bossVariants parameter from the current URL
+ */
+export function getBossVariationsFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('bossVariants');
 }
 
 /**

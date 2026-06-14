@@ -1472,6 +1472,79 @@ button#simulate-btn:disabled,
     margin-top: 1rem;
 }
 
+/* Mobile-only mode toggle bar above the boss grid */
+.boss-mode-toggle-container {
+    display: none; /* shown only in mobile media query */
+    justify-content: center;
+    margin-bottom: 0.75rem;
+    gap: 0.5rem;
+}
+
+.boss-mode-toggle-btn {
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--border-color);
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    border-radius: 4px;
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.boss-mode-toggle-btn.active {
+    background: var(--accent-secondary);
+    color: var(--bg-primary);
+    border-color: var(--accent-secondary);
+}
+
+/* Small glowing dot in the top-right corner indicating a boss has variants */
+.boss-card.has-variations::before {
+    content: '';
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #f97316;
+    box-shadow: 0 0 5px #f97316;
+    z-index: 5;
+    pointer-events: none;
+}
+
+/* Smooth mirror-flip transition on the boss portrait */
+.boss-avatar-img {
+    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Mirrored boss portrait for non-default variations */
+.boss-avatar-img--mirrored {
+    transform: scaleX(-1);
+}
+
+/* Variation badge — anchored inside the image area, just above the bottom edge */
+.boss-variation-badge {
+    position: absolute;
+    bottom: 6px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 0.15rem 0.45rem;
+    background: rgba(0, 0, 0, 0.78);
+    border: 1px solid var(--accent-secondary);
+    color: var(--accent-secondary);
+    border-radius: 3px;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.5rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+    z-index: 10;
+    white-space: nowrap;
+    pointer-events: none;
+}
+
 .boss-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
@@ -1519,6 +1592,20 @@ button#simulate-btn:disabled,
     overflow: hidden;
     border-radius: 0;
     border: none;
+    position: relative; /* anchors .boss-variation-badge inside the image area */
+}
+
+/* Desktop hint below the boss grid */
+.boss-variation-hint {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    margin-top: 0.5rem;
+    text-align: center;
+    opacity: 0.8;
+}
+
+.boss-variation-hint-dot {
+    color: #f97316;
 }
 
 .boss-avatar-img {
@@ -3813,6 +3900,16 @@ button#simulate-btn:disabled,
         overflow: hidden;
         text-overflow: ellipsis;
         line-height: 1.1;
+    }
+
+    /* Show boss variant mode toggle on mobile */
+    .boss-mode-toggle-container {
+        display: flex;
+    }
+
+    /* Hide desktop hint on mobile (the toggle button is the affordance there) */
+    .boss-variation-hint {
+        display: none;
     }
 }
 

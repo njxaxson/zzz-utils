@@ -7,10 +7,11 @@ import {
     getTeams, sortTeamByRole, getTeamLabel,
     extendTeamsWithUniversalUnits, findExclusiveCombinations, teamsOverlap 
 } from '../common/team-builder.js';
-import { scoreTeamForBoss, getBossWeaknesses } from '../common/team-scorer.js';
+import { scoreTeamForBoss, getBossWeaknesses, getBossShill, resolveBossVariation } from '../common/team-scorer.js';
 import { createStrengthLabelHtml } from '../common/strength-rating.js';
 import { 
-    decodeBosses, getBossesFromUrl, generateShareUrlWithBosses 
+    decodeBosses, getBossesFromUrl, generateShareUrlWithBosses,
+    encodeBossVariations, decodeBossVariations, getBossVariationsFromUrl
 } from '../common/roster-share.js';
 import { 
     initRoster, getUnitStates, getAllUnits,
@@ -41,8 +42,15 @@ let allBosses = [];
 // Selected boss IDs
 let selectedBosses = [];
 
+// Active variation per boss ID: { "butcher": "raging", ... }
+// Keys present only when a non-default variation is active.
+let selectedBossVariations = {};
+
 // Shared bosses mode - when true, localStorage is NOT used for page settings
 let sharedBossesMode = false;
+
+// Mobile touch mode for boss cards: null | "variant"
+let bossCardTouchMode = null;
 
 // Results
 let showVariations = false;
@@ -61,7 +69,8 @@ async function loadData() {
             containerSelector: '#roster-container',
             pageUrl: 'deadly-assault.html',
             onStateChange: () => savePageToStorage(),
-            shareUrlGenerator: (unitStates, allUnits) => generateShareUrlWithBosses(unitStates, allUnits, selectedBosses)
+            shareUrlGenerator: (unitStates, allUnits) =>
+                generateShareUrlWithBosses(unitStates, allUnits, selectedBosses, selectedBossVariations)
         });
         
         loadBossState();
@@ -85,6 +94,8 @@ function loadBossState() {
         } else {
             selectedBosses = [];
         }
+        const variationsParam = getBossVariationsFromUrl();
+        selectedBossVariations = variationsParam ? decodeBossVariations(variationsParam, allBosses) : {};
     } else {
         sharedBossesMode = false;
         loadPageFromStorage();
@@ -103,6 +114,7 @@ function savePageToStorage() {
     
     const data = {
         selectedBosses,
+        selectedBossVariations,
         showVariations
     };
     localStorage.setItem(PAGE_STORAGE_KEY, JSON.stringify(data));
@@ -120,6 +132,9 @@ function loadPageFromStorage() {
                     const boss = allBosses.find(b => b.id === id);
                     return boss && boss.available !== false;
                 });
+            }
+            if (data.selectedBossVariations && typeof data.selectedBossVariations === 'object') {
+                selectedBossVariations = data.selectedBossVariations;
             }
             if (typeof data.showVariations === 'boolean') {
                 showVariations = data.showVariations;
@@ -142,30 +157,83 @@ function renderPageUI() {
 function renderBossSection() {
     const container = document.getElementById('boss-grid');
     if (!container) return;
+
+    // Inject mobile mode toggle above the boss grid (once)
+    let modeBar = document.getElementById('boss-mode-toggle');
+    if (!modeBar) {
+        modeBar = document.createElement('div');
+        modeBar.id = 'boss-mode-toggle';
+        modeBar.className = 'boss-mode-toggle-container';
+        modeBar.innerHTML = `
+            <button class="boss-mode-toggle-btn" data-mode="variant" title="Tap a boss to cycle its variation">
+                Mode: Boss Variant
+            </button>
+        `;
+        container.parentNode.insertBefore(modeBar, container);
+        modeBar.addEventListener('click', handleBossModeToggle);
+    }
+
     // Filter out bosses with available=false
     const availableBosses = allBosses.filter(boss => boss.available !== false);
     container.innerHTML = availableBosses.map(boss => createBossCard(boss)).join('');
+
+    // Show the right-click hint only when at least one boss has an enabled variation
+    const hint = document.getElementById('boss-variation-hint');
+    if (hint) {
+        const anyHasVariants = availableBosses.some(boss => getBossEnabledVariationKeys(boss).length > 0);
+        hint.style.display = anyHasVariants ? '' : 'none';
+    }
+}
+
+function getBossEnabledVariationKeys(boss) {
+    if (!boss.variations) return [];
+    return Object.entries(boss.variations)
+        .filter(([, v]) => v.enabled !== false)
+        .map(([key]) => key);
+}
+
+function getBossVariationLabel(boss, variationId) {
+    if (!variationId) return null;
+    const resolved = resolveBossVariation(boss, variationId);
+    const shill = getBossShill(resolved);
+    if (shill) return shill.charAt(0).toUpperCase() + shill.slice(1);
+    return variationId.charAt(0).toUpperCase() + variationId.slice(1);
 }
 
 function createBossCard(boss) {
     const isSelected = selectedBosses.includes(boss.id);
-    const initials = getInitials(boss.shortName);
-    const weaknessClass = getWeaknessGradientClass(getBossWeaknesses(boss));
+    const activeVariationId = selectedBossVariations[boss.id] || null;
+    const resolvedBoss = activeVariationId ? resolveBossVariation(boss, activeVariationId) : boss;
+
+    const initials = getInitials(resolvedBoss.shortName || boss.shortName);
+    const weaknessClass = getWeaknessGradientClass(getBossWeaknesses(resolvedBoss));
     const imageUrl = getBossImageUrl(boss.id);
-    
+
+    const isMirrored = !!activeVariationId;
+    const imgClass = `boss-avatar-img${isMirrored ? ' boss-avatar-img--mirrored' : ''}`;
+
     const avatarHtml = imageUrl
-        ? `<img class="boss-avatar-img" src="${imageUrl}" alt="${boss.shortName}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="boss-initials" style="display:none">${initials}</span>`
+        ? `<img class="${imgClass}" src="${imageUrl}" alt="${boss.shortName}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="boss-initials" style="display:none">${initials}</span>`
         : `<span class="boss-initials">${initials}</span>`;
-    
+
+    const variationLabel = getBossVariationLabel(boss, activeVariationId);
+    const badgeHtml = variationLabel
+        ? `<div class="boss-variation-badge">${variationLabel}</div>`
+        : '';
+
+    const hasVariations = getBossEnabledVariationKeys(boss).length > 0;
+    const displayName = resolvedBoss.shortName || boss.shortName;
+
     return `
-        <button type="button" class="boss-card ${weaknessClass} ${isSelected ? 'selected' : ''}" 
+        <button type="button" class="boss-card ${weaknessClass} ${isSelected ? 'selected' : ''} ${hasVariations ? 'has-variations' : ''}" 
                 data-boss-id="${boss.id}" 
                 aria-pressed="${isSelected}"
-                aria-label="${boss.shortName} - Weak to ${getBossWeaknesses(boss).join(', ')}">
+                aria-label="${displayName} - Weak to ${getBossWeaknesses(resolvedBoss).join(', ')}${activeVariationId ? ' (variant: ' + activeVariationId + ')' : ''}">
             <div class="boss-avatar">
                 ${avatarHtml}
+                ${badgeHtml}
             </div>
-            <div class="boss-name">${boss.shortName}</div>
+            <div class="boss-name">${displayName}</div>
         </button>
     `;
 }
@@ -197,7 +265,12 @@ function getWeaknessGradientClass(weaknesses) {
 // ============================================================================
 
 function setupEventListeners() {
-    document.getElementById('boss-grid').addEventListener('click', handleBossClick);
+    const bossGrid = document.getElementById('boss-grid');
+    bossGrid.addEventListener('click', handleBossClick);
+    bossGrid.addEventListener('contextmenu', handleBossRightClick);
+
+    addLongPressToGrid(bossGrid);
+
     document.getElementById('run-btn').addEventListener('click', runOptimization);
     
     document.getElementById('da-variations-checkbox').addEventListener('change', (e) => {
@@ -209,11 +282,59 @@ function setupEventListeners() {
     });
 }
 
+function addLongPressToGrid(bossGrid) {
+    let longPressTimer = null;
+    let longPressTriggered = false;
+
+    bossGrid.addEventListener('touchstart', (e) => {
+        longPressTriggered = false;
+        const card = e.target.closest('.boss-card');
+        if (!card) return;
+        longPressTimer = setTimeout(() => {
+            longPressTriggered = true;
+            if (window.navigator.vibrate) window.navigator.vibrate(50);
+            cycleBossVariation(card.dataset.bossId);
+        }, 500);
+    }, { passive: true });
+
+    bossGrid.addEventListener('touchend', (e) => {
+        clearTimeout(longPressTimer);
+        if (longPressTriggered) {
+            e.preventDefault();
+        }
+    }, { passive: false });
+
+    bossGrid.addEventListener('touchmove', () => {
+        clearTimeout(longPressTimer);
+    }, { passive: true });
+}
+
+function handleBossModeToggle(e) {
+    const btn = e.target.closest('.boss-mode-toggle-btn');
+    if (!btn) return;
+    const mode = btn.dataset.mode;
+    if (bossCardTouchMode === mode) {
+        bossCardTouchMode = null;
+        btn.classList.remove('active');
+    } else {
+        document.querySelectorAll('.boss-mode-toggle-btn').forEach(b => b.classList.remove('active'));
+        bossCardTouchMode = mode;
+        btn.classList.add('active');
+    }
+}
+
 function handleBossClick(e) {
     const card = e.target.closest('.boss-card');
     if (!card) return;
-    
+
     const bossId = card.dataset.bossId;
+
+    // In "variant" touch mode, tap cycles the variation instead of selecting
+    if (bossCardTouchMode === 'variant') {
+        cycleBossVariation(bossId);
+        return;
+    }
+
     const index = selectedBosses.indexOf(bossId);
     
     if (index >= 0) {
@@ -237,6 +358,82 @@ function handleBossClick(e) {
         card.setAttribute('aria-pressed', 'true');
     }
     
+    savePageToStorage();
+}
+
+function handleBossRightClick(e) {
+    const card = e.target.closest('.boss-card');
+    if (!card) return;
+    e.preventDefault();
+    cycleBossVariation(card.dataset.bossId);
+}
+
+function cycleBossVariation(bossId) {
+    const boss = allBosses.find(b => b.id === bossId);
+    if (!boss || !boss.variations) return;
+
+    const variationKeys = getBossEnabledVariationKeys(boss);
+    if (variationKeys.length === 0) return;
+
+    // Cycle: default → variation[0] → variation[1] → ... → default
+    const currentVariation = selectedBossVariations[bossId] || null;
+    const currentIndex = currentVariation ? variationKeys.indexOf(currentVariation) : -1;
+    const nextIndex = currentIndex + 1;
+
+    if (nextIndex >= variationKeys.length) {
+        delete selectedBossVariations[bossId];
+    } else {
+        selectedBossVariations[bossId] = variationKeys[nextIndex];
+    }
+
+    const activeVariationId = selectedBossVariations[bossId] || null;
+    const resolvedBoss = activeVariationId ? resolveBossVariation(boss, activeVariationId) : boss;
+
+    // Surgical DOM update so the CSS image-flip transition can fire smoothly.
+    const card = document.querySelector(`.boss-card[data-boss-id="${bossId}"]`);
+    if (card) {
+        // 1. Toggle the mirror class on the existing <img> (CSS transition fires here)
+        const img = card.querySelector('.boss-avatar-img');
+        if (img) {
+            img.classList.toggle('boss-avatar-img--mirrored', !!activeVariationId);
+        }
+
+        // 2. Update the variation badge inside the avatar
+        const avatarEl = card.querySelector('.boss-avatar');
+        const existingBadge = card.querySelector('.boss-variation-badge');
+        const variationLabel = getBossVariationLabel(boss, activeVariationId);
+        if (variationLabel) {
+            if (existingBadge) {
+                existingBadge.textContent = variationLabel;
+            } else if (avatarEl) {
+                const newBadge = document.createElement('div');
+                newBadge.className = 'boss-variation-badge';
+                newBadge.textContent = variationLabel;
+                avatarEl.appendChild(newBadge);
+            }
+        } else if (existingBadge) {
+            existingBadge.remove();
+        }
+
+        // 3. Update the boss name text
+        const nameEl = card.querySelector('.boss-name');
+        if (nameEl) {
+            nameEl.textContent = resolvedBoss.shortName || boss.shortName;
+        }
+
+        // 4. Swap weakness gradient class
+        const newWeaknessClass = getWeaknessGradientClass(getBossWeaknesses(resolvedBoss));
+        for (const cls of [...card.classList]) {
+            if (cls.startsWith('weakness-')) card.classList.remove(cls);
+        }
+        card.classList.add(newWeaknessClass);
+
+        // 5. Update aria-label
+        const weakStr = getBossWeaknesses(resolvedBoss).join(', ');
+        const varStr = activeVariationId ? ` (variant: ${activeVariationId})` : '';
+        card.setAttribute('aria-label', `${resolvedBoss.shortName || boss.shortName} - Weak to ${weakStr}${varStr}`);
+    }
+
     savePageToStorage();
 }
 
@@ -326,10 +523,15 @@ function runOptimization() {
 function calculateOptimalTeams() {
     const availableUnits = getAvailableUnits();
     const universalUnitNames = getUniversalUnitNames();
-    // Filter out unavailable bosses (shouldn't happen, but safety check)
+    // Resolve selected bosses to their active variations
     const selectedBossObjects = selectedBosses
-        .map(id => allBosses.find(b => b.id === id))
-        .filter(boss => boss && boss.available !== false);
+        .map(id => {
+            const boss = allBosses.find(b => b.id === id);
+            if (!boss || boss.available === false) return null;
+            const variationId = selectedBossVariations[id] || null;
+            return variationId ? resolveBossVariation(boss, variationId) : boss;
+        })
+        .filter(Boolean);
     const selectedBossNames = selectedBossObjects.map(b => b.name);
     
     // DEBUG: Log available units

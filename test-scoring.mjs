@@ -22,7 +22,7 @@ import { filterBosses } from './lib/boss-filter.js';
 import { parseTeams } from './lib/team-parser.js';
 import { buildAvailableUnits } from './lib/roster-builder.js';
 import { buildTeams } from './lib/team-pipeline.js';
-import { scoreTeamForBoss } from './app/public/lib/common/team-scorer.js';
+import { scoreTeamForBoss, resolveBossVariation } from './app/public/lib/common/team-scorer.js';
 
 // ---------------------------------------------------------------------------
 // Viability / disqualification
@@ -770,24 +770,32 @@ async function main() {
     });
 
     // ========================================================================
-    // TEST 29: Astra/Nicole "wheelchair" — 300+ on Marionettes & Corruption
+    // TEST 29: Astra/Nicole "wheelchair" — 300+ on Marionettes; UCC now anti-anomaly by default
     // ========================================================================
-    // Batch: Miyabi 300+; "ZY/Astra/Nicole viable but lower (ZY is T2)" — separate floor for Zhu Yuan.
-    run('TEST 29: Miyabi and Zhu Yuan Astra/Nicole "wheelchair" competitive (Marionettes, Corruption)', () => {
+    // UCC (Corruption Complex) now defaults to anti-anomaly, so Miyabi teams are
+    // disqualified there. Test Miyabi on Marionettes only, then verify UCC open
+    // variation re-enables anomaly teams.
+    run('TEST 29: Miyabi/Astra/Nicole 290+ on Marionettes; UCC open variant re-enables anomaly', () => {
         const miyabi = scoreForTeamString('Miyabi/Astra/Nicole', allUnits)[0];
         const zy = scoreForTeamString('Zhu Yuan/Astra/Nicole', allUnits)[0];
-        for (const b of withBosses(bosses, 'Marionettes,Corruption')) {
+
+        // Marionettes: anomaly teams remain viable
+        for (const b of withBosses(bosses, 'Marionettes')) {
             const ms = scoreTeamForBoss(miyabi.team, b, {});
-            assert(
-                ms >= 290,
-                `${b.name} Miyabi/Astra/Nicole: got ${ms}, want >= 290`
-            );
+            assert(ms >= 290, `${b.name} Miyabi/Astra/Nicole: got ${ms}, want >= 290`);
             const zs = scoreTeamForBoss(zy.team, b, {});
-            assert(
-                zs >= 100,
-                `${b.name} Zhu Yuan/Astra/Nicole: got ${zs}, want 100+ (T2.5 DPS, ZY not hypercarry enough to go without stunner)`
-            );
+            assert(zs >= 100, `${b.name} Zhu Yuan/Astra/Nicole: got ${zs}, want 100+`);
         }
+
+        // UCC default: anti-anomaly → Miyabi disqualified
+        const ucc = bosses.find(b => b.id === 'ucc');
+        const uccDefault = scoreTeamForBoss(miyabi.team, ucc, {});
+        assert(uccDefault <= 0, `Default UCC should disqualify Miyabi (anti-anomaly), got ${uccDefault}`);
+
+        // UCC open variation: no anti → Miyabi viable again
+        const uccOpen = resolveBossVariation(ucc, 'og');
+        const uccOpenScore = scoreTeamForBoss(miyabi.team, uccOpen, {});
+        assert(uccOpenScore >= 290, `UCC open variation Miyabi/Astra/Nicole: got ${uccOpenScore}, want >= 290`);
     });
 
     // ========================================================================
@@ -1139,6 +1147,90 @@ async function main() {
         p = m.get('Alice / Piper / Yuzuha');
         const fdiff = j - p;
         assert(hdiff > fdiff, `Difference between Jane and Piper should be more pronounced on Horizon than Butcher because of vortex buff`);
+    });
+
+    // ========================================================================
+    // TEST 50: resolveBossVariation — merge semantics
+    // ========================================================================
+    run('TEST 50: resolveBossVariation — merge semantics', () => {
+        const butcher = bosses.find(b => b.id === 'butcher');
+        assert(butcher, 'Butcher must be found');
+        assert(butcher.variations?.raging, 'Butcher must have a "raging" variation');
+
+        // Default returns the base object unchanged
+        const defaultBoss = resolveBossVariation(butcher, null);
+        assert(defaultBoss === butcher, 'null variationId should return the base object itself');
+
+        // Raging variation: shill changes to stun, debuffs are erased
+        const ragingBoss = resolveBossVariation(butcher, 'raging');
+        assert(ragingBoss !== butcher, 'resolved variation must be a new object');
+        assert(ragingBoss.mechanics.shill === 'stun',
+            `Raging Butcher shill should be "stun", got "${ragingBoss.mechanics.shill}"`);
+        assert(!('debuffs' in ragingBoss.mechanics),
+            'Raging Butcher should have no debuffs key (erased by null override)');
+        assert(ragingBoss._variationId === 'raging', '_variationId should be set');
+
+        // Base object is not mutated
+        assert(butcher.mechanics.shill === 'anomaly', 'Base Butcher shill must remain "anomaly"');
+        assert('debuffs' in butcher.mechanics, 'Base Butcher debuffs must still exist');
+    });
+
+    // ========================================================================
+    // TEST 51: resolveBossVariation — UCC anti-anomaly + open variation
+    // ========================================================================
+    run('TEST 51: UCC default has anti-anomaly; open variation erases it', () => {
+        const ucc = bosses.find(b => b.id === 'ucc');
+        assert(ucc, 'UCC must be found');
+        assert(Array.isArray(ucc.mechanics.anti) && ucc.mechanics.anti.includes('anomaly'),
+            'Default UCC must have anti=["anomaly"]');
+
+        const openUcc = resolveBossVariation(ucc, 'og');
+        assert(!('anti' in openUcc.mechanics),
+            'UCC open variation should have no "anti" key (erased by null)');
+    });
+
+    // ========================================================================
+    // TEST 52: filterBosses supports boss:variation syntax
+    // ========================================================================
+    run('TEST 52: filterBosses boss:variation syntax resolves correctly', () => {
+        const ragingBosses = filterBosses(bosses, 'butcher:raging');
+        assert(ragingBosses.length === 1, `Expected 1 result for "butcher:raging", got ${ragingBosses.length}`);
+        const rb = ragingBosses[0];
+        assert(rb.mechanics.shill === 'stun',
+            `Raging Butcher from filterBosses should have shill="stun", got "${rb.mechanics.shill}"`);
+
+        // Plain filter still returns default
+        const defaultBosses = filterBosses(bosses, 'butcher');
+        assert(defaultBosses.length === 1, 'Plain butcher filter should return 1');
+        assert(defaultBosses[0].mechanics.shill === 'anomaly',
+            'Default Butcher should remain anomaly shill');
+    });
+
+    // ========================================================================
+    // TEST 53: Raging Butcher scoring — stun shill, disqualifies stunnerless teams
+    // ========================================================================
+    // Notorious Butcher: anomaly-shill → pure anomaly teams (no stunner) viable,
+    //   gain anomaly shill bonus.
+    // Raging Butcher: stun-shill → teams without a stunner are DISQUALIFIED entirely.
+    // Note: teams that happen to satisfy BOTH shills (e.g. Qingyi + anomaly DPS)
+    //   receive a +15 bonus on either variation and score identically — the key
+    //   difference only emerges for teams that satisfy exactly one shill type.
+    run('TEST 53: Raging Butcher — stun-shill disqualifies stunnerless anomaly teams', () => {
+        const butcher = bosses.find(b => b.id === 'butcher');
+        const ragingBoss = resolveBossVariation(butcher, 'raging');
+
+        // Miyabi/Vivian/Yuzuha: pure anomaly team, no stunner tag anywhere
+        // Notorious (anomaly shill): viable — Miyabi satisfies the shill requirement
+        // Raging (stun shill): disqualified — no unit has the "stun" tag
+        const anomalyOnlyTeams = scoreForTeamString('Miyabi/Vivian/Yuzuha', allUnits);
+        if (anomalyOnlyTeams.length > 0) {
+            const notoriousScore = scoreTeamForBoss(anomalyOnlyTeams[0].team, butcher, {});
+            const ragingScore = scoreTeamForBoss(anomalyOnlyTeams[0].team, ragingBoss, {});
+            assert(notoriousScore > 0,
+                `Miyabi/Vivian/Yuzuha should be viable on Notorious Butcher (anomaly shill), got ${notoriousScore}`);
+            assert(ragingScore <= 0,
+                `Miyabi/Vivian/Yuzuha should be disqualified on Raging Butcher (stun shill, no stunner), got ${ragingScore}`);
+        }
     });
 
     // ------------------------------------------------------------------------

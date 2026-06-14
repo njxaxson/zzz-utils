@@ -309,6 +309,14 @@ All fields are optional. Values are weighted: `true` (or 1) = minor, `2` = stron
     "anomaly:state": "wind",
     "weak": ["veils"],
     "debuffs": { "cd": 2 }
+  },
+  "variations": {
+    "example": {
+      "enabled": false,
+      "mechanics": {
+        "anti": null
+      }
+    }
   }
 }
 ```
@@ -327,8 +335,10 @@ All fields are optional. Values are weighted: `true` (or 1) = minor, `2` = stron
   * `debuffs` — Boss inflicts debuffs on the player team. Supported keys:
     * `"cd"` — Critical Damage debuff. Penalizes DPS agents that scale with CD when the boss's CD debuff exceeds the team's total CD buff supply.
     * `"daze"` — Daze debuff. Slows daze accumulation, making stun windows harder to trigger. Penalizes attack and rupture DPS proportionally to the shortfall between the debuff level and team daze supply. High-daze stunners mitigate the effect. Anomaly DPS are not penalized since their damage is less stun-window-dependent. Unlike anti-shill, this penalty can be fully eliminated by bringing a sufficiently high-daze stunner.
+* `variations` — (optional) Named alternate configurations for the boss. Each key is a variation ID (e.g. `"raging"`). Variation objects are merged onto the base boss using shallow merge semantics: omitted keys inherit from the base; an explicit `null` value erases the corresponding base property. The `mechanics` sub-object is merged key-by-key with the same semantics.
+  * `enabled` — (optional, default `true`) When `false`, the variation is **UI-only hidden**: it will not appear in the boss selection UI, the orange dot indicator, or the cycling affordance. **CLI tools ignore this flag entirely** and will always resolve a variation when explicitly requested (e.g. `--bosses "butcher:raging"`). Set to `false` for variations that are defined but not yet active in the current game rotation.
 
-**Boss property accessors:** All boss gameplay properties are accessed via exported helper functions (`getBossWeaknesses`, `getBossResistances`, `getBossShill`, `getBossAnti`, `getBossAssists`, `getBossShillIntensity`) from `team-scorer.js`. These centralize access and are designed to support boss variation resolution transparently in the future.
+**Boss property accessors:** All boss gameplay properties are accessed via exported helper functions (`getBossWeaknesses`, `getBossResistances`, `getBossShill`, `getBossAnti`, `getBossAssists`, `getBossShillIntensity`) from `team-scorer.js`. These centralize access and support boss variation resolution transparently via `resolveBossVariation(boss, variationId)`.
 
 ## Engine Architecture: Five-Layer Scoring
 

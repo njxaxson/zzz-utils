@@ -13,6 +13,17 @@
             "assists": 0,
             "weak": ["disorders"],
             "debuffs": { "daze": 2 }
+        },
+        "variations": {
+            "raging": {
+                "enabled": false,
+                "name": "Dead End Butcher",
+                "mechanics": {
+                    "shill": "stun",
+                    "debuffs": null,
+                    "weak": ["stun"]
+                }
+            }
         }
     },
     {
@@ -25,8 +36,16 @@
             "weaknesses": ["electric", "ether"],
             "resistances": [],
             "shill": null,
-            "anti": [],
+            "anti": ["anomaly"],
             "assists": 0
+        },
+        "variations": {
+            "og": {
+                "enabled": false,
+                "mechanics": {
+                    "anti": null
+                }
+            }
         }
     },
     {

@@ -153,10 +153,59 @@ export function isOnField(unit) {
 }
 
 // ============================================================================
+// BOSS VARIATION RESOLUTION
+// ============================================================================
+
+/**
+ * Resolve a boss variation by merging the override object onto the base boss.
+ * Merge semantics:
+ *   - Omitted keys in the variation inherit the base value.
+ *   - Explicit `null` in the variation erases the corresponding base key.
+ *   - The `mechanics` sub-object is merged key-by-key with the same semantics.
+ *   - All other properties (name, shortName, favored, …) are merged at the
+ *     top level.  Arrays are treated atomically (replaced, not concatenated).
+ *
+ * @param {object} boss - The base boss object from bosses.json.
+ * @param {string|null} variationId - The variation key to resolve (e.g. "raging").
+ *   Pass null/undefined to get the base (default) boss back unchanged.
+ * @returns {object} A new boss object with the variation merged in.
+ */
+export function resolveBossVariation(boss, variationId) {
+    if (!variationId || !boss.variations?.[variationId]) {
+        return boss;
+    }
+    const override = boss.variations[variationId];
+    const resolved = { ...boss };
+
+    for (const [key, value] of Object.entries(override)) {
+        if (key === 'mechanics') continue;
+        if (value === null) {
+            delete resolved[key];
+        } else {
+            resolved[key] = value;
+        }
+    }
+
+    if (override.mechanics) {
+        resolved.mechanics = { ...boss.mechanics };
+        for (const [key, value] of Object.entries(override.mechanics)) {
+            if (value === null) {
+                delete resolved.mechanics[key];
+            } else {
+                resolved.mechanics[key] = value;
+            }
+        }
+    }
+
+    resolved._variationId = variationId;
+    return resolved;
+}
+
+// ============================================================================
 // BOSS ACCESSORS
 // These functions centralize access to boss properties that were moved into
-// the mechanics block. Using accessors here allows Phase 2 variation
-// resolution to be added transparently without touching call sites.
+// the mechanics block. Using accessors here allows variation resolution to be
+// applied transparently without touching call sites.
 // ============================================================================
 
 export function getBossWeaknesses(boss) { return boss.mechanics?.weaknesses ?? []; }
