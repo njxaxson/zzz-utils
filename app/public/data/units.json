@@ -637,14 +637,13 @@
         "rank": "S",
         "limited": false,
         "tier": 1.5,
-        "tags": ["attack", "ether", "phaethon", "assist:evasive"],
+        "tags": ["attack", "ether", "phaethon", "assist:defensive"],
         "join": ["support", "stun"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "damage": { "totalize": 1 }
         },
         "faction": "Phaethon",
-        "available" : false,
         "displayText" : "Proxy made manifest? We shall see!"
     },
     {
@@ -818,7 +817,6 @@
             "damage": { "abloom": 2 }
         },
         "faction": "External Strategy Department",
-        "available": false,
         "displayText" : "Tall anomaly gentlelady sub-DPS with oversized fan creates on-field tornado traps."
     },
     {
