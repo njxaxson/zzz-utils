@@ -14,7 +14,7 @@ export const PITY_W = 80;
 export const PITY_A = 10;
 export const CFEATURED = 0.5;
 export const WFEATURED = 0.75;
-export const REFUND_RATE = 0.043;
+export const REFUND_RATE = 0.65;
 
 export const RESULT_FEATURED_S = 4;
 export const RESULT_STANDARD_S = 3;
@@ -167,46 +167,57 @@ export function simulate(context, tracker = null) {
         se: 0
     };
     let pulls = context.p;
+    let pullsUsed = 0;
     const tactic = context.tactic || TACTICS.ENGINE_FIRST;
     const useSoftPity = context.useSoftPity || false;
+    const refundRate = context.refundRate || 0;
+
+    // Each character banner A-rank (featured or standard) has a refundRate chance
+    // of refunding one pull, added immediately back into the remaining pool.
+    // This is exhaustive: refund pulls can themselves earn further refunds.
+    function cpullWithRefund() {
+        pulls--;
+        pullsUsed++;
+        const result = cpull(state, tracker, useSoftPity);
+        ctally(result, results);
+        if (refundRate > 0 && (result === RESULT_FEATURED_A || result === RESULT_STANDARD_A)) {
+            if (Math.random() < refundRate) pulls++;
+        }
+    }
+
+    function wpullTracked() {
+        pulls--;
+        pullsUsed++;
+        const result = wpull(state, useSoftPity);
+        wtally(result, results);
+    }
     
     if (tactic === TACTICS.MINDSCAPES_FIRST) {
         // All mindscapes first, then all engines
         while (results.fc < context.c && pulls > 0) {
-            pulls--;
-            const result = cpull(state, tracker, useSoftPity);
-            ctally(result, results);
+            cpullWithRefund();
         }
         while (results.fw < context.w && pulls > 0) {
-            pulls--;
-            const result = wpull(state, useSoftPity);
-            wtally(result, results);
+            wpullTracked();
         }
     } else {
         // Default: engine-first (1 char, 1 engine, remaining chars, remaining engines)
         while (context.c > 0 && pulls > 0 && results.fc == 0) {
-            pulls--;
-            const result = cpull(state, tracker, useSoftPity);
-            ctally(result, results);
+            cpullWithRefund();
         }
         while (context.w > 0 && pulls > 0 && results.fw == 0) {
-            pulls--;
-            const result = wpull(state, useSoftPity);
-            wtally(result, results);
+            wpullTracked();
         }
         while (results.fc < context.c && pulls > 0) {
-            pulls--;
-            const result = cpull(state, tracker, useSoftPity);
-            ctally(result, results);
+            cpullWithRefund();
         }
         while (results.fw < context.w && pulls > 0) {
-            pulls--;
-            const result = wpull(state, useSoftPity);
-            wtally(result, results);
+            wpullTracked();
         }
     }
     
     results.p = pulls;
+    results.pullsUsed = pullsUsed;
     return results;
 }
 
@@ -276,6 +287,8 @@ export function runBatchSimulation(context, iterations = SIMULATIONS) {
     // Run simulations
     const target = toLabel(context.c, context.w);
     let totalPullsUsed = 0;
+    let exhaustedPullsUsed = 0;
+    let exhaustedCount = 0;
     let remaining = 0;
     let set = [];
     
@@ -289,7 +302,11 @@ export function runBatchSimulation(context, iterations = SIMULATIONS) {
             a_featured[result.fa.toString()] = 1;
         }
         remaining += result.p;
-        totalPullsUsed += context.p - result.p;
+        totalPullsUsed += result.pullsUsed;
+        if (result.p === 0) {
+            exhaustedPullsUsed += result.pullsUsed;
+            exhaustedCount++;
+        }
         if (result.p > 0) set.push(result.p);
     }
     
@@ -310,6 +327,7 @@ export function runBatchSimulation(context, iterations = SIMULATIONS) {
     }
     const avgA = totalWeight > 0 ? (weightedSum / totalWeight).toFixed(2) : "0.00";
     const avgP = Math.ceil(totalPullsUsed / iterations);
+    const avgExhaustedPulls = exhaustedCount > 0 ? Math.floor(exhaustedPullsUsed / exhaustedCount) : context.p;
     
     return {
         target,
@@ -321,6 +339,7 @@ export function runBatchSimulation(context, iterations = SIMULATIONS) {
         mean,
         stddev,
         avgA,
+        avgExhaustedPulls,
         avgP,
         tracker,
         iterations

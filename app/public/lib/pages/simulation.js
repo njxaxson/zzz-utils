@@ -160,9 +160,6 @@ function runSimulation() {
             let totalPulls = Math.floor(polychrome / 160) + tapes;
 
             const includeRefunds = includeRefundsInput.checked;
-            if (includeRefunds && totalPulls > 100) {
-                totalPulls += Math.floor(totalPulls * REFUND_RATE);
-            }
 
             const context = {
                 p: totalPulls,
@@ -179,7 +176,8 @@ function runSimulation() {
                     guaranteeWInput.checked
                 ],
                 tactic: pullTacticInput.value,
-                useSoftPity: useSoftPityInput.checked
+                useSoftPity: useSoftPityInput.checked,
+                refundRate: includeRefunds ? REFUND_RATE : 0
             };
 
             // Validation
@@ -212,7 +210,7 @@ function runSimulation() {
 }
 
 function displayResults(context, results, includeRefunds) {
-    const { target, s_limited, s_standard, a_featured, mean, stddev, avgP } = results;
+    const { target, s_limited, s_standard, a_featured, mean, stddev, avgP, avgExhaustedPulls } = results;
     
     resultsSection.style.display = 'block';
 
@@ -225,8 +223,8 @@ function displayResults(context, results, includeRefunds) {
             <span class="stat-value success">${target}</span>
         </div>
         <div class="stat-line">
-            <span class="stat-label">Total Pulls${includeRefunds ? ' <span class="stat-note">(including refunds)</span>' : ''}</span>
-            <span class="stat-value">${context.p}</span>
+            <span class="stat-label">Total Pulls${includeRefunds ? ' <span class="stat-note">(avg. incl. refunds)</span>' : ''}</span>
+            <span class="stat-value">${includeRefunds ? avgExhaustedPulls : context.p}</span>
         </div>
     `;
 
