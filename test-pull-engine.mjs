@@ -18,6 +18,7 @@ import {
     tierToQuality,
     qualityLabel,
     capitalize,
+    checkTeamDependencies,
     DPS_ARCHETYPES
 } from './app/public/lib/common/pull-engine.js';
 
@@ -364,6 +365,187 @@ await runTest(19, 'Loaded roster: subdps-anomaly and mech-synergy-sanby bugs fix
         assert(juFufuRec.priority === 'Low',
             `Ju Fufu recommendation should be Low priority only, got ${juFufuRec.priority} — mech-synergy-sanby may still be inflating its score`);
     }
+});
+
+// ===========================================================================
+// TESTS 20-23: Codependent scaling (YSG veil dependency)
+// ===========================================================================
+//
+// Limited roster that has no adequate veil provider (Cissia has veils:1 < YSG's
+// scaling.veils:2). YSG has codependent:true; Aria does not.
+
+const CODEPENDENT_ROSTER = [
+    'Cissia', 'Lucia', 'Koleda', 'Nekomata',
+    'Anby', 'Ben', 'Billy', 'Corin', 'Komano', 'Lucy',
+    'Nicole', 'Pan Yinhu', 'Pulchra', 'Seth', 'Soukaku'
+];
+
+await runTest(20, 'YSG codependent — unmet veil dependency drops priority', () => {
+    const { unitStates, ownedUnits } = buildSyntheticRoster(allUnits, CODEPENDENT_ROSTER);
+    const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 15 });
+
+    const ysgRec = result.recommendations.find(r => r.units.some(u => u.id === 'ysg'));
+    assert(ysgRec, 'YSG should appear in recommendations');
+    assert(ysgRec.teamDependencyNotes?.length > 0,
+        'YSG recommendation should have teamDependencyNotes (veil providers missing)');
+
+    const providerIds = ysgRec.teamDependencyNotes.flatMap(n => n.providers.map(p => p.id));
+    assert(providerIds.includes('sunna'), 'Sunna should be listed as a veil provider');
+    assert(providerIds.includes('zhao'), 'Zhao should be listed as a veil provider');
+
+    // Priority should be one rank lower than it would be without the check
+    assert(ysgRec.priority !== 'High',
+        `YSG priority should have been downgraded, got ${ysgRec.priority}`);
+});
+
+await runTest(21, 'YSG codependent — Sunna in roster satisfies dependency', () => {
+    const roster = [...CODEPENDENT_ROSTER, 'Sunna'];
+    const { unitStates, ownedUnits } = buildSyntheticRoster(allUnits, roster);
+    const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 15 });
+
+    const ysgRec = result.recommendations.find(r => r.units.some(u => u.id === 'ysg'));
+    if (ysgRec) {
+        assert(!ysgRec.teamDependencyNotes?.length,
+            'YSG should have no teamDependencyNotes when Sunna is owned');
+    }
+});
+
+await runTest(22, 'YSG codependent — Zhao in roster satisfies dependency', () => {
+    const roster = [...CODEPENDENT_ROSTER, 'Zhao'];
+    const { unitStates, ownedUnits } = buildSyntheticRoster(allUnits, roster);
+    const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 15 });
+
+    const ysgRec = result.recommendations.find(r => r.units.some(u => u.id === 'ysg'));
+    if (ysgRec) {
+        assert(!ysgRec.teamDependencyNotes?.length,
+            'YSG should have no teamDependencyNotes when Zhao is owned');
+    }
+});
+
+await runTest(23, 'Aria has no codependent flag — no dependency check runs', () => {
+    // Put Aria on a synthetic banner to ensure she gets assessed for tile verdicts
+    const { unitStates, ownedUnits } = buildSyntheticRoster(allUnits, CODEPENDENT_ROSTER);
+    const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 15 });
+
+    const ariaRec = result.recommendations.find(r => r.units.some(u => u.id === 'aria'));
+    if (ariaRec) {
+        assert(!ariaRec.teamDependencyNotes?.length,
+            'Aria should NOT have teamDependencyNotes — she has no codependent flag');
+    }
+
+    // Also verify directly via checkTeamDependencies
+    const aria = unitByName(allUnits, 'Aria');
+    const dep = checkTeamDependencies(aria, ownedUnits, allUnits);
+    assert(!dep.hasUnmetDependency,
+        'checkTeamDependencies should return no unmet dependency for Aria (no codependent flag)');
+});
+
+// ===========================================================================
+// TESTS 24-29: Per-archetype support coverage
+// ===========================================================================
+
+await runTest(24, 'Support coverage — Lucia alone does NOT cover attack support', () => {
+    const roster = ['Evelyn', 'Lucia', 'Koleda', 'Nicole', 'Anby', 'Billy'];
+    const { unitStates, ownedUnits } = buildSyntheticRoster(allUnits, roster);
+    const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 15 });
+
+    assert(hasGap(result, 'support-attack'),
+        'support-attack gap should fire — Lucia is a terrible fit for attack teams');
+
+    const gap = findGap(result, 'support-attack');
+    const sunna = gap.units.find(u => u.id === 'sunna');
+    assert(sunna, 'Sunna should appear as a candidate in the support-attack gap');
+});
+
+await runTest(25, 'Support coverage — Astra covers attack support', () => {
+    const roster = ['Evelyn', 'Astra', 'Koleda', 'Nicole', 'Anby', 'Billy'];
+    const { unitStates, ownedUnits } = buildSyntheticRoster(allUnits, roster);
+    const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 15 });
+
+    assert(!hasGap(result, 'support-attack'),
+        'support-attack gap should NOT fire — Astra is a strong fit for attack teams');
+});
+
+await runTest(26, 'Support coverage — Yuzuha alone does NOT cover rupture support', () => {
+    const roster = ['Yixuan', 'Yuzuha', 'Dialyn', 'Nicole', 'Anby', 'Billy'];
+    const { unitStates, ownedUnits } = buildSyntheticRoster(allUnits, roster);
+    const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 15 });
+
+    assert(hasGap(result, 'support-rupture'),
+        'support-rupture gap should fire — Yuzuha is a poor fit for rupture teams');
+
+    const gap = findGap(result, 'support-rupture');
+    const lucia = gap.units.find(u => u.id === 'lucia');
+    assert(lucia, 'Lucia should appear as a candidate in the support-rupture gap');
+});
+
+await runTest(27, 'Support coverage — Sunna is a High recommendation when Lucia is the only premium support', () => {
+    const { unitStates, ownedUnits } = buildSyntheticRoster(allUnits, CODEPENDENT_ROSTER);
+    const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 15 });
+
+    // A support-attack gap should fire: Lucia is a rupture specialist and
+    // provides almost nothing for attack teams. Even though attack DPS quality
+    // is low, the player has attack DPS (A-rank) and zero adequate support.
+    assert(hasGap(result, 'support-attack'),
+        'support-attack gap should fire — Lucia does not cover attack support needs');
+
+    const gap = findGap(result, 'support-attack');
+    assert(gap.units.some(u => u.id === 'sunna'),
+        'Sunna should appear as a candidate in the support-attack gap');
+
+    // With only one specialist premium support, the gap should be High priority
+    assert(gap.priority === 'High',
+        `support-attack gap should be High priority, got ${gap.priority}`);
+
+    // Sunna should appear in a recommendation card independently of YSG
+    const sunnaRec = result.recommendations.find(r =>
+        r.units.some(u => u.id === 'sunna'));
+    assert(sunnaRec, 'Sunna should appear in a recommendation card');
+});
+
+await runTest(28, 'Support coverage — Astra is a High recommendation when Lucia is the only premium support', () => {
+    const { unitStates, ownedUnits } = buildSyntheticRoster(allUnits, CODEPENDENT_ROSTER);
+    const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 15 });
+
+    assert(hasGap(result, 'support-attack'),
+        'support-attack gap should fire — Lucia does not cover attack support needs');
+
+    const gap = findGap(result, 'support-attack');
+    assert(gap.units.some(u => u.id === 'astra'),
+        'Astra should appear as a candidate in the support-attack gap');
+
+    assert(gap.priority === 'High',
+        `support-attack gap should be High priority, got ${gap.priority}`);
+
+    const astraRec = result.recommendations.find(r =>
+        r.units.some(u => u.id === 'astra'));
+    assert(astraRec, 'Astra should appear in a recommendation card');
+});
+
+await runTest(29, 'Support coverage — Lucia recommended for rupture, Sunna excluded (join incompatible)', () => {
+    // Codependent roster with Lucia removed and Zhao added
+    const roster = CODEPENDENT_ROSTER.filter(n => n !== 'Lucia').concat('Zhao');
+    const { unitStates, ownedUnits } = buildSyntheticRoster(allUnits, roster);
+    const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 15 });
+
+    // Rupture support gap should fire — Zhao can't join rupture teams
+    assert(hasGap(result, 'support-rupture'),
+        'support-rupture gap should fire — Zhao does not cover rupture support');
+
+    const gap = findGap(result, 'support-rupture');
+    assert(gap.units.some(u => u.id === 'lucia'),
+        'Lucia should appear as a candidate in the support-rupture gap');
+
+    // Sunna joins on ["attack", "faction"] — she cannot be on rupture teams
+    assert(!gap.units.some(u => u.id === 'sunna'),
+        'Sunna should NOT appear in the support-rupture gap — her join conditions are incompatible');
+
+    // Sunna should appear independently in the support-attack gap instead
+    assert(hasGap(result, 'support-attack'),
+        'support-attack gap should also fire');
+    const attackGap = findGap(result, 'support-attack');
+    assert(attackGap.units.some(u => u.id === 'sunna'),
+        'Sunna should appear in the support-attack gap instead');
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

@@ -4114,15 +4114,15 @@ button#simulate-btn:disabled,
 }
 
 .pull-rec-card.priority-high {
-    border-left-color: #e74c3c;
+    border-left-color: #39FF14;
 }
 
 .pull-rec-card.priority-medium {
-    border-left-color: #f39c12;
+    border-left-color: #27AE60;
 }
 
 .pull-rec-card.priority-low {
-    border-left-color: #2ecc71;
+    border-left-color: #6B8E6B;
 }
 
 .rec-header {
@@ -4145,21 +4145,21 @@ button#simulate-btn:disabled,
 }
 
 .priority-badge.priority-high {
-    background: rgba(231, 76, 60, 0.2);
-    color: #e74c3c;
-    border: 1px solid rgba(231, 76, 60, 0.3);
+    background: rgba(57, 255, 20, 0.15);
+    color: #39FF14;
+    border: 1px solid rgba(57, 255, 20, 0.3);
 }
 
 .priority-badge.priority-medium {
-    background: rgba(243, 156, 18, 0.2);
-    color: #f39c12;
-    border: 1px solid rgba(243, 156, 18, 0.3);
+    background: rgba(39, 174, 96, 0.15);
+    color: #27AE60;
+    border: 1px solid rgba(39, 174, 96, 0.3);
 }
 
 .priority-badge.priority-low {
-    background: rgba(46, 204, 113, 0.2);
-    color: #2ecc71;
-    border: 1px solid rgba(46, 204, 113, 0.3);
+    background: rgba(107, 142, 107, 0.15);
+    color: #6B8E6B;
+    border: 1px solid rgba(107, 142, 107, 0.3);
 }
 
 .rec-title {

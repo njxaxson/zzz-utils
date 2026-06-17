@@ -133,6 +133,12 @@ async function main() {
             for (const r of allReasons) {
                 console.log(`     • ${r}`);
             }
+            if (rec.teamDependencyNotes?.length > 0) {
+                for (const note of rec.teamDependencyNotes) {
+                    const providerNames = note.providers?.map(p => p.name).join(', ') || '';
+                    console.log(`     ⚠ ${note.text}${providerNames ? ` [${providerNames}]` : ''}`);
+                }
+            }
             console.log(`     Suggested: ${rec.units.map(u => `${u.name} T${u.tier}${u.available === false ? ' (upcoming)' : ''}`).join(', ')}`);
             console.log();
         }

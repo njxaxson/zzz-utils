@@ -8,7 +8,7 @@ import {
     getInitials, getCharacterImageUrl
 } from '../common/roster-ui.js';
 
-import { analyze, getUnitElement } from '../common/pull-engine.js';
+import { analyze, getUnitElement, checkTeamDependencies } from '../common/pull-engine.js';
 
 const PAGE_STORAGE_KEY = 'zzz-pull-recommendations';
 
@@ -130,8 +130,9 @@ function applyBannerRecommendationOrdering(recommendations, bumpWindowIds, banne
  * Reads gap.priority set by the engine's assignPriority(), which uses relative
  * thresholds for loaded rosters — ensures tile verdicts match recommendation labels.
  */
-function bannerTileVerdictClass(unitId, allGaps) {
+function bannerTileVerdictClass(unitId, allGaps, ownedUnits, allUnits) {
     const RANK = { 'High': 2, 'Medium': 1, 'Low': 0 };
+    const DROP = { 'high': 'medium', 'medium': 'low', 'low': 'no' };
     let best = -1;
     let bestPriority = null;
     for (const gap of allGaps) {
@@ -143,7 +144,16 @@ function bannerTileVerdictClass(unitId, allGaps) {
         }
     }
     if (bestPriority === null) return 'no';
-    return bestPriority.toLowerCase();
+
+    const verdict = bestPriority.toLowerCase();
+    const unit = allUnits.find(u => u.id === unitId);
+    if (unit && ownedUnits && allUnits) {
+        const dep = checkTeamDependencies(unit, ownedUnits, allUnits);
+        if (dep.hasUnmetDependency || dep.cannotFormTeam) {
+            return DROP[verdict] ?? 'no';
+        }
+    }
+    return verdict;
 }
 
 function verdictLabel(verdictClass) {
@@ -294,13 +304,15 @@ function renderBannerTiles(results) {
     const { activeIds, upcomingIds, unitById } = results.bannerMeta;
     const unitStates = getUnitStates();
     const { allGaps } = results;
+    const allUnits = getAllUnits();
+    const ownedUnits = allUnits.filter(u => unitStates[u.id]?.owned);
 
     function tilesForIds(ids) {
         return ids
             .filter(id => unitById.has(id) && !unitStates[id]?.owned)
             .map(id => {
                 const unit = unitById.get(id);
-                const verdict = bannerTileVerdictClass(id, allGaps);
+                const verdict = bannerTileVerdictClass(id, allGaps, ownedUnits, allUnits);
                 return createBannerUnitTile(unit, verdict);
             })
             .join('');
@@ -337,7 +349,17 @@ function renderBannerTiles(results) {
     el.style.display = 'block';
 }
 
+const BANNER_TILE_NAME_LIMIT = 10;
+
+function tileDisplayName(unit) {
+    if (unit.name.length <= BANNER_TILE_NAME_LIMIT) return unit.name;
+    const aliases = unit.aliases ?? [];
+    if (aliases.length === 0) return unit.name;
+    return aliases.reduce((shortest, a) => a.length < shortest.length ? a : shortest, unit.name);
+}
+
 function createBannerUnitTile(unit, verdictClass) {
+    const displayName = tileDisplayName(unit);
     const initials = getInitials(unit.name);
     const imageUrl = getCharacterImageUrl(unit.id);
     const avatarHtml = imageUrl
@@ -348,7 +370,7 @@ function createBannerUnitTile(unit, verdictClass) {
     return `
         <div class="banner-unit-tile verdict-${verdictClass}" title="${unit.name}: ${label}">
             ${avatarHtml}
-            <span class="banner-tile-name">${unit.name}</span>
+            <span class="banner-tile-name">${displayName}</span>
             <span class="banner-tile-verdict">${label}</span>
         </div>
     `;
@@ -392,6 +414,16 @@ function renderRecommendations(results) {
     container.innerHTML = recommendations.map(rec => createRecommendationCard(rec, activeSet, upcomingSet)).join('');
 }
 
+function formatDependencyReason(unitName, note, activeSet, upcomingSet) {
+    if (!note.providers || note.providers.length === 0) return note.text;
+    const names = note.providers.map(p => {
+        if (activeSet?.has(p.id)) return `${p.name} (available now)`;
+        if (upcomingSet?.has(p.id)) return `${p.name} (upcoming)`;
+        return p.name;
+    });
+    return `${unitName} would be a more valuable pull with ${names.join(' or ')}`;
+}
+
 function createRecommendationCard(rec, activeSet, upcomingSet) {
     const priorityClass = rec.priority.toLowerCase();
     const unitsHtml = rec.units.map(unit =>
@@ -399,6 +431,12 @@ function createRecommendationCard(rec, activeSet, upcomingSet) {
     ).join('');
 
     const allReasons = [rec.reason, ...(rec.additionalReasons?.map(r => r.reason) ?? [])];
+    if (rec.teamDependencyNotes?.length > 0 && rec.units[0]) {
+        const unitName = rec.units[0].name;
+        for (const note of rec.teamDependencyNotes) {
+            allReasons.push(formatDependencyReason(unitName, note, activeSet, upcomingSet));
+        }
+    }
     const reasonsHtml = `<ul class="rec-reasons">${allReasons.map(r => `<li class="rec-reason">${r}</li>`).join('')}</ul>`;
 
     return `

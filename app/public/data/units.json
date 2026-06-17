@@ -873,7 +873,7 @@
             "elementalVariant": "honedEdge",
             "damage": { "ultimate:strong": 3, "ultimate:double": 3 },
             "utility": { "stunless": true },
-            "scaling": { "ultimates": 3, "veils": 2 }
+            "scaling": { "ultimates": 3, "veils": 2, "codependent": true }
         },
         "faction": "Yunkui Summit",
         "displayText": "Void Hunter Ye Shunguang is currently the strongest DPS agent in the game. Wants lots of ether veils to help push her into her enlightened state."

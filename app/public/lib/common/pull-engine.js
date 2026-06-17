@@ -11,9 +11,18 @@ import {
     getEffectiveScaling,
     getEffectiveRoles
 } from './team-scorer.js';
+import { getTeams } from './team-builder.js';
 
 export { ELEMENTS };
 export const DPS_ARCHETYPES = DPS_ROLES;
+
+const NATURALLY_AVAILABLE_KEYS = new Set(['chains', 'ultimates']);
+const FOUNDATIONAL_STAT_KEYS = new Set([
+    'cr', 'cd', 'atk', 'pen', 'hp', 'def', 'ap', 'am'
+]);
+const CODEPENDENT_SKIP_KEYS = new Set([
+    ...NATURALLY_AVAILABLE_KEYS, ...FOUNDATIONAL_STAT_KEYS, 'codependent'
+]);
 
 // ============================================================================
 // HELPERS
@@ -166,6 +175,148 @@ function mechanicsFitScore(supplier, consumer) {
     return score;
 }
 
+// ============================================================================
+// CODEPENDENT SCALING — TEAM DEPENDENCY CHECK
+// ============================================================================
+
+/**
+ * Check whether a candidate DPS unit's specialist scaling needs can be met
+ * by the player's roster. Gated on mechanics.scaling.codependent.
+ *
+ * @returns {{ hasUnmetDependency: boolean, cannotFormTeam: boolean,
+ *             notes: Array<{ text: string, providers: Array<{id,name}> }> }}
+ */
+export function checkTeamDependencies(candidate, ownedUnits, allUnits) {
+    const empty = { hasUnmetDependency: false, cannotFormTeam: false, notes: [] };
+
+    if (!candidate.mechanics?.scaling?.codependent) return empty;
+
+    const isDPSUnit = DPS_ARCHETYPES.some(a => candidate.tags.includes(a));
+    if (!isDPSUnit || isSubdps(candidate)) return empty;
+
+    const scaling = getEffectiveScaling(candidate);
+    const notes = [];
+    let hasUnmetDependency = false;
+
+    const selfBuffs = candidate.mechanics?.buffs || {};
+    const selfUtil = candidate.mechanics?.utility || {};
+
+    // Step 1: specialist scaling provider check
+    for (const [key, level] of Object.entries(scaling)) {
+        if (CODEPENDENT_SKIP_KEYS.has(key)) continue;
+        const scalingW = w(level);
+        if (scalingW === 0) continue;
+
+        // P22: skip self-provided needs
+        const selfSupply = Math.max(w(selfBuffs[key]), w(selfUtil[key]));
+        if (selfSupply >= scalingW) continue;
+
+        const met = ownedUnits.some(u => {
+            const buf = u.mechanics?.buffs || {};
+            const debuf = u.mechanics?.debuffs || {};
+            const util = u.mechanics?.utility || {};
+            return Math.max(w(buf[key]), w(debuf[key]), w(util[key])) >= scalingW;
+        });
+
+        if (!met) {
+            hasUnmetDependency = true;
+            const providers = allUnits
+                .filter(u => {
+                    if (u.id === candidate.id) return false;
+                    if (!u.limited || u.rank !== 'S') return false;
+                    const buf = u.mechanics?.buffs || {};
+                    const debuf = u.mechanics?.debuffs || {};
+                    const util = u.mechanics?.utility || {};
+                    return Math.max(w(buf[key]), w(debuf[key]), w(util[key])) >= scalingW;
+                })
+                .sort((a, b) => a.tier - b.tier)
+                .map(u => ({ id: u.id, name: u.name }));
+            notes.push({
+                text: `Needs ${providers.map(p => p.name).join(' or ')} to reach full potential`,
+                providers
+            });
+        }
+    }
+
+    // Step 2: disorder feasibility (for units with scaling.disorders)
+    const disorderScaling = w(scaling.disorders);
+    if (disorderScaling > 0 && !CODEPENDENT_SKIP_KEYS.has('disorders')) {
+        const candidateBaseEl = getElement(candidate)?.split(':')[0] || getUnitElement(candidate);
+        const hasDisorderPartner = ownedUnits.some(u => {
+            const uEl = getElement(u)?.split(':')[0] || getUnitElement(u);
+            if (uEl === candidateBaseEl || uEl === 'wind' || uEl === 'unknown') return false;
+            const isAno = u.tags.includes('anomaly');
+            const pseudoRoles = u.mechanics?.pseudoRole;
+            const isPseudoAno = Array.isArray(pseudoRoles) &&
+                pseudoRoles.some(e => (typeof e === 'string' ? e : e?.role) === 'anomaly');
+            return isAno || isPseudoAno;
+        });
+
+        if (!hasDisorderPartner) {
+            hasUnmetDependency = true;
+            const partners = allUnits
+                .filter(u => {
+                    if (u.id === candidate.id) return false;
+                    if (!u.limited || u.rank !== 'S') return false;
+                    const uEl = getElement(u)?.split(':')[0] || getUnitElement(u);
+                    if (uEl === candidateBaseEl || uEl === 'wind' || uEl === 'unknown') return false;
+                    const isAno = u.tags.includes('anomaly');
+                    const pr = u.mechanics?.pseudoRole;
+                    const isPseudoAno = Array.isArray(pr) &&
+                        pr.some(e => (typeof e === 'string' ? e : e?.role) === 'anomaly');
+                    return isAno || isPseudoAno;
+                })
+                .sort((a, b) => a.tier - b.tier)
+                .map(u => ({ id: u.id, name: u.name }));
+            notes.push({
+                text: `Needs ${partners.slice(0, 3).map(p => p.name).join(' or ')} for disorder generation`,
+                providers: partners
+            });
+        }
+    }
+
+    // Step 3: team formation feasibility via getTeams()
+    let cannotFormTeam = false;
+    const teamPool = [candidate, ...ownedUnits.filter(u => u.id !== candidate.id)];
+    const allTeams = getTeams(teamPool);
+    const validTeams = Object.values(allTeams).filter(
+        team => team.length === 3 && team.some(u => u.id === candidate.id)
+    );
+
+    if (validTeams.length === 0) {
+        cannotFormTeam = true;
+        hasUnmetDependency = true;
+        notes.push({
+            text: 'Cannot form a valid team with your current roster',
+            providers: []
+        });
+    } else if (disorderScaling > 0 && !CODEPENDENT_SKIP_KEYS.has('disorders')) {
+        // Verify at least one valid team includes a disorder partner
+        const candidateBaseEl = getElement(candidate)?.split(':')[0] || getUnitElement(candidate);
+        const hasTeamWithDisorder = validTeams.some(team =>
+            team.some(u => {
+                if (u.id === candidate.id) return false;
+                const uEl = getElement(u)?.split(':')[0] || getUnitElement(u);
+                if (uEl === candidateBaseEl || uEl === 'wind' || uEl === 'unknown') return false;
+                const isAno = u.tags.includes('anomaly');
+                const pr = u.mechanics?.pseudoRole;
+                const isPseudoAno = Array.isArray(pr) &&
+                    pr.some(e => (typeof e === 'string' ? e : e?.role) === 'anomaly');
+                return isAno || isPseudoAno;
+            })
+        );
+        if (!hasTeamWithDisorder && !notes.some(n => n.text.includes('disorder'))) {
+            hasUnmetDependency = true;
+            notes.push({
+                text: 'No valid team can generate disorders with your current roster',
+                providers: []
+            });
+        }
+    }
+
+    return { hasUnmetDependency, cannotFormTeam, notes };
+}
+
 function sortCandidates(units, ownedDPSUnits = []) {
     const fitScores = new Map();
     for (const candidate of units) {
@@ -185,62 +336,7 @@ function sortCandidates(units, ownedDPSUnits = []) {
     });
 }
 
-// Defines critical support mechanics per DPS archetype.
-const ARCHETYPE_SUPPORT_NEEDS = {
-    anomaly: ['atk', 'anomaly', 'disorders'],
-    attack: ['atk', 'cr', 'cd', 'stun-multiplier', 'recovery'],
-    rupture: ['sheer', 'cr', 'cd', 'stun-multiplier', 'recovery']
-};
-
-function supportProvidesNeed(support, needKey) {
-    const buf = support.mechanics?.buffs || {};
-    const debuf = support.mechanics?.debuffs || {};
-    const util = support.mechanics?.utility || {};
-    const val = Math.max(w(buf[needKey]), w(debuf[needKey]), w(util[needKey]));
-    return val >= 1;
-}
-
-function findUnmetSupportNeeds(dpsQuality, ownedSupports) {
-    const unmet = [];
-    for (const [archetype, needs] of Object.entries(ARCHETYPE_SUPPORT_NEEDS)) {
-        if (dpsQuality[archetype] < 50) continue;
-        for (const need of needs) {
-            const covered = ownedSupports.some(s => supportProvidesNeed(s, need));
-            if (!covered) {
-                unmet.push({ archetype, need });
-            }
-        }
-    }
-    return unmet;
-}
-
-function rankSupportCandidates(unownedLimitedS, allOwnedDPS, unmetNeeds = null) {
-    let candidates = unownedLimitedS.filter(u =>
-        u.tags.includes('support') || u.tags.includes('defense')
-    );
-
-    if (unmetNeeds && unmetNeeds.length > 0) {
-        const neededArchetypes = new Set(unmetNeeds.map(n => n.archetype));
-        candidates = candidates.filter(c => {
-            const roles = getEffectiveRoles(c);
-            return [...neededArchetypes].some(arch => roles.includes(arch) || c.tags.includes(arch));
-        });
-    }
-
-    return candidates
-        .map(c => {
-            let fit = 0;
-            for (const dps of allOwnedDPS) {
-                fit += mechanicsFitScore(c, dps);
-            }
-            return { unit: c, fit };
-        })
-        .sort((a, b) => {
-            if (a.unit.tier !== b.unit.tier) return a.unit.tier - b.unit.tier;
-            return b.fit - a.fit;
-        })
-        .map(x => x.unit);
-}
+const SUPPORT_GOOD_FIT = 15;
 
 // ============================================================================
 // MAIN ANALYSIS
@@ -328,7 +424,7 @@ export function analyze(allUnits, unitStates, ownedUnits, { maxRecommendations =
     const sortWithDPS = (units) => sortCandidates(units, allOwnedDPS);
 
     detectDPSGaps(gaps, dpsQuality, ownedDPS, unownedLimitedS, sortWithDPS);
-    detectSupportGap(gaps, ownedSupports, dpsQuality, unownedLimitedS, allOwnedDPS);
+    detectSupportGaps(gaps, ownedSupports, ownedDPS, dpsQuality, unownedLimitedS);
     detectStunnerGap(gaps, stunnerQuality, ownedStunners, dpsQuality, unownedLimitedS, sortWithDPS);
     detectStunnerElementGap(gaps, ownedStunners, elementQuality, unownedLimitedS, sortWithDPS);
     detectSubdpsGap(gaps, dpsQuality, ownedSubdps, unownedLimitedS, sortWithDPS);
@@ -525,18 +621,31 @@ export function analyze(allUnits, unitStates, ownedUnits, { maxRecommendations =
         });
     }
 
+    // ── Codependent scaling: post-process recommendations ───────────────────
+    const PRIORITY_DROP = { 'High': 'Medium', 'Medium': 'Low', 'Low': null };
+    for (const rec of recommendations) {
+        const primaryUnit = rec.units[0];
+        if (!primaryUnit) continue;
+        const dep = checkTeamDependencies(primaryUnit, ownedUnits, allUnits);
+        if (dep.hasUnmetDependency || dep.cannotFormTeam) {
+            rec.teamDependencyNotes = dep.notes;
+            rec.priority = PRIORITY_DROP[rec.priority] ?? null;
+        }
+    }
+    const filteredRecommendations = recommendations.filter(r => r.priority !== null);
+
     const limitedSCount = ownedUnits.filter(u => u.rank === 'S' && u.limited).length;
     const highPriorityGapCount = gaps.filter(g => g.priority === 'High').length;
     const assessment = buildAssessment(
         dpsQuality, supportQuality, stunnerQuality, elementQuality,
         compositeScore, limitedSCount,
         { ownedDPS, ownedSupports, ownedStunners },
-        highPriorityGapCount
+        highPriorityGapCount, gaps
     );
 
     return {
         assessment,
-        recommendations,
+        recommendations: filteredRecommendations,
         coverage: {
             dpsQuality, supportQuality, stunnerQuality, elementQuality,
             ownedDPS, ownedSubdps, ownedSupports, ownedStunners, ownedByElement
@@ -586,31 +695,83 @@ function detectDPSGaps(gaps, dpsQuality, ownedDPS, unownedLimitedS, sortCandidat
     }
 }
 
-function detectSupportGap(gaps, ownedSupports, dpsQuality, unownedLimitedS, allOwnedDPS) {
+function detectSupportGaps(gaps, ownedSupports, ownedDPS, dpsQuality, unownedLimitedS) {
     const ownedLimitedSupports = ownedSupports.filter(u => u.rank === 'S' && u.limited);
+    const supportCandidates = unownedLimitedS.filter(u =>
+        u.tags.includes('support') || u.tags.includes('defense')
+    );
+    if (supportCandidates.length === 0) return;
 
+    // General gap: no premium support at all
     if (ownedLimitedSupports.length === 0) {
-        const candidates = rankSupportCandidates(unownedLimitedS, allOwnedDPS);
-        if (candidates.length > 0) {
-            gaps.push({
-                id: 'support', title: 'Premium Support',
-                reason: 'Your roster has no premium supports — a strong support multiplies your existing DPS significantly',
-                score: 80, units: candidates
-            });
-        }
+        gaps.push({
+            id: 'support', title: 'Premium Support',
+            reason: 'Your roster has no premium supports — a strong support multiplies your existing DPS significantly',
+            score: 80,
+            units: [...supportCandidates].sort((a, b) => a.tier - b.tier)
+        });
         return;
     }
 
-    const unmetNeeds = findUnmetSupportNeeds(dpsQuality, ownedSupports);
-    if (unmetNeeds.length === 0) return;
+    // Per-archetype holistic support evaluation —
+    // Only premium (limited S) supports count toward coverage. A-rank supports
+    // are stopgaps and should not mask the need for a proper premium support.
+    const hasFewPremiumSupports = ownedLimitedSupports.length <= 1;
+    const DPS_ARCH_SET = new Set(DPS_ARCHETYPES);
 
-    const score = Math.min(60, 35 + unmetNeeds.length * 8);
-    const needLabels = [...new Set(unmetNeeds.map(n => n.archetype))].map(capitalize);
-    const reason = `Your ${needLabels.join(' and ')} teams could benefit from a more mechanically aligned support`;
+    function canJoinArchetype(unit, arch) {
+        const join = unit.join ?? [];
+        if (join.includes(arch)) return true;
+        // If join doesn't reference any DPS archetype, the unit is not
+        // archetype-restricted (e.g. Nicole joins on assist:evasive).
+        return !join.some(tag => DPS_ARCH_SET.has(tag));
+    }
 
-    const candidates = rankSupportCandidates(unownedLimitedS, allOwnedDPS, unmetNeeds);
-    if (candidates.length > 0) {
-        gaps.push({ id: 'support', title: 'Premium Support', reason, score, units: candidates });
+    for (const arch of DPS_ARCHETYPES) {
+        if (dpsQuality[arch] <= 0) continue;
+
+        const primaryUnits = ownedDPS[arch].filter(u => !isSubdps(u));
+        if (primaryUnits.length === 0) continue;
+        const bestDPS = primaryUnits.reduce((best, u) => u.tier < best.tier ? u : best);
+
+        const archCompatibleOwned = ownedLimitedSupports.filter(s => canJoinArchetype(s, arch));
+        const bestOwnedFit = archCompatibleOwned.reduce(
+            (max, s) => Math.max(max, mechanicsFitScore(s, bestDPS)), 0
+        );
+        if (bestOwnedFit >= SUPPORT_GOOD_FIT) continue;
+
+        const MIN_CANDIDATE_FIT = SUPPORT_GOOD_FIT / 3;
+        const ranked = supportCandidates
+            .filter(c => canJoinArchetype(c, arch))
+            .map(c => ({ unit: c, fit: mechanicsFitScore(c, bestDPS) }))
+            .filter(c => c.fit > bestOwnedFit && c.fit >= MIN_CANDIDATE_FIT)
+            .sort((a, b) => {
+                if (a.unit.tier !== b.unit.tier) return a.unit.tier - b.unit.tier;
+                return b.fit - a.fit;
+            })
+            .map(x => x.unit);
+        if (ranked.length === 0) continue;
+
+        // Fit below a minimum threshold counts as zero — a tiny incidental
+        // contribution (e.g. Lucia's cd:1 for attackers) is not real coverage.
+        const effectiveFit = bestOwnedFit < 5 ? 0 : bestOwnedFit;
+        const coverage = effectiveFit / SUPPORT_GOOD_FIT;
+        // High base when DPS is strong OR when the player has very few premium
+        // supports — a single specialist support leaves other archetypes exposed.
+        const baseScore = (dpsQuality[arch] >= 75 || hasFewPremiumSupports) ? 80 : 65;
+        const score = Math.round(baseScore * (1 - coverage));
+
+        const reason = bestOwnedFit < 5
+            ? `Your ${arch} teams have no well-fitted support — a strong ${arch}-compatible support would be a major upgrade`
+            : `Your best support for ${arch} teams is a weak fit — a better ${arch}-compatible support would significantly improve your teams`;
+
+        gaps.push({
+            id: `support-${arch}`,
+            title: `${capitalize(arch)} Support`,
+            reason,
+            score,
+            units: ranked
+        });
     }
 }
 
@@ -1105,7 +1266,7 @@ function detectDepthGap(gaps, ownedDPS, dpsQuality, unownedLimitedS, sortCandida
 // ROSTER ASSESSMENT
 // ============================================================================
 
-function buildAssessment(dpsQuality, supportQuality, stunnerQuality, elementQuality, compositeScore, limitedSCount, coverage, highPriorityGapCount = 0) {
+function buildAssessment(dpsQuality, supportQuality, stunnerQuality, elementQuality, compositeScore, limitedSCount, coverage, highPriorityGapCount = 0, gaps = []) {
     const totalSCount = coverage.ownedDPS.attack.concat(
         coverage.ownedDPS.anomaly, coverage.ownedDPS.rupture,
         coverage.ownedSupports, coverage.ownedStunners
@@ -1160,8 +1321,14 @@ function buildAssessment(dpsQuality, supportQuality, stunnerQuality, elementQual
         else if (dpsQuality[arch] <= 25) weaknesses.push(`${arch} DPS`);
     }
     const hasSRankSupport = coverage.ownedSupports.some(u => u.rank === 'S');
-    if (supportQuality >= 75 && hasSRankSupport) strengths.push('premium supports');
-    else if (supportQuality <= 25) weaknesses.push('support options');
+    const hasArchetypeSupportGap = gaps.some(g => g.id.startsWith('support-'));
+    if (supportQuality >= 75 && hasSRankSupport && !hasArchetypeSupportGap) {
+        strengths.push('premium supports');
+    } else if (supportQuality >= 75 && hasSRankSupport && hasArchetypeSupportGap) {
+        strengths.push('a premium support, though coverage is narrow');
+    } else if (supportQuality <= 25) {
+        weaknesses.push('support options');
+    }
     const hasSRankStunner = coverage.ownedStunners.some(u => u.rank === 'S');
     if (stunnerQuality >= 75 && hasSRankStunner) strengths.push('solid stunners');
     else if (stunnerQuality <= 10) weaknesses.push('stunner coverage');
