@@ -10,7 +10,8 @@ const PAGE_TITLES = {
     'pull-recommendations': 'Pull Recommendations',
     'team-recommendations': 'Team Recommendations',
     'disc-calculator': 'Disc Calculator',
-    'character-summary': 'Character Summary'
+    'character-summary': 'Character Summary',
+    'tier-list': 'Tier List'
 };
 
 /**

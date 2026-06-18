@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Zenless Zone Zero agent tier list organized by role">
+    <meta name="robots" content="index, follow">
+    <meta name="theme-color" content="#0a0a0f">
+    <link rel="canonical" href="https://njxaxson.github.io/zzz-utils/tier-list.html">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="ZZZ Utils">
+    <meta property="og:title" content="ZZZ Tier List">
+    <meta property="og:description" content="Zenless Zone Zero agent tier list organized by role">
+    <meta property="og:url" content="https://njxaxson.github.io/zzz-utils/tier-list.html">
+    <meta property="og:image" content="https://njxaxson.github.io/zzz-utils/assets/sitelogo.png">
+    <meta property="og:locale" content="en_US">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="ZZZ Tier List">
+    <meta name="twitter:description" content="Zenless Zone Zero agent tier list organized by role">
+    <meta name="twitter:image" content="https://njxaxson.github.io/zzz-utils/assets/sitelogo.png">
+    <title>ZZZ Tier List</title>
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@graph": [
+            {
+                "@type": "WebPage",
+                "name": "ZZZ Tier List",
+                "url": "https://njxaxson.github.io/zzz-utils/tier-list.html",
+                "description": "Zenless Zone Zero agent tier list organized by role",
+                "inLanguage": "en",
+                "about": {
+                    "@type": "VideoGame",
+                    "name": "Zenless Zone Zero",
+                    "alternateName": "ZZZ",
+                    "publisher": {
+                        "@type": "Organization",
+                        "name": "HoYoverse"
+                    }
+                },
+                "author": {
+                    "@type": "Person",
+                    "name": "njxaxson"
+                }
+            },
+            {
+                "@type": "BreadcrumbList",
+                "itemListElement": [
+                    { "@type": "ListItem", "position": 1, "name": "ZZZ Utils", "item": "https://njxaxson.github.io/zzz-utils/" },
+                    { "@type": "ListItem", "position": 2, "name": "Tier List", "item": "https://njxaxson.github.io/zzz-utils/tier-list.html" }
+                ]
+            }
+        ]
+    }
+    </script>
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+    <link rel="stylesheet" href="styles/style.css">
+</head>
+<body>
+    <div class="container extra-wide">
+        <div id="header-container"></div>
+
+        <main>
+            <div class="tier-list-intro">
+                <p>
+                    This tier list reflects general agent strength across endgame content, as well as how much value that they provide your account. 
+                    Placements consider team flexibility, damage ceiling, and utility. Individual performance may vary based on player skill, account
+                    investment and team composition, and endgame viability also depends heavily on specific buffs and shills; so take that into 
+                    consideration. 
+                </p>
+                <br/>
+                <p>
+                    Also, at the end of the day, you could also just think of it as my hot take. ;)
+                </p>
+            </div>
+
+            <div class="tier-list-grid" id="tier-list-grid">
+                <div class="loading-msg">Loading tier list...</div>
+            </div>
+        </main>
+
+        <div id="footer-container"></div>
+    </div>
+
+    <script type="module">
+        import { loadSharedComponents } from './lib/common/components.js';
+        loadSharedComponents('tier-list');
+    </script>
+    <script type="module" src="lib/pages/tier-list.js"></script>
+</body>
+</html>

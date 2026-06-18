@@ -4362,3 +4362,176 @@ button#simulate-btn:disabled,
         font-size: 0.55rem;
     }
 }
+
+/* ==========================================================================
+   TIER LIST PAGE
+   ========================================================================== */
+
+.tier-list-intro {
+    margin-bottom: 1.5rem;
+    padding: 1rem 1.25rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+.tier-list-intro p {
+    margin: 0;
+}
+
+.tier-list-grid {
+    display: grid;
+    grid-template-columns: auto 2fr 1fr 1fr;
+    gap: 0;
+    background: transparent;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.tier-list-header {
+    background: var(--accent-primary);
+    padding: 0.7rem 1rem;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--bg-primary);
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    border-radius: 4px;
+    margin-left: 0.4rem;
+}
+
+.tier-list-header:nth-child(2) {
+    margin-left: 0;
+}
+
+.tier-list-header.tier-label-cell {
+    background: transparent;
+}
+
+.tier-row {
+    display: contents;
+}
+
+.tier-list-row {
+    display: contents;
+}
+
+.tier-label-cell {
+    padding: 0.75rem 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    min-width: 60px;
+    background: transparent;
+    margin-top: 0.5rem;
+}
+
+.tier-label {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+
+.tier-label[data-tier="0"]   { color: #4cff7c; }
+.tier-label[data-tier="0.5"] { color: #7cef5c; }
+.tier-label[data-tier="1"]   { color: #a8e04a; }
+.tier-label[data-tier="1.5"] { color: #c8cc3e; }
+.tier-label[data-tier="2"]   { color: #e0b434; }
+.tier-label[data-tier="2.5"] { color: #e88c2c; }
+.tier-label[data-tier="3"]   { color: #d9633a; }
+.tier-label[data-tier="3.5"] { color: #c44040; }
+.tier-label[data-tier="4"]   { color: #994444; }
+
+.tier-cell {
+    padding: 0.75rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: flex-start;
+    align-content: flex-start;
+    min-height: 70px;
+    margin-top: 0.5rem;
+    border-radius: 4px;
+    margin-left: 0.4rem;
+}
+
+.tier-cell[data-col="0"] {
+    margin-left: 0;
+}
+
+.tier-row[data-tier="0"] .tier-label-cell   { border-right: 4px solid #4cff7c; }
+.tier-row[data-tier="0.5"] .tier-label-cell { border-right: 4px solid #7cef5c; }
+.tier-row[data-tier="1"] .tier-label-cell   { border-right: 4px solid #a8e04a; }
+.tier-row[data-tier="1.5"] .tier-label-cell { border-right: 4px solid #c8cc3e; }
+.tier-row[data-tier="2"] .tier-label-cell   { border-right: 4px solid #e0b434; }
+.tier-row[data-tier="2.5"] .tier-label-cell { border-right: 4px solid #e88c2c; }
+.tier-row[data-tier="3"] .tier-label-cell   { border-right: 4px solid #d9633a; }
+.tier-row[data-tier="3.5"] .tier-label-cell { border-right: 4px solid #c44040; }
+.tier-row[data-tier="4"] .tier-label-cell   { border-right: 4px solid #994444; }
+
+.tier-row[data-tier="0"] .tier-cell   { background: rgba(76, 255, 124, 0.15); }
+.tier-row[data-tier="0.5"] .tier-cell { background: rgba(124, 239, 92, 0.15); }
+.tier-row[data-tier="1"] .tier-cell   { background: rgba(168, 224, 74, 0.15); }
+.tier-row[data-tier="1.5"] .tier-cell { background: rgba(200, 204, 62, 0.15); }
+.tier-row[data-tier="2"] .tier-cell   { background: rgba(224, 180, 52, 0.15); }
+.tier-row[data-tier="2.5"] .tier-cell { background: rgba(232, 140, 44, 0.15); }
+.tier-row[data-tier="3"] .tier-cell   { background: rgba(217, 99, 58, 0.15); }
+.tier-row[data-tier="3.5"] .tier-cell { background: rgba(196, 64, 64, 0.15); }
+.tier-row[data-tier="4"] .tier-cell   { background: rgba(153, 68, 68, 0.15); }
+
+.tier-list-grid .unit-card {
+    width: 70px;
+    cursor: default;
+}
+
+.tier-list-grid .unit-card:hover {
+    transform: none;
+    box-shadow: none;
+}
+
+@media (max-width: 900px) {
+    .tier-list-grid .unit-card {
+        width: 60px;
+    }
+
+    .tier-label-cell {
+        min-width: 45px;
+        padding: 0.5rem;
+    }
+
+    .tier-label {
+        font-size: 0.75rem;
+    }
+}
+
+@media (max-width: 600px) {
+    .tier-list-grid .unit-card {
+        width: 50px;
+    }
+
+    .tier-cell {
+        padding: 0.5rem;
+        gap: 0.4rem;
+    }
+
+    .tier-list-header {
+        font-size: 0.7rem;
+        padding: 0.5rem 0.4rem;
+    }
+
+    .tier-label-cell {
+        min-width: 36px;
+        padding: 0.4rem;
+    }
+
+    .tier-label {
+        font-size: 0.65rem;
+    }
+}
