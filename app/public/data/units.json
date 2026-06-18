@@ -191,7 +191,7 @@
         "join": ["stun", "electric"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
-            "pseudoRole": ["subdps"],
+            "pseudoRole": [{ "role": "subdps", "when": { "hasUnit": "seed" } }],
             "buffs": { "cr": 1 },
             "debuffs": { "electric": 2 },
             "utility": { "daze": 1, "veils": 1 }
