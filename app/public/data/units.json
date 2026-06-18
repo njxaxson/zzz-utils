@@ -151,7 +151,7 @@
         "rank": "S",
         "limited": true,
         "tier": 1.5,
-        "tags": ["anomaly", "fire", "assist:evasive"],
+        "tags": ["anomaly", "fire", "assist:defensive"],
         "join": ["anomaly", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
