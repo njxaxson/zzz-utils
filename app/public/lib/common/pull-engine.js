@@ -6,7 +6,6 @@
 
 import { ELEMENTS, DPS_ROLES } from './constants.js';
 import {
-    hasSubDPSRole,
     getElement,
     getEffectiveScaling,
     getEffectiveRoles
@@ -52,8 +51,21 @@ export function getBestTier(units) {
     return Math.min(...units.map(u => u.tier));
 }
 
-export function isSubdps(unit) {
-    return hasSubDPSRole(unit);
+export function isSubdps(unit, team = null) {
+    const pr = unit.mechanics?.pseudoRole;
+    if (!Array.isArray(pr)) return false;
+    return pr.some(entry => {
+        const role = typeof entry === 'string' ? entry : entry?.role;
+        if (role !== 'subdps') return false;
+        if (typeof entry === 'string' || !entry?.when) return true;
+        if (team === null) return false;
+        const when = entry.when;
+        if (when.hasUnit !== undefined) return team.some(u => u.id === when.hasUnit);
+        if (when.countTag !== undefined) {
+            return team.filter(u => u.tags.includes(when.countTag)).length >= (when.minCount ?? 1);
+        }
+        return false;
+    });
 }
 
 export function isTitled(unit) {
@@ -369,7 +381,7 @@ export function analyze(allUnits, unitStates, ownedUnits, { maxRecommendations =
                 }
             }
         }
-        if (isSubdps(unit)) {
+        if (isSubdps(unit, ownedUnits)) {
             if (unit.tags.includes('anomaly')) ownedSubdps.anomaly.push(unit);
             if (unit.tags.includes('attack')) ownedSubdps.attack.push(unit);
         }
@@ -427,7 +439,7 @@ export function analyze(allUnits, unitStates, ownedUnits, { maxRecommendations =
     detectSupportGaps(gaps, ownedSupports, ownedDPS, dpsQuality, unownedLimitedS);
     detectStunnerGap(gaps, stunnerQuality, ownedStunners, dpsQuality, unownedLimitedS, sortWithDPS);
     detectStunnerElementGap(gaps, ownedStunners, elementQuality, unownedLimitedS, sortWithDPS);
-    detectSubdpsGap(gaps, dpsQuality, ownedSubdps, unownedLimitedS, sortWithDPS);
+    detectSubdpsGap(gaps, dpsQuality, ownedSubdps, unownedLimitedS, sortWithDPS, ownedUnits);
     detectAnomalyPartnerGap(gaps, ownedUnits, ownedDPS, ownedSubdps, unownedLimitedS, dpsQuality);
     detectElementGaps(gaps, elementQuality, unownedLimitedS, sortWithDPS);
     detectSynergies(gaps, ownedUnits, unownedLimitedS, unitByName, ownedByName, dpsQuality, elementQuality);
@@ -808,7 +820,7 @@ function detectStunnerGap(gaps, stunnerQuality, ownedStunners, dpsQuality, unown
     }
 }
 
-function detectSubdpsGap(gaps, dpsQuality, ownedSubdps, unownedLimitedS, sortCandidatesFn) {
+function detectSubdpsGap(gaps, dpsQuality, ownedSubdps, unownedLimitedS, sortCandidatesFn, ownedUnits) {
     const anomBest = getBestTier(ownedSubdps.anomaly);
     const anomSubdpsQuality = anomBest !== null ? tierToQuality(anomBest) : 0;
     if (dpsQuality.anomaly >= 50 && anomSubdpsQuality < 40) {
@@ -817,7 +829,7 @@ function detectSubdpsGap(gaps, dpsQuality, ownedSubdps, unownedLimitedS, sortCan
             ? 'Anomaly teams perform best with two anomaly agents — you need a sub-DPS partner'
             : 'Anomaly teams perform best with two anomaly agents — your current sub-DPS is too weak to reliably fill this role';
         const candidates = sortCandidatesFn(
-            unownedLimitedS.filter(u => u.tags.includes('anomaly') && isSubdps(u))
+            unownedLimitedS.filter(u => u.tags.includes('anomaly') && isSubdps(u, ownedUnits))
         );
         if (candidates.length > 0) {
             gaps.push({
@@ -834,7 +846,7 @@ function detectSubdpsGap(gaps, dpsQuality, ownedSubdps, unownedLimitedS, sortCan
     const atkSubdpsQuality = atkBest !== null ? tierToQuality(atkBest) : 0;
     if (dpsQuality.attack >= 75 && atkSubdpsQuality < 50) {
         const candidates = sortCandidatesFn(
-            unownedLimitedS.filter(u => u.tags.includes('attack') && isSubdps(u))
+            unownedLimitedS.filter(u => u.tags.includes('attack') && isSubdps(u, ownedUnits))
         );
         if (candidates.length > 0) {
             gaps.push({

@@ -1210,16 +1210,16 @@ async function main() {
     });
 
     // ========================================================================
-    // TEST 55: Ramiel triple-anomaly >> Ramiel wheelchair (Vivian/Yuzuha)
+    // TEST 55: Ramiel triple-anomaly >> Ramiel wheelchair (Velina/Yuzuha)
     // ========================================================================
-    // Triple-anomaly (Alice/Remielle/Vivian) should beat the Vivian+Yuzuha
+    // Triple-anomaly (Alice/Remielle/Velina) should beat the Velina+Yuzuha
     // wheelchair (Remielle/Vivian/Yuzuha) because Remielle's conditional ATK
     // buff is maximized (atk:4) on triple-anomaly vs only atk:2 on the wheelchair,
     // and the underutilization penalty penalizes the wheelchair team.
-    run('TEST 55: Triple-anomaly Ramiel >= Ramiel/Vivian/Yuzuha wheelchair', () => {
+    run('TEST 55: Triple-anomaly Ramiel >= Ramiel/Velina/Yuzuha wheelchair', () => {
         const b = NEUTRAL_BOSS;
-        const avr = scoreTeamForBoss(scoreForTeamString('Alice/Remielle/Vivian', allUnits, { preview: true })[0].team, b, {});
-        const rvy = scoreTeamForBoss(scoreForTeamString('Remielle/Vivian/Yuzuha', allUnits, { preview: true })[0].team, b, {});
+        const avr = scoreTeamForBoss(scoreForTeamString('Alice/Remielle/Velina', allUnits, { preview: true })[0].team, b, {});
+        const rvy = scoreTeamForBoss(scoreForTeamString('Remielle/Velina/Yuzuha', allUnits, { preview: true })[0].team, b, {});
         assert(avr >= rvy, `Triple-anomaly AVR(${avr}) should be >= wheelchair RVY(${rvy})`);
     });
 

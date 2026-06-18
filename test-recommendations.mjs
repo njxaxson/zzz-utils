@@ -86,9 +86,9 @@ async function runTest(num, name, fn) {
 
 console.log('Pull Engine Tests\n');
 
-// TEST 1
-await runTest(1, 'isSubdps correctness', () => {
-    const subdpsNames = ['Burnice', 'Vivian', 'Grace', 'Cissia', 'Orphie', 'Velina'];
+// PRE-TEST 0: unit-level sanity check for isSubdps
+await runTest(0, 'isSubdps correctness (pre-test)', () => {
+    const subdpsNames = ['Burnice', 'Vivian', 'Grace', 'Orphie', 'Velina'];
     const primaryNames = ['Miyabi', 'Evelyn', 'SAnby'];
     for (const name of subdpsNames) {
         const u = unitByName(allUnits, name);
@@ -100,10 +100,117 @@ await runTest(1, 'isSubdps correctness', () => {
         assert(u, `missing unit ${name}`);
         assert(!isSubdps(u), `${name} should not be subdps`);
     }
+    const cissia = unitByName(allUnits, 'Cissia');
+    assert(cissia, 'missing unit Cissia');
+    assert(!isSubdps(cissia), 'Cissia should not be subdps without Seed');
+    const seed = unitByName(allUnits, 'Seed');
+    if (seed) {
+        assert(isSubdps(cissia, [seed]), 'Cissia should be subdps when Seed is in the team');
+    }
+    const yanagi = unitByName(allUnits, 'Yanagi');
+    assert(yanagi, 'missing unit Yanagi');
+    assert(!isSubdps(yanagi), 'Yanagi should not be subdps without Miyabi');
+    const miyabi = unitByName(allUnits, 'Miyabi');
+    if (miyabi) {
+        assert(isSubdps(yanagi, [miyabi]), 'Yanagi should be subdps when Miyabi is in the team');
+    }
 });
 
-// TEST 2
-await runTest(2, 'Empty roster gap detection', () => {
+// ===========================================================================
+// TESTS 1-7: Conditional subdps in pull recommendations (integration)
+// ===========================================================================
+// Verifies that the recommendation engine correctly accounts for conditional
+// subdps roles when assessing roster coverage and generating candidates.
+
+await runTest(1, 'Yanagi counts as anomaly subdps when Miyabi is owned', () => {
+    const { unitStates, ownedUnits } = buildSyntheticRoster(
+        allUnits, ['Miyabi', 'Yanagi', 'Nicole', 'Anby', 'Billy']
+    );
+    const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 20 });
+    assert(!hasGap(result, 'subdps-anomaly'),
+        'subdps-anomaly gap should NOT fire — Yanagi fills the subdps role when Miyabi is present');
+});
+
+await runTest(2, 'Yanagi does NOT count as subdps without Miyabi', () => {
+    const { unitStates, ownedUnits } = buildSyntheticRoster(
+        allUnits, ['Yanagi', 'Aria', 'Nicole', 'Anby', 'Billy']
+    );
+    const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 20 });
+    // Yanagi (T1) + Aria (T0.5) give anomaly quality >= 50, triggering subdps check
+    // But Yanagi without Miyabi is primary only — no subdps coverage
+    if (result.coverage.dpsQuality.anomaly >= 50) {
+        assert(hasGap(result, 'subdps-anomaly'),
+            'subdps-anomaly gap SHOULD fire — Yanagi without Miyabi is primary only');
+    }
+});
+
+await runTest(3, 'Yanagi recommended as subdps when Miyabi is owned', () => {
+    const { unitStates, ownedUnits } = buildSyntheticRoster(
+        allUnits, ['Miyabi', 'Nicole', 'Anby', 'Billy']
+    );
+    const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 20 });
+    const gap = findGap(result, 'subdps-anomaly');
+    assert(gap, 'subdps-anomaly gap should fire — Miyabi has no subdps partner');
+    const yanagi = gap.units.find(u => u.id === 'yanagi');
+    assert(yanagi, 'Yanagi should appear as a subdps-anomaly candidate (her condition is met by owned Miyabi)');
+});
+
+await runTest(4, 'Yanagi NOT a subdps candidate without Miyabi in roster', () => {
+    const { unitStates, ownedUnits } = buildSyntheticRoster(
+        allUnits, ['Aria', 'Nicole', 'Anby', 'Billy']
+    );
+    const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 20 });
+    const gap = findGap(result, 'subdps-anomaly');
+    if (gap) {
+        const yanagi = gap.units.find(u => u.id === 'yanagi');
+        assert(!yanagi, 'Yanagi should NOT appear as subdps candidate — no Miyabi to activate her conditional role');
+    }
+});
+
+await runTest(5, 'Cissia counts as attack subdps when Seed is owned', () => {
+    // Owned coverage: Cissia fills subdps role, gap should not fire
+    const { unitStates, ownedUnits } = buildSyntheticRoster(
+        allUnits, ['Evelyn', 'Cissia', 'Seed', 'Nicole', 'Anby', 'Billy']
+    );
+    const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 20 });
+    assert(!hasGap(result, 'subdps-attack'),
+        'subdps-attack gap should NOT fire — Cissia fills the subdps role when Seed is present');
+
+    // Candidate: without Cissia but with Seed, Cissia should appear as a candidate
+    const { unitStates: us2, ownedUnits: ou2 } = buildSyntheticRoster(
+        allUnits, ['Evelyn', 'Seed', 'Nicole', 'Anby', 'Billy']
+    );
+    const result2 = analyze(allUnits, us2, ou2, { maxRecommendations: 20 });
+    const gap = findGap(result2, 'subdps-attack');
+    if (gap) {
+        const cissia = gap.units.find(u => u.id === 'cissia');
+        assert(cissia, 'Cissia should appear as subdps-attack candidate when Seed is owned');
+    }
+});
+
+await runTest(6, 'Cissia NOT a subdps candidate without Seed in roster', () => {
+    const { unitStates, ownedUnits } = buildSyntheticRoster(
+        allUnits, ['Evelyn', 'Nicole', 'Anby', 'Billy']
+    );
+    const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 20 });
+    const gap = findGap(result, 'subdps-attack');
+    if (gap) {
+        const cissia = gap.units.find(u => u.id === 'cissia');
+        assert(!cissia, 'Cissia should NOT appear as attack subdps candidate — no Seed to activate her conditional role');
+    }
+});
+
+await runTest(7, 'Enabler still recommended via primary gap', () => {
+    const { unitStates, ownedUnits } = buildSyntheticRoster(
+        allUnits, ['Yanagi', 'Nicole', 'Anby', 'Billy']
+    );
+    const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 20 });
+    const miyabiRec = result.recommendations.find(r => r.units.some(u => u.id === 'miyabi'));
+    assert(miyabiRec, 'Miyabi should be recommended (T0 anomaly DPS fills the dps-anomaly gap)');
+});
+
+// TEST 8
+await runTest(8, 'Empty roster gap detection', () => {
     const { unitStates, ownedUnits } = buildSyntheticRoster(allUnits, ['Nicole', 'Anby', 'Billy']);
     const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 20 });
     assert(hasGap(result, 'dps-attack'), 'expected attack DPS gap');
@@ -114,8 +221,8 @@ await runTest(2, 'Empty roster gap detection', () => {
     assert(high.length >= 3, `expected multiple high-priority recs, got ${high.length}`);
 });
 
-// TEST 3
-await runTest(3, 'Attack-only roster', () => {
+// TEST 9
+await runTest(9, 'Attack-only roster', () => {
     const { unitStates, ownedUnits } = buildSyntheticRoster(
         allUnits, ['Evelyn', 'Dialyn', 'Astra', 'Nicole', 'Anby', 'Billy']
     );
@@ -130,8 +237,8 @@ await runTest(3, 'Attack-only roster', () => {
     assert(!reasons.includes('Lucia'), 'reasons should not reference Lucia by name');
 });
 
-// TEST 4
-await runTest(4, 'Anomaly-loaded roster', () => {
+// TEST 10
+await runTest(10, 'Anomaly-loaded roster', () => {
     const { unitStates, ownedUnits } = buildSyntheticRoster(
         allUnits, ['Miyabi', 'Nangong', 'Yuzuha', 'Vivian', 'Nicole', 'Anby', 'Billy']
     );
@@ -146,8 +253,8 @@ await runTest(4, 'Anomaly-loaded roster', () => {
     assert(hasAttackOrRuptureRec, 'should recommend attack or rupture DPS');
 });
 
-// TEST 5
-await runTest(5, 'Support gap mechanics', () => {
+// TEST 11
+await runTest(11, 'Support gap mechanics', () => {
     const { unitStates, ownedUnits } = buildSyntheticRoster(
         allUnits, ['Miyabi', 'Yixuan', 'Evelyn', 'Koleda', 'Nicole', 'Anby', 'Billy']
     );
@@ -159,8 +266,8 @@ await runTest(5, 'Support gap mechanics', () => {
     assert(supportGap.units.length > 0, 'support gap should list candidates');
 });
 
-// TEST 6
-await runTest(6, 'Wind element coverage', () => {
+// TEST 12
+await runTest(12, 'Wind element coverage', () => {
     const { unitStates, ownedUnits } = buildSyntheticRoster(
         allUnits, ['Miyabi', 'Evelyn', 'Dialyn', 'Nicole', 'Anby', 'Billy']
     );
@@ -173,8 +280,8 @@ await runTest(6, 'Wind element coverage', () => {
     }
 });
 
-// TEST 7
-await runTest(7, 'Loaded roster still produces recommendations', () => {
+// TEST 13
+await runTest(13, 'Loaded roster still produces recommendations', () => {
     const { unitStates, ownedUnits } = buildSyntheticRoster(
         allUnits, ['Miyabi', 'Nangong', 'Yuzuha', 'Astra', 'Yixuan', 'Dialyn', 'Evelyn', 'Trigger', 'SAnby', 'Lucia', 'Nicole', 'Anby', 'Billy']
     );
@@ -189,8 +296,8 @@ await runTest(7, 'Loaded roster still produces recommendations', () => {
     assert(scored.length >= 3, 'at least 3 recommendations with score > 0');
 });
 
-// TEST 8
-await runTest(8, 'Mechanics synergy detection', () => {
+// TEST 14
+await runTest(14, 'Mechanics synergy detection', () => {
     const { unitStates, ownedUnits } = buildSyntheticRoster(
         allUnits, ['SAnby', 'Trigger', 'Astra', 'Nicole', 'Anby', 'Billy']
     );
@@ -203,8 +310,8 @@ await runTest(8, 'Mechanics synergy detection', () => {
     assert(orphieGap.score >= 15, `Orphie synergy score too low: ${orphieGap.score}`);
 });
 
-// TEST 9
-await runTest(9, 'SubDPS not counted as primary', () => {
+// TEST 15
+await runTest(15, 'SubDPS not counted as primary', () => {
     const { unitStates, ownedUnits } = buildSyntheticRoster(
         allUnits, ['Vivian', 'Nicole', 'Anby', 'Billy']
     );
@@ -214,8 +321,8 @@ await runTest(9, 'SubDPS not counted as primary', () => {
     assert(hasGap(result, 'dps-anomaly'), 'should recommend primary anomaly DPS');
 });
 
-// TEST 10
-await runTest(10, 'Calibration does not flatten loaded rosters', () => {
+// TEST 16
+await runTest(16, 'Calibration does not flatten loaded rosters', () => {
     const loadedNames = [
         'Miyabi', 'Nangong', 'Yuzuha', 'Astra', 'Yixuan', 'Dialyn',
         'Evelyn', 'Trigger', 'SAnby', 'Lucia', 'Yanagi', 'Burnice',
@@ -230,8 +337,8 @@ await runTest(10, 'Calibration does not flatten loaded rosters', () => {
     assert(spread > 15, `gap score spread should be > 15, got ${spread}`);
 });
 
-// TEST 11a
-await runTest(11, '11a: No disorder partner', () => {
+// TEST 17
+await runTest(17, 'No disorder partner', () => {
     const { unitStates, ownedUnits } = buildSyntheticRoster(allUnits, ['Miyabi', 'Nicole', 'Anby', 'Billy']);
     const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 20 });
     const gap = findGap(result, 'anomaly-partner');
@@ -241,8 +348,8 @@ await runTest(11, '11a: No disorder partner', () => {
     assert(ids.includes('burnice') || ids.includes('vivian'), 'expected Burnice or Vivian as candidate');
 });
 
-// TEST 11b
-await runTest(12, '11b: Same-element sub-DPS', () => {
+// TEST 18
+await runTest(18, 'Same-element sub-DPS', () => {
     const { unitStates, ownedUnits } = buildSyntheticRoster(
         allUnits, ['Yanagi', 'Grace', 'Nicole', 'Anby', 'Billy']
     );
@@ -253,10 +360,10 @@ await runTest(12, '11b: Same-element sub-DPS', () => {
         `expected element or tier reason, got: ${gap.reason}`);
 });
 
-// TEST 11c
-await runTest(13, '11c: Weak sub-DPS (T3) still fires gap', () => {
+// TEST 19
+await runTest(19, 'Weak sub-DPS still fires anomaly-partner gap', () => {
     const { unitStates, ownedUnits } = buildSyntheticRoster(
-        allUnits, ['Miyabi', 'Yanagi', 'Grace', 'Nicole', 'Anby', 'Billy']
+        allUnits, ['Miyabi', 'Grace', 'Nicole', 'Anby', 'Billy']
     );
     const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 20 });
     const gap = findGap(result, 'anomaly-partner');
@@ -264,8 +371,8 @@ await runTest(13, '11c: Weak sub-DPS (T3) still fires gap', () => {
     assert(gap.reason.includes('low-tier'), `expected low-tier reason, got: ${gap.reason}`);
 });
 
-// TEST 11d
-await runTest(14, '11d: Pseudo-anomaly mitigates gap', () => {
+// TEST 20
+await runTest(20, 'Pseudo-anomaly mitigates gap', () => {
     const { unitStates, ownedUnits } = buildSyntheticRoster(
         allUnits, ['Miyabi', 'Nangong', 'Nicole', 'Anby', 'Billy']
     );
@@ -274,8 +381,8 @@ await runTest(14, '11d: Pseudo-anomaly mitigates gap', () => {
         'anomaly-partner gap should not fire with Nangong pseudo-anomaly partner');
 });
 
-// TEST 11e
-await runTest(15, '11e: Strong partner covers holistically', () => {
+// TEST 21
+await runTest(21, 'Strong partner covers holistically', () => {
     const { unitStates, ownedUnits } = buildSyntheticRoster(
         allUnits, ['Miyabi', 'Aria', 'Vivian', 'Nicole', 'Anby', 'Billy']
     );
@@ -284,8 +391,8 @@ await runTest(15, '11e: Strong partner covers holistically', () => {
         'anomaly-partner gap should not fire with strong Vivian cross-element partner');
 });
 
-// TEST 11f
-await runTest(16, '11f: Full coverage with Burnice', () => {
+// TEST 22
+await runTest(22, 'Full coverage with Burnice', () => {
     const { unitStates, ownedUnits } = buildSyntheticRoster(
         allUnits, ['Miyabi', 'Yanagi', 'Burnice', 'Nicole', 'Anby', 'Billy']
     );
@@ -294,8 +401,8 @@ await runTest(16, '11f: Full coverage with Burnice', () => {
         'anomaly-partner gap should not fire with Burnice fire partner');
 });
 
-// TEST 11g
-await runTest(17, '11g: No primary anomaly DPS', () => {
+// TEST 23
+await runTest(23, 'No primary anomaly DPS — partner gap skipped', () => {
     const { unitStates, ownedUnits } = buildSyntheticRoster(
         allUnits, ['Evelyn', 'Dialyn', 'Trigger', 'Astra', 'Vivian', 'Nicole', 'Anby', 'Billy']
     );
@@ -304,8 +411,8 @@ await runTest(17, '11g: No primary anomaly DPS', () => {
         'anomaly-partner gap should not fire without primary anomaly DPS');
 });
 
-// TEST 11h
-await runTest(18, '11h: Candidate ranking by element match', () => {
+// TEST 24
+await runTest(24, 'Candidate ranking by element match', () => {
     const { unitStates, ownedUnits } = buildSyntheticRoster(
         allUnits, ['Aria', 'Nicole', 'Anby', 'Billy']
     );
@@ -321,7 +428,7 @@ await runTest(18, '11h: Candidate ranking by element match', () => {
     }
 });
 
-// TEST 19
+// TEST 25
 // Regression: exact roster from diagnostic output.
 // Bug 1 — Burnice (T1.5) is owned, so the subdps-anomaly gap should not fire and
 //          Vivian should not surface as a top-10 recommendation via that gap.
@@ -329,7 +436,7 @@ await runTest(18, '11h: Candidate ranking by element match', () => {
 //          provides strictly better mechanical fit with SAnby than Ju Fufu does.
 //          The mech-synergy-sanby gap must not exist; Ju Fufu's only remaining signal
 //          should be the lower-weight rupture-tag affinity gap, not the mechanical one.
-await runTest(19, 'Loaded roster: subdps-anomaly and mech-synergy-sanby bugs fixed', () => {
+await runTest(25, 'Loaded roster: subdps-anomaly and mech-synergy-sanby bugs fixed', () => {
     const rosterNames = [
         // Limited S (18)
         'Astra', 'Banyue', 'Burnice', 'Caesar', 'Cissia', 'Ellen', 'Jane Doe',
@@ -368,7 +475,7 @@ await runTest(19, 'Loaded roster: subdps-anomaly and mech-synergy-sanby bugs fix
 });
 
 // ===========================================================================
-// TESTS 20-23: Codependent scaling (YSG veil dependency)
+// TESTS 26-29: Codependent scaling (YSG veil dependency)
 // ===========================================================================
 //
 // Limited roster that has no adequate veil provider (Cissia has veils:1 < YSG's
@@ -380,7 +487,7 @@ const CODEPENDENT_ROSTER = [
     'Nicole', 'Pan Yinhu', 'Pulchra', 'Seth', 'Soukaku'
 ];
 
-await runTest(20, 'YSG codependent — unmet veil dependency drops priority', () => {
+await runTest(26, 'YSG codependent — unmet veil dependency drops priority', () => {
     const { unitStates, ownedUnits } = buildSyntheticRoster(allUnits, CODEPENDENT_ROSTER);
     const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 15 });
 
@@ -398,7 +505,7 @@ await runTest(20, 'YSG codependent — unmet veil dependency drops priority', ()
         `YSG priority should have been downgraded, got ${ysgRec.priority}`);
 });
 
-await runTest(21, 'YSG codependent — Sunna in roster satisfies dependency', () => {
+await runTest(27, 'YSG codependent — Sunna in roster satisfies dependency', () => {
     const roster = [...CODEPENDENT_ROSTER, 'Sunna'];
     const { unitStates, ownedUnits } = buildSyntheticRoster(allUnits, roster);
     const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 15 });
@@ -410,7 +517,7 @@ await runTest(21, 'YSG codependent — Sunna in roster satisfies dependency', ()
     }
 });
 
-await runTest(22, 'YSG codependent — Zhao in roster satisfies dependency', () => {
+await runTest(28, 'YSG codependent — Zhao in roster satisfies dependency', () => {
     const roster = [...CODEPENDENT_ROSTER, 'Zhao'];
     const { unitStates, ownedUnits } = buildSyntheticRoster(allUnits, roster);
     const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 15 });
@@ -422,7 +529,7 @@ await runTest(22, 'YSG codependent — Zhao in roster satisfies dependency', () 
     }
 });
 
-await runTest(23, 'Aria has no codependent flag — no dependency check runs', () => {
+await runTest(29, 'Aria has no codependent flag — no dependency check runs', () => {
     // Put Aria on a synthetic banner to ensure she gets assessed for tile verdicts
     const { unitStates, ownedUnits } = buildSyntheticRoster(allUnits, CODEPENDENT_ROSTER);
     const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 15 });
@@ -441,10 +548,10 @@ await runTest(23, 'Aria has no codependent flag — no dependency check runs', (
 });
 
 // ===========================================================================
-// TESTS 24-29: Per-archetype support coverage
+// TESTS 30-35: Per-archetype support coverage
 // ===========================================================================
 
-await runTest(24, 'Support coverage — Lucia alone does NOT cover attack support', () => {
+await runTest(30, 'Support coverage — Lucia alone does NOT cover attack support', () => {
     const roster = ['Evelyn', 'Lucia', 'Koleda', 'Nicole', 'Anby', 'Billy'];
     const { unitStates, ownedUnits } = buildSyntheticRoster(allUnits, roster);
     const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 15 });
@@ -457,7 +564,7 @@ await runTest(24, 'Support coverage — Lucia alone does NOT cover attack suppor
     assert(sunna, 'Sunna should appear as a candidate in the support-attack gap');
 });
 
-await runTest(25, 'Support coverage — Astra covers attack support', () => {
+await runTest(31, 'Support coverage — Astra covers attack support', () => {
     const roster = ['Evelyn', 'Astra', 'Koleda', 'Nicole', 'Anby', 'Billy'];
     const { unitStates, ownedUnits } = buildSyntheticRoster(allUnits, roster);
     const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 15 });
@@ -466,7 +573,7 @@ await runTest(25, 'Support coverage — Astra covers attack support', () => {
         'support-attack gap should NOT fire — Astra is a strong fit for attack teams');
 });
 
-await runTest(26, 'Support coverage — Yuzuha alone does NOT cover rupture support', () => {
+await runTest(32, 'Support coverage — Yuzuha alone does NOT cover rupture support', () => {
     const roster = ['Yixuan', 'Yuzuha', 'Dialyn', 'Nicole', 'Anby', 'Billy'];
     const { unitStates, ownedUnits } = buildSyntheticRoster(allUnits, roster);
     const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 15 });
@@ -479,7 +586,7 @@ await runTest(26, 'Support coverage — Yuzuha alone does NOT cover rupture supp
     assert(lucia, 'Lucia should appear as a candidate in the support-rupture gap');
 });
 
-await runTest(27, 'Support coverage — Sunna is a High recommendation when Lucia is the only premium support', () => {
+await runTest(33, 'Support coverage — Sunna is a High recommendation when Lucia is the only premium support', () => {
     const { unitStates, ownedUnits } = buildSyntheticRoster(allUnits, CODEPENDENT_ROSTER);
     const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 15 });
 
@@ -503,7 +610,7 @@ await runTest(27, 'Support coverage — Sunna is a High recommendation when Luci
     assert(sunnaRec, 'Sunna should appear in a recommendation card');
 });
 
-await runTest(28, 'Support coverage — Astra is a High recommendation when Lucia is the only premium support', () => {
+await runTest(34, 'Support coverage — Astra is a High recommendation when Lucia is the only premium support', () => {
     const { unitStates, ownedUnits } = buildSyntheticRoster(allUnits, CODEPENDENT_ROSTER);
     const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 15 });
 
@@ -522,7 +629,7 @@ await runTest(28, 'Support coverage — Astra is a High recommendation when Luci
     assert(astraRec, 'Astra should appear in a recommendation card');
 });
 
-await runTest(29, 'Support coverage — Lucia recommended for rupture, Sunna excluded (join incompatible)', () => {
+await runTest(35, 'Support coverage — Lucia recommended for rupture, Sunna excluded (join incompatible)', () => {
     // Codependent roster with Lucia removed and Zhao added
     const roster = CODEPENDENT_ROSTER.filter(n => n !== 'Lucia').concat('Zhao');
     const { unitStates, ownedUnits } = buildSyntheticRoster(allUnits, roster);
