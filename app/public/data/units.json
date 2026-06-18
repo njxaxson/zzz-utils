@@ -5,7 +5,7 @@
         "image": "./assets/characters/alice.webp",
         "rank": "S",
         "limited": true,
-        "tier": 0.5,
+        "tier": 1,
         "tags": ["anomaly", "physical", "assist:defensive"],
         "join": ["anomaly", "support"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
@@ -35,7 +35,7 @@
         "name": "Anton",
         "image": "./assets/characters/anton.webp",
         "rank": "A",
-        "tier": 3,
+        "tier": 4,
         "tags": ["attack", "electric", "assist:defensive"],
         "join": ["electric", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
@@ -69,7 +69,7 @@
         "image": "./assets/characters/astra.webp",
         "rank": "S",
         "limited": true,
-        "tier": 0,
+        "tier": 0.5,
         "tags": ["ether", "support", "assist:evasive"],
         "join": ["anomaly", "attack", "rupture"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
@@ -119,7 +119,7 @@
         "name": "Billy",
         "image": "./assets/characters/billy.webp",
         "rank": "A",
-        "tier": 3,
+        "tier": 3.5,
         "tags": ["attack", "physical", "assist:evasive"],
         "join": ["physical", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
@@ -168,7 +168,7 @@
         "image": "./assets/characters/caesar.webp",
         "rank": "S",
         "limited": true,
-        "tier": 2,
+        "tier": 2.5,
         "tags": ["defense", "physical", "assist:defensive"],
         "join": ["faction", "assist:defensive"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
@@ -186,7 +186,7 @@
         "image": "./assets/characters/cissia.webp",
         "rank": "S",
         "limited": true,
-        "tier": 1.5,
+        "tier": 1,
         "tags": ["attack", "electric", "assist:defensive"],
         "join": ["stun", "electric"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
@@ -237,7 +237,7 @@
         "image": "./assets/characters/ellen.webp",
         "rank": "S",
         "limited": true,
-        "tier": 2,
+        "tier": 2.5,
         "tags": ["attack", "ice", "assist:defensive"],
         "join": ["ice", "faction", "stun"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
@@ -269,7 +269,7 @@
         "image": "./assets/characters/grace.webp",
         "rank": "S",
         "limited": false,
-        "tier": 3,
+        "tier": 2.5,
         "tags": ["anomaly", "electric", "assist:evasive"],
         "join": ["electric", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
@@ -279,7 +279,7 @@
             "scaling": { "pen": true }
         },
         "faction": "Belobog Heavy Industries",
-        "displayText": "Gearhead who throws electric grenades, Grace is typically used as an anomaly sub-DPS when you don't have a better alternative."
+        "displayText": "Gearhead who throws electric grenades, Grace is typically used as an anomaly sub-DPS when you don't have a better alternative - although she's not bad when paired with a wind anomaly like Velina."
     },
     {
         "id": "harumasa",
@@ -305,7 +305,7 @@
         "image": "./assets/characters/hugo.webp",
         "rank": "S",
         "limited": true,
-        "tier": 1.5,
+        "tier": 2.5,
         "tags": ["attack", "ice", "assist:defensive"],
         "join": ["stun", "ice"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
@@ -323,7 +323,7 @@
         "image": "./assets/characters/jane-doe.webp",
         "rank": "S",
         "limited": true,
-        "tier": 1.5,
+        "tier": 1,
         "tags": ["anomaly", "physical", "assist:defensive"],
         "join": ["anomaly", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
@@ -331,7 +331,7 @@
             "buffs" : { "vortex" : 3 }
         },
         "faction": "PubSec",
-        "displayText": "Sensuous rat lady is an older physical anomaly unit that remains a fan favorite."
+        "displayText": "Sensuous rat lady is an older physical anomaly unit that remains a fan favorite. She has unique synergy with the vortex mechanic."
     },
     {
         "id": "ju-fufu",
@@ -359,7 +359,7 @@
         "image": "./assets/characters/koleda.webp",
         "rank": "S",
         "limited": false,
-        "tier": 2,
+        "tier": 2.5,
         "tags": ["stun", "fire", "assist:defensive"],
         "join": ["fire", "faction", "rupture"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
@@ -376,7 +376,7 @@
         "aliases": ["Manato"],
         "image": "./assets/characters/komano.webp",
         "rank": "A",
-        "tier": 1,
+        "tier": 1.5,
         "tags": ["rupture", "fire", "assist:defensive"],
         "join": ["support", "stun"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
@@ -392,7 +392,7 @@
         "image": "./assets/characters/lighter.webp",
         "rank": "S",
         "limited": true,
-        "tier": 0.5,
+        "tier": 1,
         "tags": ["stun", "fire", "assist:defensive"],
         "join": ["attack", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
@@ -427,7 +427,7 @@
         "name": "Lucy",
         "image": "./assets/characters/lucy.webp",
         "rank": "A",
-        "tier": 2,
+        "tier": 2.5,
         "tags": ["support", "fire", "assist:defensive"],
         "join": ["fire", "faction", "rupture"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
@@ -551,7 +551,7 @@
         "image": "./assets/characters/orphie.webp",
         "rank": "S",
         "limited": true,
-        "tier": 1,
+        "tier": 1.5,
         "tags": ["attack", "fire", "assist:defensive"],
         "join": ["stun", "support"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
@@ -570,7 +570,7 @@
         "aliases": ["PY"],
         "image": "./assets/characters/pan-yinhu.webp",
         "rank": "A",
-        "tier": 1,
+        "tier": 1.5,
         "tags": ["defense", "physical", "assist:defensive"],
         "join": ["rupture", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
@@ -592,7 +592,7 @@
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {},
         "faction": "Sons of Calydon",
-        "displayText": "Spin-to-win. A physical anomaly agent that is one of the best A-rank DPS agents."
+        "displayText": "Spin-to-win. A physical anomaly agent that is one of the best A-rank DPS agents and great at applying physical anomalies quickly."
     },
     {
         "id": "promeia",
@@ -610,14 +610,14 @@
             "buffs" : { "abloom": 3 }
         },
         "faction": "Krampus",
-        "displayText": "She's not Batman, but she's got that vibe. Strong ice anomaly agent that goes a different route from Miyabi."
+        "displayText": "She's not Batman, but she's got that vibe. Very strong ice anomaly agent that goes a different route from Miyabi. In certain scenarios, she can be even better than Miyabi."
     },
     {
         "id": "pulchra",
         "name": "Pulchra",
         "image": "./assets/characters/pulchra.webp",
         "rank": "A",
-        "tier": 1.5,
+        "tier": 2,
         "tags": ["stun", "physical", "assist:evasive"],
         "join": ["attack", "rupture", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
@@ -636,7 +636,7 @@
         "image": "./assets/characters/pyrois.webp",
         "rank": "S",
         "limited": false,
-        "tier": 1.5,
+        "tier": 1,
         "tags": ["attack", "ether", "phaethon", "assist:defensive"],
         "join": ["support", "stun"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
@@ -686,13 +686,14 @@
         "image": "./assets/characters/sanby.webp",
         "rank": "S",
         "limited": true,
-        "tier": 0.5,
+        "tier": 1,
         "tags": ["attack", "electric", "assist:defensive"],
         "join": ["stun", "support"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "damage": { "aftershock": 2 },
-            "buffs": { "aftershock": 3 }
+            "buffs": { "aftershock": 3 },
+            "scaling": { "codependent": true }
         },
         "faction": "Silver Squad",
         "displayText": "Premier electric DPS, Silver Soldier Anby wants aftershock teammates like Trigger and Orphie to maximize her damage potential."
@@ -720,7 +721,7 @@
         "name": "Seth",
         "image": "./assets/characters/seth.webp",
         "rank": "A",
-        "tier": 3.5,
+        "tier": 4,
         "tags": ["defense", "electric", "assist:defensive"],
         "join": ["electric", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
@@ -745,7 +746,7 @@
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {},
         "faction": "Obol Squad",
-        "displayText": "This fire attacker can make a suitable DPS when you don't have alternatives. Her damage ceiling is highly dependent on your attack timing; it is worthwhile to practice with her to get it right."
+        "displayText": "This fire attacker can make a suitable DPS when you don't have alternatives. Her damage ceiling is highly dependent on your attack timing; it is worthwhile to practice with her to get it right. Her strength increases dramatically with more mindscapes."
     },
     {
         "id": "soukaku",
@@ -753,7 +754,7 @@
         "aliases": ["SKK"],
         "image": "./assets/characters/soukaku.webp",
         "rank": "A",
-        "tier": 1.5,
+        "tier": 2,
         "tags": ["support", "ice", "assist:defensive"],
         "join": ["ice", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
@@ -770,7 +771,7 @@
         "image": "./assets/characters/sunna.webp",
         "rank": "S",
         "limited": true,
-        "tier": 0.5,
+        "tier": 0,
         "tags": ["support", "physical", "assist:defensive"],
         "join": ["attack", "faction"],
         "synergy": { "units": ["Aria"], "tags": [], "avoid": [] },
@@ -779,7 +780,7 @@
             "utility": { "veils": 3, "daze": 2 }
         },
         "faction": "Angels of Delusion",
-        "displayText": "Ether veil spammer that is a best-in-slot teammate for both Angels of Delusion faction mates Nangong and Aria, as well as Ye Shunguang."
+        "displayText": "Ether veil spammer that is a best-in-slot teammate for both Angels of Delusion faction mates Nangong and Aria, as well as Ye Shunguang. Although Astra has stronger buffs, Sunna provides more personal damage and significant daze buildup for a support agent, letting her edge out Astra in modern endgame for attack teams."
     },
     {
         "id": "trigger",
@@ -817,7 +818,7 @@
             "damage": { "abloom": 2 }
         },
         "faction": "External Strategy Department",
-        "displayText" : "Tall anomaly gentlelady sub-DPS with oversized fan creates on-field tornado traps."
+        "displayText" : "Tall anomaly gentlelady sub-DPS with oversized fan creates on-field tornado traps. Pairs well with Promeia."
     },
     {
         "id": "vivian",
@@ -826,7 +827,7 @@
         "image": "./assets/characters/vivian.webp",
         "rank": "S",
         "limited": true,
-        "tier": 0.5,
+        "tier": 1,
         "tags": ["anomaly", "ether", "assist:defensive"],
         "join": ["anomaly", "ether"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
@@ -837,7 +838,7 @@
             "scaling": { "am": 2 }
         },
         "faction": "Mockingbird",
-        "displayText": "Great ether anomaly sub-DPS that can help generate disorders in dual-anomaly teams. Simps for Phaethon."
+        "displayText": "Great ether anomaly sub-DPS that can help generate disorders in dual-anomaly teams. Simps for Phaethon. Although previously a staple of anomaly teams, Nangong and Velina have shifted modern teams away from her; but she is still excellent."
     },
     {
         "id": "yanagi",
@@ -856,7 +857,7 @@
             "scaling": { "pen": true }
         },
         "faction": "Section 6",
-        "displayText": "Premier electric anomaly primary DPS, this disorder-generation queen is great teammate for Miyabi."
+        "displayText": "Premier electric anomaly agent, this disorder-generation queen is great teammate for Miyabi. Suitable both as a primary or secondary DPS."
     },
     {
         "id" : "ysg",
@@ -876,7 +877,7 @@
             "scaling": { "ultimates": 3, "veils": 2, "codependent": true }
         },
         "faction": "Yunkui Summit",
-        "displayText": "Void Hunter Ye Shunguang is currently the strongest DPS agent in the game. Wants lots of ether veils to help push her into her enlightened state."
+        "displayText": "Void Hunter Ye Shunguang is currently the strongest DPS agent in the game. Wants lots of ether veils to help push her into her enlightened state, though - you will need either Sunna or Zhao to fully leverage her damage output."
     },
     {
         "id": "yidhari",
@@ -939,7 +940,7 @@
         "image": "./assets/characters/zhao.webp",
         "rank": "S",
         "limited": true,
-        "tier": 0.5,
+        "tier": 1,
         "tags": ["defense", "ice", "assist:defensive"],
         "join": ["attack", "anomaly", "support"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
