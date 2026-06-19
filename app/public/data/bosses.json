@@ -235,5 +235,19 @@
             "weak": ["abloom"],
             "debuffs": { "cd": 2 }
         }
+    },
+    {
+        "id": "girta",
+        "name": "Girtablullu",
+        "shortName": "Girtablullu",
+        "image": "./assets/bosses/girta.webp",
+        "favored": ["Velina"],
+        "mechanics": {
+            "weaknesses": ["wind"],
+            "resistances": [],
+            "shill": "anomaly",
+            "anti": ["attack", "rupture"],
+            "assists": 3
+        }
     }
 ]
