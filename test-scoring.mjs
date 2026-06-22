@@ -1278,12 +1278,22 @@ async function main() {
     });
 
     // ========================================================================
-    // TEST 60: Nangong wheelchair with Rem is severely penalized
+    // TEST 60: Miyabi/Rem triple-anomaly scores well 
+    // ========================================================================
+    // Miyabi now joins on anomaly, enabling Miyabi/Rem teams without Yanagi.
+    run('TEST 60: Miyabi/Remielle/Vivian triple-anomaly scores well', () => {
+        const b = NEUTRAL_BOSS;
+        const mrv = scoreTeamForBoss(scoreForTeamString('Miyabi/Remielle/Vivian', allUnits, { preview: true })[0].team, b, {});
+        assert(mrv >= 300, `Miyabi/Rem/Vivian should score >= 300 as triple-anomaly, got ${mrv}`);
+    });
+
+    // ========================================================================
+    // TEST 61: Nangong wheelchair with Rem is severely penalized
     // ========================================================================
     // Nangong+Rem+Yuzuha: Rem has only 1 anomaly teammate count (Nangong is stun,
     // Yuzuha is support), so buff resolves to 0. This should score much worse than
     // a standard Nangong wheelchair without Rem.
-    run('TEST 60: Nangong/Rem/Yuzuha penalized vs Nangong/Miyabi/Yuzuha', () => {
+    run('TEST 61: Nangong/Rem/Yuzuha penalized vs Nangong/Miyabi/Yuzuha', () => {
         const b = NEUTRAL_BOSS;
         const nry = scoreTeamForBoss(scoreForTeamString('Nangong/Remielle/Yuzuha', allUnits, { preview: true })[0].team, b, {});
         const nmy = scoreTeamForBoss(scoreForTeamString('Nangong/Miyabi/Yuzuha', allUnits)[0].team, b, {});

@@ -53,7 +53,7 @@
         "limited": true,
         "tier": 0.5,
         "tags": ["anomaly", "ether", "assist:defensive"],
-        "join": ["stun", "support"],
+        "join": ["stun", "support", "anomaly"],
         "synergy": { "units": ["sunna", "nangong"], "tags": [], "avoid": [] },
         "mechanics": {
             "damage": { "enhanced": 2, "abloom": 2 },
@@ -462,7 +462,7 @@
         "limited": true,
         "tier": 0,
         "tags": ["anomaly", "ice", "title", "assist:defensive"],
-        "join": ["support", "faction"],
+        "join": ["support", "faction", "anomaly"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "elementalVariant": "frost",
@@ -703,11 +703,11 @@
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "damage": { "ultimate:strong": 2 },
-            "buffs": { "pen": 3 },
+            "buffs": { "pen": 3, "atk": 2, "def": 2 },
             "scaling": { "ap": true }
         },
         "faction": "Victoria Housekeeping",
-        "displayText": "Electric support agent that specializes in buffing PEN. Sadly, she is currently very underpowered for modern endgame."
+        "displayText": "Electric support agent that specializes in buffing PEN. Her potential vision upgrades her to buff attack and defense."
     },
     {
         "id": "sanby",
@@ -772,7 +772,9 @@
         "tags": ["attack", "ice", "assist:defensive"],
         "join": ["ice", "anomaly"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
-        "mechanics": {},
+        "mechanics": {
+            "scaling" : { "def": 2 }
+        },
         "available": false,
         "faction": "Airspace Patrol Department",
         "displayText": "Horse lady with spear. "
