@@ -10,7 +10,7 @@ import {
     getEffectiveScaling,
     getEffectiveRoles
 } from './team-scorer.js';
-import { getTeams } from './team-builder.js';
+import { getTeams, isValidTeam } from './team-builder.js';
 
 export { ELEMENTS };
 export const DPS_ARCHETYPES = DPS_ROLES;
@@ -62,7 +62,8 @@ export function isSubdps(unit, team = null) {
         const when = entry.when;
         if (when.hasUnit !== undefined) return team.some(u => u.id === when.hasUnit);
         if (when.countTag !== undefined) {
-            return team.filter(u => u.tags.includes(when.countTag)).length >= (when.minCount ?? 1);
+            const selfCount = unit.tags.includes(when.countTag) ? 1 : 0;
+            return (team.filter(u => u.tags.includes(when.countTag)).length + selfCount) >= (when.minCount ?? 1);
         }
         return false;
     });
@@ -81,6 +82,36 @@ export function getUnitElement(unit) {
 }
 
 // ============================================================================
+// JOIN COMPATIBILITY
+// ============================================================================
+
+// Can these two units plausibly coexist on a team? True if at least one unit's
+// join is satisfied by the other's tags. Two DPS that both join on "stun" can
+// share a team (with a stunner as the third member) even though neither directly
+// satisfies the other's join — they share a common join requirement.
+function canJoinWith(a, b) {
+    if (isValidTeam(a, b)) return true;
+    const aJoin = a.join ?? [];
+    const bJoin = b.join ?? [];
+    const aTags = new Set(a.tags);
+    const bTags = new Set(b.tags);
+    if (a.faction) { aTags.add(a.faction); }
+    if (b.faction) { bTags.add(b.faction); }
+    const aJoinExpanded = aJoin.map(j => j === 'faction' && a.faction ? a.faction : j);
+    const bJoinExpanded = bJoin.map(j => j === 'faction' && b.faction ? b.faction : j);
+    // Either one satisfies the other's join, OR they share a common join tag
+    // (meaning a third unit with that tag enables both)
+    if (aJoinExpanded.some(tag => bTags.has(tag))) return true;
+    if (bJoinExpanded.some(tag => aTags.has(tag))) return true;
+    const aJoinSet = new Set(aJoinExpanded);
+    return bJoinExpanded.some(tag => aJoinSet.has(tag));
+}
+
+function isLumenElement(unit) {
+    return getUnitElement(unit) === 'lumen';
+}
+
+// ============================================================================
 // MECHANICS EVALUATION HELPERS
 // ============================================================================
 
@@ -96,9 +127,6 @@ function w(value) {
  */
 function mechanicsFitScore(supplier, consumer) {
     let score = 0;
-    const sBuf = supplier.mechanics?.buffs || {};
-    const sDebuf = supplier.mechanics?.debuffs || {};
-    const sUtil = supplier.mechanics?.utility || {};
     const cTags = consumer.tags;
     const cMech = consumer.mechanics || {};
     const cScaling = getEffectiveScaling(consumer);
@@ -111,6 +139,28 @@ function mechanicsFitScore(supplier, consumer) {
     const isRupDPS = cTags.includes('rupture');
     const isDPS = isAtkDPS || isAnoDPS || isRupDPS;
     if (!isDPS) return 0;
+
+    // Resolve supplier buffs: merge conditionalBuffs with static buffs when the
+    // consumer would actually satisfy the condition (e.g. Rem's ATK buff activates
+    // when there are anomaly teammates — so an anomaly consumer would benefit).
+    const sBufBase = supplier.mechanics?.buffs || {};
+    const sBuf = { ...sBufBase };
+    const condBuffs = supplier.mechanics?.conditionalBuffs;
+    if (condBuffs) {
+        for (const [key, config] of Object.entries(condBuffs)) {
+            if (sBuf[key] !== undefined) continue;
+            const tag = config.countTag;
+            // If the consumer has the counted tag, credit at least the 2-count level
+            // (supplier + consumer = 2 matching units). This is a conservative estimate.
+            if (tag && consumer.tags.includes(tag)) {
+                const levels = config.levels;
+                const level = levels[Math.min(2, levels.length - 1)];
+                if (level > 0) sBuf[key] = level;
+            }
+        }
+    }
+    const sDebuf = supplier.mechanics?.debuffs || {};
+    const sUtil = supplier.mechanics?.utility || {};
 
     const atkW = w(sBuf.atk);
     if (atkW > 0 && isDPS) {
@@ -184,6 +234,21 @@ function mechanicsFitScore(supplier, consumer) {
         }
     }
 
+    // Conditional buff anti-synergy: if the consumer's value depends on teammates with a
+    // specific tag (e.g., Rem needs anomaly teammates for her ATK buff), a supplier that
+    // DOESN'T have that tag is actively taking up a team slot that should go to someone
+    // who does. Heavy discount — generic support value is mostly wasted.
+    const consumerCondBuffs = consumer.mechanics?.conditionalBuffs;
+    if (consumerCondBuffs && score > 0) {
+        for (const config of Object.values(consumerCondBuffs)) {
+            const tag = config.countTag;
+            if (tag && !supplier.tags.includes(tag)) {
+                score = Math.round(score * 0.2);
+                break;
+            }
+        }
+    }
+
     return score;
 }
 
@@ -209,6 +274,7 @@ export function checkTeamDependencies(candidate, ownedUnits, allUnits) {
     const scaling = getEffectiveScaling(candidate);
     const notes = [];
     let hasUnmetDependency = false;
+    let cannotActivateBuffs = false;
 
     const selfBuffs = candidate.mechanics?.buffs || {};
     const selfUtil = candidate.mechanics?.utility || {};
@@ -247,6 +313,45 @@ export function checkTeamDependencies(candidate, ownedUnits, allUnits) {
                 text: `Needs ${providers.map(p => p.name).join(' or ')} to reach full potential`,
                 providers
             });
+        }
+    }
+
+    // Step 1b: conditional buff activation feasibility
+    // Check whether the roster can provide enough teammates with the required tag
+    // to fully activate conditional buffs. If the roster can't reach at least half
+    // max activation, the unit is effectively non-functional — treat same as can't
+    // activate. Partial (>50%) still flags as unmet for a 1-level priority drop.
+    const cb = candidate.mechanics?.conditionalBuffs;
+    if (cb) {
+        for (const [buffKey, config] of Object.entries(cb)) {
+            const maxLevel = Math.max(...config.levels);
+            if (maxLevel <= 0) continue;
+            const selfCount = candidate.tags.includes(config.countTag) ? 1 : 0;
+            const rosterCount = selfCount + ownedUnits.filter(u => u.tags.includes(config.countTag)).length;
+            const bestIdx = Math.min(rosterCount, config.levels.length - 1);
+            const bestAchievable = config.levels[bestIdx];
+            const neededTag = config.countTag;
+            const providers = allUnits
+                .filter(u => u.id !== candidate.id && u.limited && u.rank === 'S'
+                    && u.tags.includes(neededTag))
+                .sort((a, b) => a.tier - b.tier)
+                .map(u => ({ id: u.id, name: u.name }));
+            if (bestAchievable * 2 <= maxLevel) {
+                // At or below half max — unit can't function as designed
+                hasUnmetDependency = true;
+                cannotActivateBuffs = true;
+                const verb = bestAchievable <= 0 ? 'activate' : 'meaningfully activate';
+                notes.push({
+                    text: `Needs ${neededTag} teammates to ${verb} ${buffKey} buff — pull ${providers.slice(0, 3).map(p => p.name).join(' or ')} first`,
+                    providers
+                });
+            } else if (bestAchievable < maxLevel) {
+                hasUnmetDependency = true;
+                notes.push({
+                    text: `Needs more ${neededTag} teammates to fully activate ${buffKey} buff — pull ${providers.slice(0, 3).map(p => p.name).join(' or ')}`,
+                    providers
+                });
+            }
         }
     }
 
@@ -326,7 +431,7 @@ export function checkTeamDependencies(candidate, ownedUnits, allUnits) {
         }
     }
 
-    return { hasUnmetDependency, cannotFormTeam, notes };
+    return { hasUnmetDependency, cannotFormTeam, cannotActivateBuffs, notes };
 }
 
 function sortCandidates(units, ownedDPSUnits = []) {
@@ -446,6 +551,21 @@ export function analyze(allUnits, unitStates, ownedUnits, { maxRecommendations =
     const unitGapScoreOverrides = new Map(); // individual unit scores for mech-synergy gaps
     detectMechanicalSynergies(gaps, ownedUnits, unownedLimitedS, dpsQuality, elementQuality, unitGapScoreOverrides);
     detectDepthGap(gaps, ownedDPS, dpsQuality, unownedLimitedS, sortWithDPS);
+
+    // Pre-filter: remove codependent units that cannot form viable teams or
+    // cannot activate their core buffs. They shouldn't appear in recommendations
+    // at all — not just with a priority drop — because the gap text doesn't apply.
+    const excludedIds = new Set();
+    for (const candidate of unownedLimitedS) {
+        if (!candidate.mechanics?.scaling?.codependent) continue;
+        const dep = checkTeamDependencies(candidate, ownedUnits, allUnits);
+        if (dep.cannotFormTeam || dep.cannotActivateBuffs) excludedIds.add(candidate.id);
+    }
+    if (excludedIds.size > 0) {
+        for (const gap of gaps) {
+            if (gap.units) gap.units = gap.units.filter(u => !excludedIds.has(u.id));
+        }
+    }
 
     for (const gap of gaps) {
         gap.rawScore = gap.score;
@@ -634,14 +754,26 @@ export function analyze(allUnits, unitStates, ownedUnits, { maxRecommendations =
     }
 
     // ── Codependent scaling: post-process recommendations ───────────────────
-    const PRIORITY_DROP = { 'High': 'Medium', 'Medium': 'Low', 'Low': null };
+    const PRIORITY_ORDER = ['High', 'Medium', 'Low', null];
+    function dropPriority(current, levels) {
+        const idx = PRIORITY_ORDER.indexOf(current);
+        return PRIORITY_ORDER[Math.min(idx + levels, PRIORITY_ORDER.length - 1)];
+    }
     for (const rec of recommendations) {
-        const primaryUnit = rec.units[0];
-        if (!primaryUnit) continue;
-        const dep = checkTeamDependencies(primaryUnit, ownedUnits, allUnits);
-        if (dep.hasUnmetDependency || dep.cannotFormTeam) {
-            rec.teamDependencyNotes = dep.notes;
-            rec.priority = PRIORITY_DROP[rec.priority] ?? null;
+        // Check ALL units in the card — not just the primary. A codependent unit
+        // can appear as a non-primary in a composite card and still need the drop.
+        let worstDep = null;
+        for (const unit of rec.units) {
+            const dep = checkTeamDependencies(unit, ownedUnits, allUnits);
+            if (dep.hasUnmetDependency || dep.cannotFormTeam) {
+                if (!worstDep || dep.cannotFormTeam || dep.cannotActivateBuffs) worstDep = dep;
+            }
+        }
+        if (worstDep) {
+            rec.teamDependencyNotes = worstDep.notes;
+            const severe = worstDep.cannotFormTeam || worstDep.cannotActivateBuffs;
+            const levels = severe ? 2 : 1;
+            rec.priority = dropPriority(rec.priority, levels);
         }
     }
     const filteredRecommendations = recommendations.filter(r => r.priority !== null);
@@ -685,6 +817,7 @@ function detectDPSGaps(gaps, dpsQuality, ownedDPS, unownedLimitedS, sortCandidat
         if (!hasAnySRank && score < 50) score = 50;
 
         const hasSubdpsOnly = quality === 0 && ownedDPS[arch].some(u => isSubdps(u));
+        const primaryCount = ownedDPS[arch].filter(u => !isSubdps(u)).length;
         const reason = hasSubdpsOnly
             ? `You have ${arch} sub-DPS agents but no primary ${arch} DPS to lead your teams`
             : quality === 0
@@ -695,6 +828,8 @@ function detectDPSGaps(gaps, dpsQuality, ownedDPS, unownedLimitedS, sortCandidat
             ? `Your ${arch} coverage relies entirely on A-rank options — a premium DPS would be a significant upgrade`
             : quality <= 40
             ? `Your best ${arch} option is borderline — a premium DPS would be a major improvement`
+            : primaryCount <= 1
+            ? `Your ${arch} options are limited to a single primary DPS — more options would give team-building flexibility`
             : `You have decent ${arch} coverage, but a premium option would strengthen your roster`;
 
         const candidates = sortCandidatesFn(
@@ -864,77 +999,94 @@ function detectAnomalyPartnerGap(gaps, ownedUnits, ownedDPS, ownedSubdps, unowne
     const primaryAnomalyOwned = ownedDPS.anomaly.filter(u => !isSubdps(u));
     if (primaryAnomalyOwned.length === 0) return;
 
+    // Lumen units don't generate disorders (no anomaly gauge) — they don't count as disorder
+    // partners, and they shouldn't be evaluated for disorder coverage gaps.
+    const nonLumenPrimary = primaryAnomalyOwned.filter(u => !isLumenElement(u));
+
     const ownedAnomalySubdps = ownedSubdps.anomaly;
     const ownedPseudoAnomaly = ownedUnits.filter(u => {
         if (isSubdps(u)) return false;
         const pr = u.mechanics?.pseudoRole;
         return Array.isArray(pr) && pr.some(entry => (typeof entry === 'string' ? entry : entry?.role) === 'anomaly');
     });
-    const disorderPartners = [...ownedAnomalySubdps, ...ownedPseudoAnomaly];
+    // Lumen units also cannot be disorder partners — filter them out
+    const disorderPartners = [...ownedAnomalySubdps, ...ownedPseudoAnomaly].filter(u => !isLumenElement(u));
 
     const PARTNER_QUALITY_THRESHOLD = 40;
 
-    const hasSufficientCoverage = disorderPartners.some(partner => {
-        const partnerEl = getUnitElement(partner);
-        const partnerQuality = partner.tier != null ? tierToQuality(partner.tier) : 0;
-        const coversAtLeastOneDPS = primaryAnomalyOwned.some(dps => getUnitElement(dps) !== partnerEl);
-        return coversAtLeastOneDPS && partnerQuality >= PARTNER_QUALITY_THRESHOLD;
-    });
-
-    if (hasSufficientCoverage) return;
-
-    const uncoveredDPS = primaryAnomalyOwned.filter(dps => {
-        const dpsEl = getUnitElement(dps);
-        return !disorderPartners.some(p =>
-            getUnitElement(p) !== dpsEl &&
-            (p.tier != null ? tierToQuality(p.tier) : 0) >= PARTNER_QUALITY_THRESHOLD
-        );
-    });
-
-    const candidates = unownedLimitedS
-        .filter(u => {
-            const isAnoSubdps = isSubdps(u) && u.tags.includes('anomaly');
-            const pr = u.mechanics?.pseudoRole;
-            const isPseudoAnomaly = Array.isArray(pr) && pr.some(entry => (typeof entry === 'string' ? entry : entry?.role) === 'anomaly') && !isSubdps(u);
-            return isAnoSubdps || isPseudoAnomaly;
-        })
-        .sort((a, b) => {
-            const aEl = getUnitElement(a);
-            const bEl = getUnitElement(b);
-            const aDiffers = primaryAnomalyOwned.some(dps => getUnitElement(dps) !== aEl) ? 1 : 0;
-            const bDiffers = primaryAnomalyOwned.some(dps => getUnitElement(dps) !== bEl) ? 1 : 0;
-            if (aDiffers !== bDiffers) return bDiffers - aDiffers;
-            return a.tier - b.tier;
+    // Only check disorder coverage for non-lumen primary anomaly DPS
+    if (nonLumenPrimary.length > 0) {
+        const hasSufficientCoverage = disorderPartners.some(partner => {
+            const partnerEl = getUnitElement(partner);
+            const partnerQuality = partner.tier != null ? tierToQuality(partner.tier) : 0;
+            const coversAtLeastOneDPS = nonLumenPrimary.some(dps => getUnitElement(dps) !== partnerEl);
+            return coversAtLeastOneDPS && partnerQuality >= PARTNER_QUALITY_THRESHOLD;
         });
 
-    if (candidates.length === 0) return;
+        if (!hasSufficientCoverage) {
+            const uncoveredDPS = nonLumenPrimary.filter(dps => {
+                const dpsEl = getUnitElement(dps);
+                return !disorderPartners.some(p =>
+                    getUnitElement(p) !== dpsEl &&
+                    (p.tier != null ? tierToQuality(p.tier) : 0) >= PARTNER_QUALITY_THRESHOLD
+                );
+            });
 
-    const scoringDPS = uncoveredDPS.length > 0 ? uncoveredDPS : primaryAnomalyOwned;
-    const bestTier = getBestTier(scoringDPS);
-    const bestQuality = bestTier != null ? tierToQuality(bestTier) : 0;
-    const score = bestQuality >= 75 ? 55 :
-                  bestQuality >= 55 ? 45 : 35;
+            const candidates = unownedLimitedS
+                .filter(u => {
+                    if (isLumenElement(u)) return false;
+                    const isAnoSubdps = isSubdps(u) && u.tags.includes('anomaly');
+                    const pr = u.mechanics?.pseudoRole;
+                    const isPseudoAnomaly = Array.isArray(pr) && pr.some(entry => (typeof entry === 'string' ? entry : entry?.role) === 'anomaly') && !isSubdps(u);
+                    return isAnoSubdps || isPseudoAnomaly;
+                })
+                .sort((a, b) => {
+                    const aEl = getUnitElement(a);
+                    const bEl = getUnitElement(b);
+                    const aDiffers = nonLumenPrimary.some(dps => getUnitElement(dps) !== aEl) ? 1 : 0;
+                    const bDiffers = nonLumenPrimary.some(dps => getUnitElement(dps) !== bEl) ? 1 : 0;
+                    if (aDiffers !== bDiffers) return bDiffers - aDiffers;
+                    return a.tier - b.tier;
+                });
 
-    const hasWeakPartner = disorderPartners.length > 0 &&
-        disorderPartners.every(p => (p.tier != null ? tierToQuality(p.tier) : 0) < PARTNER_QUALITY_THRESHOLD);
+            if (candidates.length > 0) {
+                const scoringDPS = uncoveredDPS.length > 0 ? uncoveredDPS : nonLumenPrimary;
+                const bestTier = getBestTier(scoringDPS);
+                const bestQuality = bestTier != null ? tierToQuality(bestTier) : 0;
+                const score = bestQuality >= 75 ? 55 :
+                              bestQuality >= 55 ? 45 : 35;
 
-    const reason = disorderPartners.length === 0
-        ? `Your anomaly DPS have no anomaly partner — a different-element anomaly unit is needed to generate disorders`
-        : hasWeakPartner
-        ? `Your anomaly partner is too low-tier to reliably generate disorders — a stronger different-element anomaly partner is recommended`
-        : `Your anomaly partners share an element with your primary DPS — a different-element anomaly partner would unlock disorder generation`;
+                const hasWeakPartner = disorderPartners.length > 0 &&
+                    disorderPartners.every(p => (p.tier != null ? tierToQuality(p.tier) : 0) < PARTNER_QUALITY_THRESHOLD);
 
-    gaps.push({
-        id: 'anomaly-partner',
-        title: 'Anomaly Disorder Partner',
-        reason,
-        score,
-        units: candidates
-    });
+                const reason = disorderPartners.length === 0
+                    ? `Your anomaly DPS have no anomaly partner — a different-element anomaly unit is needed to generate disorders`
+                    : hasWeakPartner
+                    ? `Your anomaly partner is too low-tier to reliably generate disorders — a stronger different-element anomaly partner is recommended`
+                    : `Your anomaly partners share an element with your primary DPS — a different-element anomaly partner would unlock disorder generation`;
+
+                gaps.push({
+                    id: 'anomaly-partner',
+                    title: 'Anomaly Disorder Partner',
+                    reason,
+                    score,
+                    units: candidates
+                });
+            }
+        }
+    }
+
+    // Lumen anomaly partner needs (Refringe, conditional buffs) are handled generically:
+    // conditional buff activation is checked in checkTeamDependencies Step 1b, and
+    // Refringe benefits are emergent from scoring. No lumen-specific gap needed.
 }
 
 function detectElementGaps(gaps, elementQuality, unownedLimitedS, sortCandidatesFn) {
     for (const el of ELEMENTS) {
+        // Lumen agents deal a teammate's element via Attribute Mutation — there is no
+        // "lumen elemental damage" and no boss has lumen weakness, so the gap is meaningless.
+        if (el === 'lumen') continue;
+
         const quality = elementQuality[el];
         if (quality >= 55) continue; // Decent or better — not a meaningful gap
 
@@ -981,6 +1133,7 @@ function detectStunnerElementGap(gaps, ownedStunners, elementQuality, unownedLim
     );
 
     for (const el of ELEMENTS) {
+        if (el === 'lumen') continue;
         if (elementQuality[el] < 55) continue;
         if (ownedLimitedStunnerElements.has(el)) continue;
 
@@ -1154,12 +1307,23 @@ function detectMechanicalSynergies(gaps, ownedUnits, unownedLimitedS, dpsQuality
     for (const candidate of unownedLimitedS) {
         const isDPSCandidate = DPS_ARCHETYPES.some(a => candidate.tags.includes(a)) && !isSubdps(candidate);
         const el = getUnitElement(candidate);
+
+        // DPS candidates that also supply buffs (conditionalBuffs or conditional support
+        // pseudo-role) are hybrid units like Remielle — they should be evaluated both as
+        // consumers of owned non-DPS AND as suppliers to owned DPS.
+        const isHybridSupplier = isDPSCandidate && (
+            candidate.mechanics?.conditionalBuffs ||
+            (Array.isArray(candidate.mechanics?.pseudoRole) &&
+             candidate.mechanics.pseudoRole.some(e => (typeof e === 'string' ? e : e?.role) === 'support'))
+        );
         const targets = isDPSCandidate ? ownedSRankNonDPS : ownedSRankDPS;
 
         // Quality gate: skip DPS candidates whose archetype+element are already well-covered
+        // Lumen DPS skip the element quality check — they don't deal lumen damage
         if (isDPSCandidate) {
             const arch = DPS_ARCHETYPES.find(a => candidate.tags.includes(a));
-            if (arch && dpsQuality[arch] >= 75 && el !== 'unknown' && elementQuality[el] >= 55) {
+            const skipElementCheck = el === 'lumen';
+            if (arch && dpsQuality[arch] >= 75 && !skipElementCheck && el !== 'unknown' && elementQuality[el] >= 55) {
                 continue;
             }
         }
@@ -1167,6 +1331,9 @@ function detectMechanicalSynergies(gaps, ownedUnits, unownedLimitedS, dpsQuality
         // Collect all pairs above the meaningful-synergy threshold
         const qualifyingPairs = [];
         for (const owned of targets) {
+            // Join-compatibility gate: skip pairs where the two units can't coexist on a team
+            if (!canJoinWith(candidate, owned)) continue;
+
             const fit = isDPSCandidate
                 ? mechanicsFitScore(owned, candidate)
                 : mechanicsFitScore(candidate, owned);
@@ -1184,6 +1351,27 @@ function detectMechanicalSynergies(gaps, ownedUnits, unownedLimitedS, dpsQuality
 
             qualifyingPairs.push({ name: owned.name, id: owned.id, fit, score: pairScore });
         }
+
+        // Hybrid supplier pass: also check this DPS candidate as a supplier to owned
+        // DPS units. Uses a broader pool than the standard pass — any S-rank unit with a
+        // DPS archetype tag qualifies, regardless of the MIN_PAIR_QUALITY gate, because
+        // hybrid suppliers like Remielle benefit ALL anomaly teammates equally (subdps,
+        // A-rank partners, lower-tier units) via conditional buffs and Refringe.
+        if (isHybridSupplier) {
+            const hybridTargets = ownedUnits.filter(u =>
+                u.rank === 'S' && DPS_ARCHETYPES.some(a => u.tags.includes(a))
+            );
+            for (const owned of hybridTargets) {
+                if (!canJoinWith(candidate, owned)) continue;
+                const fit = mechanicsFitScore(candidate, owned);
+                if (fit < 15) continue;
+                const pairScore = Math.min(45, Math.round(fit * 2.5));
+                if (pairScore < 15) continue;
+                if (qualifyingPairs.some(p => p.id === owned.id)) continue;
+                qualifyingPairs.push({ name: owned.name, id: owned.id, fit, score: pairScore });
+            }
+        }
+
         if (qualifyingPairs.length === 0) continue;
 
         // Sort pairs by descending fit so [0] is the best
@@ -1257,20 +1445,34 @@ function detectMechanicalSynergies(gaps, ownedUnits, unownedLimitedS, dpsQuality
 function detectDepthGap(gaps, ownedDPS, dpsQuality, unownedLimitedS, sortCandidatesFn) {
     for (const arch of DPS_ARCHETYPES) {
         const primaryOwned = ownedDPS[arch].filter(u => u.rank === 'S' && u.limited && !isSubdps(u));
-        if (primaryOwned.length !== 1 || dpsQuality[arch] < 75) continue;
 
         const candidates = sortCandidatesFn(
             unownedLimitedS.filter(u => u.tags.includes(arch) && !isSubdps(u))
         );
-        if (candidates.length > 0) {
-            gaps.push({
-                id: `depth-${arch}`,
-                title: `${capitalize(arch)} Depth`,
-                reason: `You only have one premium ${arch} DPS — a second option would give flexibility across different team compositions`,
-                score: 30,
-                units: candidates
-            });
+        if (candidates.length === 0) continue;
+
+        // Titled T0 candidates create entirely new team archetypes (e.g., Remielle
+        // enables triple-anomaly with hybrid DPS/support). They bypass the quality and
+        // count gates — worth recommending regardless of existing archetype coverage.
+        const hasTitledT0 = candidates.some(u => isTitled(u) && u.tier === 0);
+
+        if (!hasTitledT0) {
+            if (dpsQuality[arch] < 75) continue;
+            if (primaryOwned.length !== 1) continue;
         }
+
+        const score = hasTitledT0 ? 70 : 30;
+        const reason = hasTitledT0
+            ? `A titled ${arch} unit would unlock entirely new team compositions and fundamentally expand your ${arch} options`
+            : `You only have one premium ${arch} DPS — a second option would give flexibility across different team compositions`;
+
+        gaps.push({
+            id: `depth-${arch}`,
+            title: `${capitalize(arch)} Depth`,
+            reason,
+            score,
+            units: candidates
+        });
     }
 }
 
@@ -1345,7 +1547,7 @@ function buildAssessment(dpsQuality, supportQuality, stunnerQuality, elementQual
     if (stunnerQuality >= 75 && hasSRankStunner) strengths.push('solid stunners');
     else if (stunnerQuality <= 10) weaknesses.push('stunner coverage');
 
-    const weakElements = ELEMENTS.filter(el => elementQuality[el] < 55);
+    const weakElements = ELEMENTS.filter(el => el !== 'lumen' && elementQuality[el] < 55);
     if (weakElements.length === 0) strengths.push('full element coverage');
     else if (weakElements.length >= 2) weaknesses.push(`${weakElements.map(capitalize).join('/')} element coverage`);
 

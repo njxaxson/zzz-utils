@@ -191,7 +191,7 @@
         "join": ["stun", "electric"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
-            "pseudoRole": [{ "role": "subdps", "when": { "hasUnit": "seed" } }],
+            "pseudoRole": [{ "role": "subdps", "when":{"countTag":"attack","minCount":2} }],
             "buffs": { "cr": 1 },
             "debuffs": { "electric": 2 },
             "utility": { "daze": 1, "veils": 1 }
@@ -672,7 +672,7 @@
         "rank": "S",
         "limited": true,
         "tier": 0,
-        "tags": ["anomaly", "lumens", "title", "assist:defensive"],
+        "tags": ["anomaly", "lumen", "title", "assist:defensive"],
         "join": ["anomaly", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
@@ -682,10 +682,13 @@
             ],
             "conditionalBuffs": {
                 "atk": { "countTag": "anomaly", "levels": [0, 0, 2, 4] }
-            }
+            },
+            "damage": { "ultimate:double": 3, "aftershock": 2, "luminize": 3 },
+            "scaling": { "ap": 3, "atk": 3, "codependent" : true },
+            "onfield": "shared"
         },
         "available": true,
-        "faction": "Guard of Staves",
+        "faction": "Covenant of Dayat",
         "displayText": "First-generation void hunter."
     },
     {
@@ -766,12 +769,12 @@
         "rank": "S",
         "limited": true,
         "tier": 1,
-        "tags": ["stun", "ice", "assist:defensive"],
+        "tags": ["attack", "ice", "assist:defensive"],
         "join": ["ice", "anomaly"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {},
         "available": false,
-        "faction": "Roscaelifer Knights",
+        "faction": "Airspace Patrol Department",
         "displayText": "Horse lady with spear. "
     },
     {
@@ -800,7 +803,7 @@
         "join": ["ice", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
-            "pseudoRole": [{"role":"anomaly","when":{"countTag":"anomaly","minCount":1}}],
+            "pseudoRole": [{"role":"anomaly","when":{ "hasUnit": "miyabi" }}],
             "buffs": { "atk": 3, "ice": 3 }
         },
         "faction": "Section 6",

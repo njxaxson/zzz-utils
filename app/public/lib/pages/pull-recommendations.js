@@ -132,7 +132,7 @@ function applyBannerRecommendationOrdering(recommendations, bumpWindowIds, banne
  */
 function bannerTileVerdictClass(unitId, allGaps, ownedUnits, allUnits) {
     const RANK = { 'High': 2, 'Medium': 1, 'Low': 0 };
-    const DROP = { 'high': 'medium', 'medium': 'low', 'low': 'no' };
+    const ORDERED = ['high', 'medium', 'low', 'no'];
     let best = -1;
     let bestPriority = null;
     for (const gap of allGaps) {
@@ -150,7 +150,10 @@ function bannerTileVerdictClass(unitId, allGaps, ownedUnits, allUnits) {
     if (unit && ownedUnits && allUnits) {
         const dep = checkTeamDependencies(unit, ownedUnits, allUnits);
         if (dep.hasUnmetDependency || dep.cannotFormTeam) {
-            return DROP[verdict] ?? 'no';
+            const idx = ORDERED.indexOf(verdict);
+            const severe = dep.cannotFormTeam || dep.cannotActivateBuffs;
+            const levels = severe ? 2 : 1;
+            return ORDERED[Math.min(idx + levels, ORDERED.length - 1)];
         }
     }
     return verdict;

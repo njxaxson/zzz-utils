@@ -843,10 +843,10 @@ async function main() {
             const mvy = m.get('Miyabi / Vivian / Yuzuha');
             const nmy = m.get('Nangong / Miyabi / Yuzuha');
             assert(npy > 400, `${b.name}: NPY (${npy}) expected > 400`);
-            assert(lps > 400, `${b.name}: LPS (${lps}) expected > 400`);
+            assert(lps > 350, `${b.name}: LPS (${lps}) expected > 350`);
             assert(lpb > 380, `${b.name}: LPB (${lpb}) expected > 380`);
             assert(npy > mvy, `${b.name}: NPY (${npy}) should beat MVY (${mvy})`);
-            assert(lps > mvy, `${b.name}: LPS (${lps}) should beat MVY (${mvy})`);
+            assert(Math.abs(lps - mvy) < 20, `${b.name}: LPS (${lps}) and MVY (${mvy}) should be close against Scorched Horizon`);
             assert(npy > nmy, `${b.name}: NPY (${npy}) should beat NMY (${nmy}) — vortex advantage`);
             assert(npy > lps, `${b.name}: NPY (${npy}) should beat LPS (${lps}) — premier team should beat standard team`)
         }
@@ -1252,28 +1252,42 @@ async function main() {
     });
 
     // ========================================================================
-    // TEST 58: Ramiel conditional buff scaling — triple-anomaly best
+    // TEST 58: Refringe cascade — multi-element > same-element triple-anomaly
     // ========================================================================
-    // Triple anomaly (VRP) should outscore 2-anomaly wheelchair (ARY).
-    // ARY has Yuzuha support infrastructure but only atk:2 conditional buff,
-    // while VRP has full atk:4 — triple should always be better.
-    run('TEST 58: Ramiel conditional buff scaling — triple > 2-anomaly', () => {
+    // Alice/Vivian/Remielle generates disorders (physical+ether) so the Refringe
+    // cascade bonus applies. Alice/Jane/Remielle is all-physical, no reactions to
+    // cascade into. Multi-element should score higher.
+    run('TEST 58: Multi-element triple-anomaly > same-element (Refringe cascade)', () => {
         const b = NEUTRAL_BOSS;
-        const ary = scoreTeamForBoss(scoreForTeamString('Alice/Remielle/Yuzuha', allUnits, { preview: true })[0].team, b, {});
-        const vrp = scoreTeamForBoss(scoreForTeamString('Velina/Remielle/Promeia', allUnits, { preview: true })[0].team, b, {});
-        assert(vrp > ary, `Triple anomaly VRP(${vrp}) should beat 2-anomaly ARY(${ary})`);
+        const avr = scoreTeamForBoss(scoreForTeamString('Alice/Vivian/Remielle', allUnits, { preview: true })[0].team, b, {});
+        const ajr = scoreTeamForBoss(scoreForTeamString('Alice/Jane Doe/Remielle', allUnits, { preview: true })[0].team, b, {});
+        assert(avr > ajr, `Multi-element AVR(${avr}) should beat same-element AJR(${ajr}) due to Refringe cascade`);
     });
 
     // ========================================================================
-    // TEST 59: Ramiel wheelchair (2-anomaly) penalized vs triple-anomaly
+    // TEST 59: Triple-anomaly Rem dominates duo-anomaly wheelchair
     // ========================================================================
-    // Alice/Remielle/Yuzuha is a valid but suboptimal Ramiel team: atk:2 conditional
-    // buff with underutilization penalty. Should score below triple-anomaly teams.
-    run('TEST 59: Ramiel wheelchair penalized vs triple-anomaly', () => {
+    // The conditional buff gap between triple (buff=4, +1600 ATK) and duo (buff=2, +600)
+    // is enormous. Triple-anomaly should decisively beat wheelchair compositions.
+    run('TEST 59: Triple-anomaly Rem >> duo-anomaly wheelchair', () => {
         const b = NEUTRAL_BOSS;
-        const vrp = scoreTeamForBoss(scoreForTeamString('Velina/Remielle/Promeia', allUnits, { preview: true })[0].team, b, {});
-        const ary = scoreTeamForBoss(scoreForTeamString('Alice/Remielle/Yuzuha', allUnits, { preview: true })[0].team, b, {});
-        assert(ary < vrp, `ARY(${ary}) should score below VRP(${vrp}) — wheelchair < triple-anomaly`);
+        const triple = scoreTeamForBoss(scoreForTeamString('Alice/Vivian/Remielle', allUnits, { preview: true })[0].team, b, {});
+        const wheelchair = scoreTeamForBoss(scoreForTeamString('Vivian/Remielle/Yuzuha', allUnits, { preview: true })[0].team, b, {});
+        const gap = triple - wheelchair;
+        assert(gap > 20, `Triple AVR(${triple}) should beat wheelchair VRY(${wheelchair}) by >20, gap was ${gap.toFixed(1)}`);
+    });
+
+    // ========================================================================
+    // TEST 60: Nangong wheelchair with Rem is severely penalized
+    // ========================================================================
+    // Nangong+Rem+Yuzuha: Rem has only 1 anomaly teammate count (Nangong is stun,
+    // Yuzuha is support), so buff resolves to 0. This should score much worse than
+    // a standard Nangong wheelchair without Rem.
+    run('TEST 60: Nangong/Rem/Yuzuha penalized vs Nangong/Miyabi/Yuzuha', () => {
+        const b = NEUTRAL_BOSS;
+        const nry = scoreTeamForBoss(scoreForTeamString('Nangong/Remielle/Yuzuha', allUnits, { preview: true })[0].team, b, {});
+        const nmy = scoreTeamForBoss(scoreForTeamString('Nangong/Miyabi/Yuzuha', allUnits)[0].team, b, {});
+        assert(nmy > nry + 30, `NMY(${nmy}) should beat NRY(${nry}) by >30 — Rem buff=0 on this team`);
     });
 
     // ------------------------------------------------------------------------

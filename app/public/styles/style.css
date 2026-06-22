@@ -38,7 +38,7 @@
     --element-physical: #e0b040;
     --element-ether: #d946ef;
     --element-wind: #4ade80;
-    --element-lumens: #d8ecf5;
+    --element-lumen: #f5b0d0;
     
     /* Element colors - Light variants (for text/initials) */
     --element-fire-light: #ef6a5a;
@@ -47,7 +47,7 @@
     --element-physical-light: #f0c860;
     --element-ether-light: #e879f9;
     --element-wind-light: #86efac;
-    --element-lumens-light: #e4f5f7;
+    --element-lumen-light: #fad0e8;
 }
 
 /* ============================================================================
@@ -1345,7 +1345,7 @@ button#simulate-btn:disabled,
 .unit-card.element-physical { border-color: var(--element-physical); }
 .unit-card.element-ether { border-color: var(--element-ether); }
 .unit-card.element-wind { border-color: var(--element-wind); }
-.unit-card.element-lumens { border-color: var(--element-lumens); }
+.unit-card.element-lumen { border-color: var(--element-lumen); }
 
 /* Not owned state */
 .unit-card.not-owned {
@@ -1412,7 +1412,7 @@ button#simulate-btn:disabled,
 .unit-card.element-physical .unit-initials { color: var(--element-physical-light); }
 .unit-card.element-ether .unit-initials { color: var(--element-ether-light); }
 .unit-card.element-wind .unit-initials { color: var(--element-wind-light); }
-.unit-card.element-lumens .unit-initials { color: var(--element-lumens-light); }
+.unit-card.element-lumen .unit-initials { color: var(--element-lumen-light); }
 
 .unit-card.not-owned .unit-initials {
     color: var(--text-secondary);
@@ -1643,7 +1643,7 @@ button#simulate-btn:disabled,
 .boss-card.selected.weakness-physical { background: var(--element-physical); }
 .boss-card.selected.weakness-ether { background: var(--element-ether); }
 .boss-card.selected.weakness-wind { background: var(--element-wind); }
-.boss-card.selected.weakness-lumens { background: var(--element-lumens); }
+.boss-card.selected.weakness-lumen { background: var(--element-lumen); }
 
 /* Dual weakness gradients */
 .boss-card.selected.weakness-electric-ether { background: linear-gradient(135deg, var(--element-electric) 35%, var(--element-ether) 65%); }
@@ -1662,12 +1662,12 @@ button#simulate-btn:disabled,
 .boss-card.selected.weakness-fire-wind { background: linear-gradient(135deg, var(--element-fire) 35%, var(--element-wind) 65%); }
 .boss-card.selected.weakness-ice-wind { background: linear-gradient(135deg, var(--element-ice) 35%, var(--element-wind) 65%); }
 .boss-card.selected.weakness-physical-wind { background: linear-gradient(135deg, var(--element-physical) 35%, var(--element-wind) 65%); }
-.boss-card.selected.weakness-electric-lumens { background: linear-gradient(135deg, var(--element-electric) 35%, var(--element-lumens) 65%); }
-.boss-card.selected.weakness-ether-lumens { background: linear-gradient(135deg, var(--element-ether) 35%, var(--element-lumens) 65%); }
-.boss-card.selected.weakness-fire-lumens { background: linear-gradient(135deg, var(--element-fire) 35%, var(--element-lumens) 65%); }
-.boss-card.selected.weakness-ice-lumens { background: linear-gradient(135deg, var(--element-ice) 35%, var(--element-lumens) 65%); }
-.boss-card.selected.weakness-lumens-physical { background: linear-gradient(135deg, var(--element-lumens) 35%, var(--element-physical) 65%); }
-.boss-card.selected.weakness-lumens-wind { background: linear-gradient(135deg, var(--element-lumens) 35%, var(--element-wind) 65%); }
+.boss-card.selected.weakness-electric-lumen { background: linear-gradient(135deg, var(--element-electric) 35%, var(--element-lumen) 65%); }
+.boss-card.selected.weakness-ether-lumen { background: linear-gradient(135deg, var(--element-ether) 35%, var(--element-lumen) 65%); }
+.boss-card.selected.weakness-fire-lumen { background: linear-gradient(135deg, var(--element-fire) 35%, var(--element-lumen) 65%); }
+.boss-card.selected.weakness-ice-lumen { background: linear-gradient(135deg, var(--element-ice) 35%, var(--element-lumen) 65%); }
+.boss-card.selected.weakness-lumen-physical { background: linear-gradient(135deg, var(--element-lumen) 35%, var(--element-physical) 65%); }
+.boss-card.selected.weakness-lumen-wind { background: linear-gradient(135deg, var(--element-lumen) 35%, var(--element-wind) 65%); }
 
 @media (max-width: 768px) {
     .boss-grid {
@@ -1995,7 +1995,7 @@ button#simulate-btn:disabled,
 .element-tag.physical { background: var(--element-physical); color: #1a1a26; }
 .element-tag.ether { background: var(--element-ether); color: white; }
 .element-tag.wind { background: var(--element-wind); color: #1a1a26; }
-.element-tag.lumens { background: var(--element-lumens); color: #1a1a26; }
+.element-tag.lumen { background: var(--element-lumen); color: #1a1a26; }
 
 /* ============================================================================
    TEAMS GRID
@@ -2066,7 +2066,7 @@ button#simulate-btn:disabled,
 .team-unit.element-physical { border-color: var(--element-physical); }
 .team-unit.element-ether { border-color: var(--element-ether); }
 .team-unit.element-wind { border-color: var(--element-wind); }
-.team-unit.element-lumens { border-color: var(--element-lumens); }
+.team-unit.element-lumen { border-color: var(--element-lumen); }
 
 .team-unit .unit-avatar {
     width: 100%;
@@ -2092,7 +2092,7 @@ button#simulate-btn:disabled,
 .team-unit.element-physical .unit-initials { color: var(--element-physical-light); }
 .team-unit.element-ether .unit-initials { color: var(--element-ether-light); }
 .team-unit.element-wind .unit-initials { color: var(--element-wind-light); }
-.team-unit.element-lumens .unit-initials { color: var(--element-lumens-light); }
+.team-unit.element-lumen .unit-initials { color: var(--element-lumen-light); }
 
 .team-unit .unit-name {
     font-size: 0.5rem;
@@ -2134,7 +2134,7 @@ button#simulate-btn:disabled,
 .team-badge.element-badge.physical { background: var(--element-physical); color: #1a1a26; }
 .team-badge.element-badge.ether { background: var(--element-ether); color: white; }
 .team-badge.element-badge.wind { background: var(--element-wind); color: #1a1a26; }
-.team-badge.element-badge.lumens { background: var(--element-lumens); color: #1a1a26; }
+.team-badge.element-badge.lumen { background: var(--element-lumen); color: #1a1a26; }
 
 .team-badge.role-badge {
     background: rgba(0, 212, 170, 0.2);
@@ -2226,7 +2226,7 @@ button#simulate-btn:disabled,
 .grid-row-label.element-physical { color: var(--element-physical-light); }
 .grid-row-label.element-ether { color: var(--element-ether-light); }
 .grid-row-label.element-wind { color: var(--element-wind-light); }
-.grid-row-label.element-lumens { color: var(--element-lumens-light); }
+.grid-row-label.element-lumen { color: var(--element-lumen-light); }
 
 .grid-cell {
     flex: 1;
@@ -2562,7 +2562,7 @@ button#simulate-btn:disabled,
 .result-boss-tile.weakness-physical { background: var(--element-physical); }
 .result-boss-tile.weakness-ether { background: var(--element-ether); }
 .result-boss-tile.weakness-wind { background: var(--element-wind); }
-.result-boss-tile.weakness-lumens { background: var(--element-lumens); }
+.result-boss-tile.weakness-lumen { background: var(--element-lumen); }
 
 .result-boss-tile.weakness-electric-ether { background: linear-gradient(135deg, var(--element-electric) 35%, var(--element-ether) 65%); }
 .result-boss-tile.weakness-ether-ice { background: linear-gradient(135deg, var(--element-ether) 35%, var(--element-ice) 65%); }
@@ -2580,12 +2580,12 @@ button#simulate-btn:disabled,
 .result-boss-tile.weakness-fire-wind { background: linear-gradient(135deg, var(--element-fire) 35%, var(--element-wind) 65%); }
 .result-boss-tile.weakness-ice-wind { background: linear-gradient(135deg, var(--element-ice) 35%, var(--element-wind) 65%); }
 .result-boss-tile.weakness-physical-wind { background: linear-gradient(135deg, var(--element-physical) 35%, var(--element-wind) 65%); }
-.result-boss-tile.weakness-electric-lumens { background: linear-gradient(135deg, var(--element-electric) 35%, var(--element-lumens) 65%); }
-.result-boss-tile.weakness-ether-lumens { background: linear-gradient(135deg, var(--element-ether) 35%, var(--element-lumens) 65%); }
-.result-boss-tile.weakness-fire-lumens { background: linear-gradient(135deg, var(--element-fire) 35%, var(--element-lumens) 65%); }
-.result-boss-tile.weakness-ice-lumens { background: linear-gradient(135deg, var(--element-ice) 35%, var(--element-lumens) 65%); }
-.result-boss-tile.weakness-lumens-physical { background: linear-gradient(135deg, var(--element-lumens) 35%, var(--element-physical) 65%); }
-.result-boss-tile.weakness-lumens-wind { background: linear-gradient(135deg, var(--element-lumens) 35%, var(--element-wind) 65%); }
+.result-boss-tile.weakness-electric-lumen { background: linear-gradient(135deg, var(--element-electric) 35%, var(--element-lumen) 65%); }
+.result-boss-tile.weakness-ether-lumen { background: linear-gradient(135deg, var(--element-ether) 35%, var(--element-lumen) 65%); }
+.result-boss-tile.weakness-fire-lumen { background: linear-gradient(135deg, var(--element-fire) 35%, var(--element-lumen) 65%); }
+.result-boss-tile.weakness-ice-lumen { background: linear-gradient(135deg, var(--element-ice) 35%, var(--element-lumen) 65%); }
+.result-boss-tile.weakness-lumen-physical { background: linear-gradient(135deg, var(--element-lumen) 35%, var(--element-physical) 65%); }
+.result-boss-tile.weakness-lumen-wind { background: linear-gradient(135deg, var(--element-lumen) 35%, var(--element-wind) 65%); }
 
 /* Result team stack */
 .result-team-stack {
@@ -2612,7 +2612,7 @@ button#simulate-btn:disabled,
 .result-unit-card.element-physical { border-color: var(--element-physical); }
 .result-unit-card.element-ether { border-color: var(--element-ether); }
 .result-unit-card.element-wind { border-color: var(--element-wind); }
-.result-unit-card.element-lumens { border-color: var(--element-lumens); }
+.result-unit-card.element-lumen { border-color: var(--element-lumen); }
 
 .result-unit-card .unit-avatar {
     width: 100%;
@@ -2638,7 +2638,7 @@ button#simulate-btn:disabled,
 .result-unit-card.element-physical .unit-initials { color: var(--element-physical-light); }
 .result-unit-card.element-ether .unit-initials { color: var(--element-ether-light); }
 .result-unit-card.element-wind .unit-initials { color: var(--element-wind-light); }
-.result-unit-card.element-lumens .unit-initials { color: var(--element-lumens-light); }
+.result-unit-card.element-lumen .unit-initials { color: var(--element-lumen-light); }
 
 .result-unit-card .unit-name {
     font-size: 0.55rem;
@@ -3110,9 +3110,9 @@ button#simulate-btn:disabled,
     color: #1a1a26;
 }
 
-.element-toggle.lumens.active {
-    background: var(--element-lumens);
-    border-color: var(--element-lumens);
+.element-toggle.lumen.active {
+    background: var(--element-lumen);
+    border-color: var(--element-lumen);
     color: #1a1a26;
 }
 
@@ -4238,7 +4238,7 @@ button#simulate-btn:disabled,
 .rec-unit.element-physical { border-color: var(--element-physical); }
 .rec-unit.element-ether { border-color: var(--element-ether); }
 .rec-unit.element-wind { border-color: var(--element-wind); }
-.rec-unit.element-lumens { border-color: var(--element-lumens); }
+.rec-unit.element-lumen { border-color: var(--element-lumen); }
 
 .rec-unit .unit-avatar {
     width: 44px;

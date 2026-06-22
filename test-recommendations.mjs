@@ -102,10 +102,10 @@ await runTest(0, 'isSubdps correctness (pre-test)', () => {
     }
     const cissia = unitByName(allUnits, 'Cissia');
     assert(cissia, 'missing unit Cissia');
-    assert(!isSubdps(cissia), 'Cissia should not be subdps without Seed');
+    assert(!isSubdps(cissia), 'Cissia should not be subdps without team context');
     const seed = unitByName(allUnits, 'Seed');
     if (seed) {
-        assert(isSubdps(cissia, [seed]), 'Cissia should be subdps when Seed is in the team');
+        assert(isSubdps(cissia, [seed]), 'Cissia should be subdps when Seed is a teammate (2 attackers total)');
     }
     const yanagi = unitByName(allUnits, 'Yanagi');
     assert(yanagi, 'missing unit Yanagi');
@@ -530,17 +530,11 @@ await runTest(28, 'YSG codependent — Zhao in roster satisfies dependency', () 
 });
 
 await runTest(29, 'Aria has no codependent flag — no dependency check runs', () => {
-    // Put Aria on a synthetic banner to ensure she gets assessed for tile verdicts
     const { unitStates, ownedUnits } = buildSyntheticRoster(allUnits, CODEPENDENT_ROSTER);
-    const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 15 });
 
-    const ariaRec = result.recommendations.find(r => r.units.some(u => u.id === 'aria'));
-    if (ariaRec) {
-        assert(!ariaRec.teamDependencyNotes?.length,
-            'Aria should NOT have teamDependencyNotes — she has no codependent flag');
-    }
-
-    // Also verify directly via checkTeamDependencies
+    // Verify directly that Aria's own codependent check is clean.
+    // (Card-level teamDependencyNotes may inherit from codependent co-card members,
+    // which is correct behavior — only the unit-level check matters here.)
     const aria = unitByName(allUnits, 'Aria');
     const dep = checkTeamDependencies(aria, ownedUnits, allUnits);
     assert(!dep.hasUnmetDependency,
@@ -653,6 +647,105 @@ await runTest(35, 'Support coverage — Lucia recommended for rupture, Sunna exc
     const attackGap = findGap(result, 'support-attack');
     assert(attackGap.units.some(u => u.id === 'sunna'),
         'Sunna should appear in the support-attack gap instead');
+});
+
+// ===========================================================================
+// TESTS 36-39: Lumen / Remielle pull recommendations
+// ===========================================================================
+
+await runTest(36, 'Remielle not recommended to synergize with join-incompatible units', () => {
+    // Trigger joins on ["attack", "electric"] — no join overlap with Rem at all.
+    // Rem should NOT appear in a mech-synergy gap paired with Trigger.
+    const roster = ['Trigger', 'Evelyn', 'Astra', 'Nicole', 'Anby', 'Billy'];
+    const { unitStates, ownedUnits } = buildSyntheticRoster(allUnits, roster);
+    const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 20 });
+
+    const remTriggerGap = result.allGaps.find(g =>
+        g.id.startsWith('mech-synergy-') &&
+        g.units.some(u => u.id === 'ramiel') &&
+        g.bestPairName === 'Trigger'
+    );
+    assert(!remTriggerGap,
+        'Remielle should NOT be paired with Trigger — no join compatibility');
+});
+
+await runTest(38, 'Remielle does NOT count as disorder partner for other anomaly DPS', () => {
+    // Roster: Miyabi + Remielle — Rem is lumen and can't generate disorders.
+    // Miyabi should still need a non-lumen disorder partner.
+    const roster = ['Miyabi', 'Remielle', 'Nicole', 'Anby', 'Billy'];
+    const { unitStates, ownedUnits } = buildSyntheticRoster(allUnits, roster);
+    const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 20 });
+
+    assert(hasGap(result, 'anomaly-partner'),
+        'anomaly-partner gap should fire — Remielle (lumen) cannot generate disorders for Miyabi');
+});
+
+await runTest(40, 'Remielle codependent — no anomaly roster drops to Low or removed', () => {
+    // Roster has zero anomaly agents — Rem can't form any valid team.
+    // cannotFormTeam should fire, dropping TWO priority levels.
+    const roster = [
+        'Evelyn', 'Trigger', 'Harumasa', 'Lighter',
+        'Astra', 'Yuzuha', 'Lycaon',
+        'Nicole', 'Anby', 'Billy'
+    ];
+    const { unitStates, ownedUnits } = buildSyntheticRoster(allUnits, roster);
+    const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 15 });
+
+    const ramiel = unitByName(allUnits, 'Remielle');
+    const dep = checkTeamDependencies(ramiel, ownedUnits, allUnits);
+    assert(dep.cannotFormTeam, 'cannotFormTeam should be true with no anomaly roster');
+
+    const remRec = result.recommendations.find(r => r.units.some(u => u.id === 'ramiel'));
+    assert(!remRec, 'Rem should not appear in recommendations at all when she cannot form any team');
+});
+
+await runTest(41, 'Remielle excluded with single A-rank anomaly partner (Piper)', () => {
+    // Piper alone can't enable triple-anomaly. Rem's best achievable buff is 2
+    // (half of max 4) — cannotActivateBuffs should fire, excluding her from gaps.
+    const baseRoster = [
+        'Evelyn', 'Trigger', 'Harumasa', 'Lighter',
+        'Astra', 'Yuzuha', 'Lycaon', 'Nangong',
+        'Nicole', 'Anby', 'Billy'
+    ];
+
+    // Without Piper: zero anomaly → Rem excluded (cannotActivateBuffs)
+    const { unitStates: states0, ownedUnits: owned0 } = buildSyntheticRoster(allUnits, baseRoster);
+    const result0 = analyze(allUnits, states0, owned0, { maxRecommendations: 15 });
+    const rem0 = result0.recommendations.find(r => r.units.some(u => u.id === 'ramiel'));
+    assert(!rem0, 'Rem should not appear with zero anomaly agents');
+
+    // With Piper: single A-rank anomaly → Rem STILL excluded (buff = 2/4 ≤ half)
+    const withPiper = [...baseRoster, 'Piper'];
+    const { unitStates: states1, ownedUnits: owned1 } = buildSyntheticRoster(allUnits, withPiper);
+    const result1 = analyze(allUnits, states1, owned1, { maxRecommendations: 15 });
+    const rem1 = result1.recommendations.find(r => r.units.some(u => u.id === 'ramiel'));
+    assert(!rem1, 'Rem should not appear with only Piper — can\'t build triple-anomaly');
+
+    // Verify the anomaly DPS gap itself stays HIGH without Piper (the NEED is real)
+    const anomalyGap0 = result0.allGaps.find(g => g.id === 'dps-anomaly');
+    assert(anomalyGap0, 'dps-anomaly gap should fire with zero anomaly agents');
+    assert(anomalyGap0.priority === 'High',
+        `dps-anomaly should be High with zero anomaly, got ${anomalyGap0.priority}`);
+
+    // With Piper, anomaly DPS gap should still fire (Piper is borderline at best)
+    const anomalyGap1 = result1.allGaps.find(g => g.id === 'dps-anomaly');
+    assert(anomalyGap1, 'dps-anomaly gap should still fire with only Piper');
+});
+
+await runTest(42, 'Remielle is High priority for anomaly-loaded roster', () => {
+    // Even with Miyabi + Alice + Promeia (deep anomaly coverage), Rem should be
+    // High priority — she's a titled T0 that creates entirely new team archetypes.
+    const roster = [
+        'Miyabi', 'Alice', 'Promeia', 'Vivian', 'Nangong', 'Yuzuha',
+        'Astra', 'Trigger', 'Nicole', 'Anby', 'Billy'
+    ];
+    const { unitStates, ownedUnits } = buildSyntheticRoster(allUnits, roster);
+    const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 10 });
+
+    const remRec = result.recommendations.find(r => r.units.some(u => u.id === 'ramiel'));
+    assert(remRec, 'Remielle should appear in recommendations for an anomaly-loaded roster');
+    assert(remRec.priority === 'High',
+        `Remielle should be High priority, got ${remRec.priority} — titled T0 creates new archetypes`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

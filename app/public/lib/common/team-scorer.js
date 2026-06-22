@@ -61,7 +61,7 @@ const NEED_FULFILLMENT_KEYS = [
 
 const VORTEX_TIERS = { 
     //Base elements
-    "ice": 4, "fire": 2, "physical": 2, "ether": 1, "electric": 1, "lumens": 0,
+    "ice": 4, "fire": 2, "physical": 2, "ether": 1, "electric": 1, "lumen": 0,
     //Variants
     "ice:frost" : 0.001, 
     "ether:auricInk" : 0.8, 
@@ -71,6 +71,17 @@ const VORTEX_DEFAULT_TIER = 0.001;
 const VORTEX_BASE = 17;
 // Normalisation base for tier scaling in vortex buff affinity (ice=4).
 const MAX_VORTEX_TIER = 4;
+// Refringe: bonus applied to each non-lumen anomaly teammate when a lumen agent is on
+// the team with Lumiflux Buildup. Large by design — comparable to vortex/disorder bonuses.
+// Deliberately tunable: allocation (to teammates, to lumen agent, or both) may shift after testing.
+const REFRINGE_BONUS = 15;
+// Refringe cascades: Attribute Mutation boosts anomaly proc damage, which in turn increases
+// disorder/vortex damage derived from those procs. Partners generating reactions get extra credit.
+const REFRINGE_DISORDER_CASCADE = 8;
+const REFRINGE_VORTEX_CASCADE = 6;
+// Conditional buff underutilization: squared-gap penalty per buff key.
+// gap² × MULT punishes large missed buffs disproportionately (duo-anomaly Rem: 140, solo: 560).
+const CONDITIONAL_BUFF_PENALTY_MULT = 35;
 const POLARITY_VORTEX_DISCOUNT = 0.35;
 const NATURALLY_AVAILABLE_NEEDS = new Set(['ultimates', 'chains']);
 const STAT_SCALING_KEYS = ['am', 'ap', 'cr', 'cd', 'hp', 'def', 'pen', 'sheer'];
@@ -143,7 +154,8 @@ export function isARank(unit) {
 }
 
 export function getElement(unit) {
-    return unit.tags.find(tag => ELEMENTS.includes(tag));
+    // _morphedElement is set transiently during try-all morph scoring for lumen units
+    return unit._morphedElement ?? unit.tags.find(tag => ELEMENTS.includes(tag));
 }
 
 export function hasDefensiveAssist(unit) {
@@ -152,10 +164,31 @@ export function hasDefensiveAssist(unit) {
 
 export function isOnField(unit) {
     const explicit = unit.mechanics?.onfield;
-    if (explicit !== undefined) return !!explicit;
+    if (explicit !== undefined) return explicit === true || explicit === 'shared';
     if (isDPS(unit) || isStun(unit)) return true;
     const activated = unit._activatedRoles || [];
     return activated.some(r => DPS_ROLES.includes(r) || r === 'stun');
+}
+
+function isSharedField(unit) {
+    return unit.mechanics?.onfield === 'shared';
+}
+
+function isLumenUnit(unit) {
+    return getElement(unit) === 'lumen';
+}
+
+// Returns the list of teammate elements that a lumen unit could morph to via Attribute Mutation.
+// Lumen agents deal damage as the next agent's element in team order — effectively any teammate
+// element. The caller should score with each option and take the best result.
+function getPossibleMorphElements(unit, team) {
+    if (!isLumenUnit(unit)) return null;
+    return [...new Set(
+        team
+            .filter(u => u.id !== unit.id)
+            .map(u => getElement(u))
+            .filter(e => e !== 'lumen')
+    )];
 }
 
 // ============================================================================
@@ -254,8 +287,10 @@ function computeConditionalBuffPenalty(supplier, team) {
         if (maxLevel <= 0) continue;
         const resolved = resolveConditionalBuffValue(supplier, team, buffKey);
         if (resolved >= maxLevel) continue;
-        const efficiency = resolved / maxLevel;
-        totalPenalty += (1 - efficiency) * maxLevel * 7;
+        // Squared-gap: large drops are disproportionately punished.
+        // duo-anomaly Rem (gap 2): 4*10=40; solo Rem (gap 4): 16*10=160.
+        const gap = maxLevel - resolved;
+        totalPenalty += gap * gap * CONDITIONAL_BUFF_PENALTY_MULT;
     }
     return totalPenalty;
 }
@@ -330,7 +365,9 @@ function getElementVariant(unit) {
 function teamHasImplicitDisorders(team) {
     const anomalyAgents = team.filter(u => getEffectiveRoles(u).includes('anomaly'));
     if (anomalyAgents.length < 2) return false;
-    const elements = anomalyAgents.map(u => getElementVariant(u));
+    // Lumen doesn't open its own anomaly gauge, so it doesn't contribute to elemental
+    // diversity for disorder purposes. Only count non-lumen anomaly elements.
+    const elements = anomalyAgents.map(u => getElementVariant(u)).filter(e => e !== 'lumen');
     return new Set(elements).size >= 2;
 }
 
@@ -370,8 +407,16 @@ function computeAnomalyReactions(team, boss) {
         let bestVortexTier = 0;
         let hasDisorder = false;
 
+        // Lumen agents don't build anomaly gauges via Attribute Mutation — their damage
+        // morphs to a teammate's element but does not fill the corresponding anomaly gauge.
+        // Therefore lumen units produce no anomaly reactions (no disorder, no vortex).
+        if (element === 'lumen') {
+            reactions.set(unit, { bestVortexTier: 0, hasDisorder: false });
+            continue;
+        }
+
         if (bossAnomaly) {
-            if (element !== bossAnomaly) {
+            if (element !== bossAnomaly && bossAnomaly !== 'lumen') {
                 if (bossAnomaly === 'wind' || element === 'wind') {
                     bestVortexTier = getVortexTierForElement(unit, bossAnomaly);
                 } else {
@@ -383,6 +428,8 @@ function computeAnomalyReactions(team, boss) {
                 if (partner === unit) continue;
                 const partnerEl = getElement(partner);
                 if (element === partnerEl) continue;
+                // Skip lumen pairings — lumen doesn't open its own gauge
+                if (partnerEl === 'lumen') continue;
 
                 if (element === 'wind' || partnerEl === 'wind') {
                     const nonWindUnit = (element === 'wind') ? partner : unit;
@@ -783,17 +830,39 @@ function checkDisqualifications(team, boss, debug) {
 
     const bossResistances = getBossResistances(boss);
     for (const unit of dpsUnits) {
-        if (bossResistances.includes(getElement(unit))) {
-            if (isEffectiveSupport(unit) || isEffectiveDefense(unit)) continue;
-            if (debug) console.log(`  DISQUALIFIED: ${unit.name} element resisted by boss`);
-            return -1;
+        if (isEffectiveSupport(unit) || isEffectiveDefense(unit)) continue;
+        const morphOptions = getPossibleMorphElements(unit, team);
+        if (morphOptions !== null) {
+            // Lumen unit: DQ only if ALL morph targets are resisted — if any target is
+            // unresisted the player will morph to it instead.
+            const hasValidMorph = morphOptions.length === 0 ||
+                morphOptions.some(e => !bossResistances.includes(e));
+            if (!hasValidMorph) {
+                if (debug) console.log(`  DISQUALIFIED: ${unit.name} (lumen) — all morph targets resisted`);
+                return -1;
+            }
+        } else {
+            if (bossResistances.includes(getElement(unit))) {
+                if (debug) console.log(`  DISQUALIFIED: ${unit.name} element resisted by boss`);
+                return -1;
+            }
         }
     }
 
     const bossAssists = getBossAssists(boss);
-    const defensiveAssistCount = team.filter(hasDefensiveAssist).length;
-    if (defensiveAssistCount < bossAssists) {
-        if (debug) console.log(`  DISQUALIFIED: ${defensiveAssistCount}/${bossAssists} defensive assists`);
+    // Units with shared field time (forced on/off-field cycle, mechanics.onfield === "shared")
+    // cannot reliably provide their defensive assist during the off-field phase. They count
+    // toward the assist requirement only when boss.assists === team.length (the "zero evasive
+    // assists" condition). Otherwise, only reliably-available defensive assists count.
+    const reliableDefAssists = team.filter(u => {
+        if (!hasDefensiveAssist(u)) return false;
+        if (isSharedField(u)) {
+            return bossAssists >= team.length;
+        }
+        return true;
+    }).length;
+    if (reliableDefAssists < bossAssists) {
+        if (debug) console.log(`  DISQUALIFIED: ${reliableDefAssists}/${bossAssists} reliable defensive assists`);
         return -1;
     }
 
@@ -1851,6 +1920,28 @@ function scoreMechanicalSynergy(team, debug, options = {}) {
         }
     }
 
+    // Refringe bonus: when a lumen anomaly agent is present, their Lumiflux Buildup is consumed
+    // when a non-lumen anomaly teammate procs an anomaly, dealing a large additional hit.
+    // Cascade: Attribute Mutation boosts anomaly proc damage, so disorder/vortex damage (which
+    // derives from anomaly procs) is also amplified. Partners with active reactions get extra credit.
+    const lumenAnomalyAgents = anomalyDPS.filter(isLumenUnit);
+    if (lumenAnomalyAgents.length > 0) {
+        const nonLumenAnomalyPartners = anomalyDPS.filter(u => !isLumenUnit(u));
+        for (const partner of nonLumenAnomalyPartners) {
+            const reaction = reactions.get(partner);
+            let bonus = REFRINGE_BONUS;
+            if (reaction?.hasDisorder) bonus += REFRINGE_DISORDER_CASCADE;
+            if (reaction?.bestVortexTier > 0) bonus += REFRINGE_VORTEX_CASCADE;
+            consumerScores.set(partner.name, (consumerScores.get(partner.name) || 0) + bonus);
+            if (debug) {
+                const parts = [`base ${REFRINGE_BONUS}`];
+                if (reaction?.hasDisorder) parts.push(`disorder +${REFRINGE_DISORDER_CASCADE}`);
+                if (reaction?.bestVortexTier > 0) parts.push(`vortex +${REFRINGE_VORTEX_CASCADE}`);
+                console.log(`    Refringe: ${partner.name} +${bonus} (${parts.join(', ')})`);
+            }
+        }
+    }
+
     // Diametric synergy: proportional amplifier on consumer's incoming L4
     if (debug) console.log('    Diametric synergy:');
     for (const consumer of team) {
@@ -2114,6 +2205,36 @@ function checkSynergyAvoid(team, { lenient = false, debug = false } = {}) {
 
 export function scoreTeamForBoss(team, boss, options = {}) {
     const { lenient = false, debug = false } = options;
+
+    // Lumen units morph their damage to a teammate's element via Attribute Mutation.
+    // Try each possible morph combination and return the highest score — the player will
+    // naturally order their team for the optimal outcome.
+    const lumenUnits = team.filter(isLumenUnit);
+    if (lumenUnits.length > 0 && !debug) {
+        const morphOptions = lumenUnits.map(u => getPossibleMorphElements(u, team) ?? [null]);
+        let bestScore = -Infinity;
+        const tryMorphCombinations = (idx) => {
+            if (idx === lumenUnits.length) {
+                const s = scoreTeamForBoss(team, boss, options);
+                if (s > bestScore) bestScore = s;
+                return;
+            }
+            const unit = lumenUnits[idx];
+            const targets = morphOptions[idx];
+            if (targets.length === 0) {
+                tryMorphCombinations(idx + 1);
+            } else {
+                for (const el of targets) {
+                    unit._morphedElement = el;
+                    tryMorphCombinations(idx + 1);
+                }
+                delete unit._morphedElement;
+            }
+        };
+        tryMorphCombinations(0);
+        return bestScore === -Infinity ? -1 : bestScore;
+    }
+
     const baseScore = lenient ? 200 : 100;
     let score = baseScore;
 
@@ -2127,9 +2248,16 @@ export function scoreTeamForBoss(team, boss, options = {}) {
         console.log(`SCORING: ${teamLabel}`);
         console.log(`Boss: ${boss.name}`);
         console.log(`Base score: ${baseScore}`);
+        const lumenLabels = lumenUnits.map(u => `${u.name}→${u._morphedElement ?? '(native)'}`);
+        if (lumenLabels.length > 0) console.log(`Lumen morph: ${lumenLabels.join(', ')}`);
     }
 
-    const cleanupRoles = () => { for (const u of team) delete u._activatedRoles; };
+    const cleanupRoles = () => {
+        for (const u of team) {
+            delete u._activatedRoles;
+            delete u._morphedElement;
+        }
+    };
 
     // Layer 1: Disqualifications
     const disq = checkDisqualifications(team, boss, debug);
@@ -2156,8 +2284,13 @@ export function scoreTeamForBoss(team, boss, options = {}) {
     }
     if (debug) console.log(`    Structure type: ${structureScore >= 0 ? '+' : ''}${structureScore} (used for teamwork multiplier)`);
 
-    // Field-time economy (stunners have brief rotations that don't compete for DPS field time)
-    const onFieldCount = team.filter(isOnField).length;
+    // Field-time economy (stunners have brief rotations that don't compete for DPS field time).
+    // Shared-field units (e.g., Remielle's forced on/off cycle) count as 0.5 — they occupy
+    // field time but not exclusively.
+    const onFieldCount = team.reduce((sum, u) => {
+        if (!isOnField(u)) return sum;
+        return sum + (isSharedField(u) ? 0.5 : 1);
+    }, 0);
     let fieldTimeAdj = 0;
     if (onFieldCount === 0)      fieldTimeAdj = FIELD_TIME.ZERO_ONFIELD_PENALTY;
     else if (onFieldCount === 1) fieldTimeAdj = FIELD_TIME.SOLO_CARRY_BONUS;
