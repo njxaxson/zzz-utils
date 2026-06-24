@@ -20,7 +20,7 @@ const FOUNDATIONAL_STAT_KEYS = new Set([
     'cr', 'cd', 'atk', 'pen', 'hp', 'def', 'ap', 'am'
 ]);
 const CODEPENDENT_SKIP_KEYS = new Set([
-    ...NATURALLY_AVAILABLE_KEYS, ...FOUNDATIONAL_STAT_KEYS, 'codependent'
+    ...NATURALLY_AVAILABLE_KEYS, ...FOUNDATIONAL_STAT_KEYS, 'codependent', 'buffs'
 ]);
 
 // ============================================================================

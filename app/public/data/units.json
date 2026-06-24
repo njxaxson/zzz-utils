@@ -175,7 +175,8 @@
         "mechanics": {
             "pseudoRole": ["stun"],
             "buffs": { "atk": 2 },
-            "utility": { "shields": 2, "interrupt-resistance": 2 }
+            "utility": { "shields": 2, "interrupt-resistance": 2 },
+            "scaling": { "buffs": 2 }
         },
         "faction": "Sons of Calydon",
         "displayText": "For those who struggle with the combat, Caesar's shielding and attack interrupts can make it easier to power through fights."
@@ -194,7 +195,8 @@
             "pseudoRole": [{ "role": "subdps", "when":{"countTag":"attack","minCount":2} }],
             "buffs": { "cr": 1 },
             "debuffs": { "electric": 2 },
-            "utility": { "daze": 1, "veils": 1 }
+            "utility": { "daze": 1, "veils": 1 },
+            "scaling": { "buffs": 2 }
         },
         "faction": "PubSec",
         "displayText": "Snake girl is an electric sub-DPS primarily designed to work with Seed."
@@ -398,7 +400,8 @@
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "buffs": { "fire": 2, "ice": 2 },
-            "debuffs": { "recovery": 3 }
+            "debuffs": { "recovery": 3 },
+            "scaling": { "buffs": 1 }
         },
         "faction": "Sons of Calydon",
         "displayText": "The original coolest man alive. Excellent stun unit that buffs fire and ice damage."
@@ -449,7 +452,8 @@
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "buffs": { "stun-multiplier": 2 },
-            "debuffs": { "ice": 2 }
+            "debuffs": { "ice": 2 },
+            "scaling": { "buffs": 0 }
         },
         "faction": "Victoria Housekeeping",
         "displayText": "Unlocking his potential vision opens Lycaon up as an anomaly-compatible stunner."
@@ -561,7 +565,7 @@
             "onfield": false,
             "damage": { "aftershock": 3 },
             "buffs": { "atk": 2 },
-            "scaling": { "er": 3 }
+            "scaling": { "er": 3, "buffs": 2 }
         },
         "faction": "Obol Squad",
         "displayText": "Clumsy off-field attack agent that does aftershock damage and buffs teammates. Not recommended as an on-field DPS."
@@ -608,8 +612,9 @@
         "join": ["stun", "anomaly"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
-            "damage": { "abloom": 3, "enhanced": 1 },
-            "buffs": { "abloom": 3 }
+            "damage": { "abloom": 3, "enhanced": 2 },
+            "buffs": { "abloom": 3 },
+            "scaling": { "buffs": 1 }
         },
         "faction": "Krampus",
         "displayText": "She's not Batman, but she's got that vibe. Very strong ice anomaly agent that goes a different route from Miyabi. In certain scenarios, she can be even better than Miyabi."
@@ -722,7 +727,7 @@
         "mechanics": {
             "damage": { "aftershock": 2 },
             "buffs": { "aftershock": 3 },
-            "scaling": { "codependent": true }
+            "scaling": { "codependent": true, "buffs": 3 }
         },
         "faction": "Silver Squad",
         "displayText": "Premier electric DPS, Silver Soldier Anby wants aftershock teammates like Trigger and Orphie to maximize her damage potential."

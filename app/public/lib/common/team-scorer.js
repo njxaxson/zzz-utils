@@ -24,7 +24,7 @@ const MULT = {
     STUN_EMERGENCE: 1.0,
     ELEMENT_BUFF: 2,
     ELEMENT_DEBUFF: 2,
-    ANOMALY_BUFF: 2,
+    ANOMALY_BUFF: 1.6,
     SHEER_BUFF: 9,
     PEN_BUFF: 2,
     ATK_BUFF: 0.7,
@@ -36,7 +36,7 @@ const MULT = {
     ULTIMATES_PROVISION: 1.5,
     STUN_MULT_BUFF: 2,
     TOTALIZE_PENALTY: 38,
-    DISORDER_BONUS: 12,
+    DISORDER_BONUS: 6,
     DIAMETRIC: 3,
     VORTEX_BUFF: 4,
 };
@@ -44,12 +44,12 @@ const MULT = {
 const RUPTURE_ATK_EFFICIENCY = 0.33;
 
 const BOSS_WEAK = {
-    DISORDER_PER_UNIT: 8,
+    DISORDER_PER_UNIT: 4,
     VEIL_PER_UNIT: 8,
     STUN_BONUS: 15,
     ABLOOM_PER_UNIT: 5,
-    FREEZE_BONUS: 60,
-    CD_DEBUFF_PER_UNIT: 12,
+    FREEZE_BONUS: 15,
+    CD_DEBUFF_PER_UNIT: 16,
     DAZE_DEBUFF_PER_UNIT: 10,
 };
 
@@ -61,27 +61,28 @@ const NEED_FULFILLMENT_KEYS = [
 
 const VORTEX_TIERS = { 
     //Base elements
-    "ice": 4, "fire": 2, "physical": 2, "ether": 1, "electric": 1, "lumen": 0,
+    "ice": 4.5, "fire": 2, "physical": 2, "ether": 1, "electric": 1, "lumen": 0,
     //Variants
     "ice:frost" : 0.001, 
     "ether:auricInk" : 0.8, 
     "physical:honedEdge" : 0.8
 };
 const VORTEX_DEFAULT_TIER = 0.001;
-const VORTEX_BASE = 17;
+const VORTEX_BASE = 15;
 // Normalisation base for tier scaling in vortex buff affinity (ice=4).
 const MAX_VORTEX_TIER = 4;
 // Refringe: bonus applied to each non-lumen anomaly teammate when a lumen agent is on
 // the team with Lumiflux Buildup. Large by design — comparable to vortex/disorder bonuses.
 // Deliberately tunable: allocation (to teammates, to lumen agent, or both) may shift after testing.
-const REFRINGE_BONUS = 15;
+const REFRINGE_BONUS = 8;
 // Refringe cascades: Attribute Mutation boosts anomaly proc damage, which in turn increases
 // disorder/vortex damage derived from those procs. Partners generating reactions get extra credit.
-const REFRINGE_DISORDER_CASCADE = 8;
-const REFRINGE_VORTEX_CASCADE = 6;
+const REFRINGE_DISORDER_CASCADE = 4;
+const REFRINGE_VORTEX_CASCADE = 3;
 // Conditional buff underutilization: squared-gap penalty per buff key.
 // gap² × MULT punishes large missed buffs disproportionately (duo-anomaly Rem: 140, solo: 560).
 const CONDITIONAL_BUFF_PENALTY_MULT = 35;
+const L4_SOFT_CAP = 250;
 const POLARITY_VORTEX_DISCOUNT = 0.35;
 const NATURALLY_AVAILABLE_NEEDS = new Set(['ultimates', 'chains']);
 const STAT_SCALING_KEYS = ['am', 'ap', 'cr', 'cd', 'hp', 'def', 'pen', 'sheer'];
@@ -615,8 +616,17 @@ function getBuffRelevance(key, consumer) {
             return dps ? 1 : 0;
         case 'chains':
             return 1;
+        case 'abloom':
+            if (roles.includes('anomaly')) return 1;
+            if (consumer.mechanics?.damage?.abloom) return 1;
+            return 0;
+        case 'disorders':
+            if (roles.includes('anomaly')) return 1;
+            if (consumer.mechanics?.damage?.polarity || consumer.mechanics?.damage?.disorders) return 1;
+            return 0;
         default:
-            if (consumer.mechanics?.damage?.[key]) return 1;
+            const dmgVal = consumer.mechanics?.damage?.[key];
+            if (dmgVal) return w(dmgVal) >= 2 ? 1 : 0.5;
             if (ELEMENTS.includes(key) && element === key && (dps || roles.includes('stun'))) return 1;
             return 0;
     }
@@ -646,7 +656,18 @@ const BUFF_IMPACT = {
     'stun-multiplier': MULT.STUN_MULT_BUFF,
 };
 
+function getScalingBuffs(unit) {
+    const explicit = unit.mechanics?.scaling?.buffs;
+    if (explicit !== undefined) return w(explicit);
+    if (unit.tags.includes('support') || unit.tags.includes('defense')) return 3;
+    if (unit.tags.includes('stun')) return 2;
+    return 0;
+}
+
 function computeBuffUtilization(supplier, team) {
+    const scalingBuffs = getScalingBuffs(supplier);
+    if (scalingBuffs === 0) return 1.0;
+
     const consumers = team.filter(t => t !== supplier);
     const nConsumers = consumers.length;
 
@@ -694,7 +715,8 @@ function computeBuffUtilization(supplier, team) {
         }
         if (totalWeight === 0) return 1.0;
         const rawUtil = effectiveWeight / totalWeight;
-        return 0.65 + 0.35 * rawUtil;
+        const baseUtil = 0.65 + 0.35 * rawUtil;
+        return 1 - (1 - baseUtil) * (scalingBuffs / 3);
     }
 
     const buffs = { ...(supplier.mechanics?.buffs || {}) };
@@ -717,6 +739,10 @@ function computeBuffUtilization(supplier, team) {
         const bw = w(value);
         if (bw <= 0) continue;
         totalWeight += bw;
+        if (bw < 2) {
+            effectiveWeight += bw;
+            continue;
+        }
 
         if (STAT_BUFF_KEYS.has(key)) {
             let dpsRelevance = 0;
@@ -745,6 +771,10 @@ function computeBuffUtilization(supplier, team) {
         const dw = w(value);
         if (dw <= 0) continue;
         totalWeight += dw;
+        if (dw < 2) {
+            effectiveWeight += dw;
+            continue;
+        }
         let maxRelevance = 0;
         for (const consumer of consumers) {
             maxRelevance = Math.max(maxRelevance, getDebuffRelevance(key, consumer));
@@ -782,7 +812,8 @@ function computeBuffUtilization(supplier, team) {
     const rawCoreRatio = coreWeight > 0 ? coreEffective / coreWeight : 0;
     const coreActivation = Math.min(1.0, coreImpact / CORE_IMPACT_BASELINE);
     const coreRatio = rawCoreRatio * coreActivation;
-    return Math.min(1.0, Math.max(adjustedRatio, threshold, coreRatio));
+    const baseUtil = Math.min(1.0, Math.max(adjustedRatio, threshold, coreRatio));
+    return 1 - (1 - baseUtil) * (scalingBuffs / 3);
 }
 
 // ============================================================================
@@ -1085,15 +1116,17 @@ function scoreInherentQuality(team, { lenient = false, debug = false, boss = nul
         }
 
         let tierBonus = 0;
-        if (tier <= 0.5)      tierBonus = (65 - (tier * 20)) * tierMult;
-        else if (tier <= 1.5) tierBonus = (25 - ((tier - 1) * 10)) * tierMult;
-        else if (tier <= 2)   tierBonus = -(lenient ? 15 : 40);
-        else if (tier <= 3)   tierBonus = -(lenient ? 40 : 130);
-        else                  tierBonus = -(lenient ? 60 : 130);
+        if (tier <= 0.5)      tierBonus = (40 - (tier * 10)) * tierMult;
+        else if (tier <= 1.5) tierBonus = (18 - ((tier - 1) * 6)) * tierMult;
+        else if (tier <= 2)   tierBonus = -(lenient ? 5 : 10);
+        else if (tier <= 2.5) tierBonus = -(lenient ? 10 : 25);
+        else if (tier <= 3)   tierBonus = -(lenient ? 25 : 65);
+        else if (tier <= 3.5) tierBonus = -(lenient ? 35 : 90);
+        else                  tierBonus = -(lenient ? 50 : 120);
         score += tierBonus;
 
         if (isTitled(unit)) {
-            const titledBonus = forcedSecondary ? Math.round(20 * tierMult) : 20;
+            const titledBonus = forcedSecondary ? Math.round(15 * tierMult) : 15;
             score += titledBonus;
             if (debug) console.log(`      ${unit.name}: T${tier} → ${tierBonus >= 0 ? '+' : ''}${tierBonus}${tierMult < 1 ? ` (${forcedSecondary ? 'forced' : 'subdps'} x0.5)` : ''}, +${titledBonus} titled`);
         } else if (debug) {
@@ -1140,18 +1173,18 @@ function scoreInherentQuality(team, { lenient = false, debug = false, boss = nul
     for (const unit of [...supportUnits, ...defenseUnits, ...stunUnits].filter(u => !dpsSet.has(u))) {
         const tier = unit.tier ?? 2.5;
         let tierBonus = 0;
-        if (tier <= 0.5)      tierBonus = 23 - (tier * 8);
-        else if (tier <= 1.5) tierBonus = 9 - ((tier - 1) * 4);
-        else if (tier <= 2)   tierBonus = -(lenient ? 5 : 14);
-        else if (tier <= 3)   tierBonus = -(lenient ? 20 : 60);
-        else                  tierBonus = -(lenient ? 40 : 100);
+        if (tier <= 0.5)      tierBonus = 15 - (tier * 4);
+        else if (tier <= 1.5) tierBonus = 7 - ((tier - 1) * 4);
+        else if (tier <= 2)   tierBonus = 0;
+        else if (tier <= 2.5) tierBonus = -(lenient ? 8 : 20);
+        else                  tierBonus = -(lenient ? 15 : 35);
 
         let rankBonus = 0;
         if (isStun(unit)) {
-            if (isSRank(unit)) { rankBonus += 10; if (isLimited(unit)) rankBonus += 5; }
+            if (isSRank(unit)) { rankBonus += 6; if (isLimited(unit)) rankBonus += 5; }
             else if (isARank(unit)) rankBonus = -5;
         } else {
-            if (isSRank(unit)) { rankBonus += 10; if (isLimited(unit)) rankBonus += 8; }
+            if (isSRank(unit)) { rankBonus += 6; if (isLimited(unit)) rankBonus += 8; }
             else if (isARank(unit)) rankBonus = -5;
         }
 
@@ -1185,12 +1218,12 @@ function scoreInherentQuality(team, { lenient = false, debug = false, boss = nul
     for (const unit of dpsUnits) {
         let rankBonus = 0;
         if (isSRank(unit)) {
-            rankBonus += 20;
+            rankBonus += 12;
             if (isTitled(unit)) rankBonus += 15;
             if (isLimited(unit)) rankBonus += 10;
         } else if (isARank(unit)) {
             const tier = unit.tier ?? 2.5;
-            rankBonus = (tier >= 2) ? -(lenient ? 25 : 80) : -10;
+            rankBonus = (tier >= 2) ? -(lenient ? 12 : 30) : -10;
         }
         if (forcedSecondaryUnits.has(unit) && rankBonus > 0) {
             rankBonus = Math.round(rankBonus * 0.5);
@@ -1231,16 +1264,16 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
         if (isDPSShill) {
             const hasShilledDPS = dpsUnits.some(u => u.tags.includes(bossShill) && !isEffectiveSupport(u) && !isEffectiveDefense(u));
             if (hasShilledDPS) {
-                score += 15;
-                if (debug) console.log(`    Shill match (${bossShill}): +15`);
+                score += 8;
+                if (debug) console.log(`    Shill match (${bossShill}): +8`);
             }
         } else {
             if (!team.some(u => u.tags.includes(bossShill))) {
                 if (debug) console.log(`    DISQUALIFIED: Missing required role ${bossShill}`);
                 return { score: -1, disqualified: true };
             }
-            score += 15;
-            if (debug) console.log(`    Non-DPS shill match (${bossShill}): +15`);
+            score += 8;
+            if (debug) console.log(`    Non-DPS shill match (${bossShill}): +8`);
         }
     }
     
@@ -1253,7 +1286,7 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
                 const multiplier = favoredCount === 1
                     ? shillIntensity
                     : 1 + (shillIntensity - 1) * 0.5;
-                const bonus = Math.round(35 * multiplier);
+                const bonus = Math.round(22 * multiplier);
                 score += bonus;
                 if (debug) console.log(`    Favored: ${unit.name} +${bonus} (intensity ${shillIntensity}, #${favoredCount})`);
             }
@@ -1369,31 +1402,34 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
 
     // --- DPS element weakness/resistance ---
     const l3Reactions = computeAnomalyReactions(team, boss);
+    let onElementDPSCount = 0;
     for (const unit of dpsUnits) {
         const element = getElement(unit);
 
         if (bossWeaknesses.includes(element)) {
+            onElementDPSCount++;
             const isSubDPS = hasSubDPSRole(unit);
             const unitReaction = l3Reactions.get(unit);
             const reactionDisabled = isSubDPS && isAnomaly(unit) &&
                 !(unitReaction?.bestVortexTier > 0 || unitReaction?.hasDisorder) &&
                 !bossWeaknesses.includes(element);
             let bonus = isSRank(unit)
-                ? (isSubDPS ? 25 : 40)
-                : (isSubDPS ? 10 : 20);
+                ? (isSubDPS ? 17 : 28)
+                : (isSubDPS ? 9 : 15);
             if (reactionDisabled) bonus = Math.round(bonus * 0.5);
+            if (onElementDPSCount > 1 && bossWeaknesses.length >= 2) bonus = Math.round(bonus * 0.6);
             score += bonus;
-            if (debug) console.log(`    ${unit.name} on-element (${element}): +${bonus}${reactionDisabled ? ' (reaction-disabled)' : ''}`);
+            if (debug) console.log(`    ${unit.name} on-element (${element}): +${bonus}${reactionDisabled ? ' (reaction-disabled)' : ''}${onElementDPSCount > 1 ? ' (diminished)' : ''}`);
 
             if (isTitled(unit) && bossShill && DPS_ROLES.includes(bossShill) && !unit.tags.includes(bossShill)) {
-                score += 30;
-                if (debug) console.log(`    ${unit.name} titled on-element vs shill mismatch: +30`);
+                score += 15;
+                if (debug) console.log(`    ${unit.name} titled on-element vs shill mismatch: +15`);
             }
         }
     }
 
     if (bossWeaknesses.length > 0) {
-        const primaryDPS = dpsUnits.filter(u => !hasSubDPSRole(u));
+        const primaryDPS = dpsUnits.filter(u => !hasSubDPSRole(u) && !isStun(u));
         const onCount = primaryDPS.filter(u => bossWeaknesses.includes(getElement(u))).length;
         const offCount = primaryDPS.length - onCount;
 
@@ -1422,8 +1458,10 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
             score += scaledBonus;
             if (debug) console.log(`    ${unit.name} stun on-element: +${scaledBonus} (util ${Math.round(util * 100)}%)`);
         } else if (!bossResistances.includes(element) && bossWeaknesses.length > 0) {
-            score -= 15;
-            if (debug) console.log(`    ${unit.name} stun off-element: -15`);
+            const hasAnomPseudo = unit._activatedRoles?.some(r => DPS_ROLES.includes(r));
+            const penalty = hasAnomPseudo ? 0 : 15;
+            score -= penalty;
+            if (debug) console.log(`    ${unit.name} stun off-element: -${penalty}${hasAnomPseudo ? ' (DPS pseudo-role)' : ''}`);
         }
     }
 
@@ -1540,7 +1578,7 @@ function scoreBaselineAffinity(supplier, consumer, debug, options = {}) {
         if (reaction?.bestVortexTier > 0) {
             const cw = resolveBaselineWeight(consumer, 'anomaly-affinity');
             if (cw > 0) {
-                const tierScale = reaction.bestVortexTier / MAX_VORTEX_TIER;
+                const tierScale = Math.min(1.0, reaction.bestVortexTier / MAX_VORTEX_TIER);
                 const val = w(supplierBuffs.vortex) * cw * tierScale * MULT.VORTEX_BUFF;
                 score += val;
                 dbg('vortex-buff', val);
@@ -2119,7 +2157,7 @@ function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs =
             }
             if (needsTotal > 0 && needsMet < needsTotal) {
                 const reception = needsMet / needsTotal;
-                const receptionUtil = 0.6 + 0.4 * reception;
+                const receptionUtil = 0.7 + 0.3 * reception;
                 const weight = Math.min(0.5, needsTotal * 0.25);
                 logSum += weight * Math.log(Math.max(receptionUtil * receptionUtil, 0.01));
                 totalWeight += weight;
@@ -2235,7 +2273,7 @@ export function scoreTeamForBoss(team, boss, options = {}) {
         return bestScore === -Infinity ? -1 : bestScore;
     }
 
-    const baseScore = lenient ? 200 : 100;
+    const baseScore = lenient ? 250 : 175;
     let score = baseScore;
 
     for (const unit of team) {
@@ -2306,9 +2344,15 @@ export function scoreTeamForBoss(team, boss, options = {}) {
     if (bossResult.disqualified) { cleanupRoles(); return -1; }
     score += bossResult.score;
 
-    // Layer 4: Mechanical Synergy
+    // Layer 4: Mechanical Synergy (with diminishing returns via hyperbolic soft cap)
     const antiRupture = getBossAnti(boss).includes('rupture');
-    score += scoreMechanicalSynergy(team, debug, { antiRupture, boss });
+    const rawL4 = scoreMechanicalSynergy(team, debug, { antiRupture, boss });
+    const L4_PASSTHROUGH = 100;
+    const adjustedL4 = rawL4 > L4_PASSTHROUGH
+        ? L4_PASSTHROUGH + (rawL4 - L4_PASSTHROUGH) * L4_SOFT_CAP / (rawL4 - L4_PASSTHROUGH + L4_SOFT_CAP)
+        : rawL4;
+    score += adjustedL4;
+    if (debug && rawL4 !== adjustedL4) console.log(`    L4 soft cap: raw ${rawL4.toFixed(1)} → adjusted ${adjustedL4.toFixed(1)}`);
 
     // Layer 5: Additional Synergies
     score += scoreAdditionalSynergies(team, debug);
