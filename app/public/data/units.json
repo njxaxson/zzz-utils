@@ -681,16 +681,14 @@
         "join": ["anomaly", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
-            "pseudoRole": [
-                "dps",
-                {"role":"support","when":{"countTag":"anomaly","minCount":3}}
-            ],
+            "pseudoRole": ["subdps", "support"],
             "conditionalBuffs": {
                 "atk": { "countTag": "anomaly", "levels": [0, 0, 2, 4] }
             },
             "damage": { "ultimate:double": 3, "aftershock": 2, "luminize": 3 },
-            "scaling": { "ap": 3, "atk": 3, "codependent" : true },
-            "onfield": "shared"
+            "buffs": { "anomaly": 2 },
+            "scaling": { "ap": 3, "atk": 3, "codependent" : true, "buffs": 3 },
+            "onfield": false
         },
         "available": true,
         "faction": "Covenant of Dayat",
