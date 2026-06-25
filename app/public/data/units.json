@@ -75,7 +75,7 @@
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "buffs": { "atk": 3, "cd": 3 },
-            "utility": { "quick-assists": 3, "chains": 2, "heal:team": true }
+            "utility": { "quick-assists": 3, "chains": 2, "heal:team": true, "rotations": "limited" }
         },
         "faction": "Stars of Lyra",
         "displayText": "The best generalist support in the game, Astra can round out any team."
@@ -688,6 +688,7 @@
             "damage": { "ultimate:double": 3, "aftershock": 2, "luminize": 3 },
             "buffs": { "anomaly": 2 },
             "scaling": { "ap": 3, "atk": 3, "codependent" : true, "buffs": 3 },
+            "utility": { "rotations": "limited" },
             "onfield": false
         },
         "available": true,

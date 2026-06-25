@@ -175,6 +175,18 @@ function isSharedField(unit) {
     return unit.mechanics?.onfield === 'shared';
 }
 
+function hasLimitedRotations(unit) {
+    return unit.mechanics?.utility?.rotations === 'limited';
+}
+
+function getEffectiveAssists(boss, team) {
+    const bossAssists = getBossAssists(boss);
+    if (bossAssists === 0) return 0;
+    if (getBossChainParry(boss)) return bossAssists;
+    const limitedCount = team.filter(hasLimitedRotations).length;
+    return Math.max(0, bossAssists - limitedCount);
+}
+
 function isLumenUnit(unit) {
     return getElement(unit) === 'lumen';
 }
@@ -253,6 +265,7 @@ export function getBossResistances(boss) { return boss.mechanics?.resistances ??
 export function getBossShill(boss) { return boss.mechanics?.shill ?? null; }
 export function getBossAnti(boss) { return boss.mechanics?.anti ?? []; }
 export function getBossAssists(boss) { return boss.mechanics?.assists ?? 0; }
+export function getBossChainParry(boss) { return boss.mechanics?.chainParry === true; }
 export function getBossShillIntensity(boss) { return boss.mechanics?.shillIntensity ?? 1; }
 
 // ============================================================================
@@ -881,10 +894,7 @@ function checkDisqualifications(team, boss, debug) {
     }
 
     const bossAssists = getBossAssists(boss);
-    // Units with shared field time (forced on/off-field cycle, mechanics.onfield === "shared")
-    // cannot reliably provide their defensive assist during the off-field phase. They count
-    // toward the assist requirement only when boss.assists === team.length (the "zero evasive
-    // assists" condition). Otherwise, only reliably-available defensive assists count.
+    const effectiveAssists = getEffectiveAssists(boss, team);
     const reliableDefAssists = team.filter(u => {
         if (!hasDefensiveAssist(u)) return false;
         if (isSharedField(u)) {
@@ -892,8 +902,8 @@ function checkDisqualifications(team, boss, debug) {
         }
         return true;
     }).length;
-    if (reliableDefAssists < bossAssists) {
-        if (debug) console.log(`  DISQUALIFIED: ${reliableDefAssists}/${bossAssists} reliable defensive assists`);
+    if (reliableDefAssists < effectiveAssists) {
+        if (debug) console.log(`  DISQUALIFIED: ${reliableDefAssists}/${effectiveAssists} reliable defensive assists`);
         return -1;
     }
 
@@ -1505,8 +1515,9 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
     }
 
     // --- Defensive assist bonus ---
-    if (bossAssists >= 2) {
-        const extra = team.filter(hasDefensiveAssist).length - bossAssists;
+    const effectiveAssists = getEffectiveAssists(boss, team);
+    if (effectiveAssists >= 2) {
+        const extra = team.filter(hasDefensiveAssist).length - effectiveAssists;
         if (extra > 0) {
             score += extra * 3;
             if (debug) console.log(`    Extra defensive assists: +${extra * 3}`);

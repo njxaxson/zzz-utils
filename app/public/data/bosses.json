@@ -247,7 +247,8 @@
             "resistances": [],
             "shill": "anomaly",
             "anti": ["attack", "rupture"],
-            "assists": 3
+            "assists": 3,
+            "chainParry": true
         }
     }
 ]

@@ -269,7 +269,7 @@ export function checkTeamDependencies(candidate, ownedUnits, allUnits) {
     if (!candidate.mechanics?.scaling?.codependent) return empty;
 
     const isDPSUnit = DPS_ARCHETYPES.some(a => candidate.tags.includes(a));
-    if (!isDPSUnit || isSubdps(candidate)) return empty;
+    if (!isDPSUnit && !isSubdps(candidate)) return empty;
 
     const scaling = getEffectiveScaling(candidate);
     const notes = [];
@@ -1447,7 +1447,8 @@ function detectDepthGap(gaps, ownedDPS, dpsQuality, unownedLimitedS, sortCandida
         const primaryOwned = ownedDPS[arch].filter(u => u.rank === 'S' && u.limited && !isSubdps(u));
 
         const candidates = sortCandidatesFn(
-            unownedLimitedS.filter(u => u.tags.includes(arch) && !isSubdps(u))
+            unownedLimitedS.filter(u => u.tags.includes(arch) &&
+                (!isSubdps(u) || (isTitled(u) && u.tier === 0)))
         );
         if (candidates.length === 0) continue;
 
