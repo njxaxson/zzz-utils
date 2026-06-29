@@ -688,12 +688,12 @@
             "damage": { "ultimate:double": 3, "aftershock": 2, "luminize": 3 },
             "buffs": { "anomaly": 2 },
             "scaling": { "ap": 3, "atk": 3, "codependent" : true, "buffs": 3 },
-            "utility": { "rotations": "limited" },
+            "utility": { "daze": 2,  "rotations": "limited" },
             "onfield": false
         },
         "available": true,
         "faction": "Covenant of Dayat",
-        "displayText": "First-generation void hunter."
+        "displayText": "First-generation void hunter is an off-field support rather than an on-field hypercarry DPS. Requires a triple-anomaly team composition to be effective."
     },
     {
         "id": "rina",
@@ -776,9 +776,7 @@
         "tags": ["attack", "ice", "assist:defensive"],
         "join": ["ice", "anomaly"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
-        "mechanics": {
-            "scaling" : { "def": 2 }
-        },
+        "mechanics": {},
         "available": false,
         "faction": "Airspace Patrol Department",
         "displayText": "Horse lady with spear. "
@@ -871,7 +869,7 @@
 
         },
         "faction": "External Strategy Department",
-        "displayText" : "Tall anomaly gentlelady sub-DPS with oversized fan creates on-field tornado traps. Pairs well with Promeia."
+        "displayText" : "Tall anomaly gentlelady sub-DPS with oversized fan creates on-field tornado traps. Pairs well with Jane and Promeia."
     },
     {
         "id": "vivian",
