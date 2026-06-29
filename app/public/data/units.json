@@ -559,7 +559,8 @@
             "pseudoRole": "support,subdps",
             "onfield": false,
             "damage": { "aftershock": 3 },
-            "buffs": { "atk": 2 }
+            "buffs": { "atk": 2 },
+            "scaling": { "er": 3 }
         },
         "faction": "Obol Squad",
         "displayText": "Clumsy off-field attack agent that does aftershock damage and buffs teammates. Not recommended as an on-field DPS."
@@ -815,7 +816,10 @@
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "pseudoRole": "subdps",
-            "damage": { "abloom": 2 }
+            "damage": { "abloom": 2 },
+            "utility": { "daze": 2 },
+            "scaling": { "er": 3 }
+
         },
         "faction": "External Strategy Department",
         "displayText" : "Tall anomaly gentlelady sub-DPS with oversized fan creates on-field tornado traps. Pairs well with Promeia."
