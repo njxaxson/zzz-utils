@@ -39,6 +39,7 @@ const MULT = {
     DISORDER_BONUS: 6,
     DIAMETRIC: 3,
     VORTEX_BUFF: 4,
+    REPLACEMENT_COST: 0.5,
 };
 
 const RUPTURE_ATK_EFFICIENCY = 0.33;
@@ -513,8 +514,9 @@ export function getEffectiveScaling(unit) {
         const damage = unit.mechanics?.damage || {};
         if (!hasSubDPSRole(unit)) {
             let implicitUlt = 1;
-            if (damage['ultimate:strong']) implicitUlt = Math.max(implicitUlt, 2);
-            if (damage['ultimate:double']) implicitUlt = Math.max(implicitUlt, 3);
+            if (w(damage['ultimate:strong']) >= 2) implicitUlt = Math.max(implicitUlt, 2);
+            if (w(damage['ultimate:double']) >= 2) implicitUlt = Math.max(implicitUlt, 3);
+            if (damage['ultimate:weak']) implicitUlt = 0;
             baseline.ultimates = implicitUlt;
         }
         baseline['quick-assists'] = 0.25;
@@ -1711,13 +1713,16 @@ function scoreBaselineAffinity(supplier, consumer, debug, options = {}) {
     }
 
     // Ultimates provision → primary DPS only (subdps don't consume the burst window)
+    // Skipped when consumer has a weak ultimate (their ultimate isn't stronger than their chain)
     const supplierUtility = supplier.mechanics?.utility || {};
     const ultimatesWeight = w(supplierUtility.ultimates);
     if (ultimatesWeight > 0 && isDPSByRoles(consumerRoles) && !hasSubDPSRole(consumer)) {
-        const burstWeight = getMaxBurstWeight(consumer);
-        const val = ultimatesWeight * burstWeight * MULT.ULTIMATES_PROVISION;
-        score += val;
-        dbg('ultimates', val);
+        if (!consumer.mechanics?.damage?.['ultimate:weak']) {
+            const burstWeight = getMaxBurstWeight(consumer);
+            const val = ultimatesWeight * burstWeight * MULT.ULTIMATES_PROVISION;
+            score += val;
+            dbg('ultimates', val);
+        }
     }
 
     return { score, firedCategories };
@@ -1731,6 +1736,9 @@ function scoreNeedFulfillment(supplier, consumer, debug, options = {}) {
     const supplierBuffs = supplier.mechanics?.buffs || {};
     const supplierDebuffs = supplier.mechanics?.debuffs || {};
     const supplierUtility = supplier.mechanics?.utility || {};
+
+    const converts = consumer.mechanics?.converts;
+    const replaces = supplier.mechanics?.replaces;
 
     for (const key of NEED_FULFILLMENT_KEYS) {
         const scalingWeight = w(scaling[key]);
@@ -1746,11 +1754,42 @@ function scoreNeedFulfillment(supplier, consumer, debug, options = {}) {
                 w(supplierUtility[key])
             );
         }
+
+        // Consumer-side conversion: if consumer converts X→Y, supplier's X provision
+        // augments effective Y supply (e.g., Norma converts QA→chain, so QA supply also
+        // counts as chain supply for need fulfillment)
+        if (converts) {
+            for (const [inputKey, outputKey] of Object.entries(converts)) {
+                if (outputKey === key) {
+                    const convertedSupply = Math.max(
+                        w(supplierBuffs[inputKey]),
+                        w(supplierDebuffs[inputKey]),
+                        w(supplierUtility[inputKey])
+                    );
+                    supplyWeight = Math.max(supplyWeight, convertedSupply);
+                }
+            }
+        }
+
         if (supplyWeight > 0) {
             const fulfillment = Math.min(1, supplyWeight / scalingWeight);
             const val = supplyWeight * scalingWeight * MULT.NEED_FULFILLMENT * fulfillment;
             score += val;
             if (debug) console.log(`        need(${key}): ${val.toFixed(1)}${fulfillment < 1 ? ` (gated ${Math.round(fulfillment * 100)}%)` : ''}`);
+        }
+
+        // Supplier-side replacement: if supplier provides X which replaces consumer's Y,
+        // reduces effective Y supply (e.g., Dialyn's ultimates replace chains)
+        if (replaces) {
+            for (const [costKey, providedKey] of Object.entries(replaces)) {
+                if (costKey !== key) continue;
+                const provisionWeight = w(supplierUtility[providedKey] ?? supplierBuffs[providedKey]);
+                if (provisionWeight <= 0) continue;
+                const fulfillment = Math.min(1, provisionWeight / scalingWeight);
+                const penalty = provisionWeight * scalingWeight * MULT.REPLACEMENT_COST * fulfillment;
+                score -= penalty;
+                if (debug) console.log(`        replace-cost(${providedKey}->${costKey}): -${penalty.toFixed(1)}`);
+            }
         }
     }
 
@@ -1774,6 +1813,19 @@ function scoreNeedFulfillment(supplier, consumer, debug, options = {}) {
         let buffWeight = w(supplierBuffs[damageType]);
         if (damageType === 'polarity') {
             buffWeight = Math.max(buffWeight, w(supplierBuffs.disorders));
+        }
+        // Consumer-side conversion: if consumer converts X→Y, supplier's X provision
+        // also counts as supply for Y damage type
+        if (converts) {
+            for (const [inputKey, outputKey] of Object.entries(converts)) {
+                if (outputKey === damageType) {
+                    const convertedSupply = Math.max(
+                        w(supplierBuffs[inputKey]),
+                        w(supplierUtility[inputKey])
+                    );
+                    buffWeight = Math.max(buffWeight, convertedSupply);
+                }
+            }
         }
         if (buffWeight > 0) {
             let val = buffWeight * dw * MULT.DAMAGE_NEED;

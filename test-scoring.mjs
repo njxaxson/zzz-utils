@@ -325,7 +325,7 @@ async function main() {
                 m1.get('Dialyn / Evelyn / Astra') > m1.get('Lighter / Evelyn / Astra') &&
                 m1.get('Dialyn / Evelyn / Astra') > m1.get('Ju Fufu / Evelyn / Astra') && 
                 m1.get('Lighter / Evelyn / Astra') > m1.get('Ju Fufu / Evelyn / Astra'),
-                `${b.name}: Evelyn+Astra: want Lighter > Dialyn > JF (fire-weak)`
+                `${b.name}: Evelyn+Astra: want Dialyn > Lighter > JF (fire-weak)`
             );
         }
     });
@@ -1298,6 +1298,45 @@ async function main() {
         const nry = scoreTeamForBoss(scoreForTeamString('Nangong/Remielle/Yuzuha', allUnits, { preview: true })[0].team, b, {});
         const nmy = scoreTeamForBoss(scoreForTeamString('Nangong/Miyabi/Yuzuha', allUnits)[0].team, b, {});
         assert(nmy > nry + 30, `NMY(${nmy}) should beat NRY(${nry}) by >30 — Rem buff=0 on this team`);
+    });
+
+    // ========================================================================
+    // TEST 62: Sigrid stunner ordering — weak ultimate + chain replacement
+    // ========================================================================
+    // Sigrid has damage["ultimate:weak"]:2 and scaling.chains:3. On an ice-weak boss,
+    // ice stunners (Lycaon, Lighter) should beat Dialyn because:
+    //   1. Dialyn's ultimates provision gives Sigrid 0 benefit (weak ultimate)
+    //   2. Dialyn's replaces: {ultimates:chains} penalizes Sigrid's chain scaling
+    //   3. Ice stunners get on-element L3 bonus
+    // But Dialyn still comfortably beats low-tier stunners (tier advantage).
+    run('TEST 62: Sigrid stunner ordering — weak ultimate + chain replacement (Marionettes)', () => {
+        const t = 'Lighter/Sigrid/Soukaku,Lycaon/Sigrid/Soukaku,Dialyn/Sigrid/Soukaku,Koleda/Sigrid/Soukaku';
+        for (const b of withBosses(bosses, 'Marionettes')) {
+            const m = scoreMapForBoss(scoreForTeamString(t, allUnits, { preview: true }), b);
+            const lycaon = m.get('Lycaon / Sigrid / Soukaku');
+            const lighter = m.get('Lighter / Sigrid / Soukaku');
+            const dialyn = m.get('Dialyn / Sigrid / Soukaku');
+            const koleda = m.get('Koleda / Sigrid / Soukaku');
+            assert(lycaon > dialyn, `${b.name}: Lycaon(${lycaon?.toFixed(1)}) > Dialyn(${dialyn?.toFixed(1)}) for Sigrid`);
+            assert(lighter > dialyn, `${b.name}: Lighter(${lighter?.toFixed(1)}) > Dialyn(${dialyn?.toFixed(1)}) for Sigrid`);
+            assert(dialyn > koleda + 30, `${b.name}: Dialyn(${dialyn?.toFixed(1)}) >> Koleda(${koleda?.toFixed(1)}) — tier still matters`);
+        }
+    });
+
+    // ========================================================================
+    // TEST 63: Norma QA-to-chain conversion — Astra synergy
+    // ========================================================================
+    // Norma has converts: {quick-assists: chain} and damage.chain:3. Astra's
+    // utility.quick-assists:3 should feed Norma's chain damage via conversion,
+    // making Astra significantly better than Nicole (who provides no QA).
+    run('TEST 63: Norma QA-to-chain conversion — Astra synergy (Pompey)', () => {
+        const t = 'Norma/Evelyn/Astra,Norma/Evelyn/Nicole';
+        for (const b of withBosses(bosses, 'Pompey')) {
+            const m = scoreMapForBoss(scoreForTeamString(t, allUnits, { preview: true }), b);
+            const astra = m.get('Norma / Evelyn / Astra');
+            const nicole = m.get('Norma / Evelyn / Nicole');
+            assert(astra > nicole + 50, `${b.name}: Norma+Astra(${astra?.toFixed(1)}) >> Norma+Nicole(${nicole?.toFixed(1)}) — QA conversion value`);
+        }
     });
 
     // ------------------------------------------------------------------------

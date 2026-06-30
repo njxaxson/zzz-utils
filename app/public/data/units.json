@@ -150,7 +150,7 @@
         "image": "./assets/characters/burnice.webp",
         "rank": "S",
         "limited": true,
-        "tier": 1.5,
+        "tier": 1,
         "tags": ["anomaly", "fire", "assist:defensive"],
         "join": ["anomaly", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
@@ -228,6 +228,7 @@
             "buffs": { "stun-multiplier": 2 },
             "debuffs": { "recovery": 2 },
             "utility": { "ultimates": 3 },
+            "replaces": { "chains": "ultimates" },
             "scaling": { "cr": 3 }
         },
         "faction": "Krampus",
@@ -435,7 +436,8 @@
         "join": ["fire", "faction", "rupture"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
-            "buffs": { "atk": 2 }
+            "buffs": { "atk": 2 },
+            "utility": { "quick-assists": true }
         },
         "faction": "Sons of Calydon",
         "displayText": "Basic generalist support unit. Her W-engine is one of the best A-rank engines for S-rank support units."
@@ -504,34 +506,13 @@
         "image": "./assets/characters/nekomata.webp",
         "rank": "S",
         "limited": false,
-        "tier": 3.5,
+        "tier": 2.5,
         "tags": ["attack", "physical", "assist:defensive"],
         "join": ["physical", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {},
         "faction": "Cunning Hares",
-        "displayText": "Cat girl is the bane of 50/50s everywhere. Her best use is as a low-energy-consumption teammate for Seed, but even that is pushing it."
-    },
-    {
-        "id": "norma",
-        "name": "Norma",
-        "image": "./assets/characters/norma.webp",
-        "rank": "S",
-        "limited": true,
-        "tier": 0.5,
-        "tags": ["stun", "fire", "assist:defensive"],
-        "join": ["attack", "rupture"],
-        "synergy": { "units": [], "tags": [], "avoid": [] },
-        "mechanics": {
-            "pseudoRole": ["subdps"],
-            "damage": { "chain": 3 },
-            "buffs": { "stun-multiplier": 2 },
-            "debuffs": { "recovery": 2 },
-            "scaling": { "quick-assists": 2, "sheer": 1, "atk": 3 }
-        },
-        "available": false,
-        "faction": "External Strategy Department",
-        "displayText": "Whacky bangboo engineer fires missiles at enemies. She can convert some quick assists into chain attacks and converts sheer damage buffs back into attack damage."
+        "displayText": "Cat girl is the bane of 50/50s everywhere. With her potential vision buffs, she is usuable; without them her best use is as a low-energy-consumption teammate for Seed."
     },
     {
         "id": "nicole",
@@ -548,6 +529,28 @@
         },
         "faction": "Cunning Hares",
         "displayText": "Everyone loves Nicole. Great support agent that specializes in shredding enemy defense, even for an A-rank."
+    },
+    {
+        "id": "norma",
+        "name": "Norma",
+        "image": "./assets/characters/norma.webp",
+        "rank": "S",
+        "limited": true,
+        "tier": 0.5,
+        "tags": ["stun", "fire", "assist:defensive"],
+        "join": ["attack", "rupture"],
+        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {
+            "pseudoRole": ["subdps"],
+            "damage": { "chain": 3 },
+            "buffs": { "stun-multiplier": 2 },
+            "debuffs": { "recovery": 2 },
+            "converts": { "quick-assists": "chain" },
+            "scaling": { "quick-assists": 2, "sheer": 1, "atk": 3 }
+        },
+        "available": false,
+        "faction": "External Strategy Department",
+        "displayText": "Whacky bangboo engineer fires missiles at enemies. She can convert some quick assists into chain attacks and converts sheer damage buffs back into attack damage."
     },
     {
         "id": "orphie",
@@ -648,7 +651,7 @@
         "join": ["support", "stun"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
-            "damage": { "totalize": 1 }
+            "damage": { "chain": 3, "totalize": 1, "ultimate:double": 1, "ultimate:weak": 1 }
         },
         "faction": "Phaethon",
         "displayText" : "Proxy made manifest? We shall see!"
@@ -772,11 +775,14 @@
         "image": "./assets/characters/sigrid.webp",
         "rank": "S",
         "limited": true,
-        "tier": 1,
+        "tier": 0.5,
         "tags": ["attack", "ice", "assist:defensive"],
         "join": ["ice", "anomaly"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
-        "mechanics": {},
+        "mechanics": {
+            "damage": { "enhanced": 3, "ultimate:weak": 2 },
+            "scaling": { "chains" : 3 }
+        },
         "available": false,
         "faction": "Airspace Patrol Department",
         "displayText": "Horse lady with spear. "
@@ -864,9 +870,8 @@
         "mechanics": {
             "pseudoRole": ["subdps"],
             "damage": { "abloom": 2 },
-            "utility": { "daze": 2 },
+            "utility": { "daze": 2 ,"quick-assists": true },
             "scaling": { "er": 3 }
-
         },
         "faction": "External Strategy Department",
         "displayText" : "Tall anomaly gentlelady sub-DPS with oversized fan creates on-field tornado traps. Pairs well with Jane and Promeia."

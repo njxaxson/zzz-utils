@@ -231,10 +231,15 @@ await runTest(9, 'Attack-only roster', () => {
     assert(hasGap(result, 'dps-rupture'), 'expected rupture DPS gap');
     const anomalyGap = findGap(result, 'dps-anomaly');
     assert(anomalyGap && anomalyGap.score >= 70, 'anomaly gap should be high priority');
-    const reasons = gapReasons(result);
-    assert(!reasons.includes('Astra'), 'reasons should not reference Astra by name');
-    assert(!reasons.includes('Yuzuha'), 'reasons should not reference Yuzuha by name');
-    assert(!reasons.includes('Lucia'), 'reasons should not reference Lucia by name');
+    // Structural gap reasons should not hard-code specific unit names as prescriptive
+    // recommendations. Mech-synergy gaps legitimately reference owned units to explain
+    // pairings (e.g., "Sigrid has synergy with your Astra"), so exclude them.
+    const structuralReasons = result.allGaps
+        .filter(g => !g.id.startsWith('mech-synergy-'))
+        .map(g => g.reason).join(' ');
+    assert(!structuralReasons.includes('Astra'), 'structural reasons should not reference Astra by name');
+    assert(!structuralReasons.includes('Yuzuha'), 'structural reasons should not reference Yuzuha by name');
+    assert(!structuralReasons.includes('Lucia'), 'structural reasons should not reference Lucia by name');
 });
 
 // TEST 10
