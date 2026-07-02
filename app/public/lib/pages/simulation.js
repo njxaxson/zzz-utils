@@ -311,7 +311,7 @@ function displayResults(context, results, includeRefunds) {
         </div>
         <div class="stat-line">
             <span class="stat-label">Expected range</span>
-            <span class="stat-value success">${Math.max(avgP - stddev, 0)} - ${Math.min(avgP + stddev, context.p)} pulls</span>
+            <span class="stat-value success">${Math.max(avgP - stddev, 0)} - ${Math.min(avgP + stddev, avgExhaustedPulls)} pulls</span>
         </div>
     `;
 
