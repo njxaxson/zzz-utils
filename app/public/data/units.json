@@ -541,12 +541,13 @@
         "join": ["attack", "rupture"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
+            "onfield": false,
             "pseudoRole": ["subdps"],
             "damage": { "chain": 3 },
-            "buffs": { "stun-multiplier": 2 },
+            "buffs": { "stun-multiplier": 2, "atk": 1 },
             "debuffs": { "recovery": 2 },
-            "converts": { "quick-assists": "chain" },
-            "scaling": { "quick-assists": 2, "sheer": 1, "atk": 3 }
+            "utility": { "quick-assists": true, "chains": 2 },
+            "scaling": { "sheer": 1, "atk": 3 }
         },
         "available": false,
         "faction": "External Strategy Department",

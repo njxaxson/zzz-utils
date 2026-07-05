@@ -1309,14 +1309,17 @@ async function main() {
     //   2. Dialyn's replaces: {ultimates:chains} penalizes Sigrid's chain scaling
     //   3. Ice stunners get on-element L3 bonus
     // But Dialyn still comfortably beats low-tier stunners (tier advantage).
+    // Norma is the best stunner for Sigrid: chain provision + subdps damage + no replacement cost.
     run('TEST 62: Sigrid stunner ordering — weak ultimate + chain replacement (Marionettes)', () => {
-        const t = 'Lighter/Sigrid/Soukaku,Lycaon/Sigrid/Soukaku,Dialyn/Sigrid/Soukaku,Koleda/Sigrid/Soukaku';
+        const t = 'Norma/Sigrid/Soukaku,Lighter/Sigrid/Soukaku,Lycaon/Sigrid/Soukaku,Dialyn/Sigrid/Soukaku,Koleda/Sigrid/Soukaku';
         for (const b of withBosses(bosses, 'Marionettes')) {
             const m = scoreMapForBoss(scoreForTeamString(t, allUnits, { preview: true }), b);
+            const norma = m.get('Norma / Sigrid / Soukaku');
             const lycaon = m.get('Lycaon / Sigrid / Soukaku');
             const lighter = m.get('Lighter / Sigrid / Soukaku');
             const dialyn = m.get('Dialyn / Sigrid / Soukaku');
             const koleda = m.get('Koleda / Sigrid / Soukaku');
+            assert(norma > lycaon, `${b.name}: Norma(${norma?.toFixed(1)}) > Lycaon(${lycaon?.toFixed(1)}) for Sigrid`);
             assert(lycaon > dialyn, `${b.name}: Lycaon(${lycaon?.toFixed(1)}) > Dialyn(${dialyn?.toFixed(1)}) for Sigrid`);
             assert(lighter > dialyn, `${b.name}: Lighter(${lighter?.toFixed(1)}) > Dialyn(${dialyn?.toFixed(1)}) for Sigrid`);
             assert(dialyn > koleda + 30, `${b.name}: Dialyn(${dialyn?.toFixed(1)}) >> Koleda(${koleda?.toFixed(1)}) — tier still matters`);
@@ -1324,18 +1327,54 @@ async function main() {
     });
 
     // ========================================================================
-    // TEST 63: Norma QA-to-chain conversion — Astra synergy
+    // TEST 63: Norma/Astra synergy — ATK buff + chain provision value
     // ========================================================================
-    // Norma has converts: {quick-assists: chain} and damage.chain:3. Astra's
-    // utility.quick-assists:3 should feed Norma's chain damage via conversion,
-    // making Astra significantly better than Nicole (who provides no QA).
-    run('TEST 63: Norma QA-to-chain conversion — Astra synergy (Pompey)', () => {
+    // Norma has scaling.atk:3 and damage.chain:3. Astra's atk:3 + cd:3 + chain
+    // provision makes her significantly better than Nicole for Norma teams.
+    run('TEST 63: Norma/Astra synergy — Astra significantly better than Nicole (Pompey)', () => {
         const t = 'Norma/Evelyn/Astra,Norma/Evelyn/Nicole';
         for (const b of withBosses(bosses, 'Pompey')) {
             const m = scoreMapForBoss(scoreForTeamString(t, allUnits, { preview: true }), b);
             const astra = m.get('Norma / Evelyn / Astra');
             const nicole = m.get('Norma / Evelyn / Nicole');
-            assert(astra > nicole + 50, `${b.name}: Norma+Astra(${astra?.toFixed(1)}) >> Norma+Nicole(${nicole?.toFixed(1)}) — QA conversion value`);
+            assert(astra > nicole + 30, `${b.name}: Norma+Astra(${astra?.toFixed(1)}) >> Norma+Nicole(${nicole?.toFixed(1)}) — Astra provides better buff suite`);
+        }
+    });
+
+    // ========================================================================
+    // TEST 64: Norma vs Dialyn — fire-weak favors Norma, otherwise Dialyn wins
+    // ========================================================================
+    // Norma is a fire stunner with subdps chain damage; Dialyn is physical with free
+    // ultimates. On fire-weak bosses Norma's on-element bonus + chain provision exceeds
+    // Dialyn's generic utility. On physical-weak or neutral bosses Dialyn's tier advantage
+    // and ultimate provision maintain her lead.
+    run('TEST 64: Norma vs Dialyn — fire-weak favors Norma, otherwise Dialyn wins', () => {
+        // Fire-weak: Norma > Dialyn (Pompey with Evelyn/Astra, Hunter with Lucia/Banyue)
+        for (const b of withBosses(bosses, 'Pompey')) {
+            const t = 'Norma/Evelyn/Astra,Dialyn/Evelyn/Astra';
+            const m = scoreMapForBoss(scoreForTeamString(t, allUnits, { preview: true }), b);
+            assert(m.get('Norma / Evelyn / Astra') > m.get('Dialyn / Evelyn / Astra'),
+                `${b.name}: Norma(${m.get('Norma / Evelyn / Astra')?.toFixed(1)}) > Dialyn(${m.get('Dialyn / Evelyn / Astra')?.toFixed(1)}) for Evelyn/Astra`);
+        }
+        for (const b of withBosses(bosses, 'Hunter')) {
+            const t = 'Norma/Banyue/Lucia,Dialyn/Banyue/Lucia';
+            const m = scoreMapForBoss(scoreForTeamString(t, allUnits, { preview: true }), b);
+            assert(m.get('Norma / Banyue / Lucia') > m.get('Dialyn / Banyue / Lucia'),
+                `${b.name}: Norma(${m.get('Norma / Banyue / Lucia')?.toFixed(1)}) > Dialyn(${m.get('Dialyn / Banyue / Lucia')?.toFixed(1)}) for Banyue/Lucia`);
+        }
+        // Physical-weak: Dialyn > Norma (Thrall, Defiler with Lucia/Starlight Billy)
+        for (const b of withBosses(bosses, 'Thrall,Defiler')) {
+            const t = 'Norma/Starlight Billy/Lucia,Dialyn/Starlight Billy/Lucia';
+            const m = scoreMapForBoss(scoreForTeamString(t, allUnits, { preview: true }), b);
+            assert(m.get('Dialyn / Starlight Billy / Lucia') > m.get('Norma / Starlight Billy / Lucia'),
+                `${b.name}: Dialyn(${m.get('Dialyn / Starlight Billy / Lucia')?.toFixed(1)}) > Norma(${m.get('Norma / Starlight Billy / Lucia')?.toFixed(1)}) for SBilly/Lucia`);
+        }
+        // Neutral (Corruption): Dialyn > Norma when neither hits a weakness
+        for (const b of withBosses(bosses, 'Corruption')) {
+            const t = 'Norma/Yixuan/Lucia,Dialyn/Yixuan/Lucia';
+            const m = scoreMapForBoss(scoreForTeamString(t, allUnits, { preview: true }), b);
+            assert(m.get('Dialyn / Yixuan / Lucia') > m.get('Norma / Yixuan / Lucia'),
+                `${b.name}: Dialyn(${m.get('Dialyn / Yixuan / Lucia')?.toFixed(1)}) > Norma(${m.get('Norma / Yixuan / Lucia')?.toFixed(1)}) for Yixuan/Lucia`);
         }
     });
 
