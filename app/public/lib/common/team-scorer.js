@@ -72,6 +72,9 @@ const VORTEX_DEFAULT_TIER = 0.001;
 const VORTEX_BASE = 15;
 // Normalisation base for tier scaling in vortex buff affinity (ice=4).
 const MAX_VORTEX_TIER = 4;
+// Minimum primary DPS vortex tier for full team vortex bonuses. Below this threshold,
+// vortex bonuses are proportionally discounted — the team lacks a vortex-focused carry.
+const VORTEX_PRIMARY_MIN = 1.0;
 // Refringe: bonus applied to each non-lumen anomaly teammate when a lumen agent is on
 // the team with Lumiflux Buildup. Large by design — comparable to vortex/disorder bonuses.
 // Deliberately tunable: allocation (to teammates, to lumen agent, or both) may shift after testing.
@@ -2216,6 +2219,20 @@ function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs =
                 const hasReaction = unitReaction?.bestVortexTier > 0 || unitReaction?.hasDisorder;
                 if (!hasReaction) {
                     needsTotal++;
+                }
+                // Wasted vortex: subdps generates vortex but no native primary anomaly DPS
+                // benefits from it (e.g., Velina + Miyabi frost). The wind reaction is wasted
+                // because the hypercarry's vortex tier is negligible.
+                if (unitReaction?.bestVortexTier > 0) {
+                    const primaryNativeAnomaly = team.filter(t =>
+                        t !== unit && t.tags.includes('anomaly') && !hasSubDPSRole(t)
+                    );
+                    const bestPrimaryTier = primaryNativeAnomaly.reduce((best, t) => {
+                        return Math.max(best, twReactions.get(t)?.bestVortexTier ?? 0);
+                    }, 0);
+                    if (bestPrimaryTier < VORTEX_PRIMARY_MIN) {
+                        needsTotal++;
+                    }
                 }
             }
             if (needsTotal > 0 && needsMet < needsTotal) {

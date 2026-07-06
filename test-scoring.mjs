@@ -1378,6 +1378,34 @@ async function main() {
         }
     });
 
+    // ========================================================================
+    // TEST 65: Miyabi+Velina anti-pattern — wasted vortex cohesion penalty
+    // ========================================================================
+    // Velina is a wind anomaly subdps whose primary team value is vortex generation.
+    // Miyabi (frost variant, vortex tier 0.001) cannot exploit vortex reactions,
+    // so pairing them wastes Velina's contribution. The cohesion penalty should make
+    // proper compositions score meaningfully higher than this anti-pattern.
+    // Conversely, Promeia (ice, tier 4.5) actually uses vortex — no penalty there.
+    run('TEST 65: Miyabi+Velina anti-pattern — wasted vortex cohesion penalty (Girtablullu)', () => {
+        const t = 'Nangong/Miyabi/Velina,Nangong/Miyabi/Yuzuha,Nangong/Promeia/Velina,Promeia/Velina/Yuzuha,Miyabi/Velina/Yuzuha';
+        for (const b of withBosses(bosses, 'Girtablullu')) {
+            const m = scoreMapForBoss(scoreForTeamString(t, allUnits, { preview: true }), b);
+            const miyabiVelina  = m.get('Nangong / Miyabi / Velina');
+            const miyabiYuzuha  = m.get('Nangong / Miyabi / Yuzuha');
+            const promeiaVelina = m.get('Nangong / Promeia / Velina');
+            const velinaYuzuha  = m.get('Promeia / Velina / Yuzuha');
+            const meebsVelYuzu  = m.get('Miyabi / Velina / Yuzuha');
+            assert(miyabiYuzuha > miyabiVelina,
+                `${b.name}: Miyabi+Yuzuha(${miyabiYuzuha?.toFixed(1)}) > Miyabi+Velina(${miyabiVelina?.toFixed(1)}) — Yuzuha's buffs beat wasted vortex`);
+            assert(promeiaVelina > miyabiVelina,
+                `${b.name}: Promeia+Velina(${promeiaVelina?.toFixed(1)}) > Miyabi+Velina(${miyabiVelina?.toFixed(1)}) — Promeia uses vortex`);
+            assert(velinaYuzuha > miyabiVelina,
+                `${b.name}: Promeia/Velina/Yuzuha(${velinaYuzuha?.toFixed(1)}) > Miyabi+Velina(${miyabiVelina?.toFixed(1)}) — proper vortex team`);
+            assert(meebsVelYuzu <= miyabiVelina + 15,
+                    `${b.name}: MVY (${meebsVelYuzu?.toFixed(1)}) and NMV (${miyabiVelina?.toFixed(1)}) should be in the same class of scores comparative to proper vortex teams`);    
+        }
+    });
+
     // ------------------------------------------------------------------------
     // Summary
     // ------------------------------------------------------------------------

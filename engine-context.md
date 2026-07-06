@@ -558,6 +558,8 @@ These principles govern how the mechanics-driven engine evaluates teams. They ar
 
 **Resource Conversion (P33):** A consumer may convert one resource into another for themselves, increasing effective supply. Modeled via `mechanics.converts: { "input_resource": "output_resource" }` on the consumer side. In `scoreNeedFulfillment` and the damage-type loop, if a supplier provides the input resource, the output resource's effective supply is augmented (via `Math.max`). Example: Norma's `converts: { "quick-assists": "chain" }` means Astra's quick-assist provision also feeds Norma's chain damage scaling.
 
+**Wasted Vortex Cohesion Penalty (P34):** A wind anomaly subdps (e.g., Velina) generates vortex reactions as their primary team contribution. If no native primary anomaly DPS (non-subdps, native `anomaly` tag) has a meaningful vortex tier (>= `VORTEX_PRIMARY_MIN`), the subdps's vortex generation is wasted — the hypercarry cannot exploit it. This is counted as an unmet need for that subdps in `computeTeamworkMultiplier`, reducing team cohesion. Example: Velina + Miyabi (frost variant, vortex tier 0.001) is penalized because Miyabi gains nothing from vortex. Velina + Promeia (ice, vortex tier 4.5) is not penalized. The penalty does not fire based on pseudo-anomaly roles (Nangong's anomaly pseudo-role is irrelevant — only units with native `anomaly` in their `tags` count as primary DPS for this check).
+
 ## Wheelchair Compositions
 
 Powerful support/utility pairings that uplift almost any compatible DPS:
