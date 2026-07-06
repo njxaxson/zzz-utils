@@ -53,7 +53,7 @@ let sharedBossesMode = false;
 let bossCardTouchMode = null;
 
 // Results
-let showVariations = false;
+let showCreativeOptions = false;
 let lastResults = null;
 
 // ============================================================================
@@ -115,7 +115,7 @@ function savePageToStorage() {
     const data = {
         selectedBosses,
         selectedBossVariations,
-        showVariations
+        showCreativeOptions
     };
     localStorage.setItem(PAGE_STORAGE_KEY, JSON.stringify(data));
 }
@@ -136,8 +136,8 @@ function loadPageFromStorage() {
             if (data.selectedBossVariations && typeof data.selectedBossVariations === 'object') {
                 selectedBossVariations = data.selectedBossVariations;
             }
-            if (typeof data.showVariations === 'boolean') {
-                showVariations = data.showVariations;
+            if (typeof data.showCreativeOptions === 'boolean') {
+                showCreativeOptions = data.showCreativeOptions;
             }
         }
     } catch (e) {
@@ -274,7 +274,7 @@ function setupEventListeners() {
     document.getElementById('run-btn').addEventListener('click', runOptimization);
     
     document.getElementById('da-variations-checkbox').addEventListener('change', (e) => {
-        showVariations = e.target.checked;
+        showCreativeOptions = e.target.checked;
         savePageToStorage();
         if (lastResults) {
             displayResults(lastResults, false);
@@ -733,13 +733,15 @@ function displayResults(results, scroll = true) {
 
     // Update checkbox state
     const checkbox = document.getElementById('da-variations-checkbox');
-    if (checkbox) checkbox.checked = showVariations;
+    if (checkbox) checkbox.checked = showCreativeOptions;
 
     let combos;
-    if (showVariations) {
-        combos = results.combinations.slice(0, DISPLAY_LIMIT + 5);
-    } else {
+    let creativeDisclaimer = '';
+    if (showCreativeOptions) {
         combos = results.diverseResults || [];
+        creativeDisclaimer = `<div class="lenient-notice">These results prioritize roster variety &mdash; each option uses a distinct DPS lineup. Individual assignments may not be the absolute strongest possible teams.</div>`;
+    } else {
+        combos = results.combinations.slice(0, DISPLAY_LIMIT + 5);
     }
     
     if (combos.length === 0) {
@@ -761,7 +763,7 @@ function displayResults(results, scroll = true) {
             ? `<div class="lenient-notice">* Limited roster — using lenient scoring for ${results.lenientBosses.join(', ')}.</div>`
             : '';
         
-        container.innerHTML = `${lenientNotice}
+        container.innerHTML = `${lenientNotice}${creativeDisclaimer}
             <div class="carousel">
                 <button class="carousel-btn carousel-prev" onclick="prevResult()" aria-label="Previous result">
                     <span>‹</span>
