@@ -2820,6 +2820,7 @@ button#simulate-btn:disabled,
     
     .result-unit-card .unit-name {
         flex: 1;
+        min-width: 0;
         padding: 0.25rem 0.5rem;
         font-size: 0.7rem;
         text-align: left;
@@ -4266,6 +4267,8 @@ button#simulate-btn:disabled,
     color: var(--text-primary);
     text-align: center;
     line-height: 1.1;
+    width: 100%;
+    white-space: normal;
     overflow: hidden;
     text-overflow: ellipsis;
     display: -webkit-box;
