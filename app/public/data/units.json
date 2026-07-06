@@ -695,7 +695,7 @@
             "utility": { "daze": 2,  "rotations": "limited" },
             "onfield": false
         },
-        "available": true,
+        "available": false,
         "faction": "Covenant of Dayat",
         "displayText": "First-generation void hunter is an off-field support rather than an on-field hypercarry DPS. Requires a triple-anomaly team composition to be effective."
     },
