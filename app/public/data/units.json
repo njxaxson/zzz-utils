@@ -549,7 +549,6 @@
             "utility": { "quick-assists": true, "chains": 2 },
             "scaling": { "sheer": 1, "atk": 3 }
         },
-        "available": false,
         "faction": "External Strategy Department",
         "displayText": "Whacky bangboo engineer fires missiles at enemies. She can convert some quick assists into chain attacks and converts sheer damage buffs back into attack damage."
     },
