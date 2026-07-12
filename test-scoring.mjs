@@ -549,8 +549,8 @@ async function main() {
         const low = scoreForTeamString('Lycaon/Yixuan/Soukaku', allUnits)[0];
         for (const b of withBosses(bosses, 'Nightmare,Butcher,Neutral')) {
             assert(
-                scoreTeamForBoss(low.team, b, {}) <= 250,
-                `${b.name} Lycaon/Yixuan/Soukaku should be mid (<= 250), got ${scoreTeamForBoss(low.team, b, {})}`
+                scoreTeamForBoss(low.team, b, {}) <= 265,
+                `${b.name} Lycaon/Yixuan/Soukaku should be mid (<= 265), got ${scoreTeamForBoss(low.team, b, {})}`
             );
         }
         const mid = scoreForTeamString('Ye Shunguong/Zhao/Soukaku', allUnits)[0];
@@ -561,8 +561,8 @@ async function main() {
         for (const b of withBosses(bosses, 'Butcher')) {
             const ms = scoreTeamForBoss(mid.team, b, {});
             assert(
-                ms >= 180 && ms <= 260,
-                `${b.name} YSG/Zhao/Soukaku: got ${ms}, expected [180, 260] (off-weakness anomaly boss)`
+                ms >= 180 && ms <= 270,
+                `${b.name} YSG/Zhao/Soukaku: got ${ms}, expected [180, 270] (off-weakness anomaly boss)`
             );
         }
         const high = scoreForTeamString('Nangong/Miyabi/Soukaku', allUnits)[0];

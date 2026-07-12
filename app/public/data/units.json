@@ -153,14 +153,14 @@
         "tier": 1,
         "tags": ["anomaly", "fire", "assist:defensive"],
         "join": ["anomaly", "faction"],
-        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "synergy": { "units": ["Velina"], "tags": [], "avoid": [] },
         "mechanics": {
             "pseudoRole": ["subdps"],
             "onfield": false,
             "damage": { "abloom": 1 }
         },
         "faction": "Sons of Calydon",
-        "displayText": "This ditzy Calydon bartender is an off-field fire anomaly sub-DPS."
+        "displayText": "This ditzy Calydon bartender is an off-field fire anomaly sub-DPS. At P6, she pairs particularly well with Velina."
     },
     {
         "id": "caesar",
@@ -272,17 +272,17 @@
         "image": "./assets/characters/grace.webp",
         "rank": "S",
         "limited": false,
-        "tier": 2.5,
+        "tier": 2,
         "tags": ["anomaly", "electric", "assist:evasive"],
         "join": ["electric", "faction"],
-        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "synergy": { "units": ["Velina"], "tags": [], "avoid": [] },
         "mechanics": {
             "pseudoRole": ["subdps"],
             "damage": { "abloom": 1 },
             "scaling": { "pen": true }
         },
         "faction": "Belobog Heavy Industries",
-        "displayText": "Gearhead who throws electric grenades, Grace is typically used as an anomaly sub-DPS when you don't have a better alternative - although she's not bad when paired with a wind anomaly like Velina."
+        "displayText": "Gearhead who throws electric grenades, Grace is typically used as an anomaly sub-DPS when you don't have a better alternative - but at P6, she can actually be quite good when paired with a wind anomaly like Velina."
     },
     {
         "id": "harumasa",
@@ -343,7 +343,7 @@
         "image": "./assets/characters/ju-fufu.webp",
         "rank": "S",
         "limited": true,
-        "tier": 1,
+        "tier": 1.5,
         "tags": ["stun", "fire", "assist:defensive"],
         "join": ["attack", "rupture"],
         "synergy": { "units": [], "tags": ["rupture"], "avoid": [] },
@@ -420,7 +420,7 @@
         "mechanics": {
             "damage": { "aftershock": true },
             "buffs": { "sheer": 3, "cd": 1 },
-            "utility": { "veils": true },
+            "utility": { "veils": true, "heal:team": 1 },
             "scaling": { "hp": 3 }
         },
         "faction": "Spook Shack",
@@ -705,14 +705,15 @@
         "image": "./assets/characters/rina.webp",
         "rank": "S",
         "limited": false,
-        "tier": 2.5,
+        "tier": 2,
         "tags": ["support", "electric", "assist:evasive"],
         "join": ["faction", "electric"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "damage": { "ultimate:strong": 2 },
             "buffs": { "pen": 3, "atk": 2, "def": 2 },
-            "scaling": { "ap": true }
+            "scaling": { "ap": true },
+            "utility": { "quick-assists": true }
         },
         "faction": "Victoria Housekeeping",
         "displayText": "Electric support agent that specializes in buffing PEN. Her potential vision upgrades her to buff attack and defense."
@@ -795,13 +796,13 @@
         "image": "./assets/characters/soldier-11.webp",
         "rank": "S",
         "limited": false,
-        "tier": 2,
+        "tier": 1.5,
         "tags": ["attack", "fire", "assist:defensive"],
         "join": ["fire", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {},
         "faction": "Obol Squad",
-        "displayText": "This fire attacker can make a suitable DPS when you don't have alternatives. Her damage ceiling is highly dependent on your attack timing; it is worthwhile to practice with her to get it right. Her strength increases dramatically with more mindscapes."
+        "displayText": "This fire attacker can make a suitable DPS when you don't have alternatives. Her damage ceiling is highly dependent on your attack timing; it is worthwhile to practice with her to get it right. Norma is her favorite stunner, and her strength increases dramatically with more mindscapes."
     },
     {
         "id": "soukaku",
@@ -815,7 +816,8 @@
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "pseudoRole": [{"role":"anomaly","when":{ "hasUnit": "miyabi" }}],
-            "buffs": { "atk": 3, "ice": 3 }
+            "buffs": { "atk": 3, "ice": 3 },
+            "utility": { "quick-assists": true }
         },
         "faction": "Section 6",
         "displayText": "An ice support that is best built like an anomaly agent. She can also generate disorders with Miyabi even though they are both ice, because Miyabi is technically 'frost' instead of ice."
@@ -832,7 +834,7 @@
         "synergy": { "units": ["Aria"], "tags": [], "avoid": [] },
         "mechanics": {
             "buffs": { "atk": 3, "stun-multiplier": 2 },
-            "utility": { "veils": 3, "daze": 2 }
+            "utility": { "veils": 3, "daze": 2, "quick-assists" : true }
         },
         "faction": "Angels of Delusion",
         "displayText": "Ether veil spammer that is a best-in-slot teammate for both Angels of Delusion faction mates Nangong and Aria, as well as Ye Shunguang. Although Astra has stronger buffs, Sunna provides more personal damage and significant daze buildup for a support agent, letting her edge out Astra in modern endgame for attack teams."
@@ -852,7 +854,8 @@
             "damage": { "aftershock": 3 },
             "buffs": { "stun-multiplier": 2 },
             "debuffs": { "defense": 2 },
-            "scaling": { "cr": 3 }
+            "scaling": { "cr": 3 },
+            "utility": { "quick-assists": true }
         },
         "faction": "Obol Squad",
         "displayText": "Off-field electric aftershock stun agent that can shred defense with her W-engine."
@@ -904,7 +907,7 @@
         "image": "./assets/characters/yanagi.webp",
         "rank": "S",
         "limited": true,
-        "tier": 1,
+        "tier": 1.5,
         "tags": ["anomaly", "electric", "assist:defensive"],
         "join": ["electric", "anomaly"],
         "synergy": { "units": [], "tags": [], "avoid": [] },

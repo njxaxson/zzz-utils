@@ -250,5 +250,19 @@
             "assists": 3,
             "chainParry": true
         }
+    },
+    {
+        "id": "bashmu",
+        "name": "Aberrant Beast",
+        "shortName": "Beast",
+        "image": null,
+        "favored": ["Remielle"],
+        "mechanics": {
+            "weaknesses": [],
+            "resistances": [],
+            "shill": "anomaly",
+            "anti": ["attack", "rupture"],
+            "assists": 2
+        }
     }
 ]
