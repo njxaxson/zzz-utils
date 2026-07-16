@@ -1241,7 +1241,7 @@ async function main() {
     // ========================================================================
     // TEST 57: Miyabi existing teams unaffected by changes
     // ========================================================================
-    // Regression guard: Miyabi has no conditionalBuffs, so none of these changes
+    // Regression guard: Miyabi has no conditional.buffs, so none of these changes
     // should alter her top team scores. Wheelchair should still be CONVENTIONAL.
     run('TEST 57: Miyabi/Astra/Nicole wheelchair still CONVENTIONAL (regression guard)', () => {
         const b = NEUTRAL_BOSS;

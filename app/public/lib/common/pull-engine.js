@@ -140,12 +140,12 @@ function mechanicsFitScore(supplier, consumer) {
     const isDPS = isAtkDPS || isAnoDPS || isRupDPS;
     if (!isDPS) return 0;
 
-    // Resolve supplier buffs: merge conditionalBuffs with static buffs when the
-    // consumer would actually satisfy the condition (e.g. Rem's ATK buff activates
+    // Resolve supplier buffs: merge mechanics.conditional.buffs with static buffs when
+    // the consumer would actually satisfy the condition (e.g. Rem's ATK buff activates
     // when there are anomaly teammates — so an anomaly consumer would benefit).
     const sBufBase = supplier.mechanics?.buffs || {};
     const sBuf = { ...sBufBase };
-    const condBuffs = supplier.mechanics?.conditionalBuffs;
+    const condBuffs = supplier.mechanics?.conditional?.buffs;
     if (condBuffs) {
         for (const [key, config] of Object.entries(condBuffs)) {
             if (sBuf[key] !== undefined) continue;
@@ -238,7 +238,7 @@ function mechanicsFitScore(supplier, consumer) {
     // specific tag (e.g., Rem needs anomaly teammates for her ATK buff), a supplier that
     // DOESN'T have that tag is actively taking up a team slot that should go to someone
     // who does. Heavy discount — generic support value is mostly wasted.
-    const consumerCondBuffs = consumer.mechanics?.conditionalBuffs;
+    const consumerCondBuffs = consumer.mechanics?.conditional?.buffs;
     if (consumerCondBuffs && score > 0) {
         for (const config of Object.values(consumerCondBuffs)) {
             const tag = config.countTag;
@@ -321,7 +321,7 @@ export function checkTeamDependencies(candidate, ownedUnits, allUnits) {
     // to fully activate conditional buffs. If the roster can't reach at least half
     // max activation, the unit is effectively non-functional — treat same as can't
     // activate. Partial (>50%) still flags as unmet for a 1-level priority drop.
-    const cb = candidate.mechanics?.conditionalBuffs;
+    const cb = candidate.mechanics?.conditional?.buffs;
     if (cb) {
         for (const [buffKey, config] of Object.entries(cb)) {
             const maxLevel = Math.max(...config.levels);
@@ -1308,11 +1308,11 @@ function detectMechanicalSynergies(gaps, ownedUnits, unownedLimitedS, dpsQuality
         const isDPSCandidate = DPS_ARCHETYPES.some(a => candidate.tags.includes(a)) && !isSubdps(candidate);
         const el = getUnitElement(candidate);
 
-        // DPS candidates that also supply buffs (conditionalBuffs or conditional support
-        // pseudo-role) are hybrid units like Remielle — they should be evaluated both as
-        // consumers of owned non-DPS AND as suppliers to owned DPS.
+        // DPS candidates that also supply buffs (mechanics.conditional.buffs or a
+        // conditional support pseudo-role) are hybrid units like Remielle — they should
+        // be evaluated both as consumers of owned non-DPS AND as suppliers to owned DPS.
         const isHybridSupplier = isDPSCandidate && (
-            candidate.mechanics?.conditionalBuffs ||
+            candidate.mechanics?.conditional?.buffs ||
             (Array.isArray(candidate.mechanics?.pseudoRole) &&
              candidate.mechanics.pseudoRole.some(e => (typeof e === 'string' ? e : e?.role) === 'support'))
         );

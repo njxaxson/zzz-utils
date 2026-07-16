@@ -283,7 +283,7 @@ function w(value) {
 }
 
 function resolveConditionalBuffValue(supplier, team, buffKey) {
-    const cb = supplier.mechanics?.conditionalBuffs?.[buffKey];
+    const cb = supplier.mechanics?.conditional?.buffs?.[buffKey];
     if (!cb) return null;
     const count = team.filter(u => u.tags.includes(cb.countTag)).length;
     const idx = Math.min(count, cb.levels.length - 1);
@@ -297,7 +297,7 @@ function getEffectiveBuffValue(supplier, team, buffKey) {
 }
 
 function computeConditionalBuffPenalty(supplier, team) {
-    const cb = supplier.mechanics?.conditionalBuffs;
+    const cb = supplier.mechanics?.conditional?.buffs;
     if (!cb) return 0;
     let totalPenalty = 0;
     for (const [buffKey, config] of Object.entries(cb)) {
@@ -691,7 +691,7 @@ function computeBuffUtilization(supplier, team) {
 
     if (isDPS(supplier)) {
         const buffs = { ...(supplier.mechanics?.buffs || {}) };
-        const conditionalBuffs = supplier.mechanics?.conditionalBuffs;
+        const conditionalBuffs = supplier.mechanics?.conditional?.buffs;
         if (conditionalBuffs) {
             for (const [key] of Object.entries(conditionalBuffs)) {
                 const val = resolveConditionalBuffValue(supplier, team, key);
@@ -738,7 +738,7 @@ function computeBuffUtilization(supplier, team) {
     }
 
     const buffs = { ...(supplier.mechanics?.buffs || {}) };
-    const conditionalBuffsNonDPS = supplier.mechanics?.conditionalBuffs;
+    const conditionalBuffsNonDPS = supplier.mechanics?.conditional?.buffs;
     if (conditionalBuffsNonDPS) {
         for (const [key] of Object.entries(conditionalBuffsNonDPS)) {
             const val = resolveConditionalBuffValue(supplier, team, key);
@@ -2172,7 +2172,7 @@ function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs =
         const buffs = unit.mechanics?.buffs || {};
         const debuffs = unit.mechanics?.debuffs || {};
         const utility = unit.mechanics?.utility || {};
-        const conditionalBuffs = unit.mechanics?.conditionalBuffs || {};
+        const conditionalBuffs = unit.mechanics?.conditional?.buffs || {};
         const hasBuffContributions = Object.keys(buffs).length > 0 || Object.keys(debuffs).length > 0
             || Object.keys(conditionalBuffs).length > 0
             || (!isDPS(unit) && NEED_FULFILLMENT_KEYS.some(k => w(utility[k]) > 0))

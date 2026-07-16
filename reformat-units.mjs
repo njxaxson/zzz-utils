@@ -18,15 +18,24 @@ function formatPseudoRole(arr) {
     return '[\n' + lines.join(',\n') + '\n            ]';
 }
 
-function formatConditionalBuffs(cb) {
-    const cbLines = [];
-    for (const [bk, bv] of Object.entries(cb)) {
+// Formats one conditional group (e.g. "buffs", "debuffs", "scaling") whose entries
+// share the { countTag, levels } shape.
+function formatConditionalGroup(group, indent) {
+    const innerIndent = indent + '    ';
+    const lines = Object.entries(group).map(([bk, bv]) => {
         const levStr = '[' + bv.levels.join(', ') + ']';
-        cbLines.push(
-            `                ${JSON.stringify(bk)}: { "countTag": ${JSON.stringify(bv.countTag)}, "levels": ${levStr} }`
-        );
-    }
-    return '{\n' + cbLines.join(',\n') + '\n            }';
+        return `${innerIndent}${JSON.stringify(bk)}: { "countTag": ${JSON.stringify(bv.countTag)}, "levels": ${levStr} }`;
+    });
+    return '{\n' + lines.join(',\n') + '\n' + indent + '}';
+}
+
+// Formats the top-level "conditional" block, e.g. { buffs: {...}, debuffs: {...} }.
+function formatConditional(cond, indent) {
+    const innerIndent = indent + '    ';
+    const lines = Object.entries(cond).map(([k, v]) =>
+        `${innerIndent}${JSON.stringify(k)}: ${formatConditionalGroup(v, innerIndent)}`
+    );
+    return '{\n' + lines.join(',\n') + '\n' + indent + '}';
 }
 
 function formatMechanics(mech) {
@@ -35,8 +44,8 @@ function formatMechanics(mech) {
     for (const [k, v] of Object.entries(mech)) {
         if (k === 'pseudoRole') {
             lines.push(`${indent}"pseudoRole": ${formatPseudoRole(v)}`);
-        } else if (k === 'conditionalBuffs') {
-            lines.push(`${indent}"conditionalBuffs": ${formatConditionalBuffs(v)}`);
+        } else if (k === 'conditional') {
+            lines.push(`${indent}"conditional": ${formatConditional(v, indent)}`);
         } else if (typeof v === 'object' && v !== null && !Array.isArray(v)) {
             lines.push(`${indent}${JSON.stringify(k)}: ${inlineObj(v)}`);
         } else {

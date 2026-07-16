@@ -686,8 +686,10 @@
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "pseudoRole": ["subdps", "support"],
-            "conditionalBuffs": {
-                "atk": { "countTag": "anomaly", "levels": [0, 0, 2, 4] }
+            "conditional": {
+                "buffs": {
+                    "atk": { "countTag": "anomaly", "levels": [0, 0, 2, 4] }
+                }
             },
             "damage": { "ultimate:double": 3, "aftershock": 2, "luminize": 3 },
             "buffs": { "anomaly": 2 },
