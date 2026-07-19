@@ -126,11 +126,16 @@ function applyBannerRecommendationOrdering(recommendations, bumpWindowIds, banne
 }
 
 /**
- * Best gap priority for a unit across all gaps.
- * Reads gap.priority set by the engine's assignPriority(), which uses relative
- * thresholds for loaded rosters — ensures tile verdicts match recommendation labels.
+ * Verdict for a unit, sourced from its actual recommendation card when one exists —
+ * rec.priority already reflects the engine's composite-priority escalation (3+ Medium
+ * gap contributions → High) and codependent-dependency drop, so this keeps tile
+ * verdicts in lockstep with the recommendation labels instead of re-deriving a
+ * possibly-lower verdict from a single raw gap.
  */
-function bannerTileVerdictClass(unitId, allGaps, ownedUnits, allUnits) {
+function bannerTileVerdictClass(unitId, allGaps, ownedUnits, allUnits, recommendations) {
+    const recMatch = recommendations?.find(rec => rec.units.some(u => u.id === unitId));
+    if (recMatch) return recMatch.priority.toLowerCase();
+
     const RANK = { 'High': 2, 'Medium': 1, 'Low': 0 };
     const ORDERED = ['high', 'medium', 'low', 'no'];
     let best = -1;
@@ -315,7 +320,7 @@ function renderBannerTiles(results) {
             .filter(id => unitById.has(id) && !unitStates[id]?.owned)
             .map(id => {
                 const unit = unitById.get(id);
-                const verdict = bannerTileVerdictClass(id, allGaps, ownedUnits, allUnits);
+                const verdict = bannerTileVerdictClass(id, allGaps, ownedUnits, allUnits, results.recommendations);
                 return createBannerUnitTile(unit, verdict);
             })
             .join('');

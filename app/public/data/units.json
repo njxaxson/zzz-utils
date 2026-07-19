@@ -524,8 +524,9 @@
         "join": ["ether", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
-            "buffs": { "ether": 1 },
-            "debuffs": { "defense": 3 }
+            "buffs": { "ether": 1, "cr" : 1 },
+            "debuffs": { "defense": 3 },
+            "utility": { "quick-assists": true }
         },
         "faction": "Cunning Hares",
         "displayText": "Everyone loves Nicole. Great support agent that specializes in shredding enemy defense, even for an A-rank."
