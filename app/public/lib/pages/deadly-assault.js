@@ -3,25 +3,22 @@
  * Finds optimal team allocations for 3 DA bosses
  */
 
-import { 
+import {
     getTeams, sortTeamByRole, getTeamLabel,
-    extendTeamsWithUniversalUnits, findExclusiveCombinations, teamsOverlap 
+    extendTeamsWithUniversalUnits, teamsOverlap
 } from '../common/team-builder.js';
 import { scoreTeamForBoss, getBossWeaknesses, getBossShill, resolveBossVariation } from '../common/team-scorer.js';
 import { createStrengthLabelHtml } from '../common/strength-rating.js';
-import { 
+import {
     decodeBosses, getBossesFromUrl, generateShareUrlWithBosses,
     encodeBossVariations, decodeBossVariations, getBossVariationsFromUrl
 } from '../common/roster-share.js';
-import { 
+import {
     initRoster, getUnitStates, getAllUnits,
     getInitials, getUnitElement, getCharacterImageUrl, getUniversalUnitNames
 } from '../common/roster-ui.js';
-import {
-    isPrimaryDps, unitFingerprint, getTeamDpsBuckets, teamDpsFingerprint,
-    findDiverseStrategies as findDiverseStrategiesCore,
-    DEFAULT_PER_BOSS_FLOOR_RATIO, DEFAULT_MIN_RESULTS_BEFORE_FLOOR
-} from '../common/dps-buckets.js';
+import { isPrimaryDps, unitFingerprint, teamDpsFingerprint } from '../common/dps-buckets.js';
+import { solveDeadlyAssault } from '../common/deadly-assault-solver.js';
 
 // ============================================================================
 // CONSTANTS
@@ -653,41 +650,22 @@ function calculateOptimalTeams() {
         console.groupEnd();
     }
     
-    // Variations mode: standard score-sorted combinations
-    let combinations = findExclusiveCombinations(viableTeamsByBoss, selectedBossNames);
-
-    // Diverse mode: DPS assignment is the first-class decision
-    let diverseResults = findDiverseStrategies(
-        viableTeamsByBoss, selectedBossNames, DISPLAY_LIMIT
-    );
-
-    // Fallback: if no non-overlapping triples found, retry all bosses in lenient mode
-    if (combinations.length === 0 && diverseResults.length === 0) {
-        console.log('⚠️ No non-overlapping combinations found — retrying all bosses in lenient mode...');
-        for (const boss of selectedBossObjects) {
-            for (const label of teamLabels) {
-                const team = threeCharTeams[label];
-                const score = scoreTeamForBoss(team, boss, { lenient: true });
-                if (score <= 0) continue;
-
-                const existing = viableTeamsByBoss[boss.name].find(t => t.label === label);
-                if (existing) {
-                    if (score > existing.score) existing.score = score;
-                    existing.lenient = true;
-                } else {
-                    viableTeamsByBoss[boss.name].push({ label, team, score, lenient: true });
-                }
-            }
-            viableTeamsByBoss[boss.name].sort((a, b) => b.score - a.score);
-            console.log(`   ${boss.name}: ${viableTeamsByBoss[boss.name].length} viable teams (after lenient)`);
-        }
-
-        combinations = findExclusiveCombinations(viableTeamsByBoss, selectedBossNames);
-        diverseResults = findDiverseStrategies(
-            viableTeamsByBoss, selectedBossNames, DISPLAY_LIMIT
-        );
-        console.log(`After lenient retry — Combinations: ${combinations.length}, Diverse: ${diverseResults.length}`);
-    }
+    // Variations mode (standard score-sorted combinations) and Diverse mode
+    // (DPS assignment as the first-class decision) share one solver so the
+    // webapp and the deadly-assault CLI can never drift apart.
+    const { combinations, diverseResults } = solveDeadlyAssault({
+        viableTeamsByBoss,
+        bossNames: selectedBossNames,
+        bossObjects: selectedBossObjects,
+        teamLabels,
+        threeCharTeams,
+        scoreLenient: (team, boss) => {
+            const score = scoreTeamForBoss(team, boss, { lenient: true });
+            return score > 0 ? score : null;
+        },
+        diverseLimit: DISPLAY_LIMIT,
+        log: console.log
+    });
 
     console.log(`Combinations: ${combinations.length}, Diverse strategies: ${diverseResults.length}`);
     diverseResults.forEach((combo, i) => {
@@ -719,12 +697,6 @@ function calculateOptimalTeams() {
 // Carousel state
 let currentResultIndex = 0;
 let totalResults = 0;
-
-function findDiverseStrategies(viableTeamsByBoss, bossNames, limit) {
-    const result = findDiverseStrategiesCore(viableTeamsByBoss, bossNames, limit);
-    console.log(`Diversity selection: ${result.totalStrategies} total strategies, per-boss floor ${result.perBossFloor.toFixed(0)} (enforced after ${DEFAULT_MIN_RESULTS_BEFORE_FLOOR} results)`);
-    return result.selected;
-}
 
 function displayResults(results, scroll = true) {
     lastResults = results;

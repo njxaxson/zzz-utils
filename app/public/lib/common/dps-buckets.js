@@ -5,7 +5,7 @@
  * then selects diverse strategies that surface meaningfully different options
  * rather than minor support variations of the same DPS assignment.
  *
- * Shared between the webapp (deadly-assault page) and CLI scripts (da-buckets).
+ * Shared between the webapp (deadly-assault page) and the deadly-assault CLI script.
  */
 
 import { teamsOverlap } from './team-builder.js';

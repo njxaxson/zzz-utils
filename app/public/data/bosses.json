@@ -73,7 +73,8 @@
             "resistances": ["electric"],
             "shill": null,
             "anti": [],
-            "assists": 0
+            "assists": 0,
+            "weak" : ["stun"]
         }
     },
     {
@@ -257,6 +258,7 @@
         "shortName": "Beast",
         "image": null,
         "favored": ["Remielle"],
+        "available" : false,
         "mechanics": {
             "weaknesses": [],
             "resistances": [],

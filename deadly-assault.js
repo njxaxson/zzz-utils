@@ -14,9 +14,51 @@ import { filterBosses } from './lib/boss-filter.js';
 import { buildTeams } from './lib/team-pipeline.js';
 import { parseTeams } from './lib/team-parser.js';
 import { scoreTeamForBoss, getBossWeaknesses, getBossResistances, getBossShill, getBossAnti, getBossAssists } from './app/public/lib/common/team-scorer.js';
-import { findExclusiveCombinations, teamsOverlap } from './app/public/lib/common/team-builder.js';
+import { teamsOverlap } from './app/public/lib/common/team-builder.js';
+import { isPrimaryDps, unitFingerprint, getTeamDpsBuckets } from './app/public/lib/common/dps-buckets.js';
+import { solveDeadlyAssault } from './app/public/lib/common/deadly-assault-solver.js';
 import { rawScorePassesFilter } from './lib/score-filter.js';
 import { ELEMENTS, DPS_ROLES } from './app/public/lib/common/constants.js';
+
+const DISPLAY_LIMIT = 5;
+
+// Debug-only: DPS-archetype bucket breakdown per boss, plus key-DPS-missing checks.
+function printDpsBucketDiagnostics(boss, viableTeams, disqualified, keyDpsNames) {
+    const buckets = new Map();
+    for (const entry of viableTeams) {
+        const fps = getTeamDpsBuckets(entry.team);
+        for (const fp of fps) {
+            if (!fp) continue;
+            if (!buckets.has(fp)) buckets.set(fp, []);
+            buckets.get(fp).push(entry);
+        }
+    }
+
+    console.log(`  DPS buckets: ${buckets.size}`);
+    for (const [fp, entries] of [...buckets.entries()].sort((a, b) => b[1][0].score - a[1][0].score)) {
+        const best = entries.reduce((a, b) => a.score > b.score ? a : b);
+        const dpsUnit = best.team.find(u => isPrimaryDps(u) && unitFingerprint(u) === fp);
+        const name = dpsUnit ? dpsUnit.name : '?';
+        console.log(`    [${fp}] ${name} — best: ${best.score.toFixed(0)}, ${entries.length} teams`);
+    }
+
+    const missingDps = keyDpsNames.filter(name =>
+        !viableTeams.some(entry => entry.team.some(u => u.name === name && isPrimaryDps(u)))
+    );
+    if (missingDps.length > 0) {
+        console.log(`  Missing key DPS: ${missingDps.join(', ')}`);
+        for (const name of missingDps) {
+            const teamsWithUnit = disqualified.filter(e => e.team.some(u => u.name === name));
+            if (teamsWithUnit.length === 0) {
+                console.log(`    ${name}: NO teams formed at all`);
+            } else {
+                const best = teamsWithUnit.sort((a, b) => b.score - a.score)[0];
+                console.log(`    ${name}: ${teamsWithUnit.length} teams, all scored <= 0. Best: ${best.label} = ${best.score.toFixed(0)}`);
+                scoreTeamForBoss(best.team, boss, { debug: true });
+            }
+        }
+    }
+}
 
 const options = parseArgs({
     name: 'deadly-assault.js',
@@ -26,7 +68,8 @@ const options = parseArgs({
         '  node deadly-assault.js -b defiler,hunter,solo   Another combo',
         '  node deadly-assault.js -m -b butch,ucc,pomp     Personal roster',
         '  node deadly-assault.js -q "?roster=..." -10     Share URL, top 10',
-        '  node deadly-assault.js -b butch,ucc,pomp -s 400 Teams per boss must score >= 400'
+        '  node deadly-assault.js -b butch,ucc,pomp -s 400 Teams per boss must score >= 400',
+        '  node deadly-assault.js -b butch,ucc,pomp -d     Debug: top teams, DPS buckets, missing-DPS check'
     ].join('\n')
 });
 
@@ -146,6 +189,7 @@ async function main() {
     const DEBUG = options.debug;
 
     const selectedBossObjects = filteredBossObjects;
+    const selectedBossNames = selectedBossObjects.map(b => b.name);
 
     // Explicit teams mode: skip normal pipeline
     if (options.teams) {
@@ -204,6 +248,12 @@ async function main() {
         const modeNote = options.units ? " (whitelist mode)" : (options.onlyMine ? " (personal roster)" : "");
         console.log(`Using ${availableUnits.length} units${modeNote}\n`);
     }
+
+    // Tier 0 units are this roster's best-in-class DPS — used as the "key DPS" watch
+    // list for the missing-DPS debug check, instead of a hardcoded name list.
+    const keyDpsNames = availableUnits
+        .filter(u => u.tier === 0 && DPS_ROLES.some(role => u.tags.includes(role)))
+        .map(u => u.name);
 
     // ============================================================================
     // TIER 0 SANITY CHECK
@@ -278,55 +328,6 @@ async function main() {
     }
 
     // ============================================================================
-    // DOMINANCE CHECK
-    // ============================================================================
-
-    function isDominatedCombination(combination, viableTeamsByBoss, availableUnits) {
-        const usedUnitIds = new Set();
-        for (const assignment of combination.assignments) {
-            for (const unit of assignment.team) {
-                usedUnitIds.add(unit.id);
-            }
-        }
-
-        const tier0Units = availableUnits.filter(u => u.tier === 0);
-        const missingTier0 = tier0Units.filter(u => !usedUnitIds.has(u.id));
-
-        if (missingTier0.length === 0) return { dominated: false };
-
-        for (const missingUnit of missingTier0) {
-            for (let i = 0; i < combination.assignments.length; i++) {
-                const assignment = combination.assignments[i];
-                const bossName = assignment.boss;
-                const currentScore = assignment.score;
-                const viableTeams = viableTeamsByBoss[bossName] || [];
-
-                const otherTeamUnitIds = new Set();
-                for (let j = 0; j < combination.assignments.length; j++) {
-                    if (j !== i) {
-                        for (const unit of combination.assignments[j].team) {
-                            otherTeamUnitIds.add(unit.id);
-                        }
-                    }
-                }
-
-                for (const candidateTeam of viableTeams) {
-                    if (candidateTeam.score <= currentScore) continue;
-                    if (!candidateTeam.team.some(u => u.id === missingUnit.id)) continue;
-                    if (candidateTeam.team.some(u => otherTeamUnitIds.has(u.id))) continue;
-
-                    return {
-                        dominated: true,
-                        reason: `Could use ${candidateTeam.label} (${candidateTeam.score}) for ${bossName.replace("Notorious ", "")} instead of ${assignment.label} (${currentScore}) to include ${missingUnit.name}`
-                    };
-                }
-            }
-        }
-
-        return { dominated: false };
-    }
-
-    // ============================================================================
     // MAIN EXECUTION
     // ============================================================================
 
@@ -360,12 +361,15 @@ async function main() {
 
     for (const boss of selectedBossObjects) {
         viableTeamsByBoss[boss.name] = [];
+        const disqualified = DEBUG ? [] : null;
 
         for (const label of teamLabels) {
             const team = threeCharTeams[label];
             const score = scoreTeamForBoss(team, boss, { debug: options.debug });
             if (score > 0 && rawScorePassesFilter(score, options)) {
                 viableTeamsByBoss[boss.name].push({ label, team, score });
+            } else if (DEBUG) {
+                disqualified.push({ label, team, score });
             }
         }
 
@@ -384,6 +388,7 @@ async function main() {
         if (DEBUG) {
             const lenientNote = lenientBosses.includes(boss.name) ? " (LENIENT)" : "";
             console.log(`${boss.name}: ${viableTeamsByBoss[boss.name].length} viable teams${lenientNote}`);
+            printDpsBucketDiagnostics(boss, viableTeamsByBoss[boss.name], disqualified, keyDpsNames);
         }
     }
 
@@ -405,9 +410,20 @@ async function main() {
         }
     }
 
-    // Find exclusive combinations
-    let combinations = findExclusiveCombinations(viableTeamsByBoss, SELECTED_BOSSES);
-    const totalCombos = combinations.length;
+    // Find exclusive combinations (shared solver — same algorithm as the webapp)
+    let { combinations } = solveDeadlyAssault({
+        viableTeamsByBoss,
+        bossNames: selectedBossNames,
+        bossObjects: selectedBossObjects,
+        teamLabels,
+        threeCharTeams,
+        scoreLenient: (team, boss) => {
+            const score = scoreTeamForBoss(team, boss, { lenient: true, debug: options.debug });
+            return (score > 0 && rawScorePassesFilter(score, options)) ? score : null;
+        },
+        diverseLimit: DISPLAY_LIMIT,
+        log: DEBUG ? console.log : () => {}
+    });
 
     if (options.include && options.include.length > 0) {
         const beforeIncludeFilter = combinations.length;
@@ -425,70 +441,17 @@ async function main() {
         }
     }
 
-    combinations = combinations.filter(combo => {
-        const result = isDominatedCombination(combo, viableTeamsByBoss, availableUnits);
-        combo.dominanceCheck = result;
-        return !result.dominated;
-    });
-
-    const dominatedCount = totalCombos - combinations.length;
-
     for (const combo of combinations) {
-        const check = checkTier0Utilization(combo, availableUnits, SELECTED_BOSSES, bosses);
-        combo.sanityCheck = check;
-        combo.priority += check.warnings.length * 1000;
+        combo.sanityCheck = checkTier0Utilization(combo, availableUnits, selectedBossNames, bosses);
     }
 
-    combinations.sort((a, b) => {
-        if (a.priority !== b.priority) return a.priority - b.priority;
-        return b.totalScore - a.totalScore;
-    });
-
     if (DEBUG) {
-        console.log(`Found ${combinations.length} valid team allocations (${dominatedCount} dominated removed)\n`);
+        console.log(`Found ${combinations.length} valid team allocations\n`);
     }
 
     if (combinations.length === 0) {
-        console.log('⚠️ No non-overlapping combinations found — retrying all bosses in lenient mode...');
-        for (const boss of selectedBossObjects) {
-            for (const label of teamLabels) {
-                const team = threeCharTeams[label];
-                const score = scoreTeamForBoss(team, boss, { lenient: true, debug: options.debug });
-                if (score <= 0 || !rawScorePassesFilter(score, options)) continue;
-
-                const existing = viableTeamsByBoss[boss.name].find(t => t.label === label);
-                if (existing) {
-                    if (score > existing.score) existing.score = score;
-                    existing.lenient = true;
-                } else {
-                    viableTeamsByBoss[boss.name].push({ label, team, score, lenient: true });
-                }
-            }
-            viableTeamsByBoss[boss.name].sort((a, b) => b.score - a.score);
-            console.log(`   ${boss.name}: ${viableTeamsByBoss[boss.name].length} viable teams (after lenient)`);
-        }
-
-        combinations = findExclusiveCombinations(viableTeamsByBoss, SELECTED_BOSSES);
-        combinations = combinations.filter(combo => {
-            const result = isDominatedCombination(combo, viableTeamsByBoss, availableUnits);
-            combo.dominanceCheck = result;
-            return !result.dominated;
-        });
-        for (const combo of combinations) {
-            const check = checkTier0Utilization(combo, availableUnits, SELECTED_BOSSES, bosses);
-            combo.sanityCheck = check;
-            combo.priority += check.warnings.length * 1000;
-        }
-        combinations.sort((a, b) => {
-            if (a.priority !== b.priority) return a.priority - b.priority;
-            return b.totalScore - a.totalScore;
-        });
-
-        console.log(`After lenient retry — ${combinations.length} valid allocations`);
-        if (combinations.length === 0) {
-            console.log("No valid combinations found even in lenient mode. Try different bosses or expand your unit pool.");
-            return;
-        }
+        console.log("No valid combinations found even in lenient mode. Try different bosses or expand your unit pool.");
+        return;
     }
 
     // Display results
