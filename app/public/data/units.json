@@ -778,7 +778,7 @@
         "limited": true,
         "tier": 0.5,
         "tags": ["attack", "ice", "assist:defensive"],
-        "join": ["ice", "anomaly"],
+        "join": ["stun", "support"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "damage": { "enhanced": 3, "ultimate:weak": 2 },
