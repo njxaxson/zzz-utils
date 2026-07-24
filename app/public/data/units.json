@@ -598,7 +598,7 @@
         "rank": "A",
         "tier": 1.5,
         "tags": ["anomaly", "physical", "assist:defensive"],
-        "join": ["physical", "faction"],
+        "join": ["physical", "faction", "anomaly"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {},
         "faction": "Sons of Calydon",
