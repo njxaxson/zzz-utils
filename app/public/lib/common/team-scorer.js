@@ -62,7 +62,7 @@ const NEED_FULFILLMENT_KEYS = [
 
 const VORTEX_TIERS = { 
     //Base elements
-    "ice": 4.5, "fire": 2, "physical": 2, "ether": 1, "electric": 1, "lumen": 0,
+    "ice": 4.5, "fire": 2, "physical": 2, "ether": 2, "electric": 1, "lumen": 0,
     //Variants
     "ice:frost" : 0.001, 
     "ether:auricInk" : 0.8, 
