@@ -163,6 +163,26 @@
         "displayText": "This ditzy Calydon bartender is an off-field fire anomaly sub-DPS. At P6, she pairs particularly well with Velina."
     },
     {
+        "id": "claret",
+        "name": "Claret",
+        "image": null,
+        "rank": "S",
+        "limited": true,
+        "tier":0.5,
+        "tags": ["defense", "fire", "assist:defensive"],
+        "join": ["stun", "support"],
+        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {
+            "pseudoRole": ["attack"],
+            "onfield": true,
+            "damage": { "ultimate:weak": 2, "chain" : 3, "enhanced" : 3 },
+            "scaling" : { "cr" : 3, "cd" : 3, "atk": 3, "def" : 3 }
+        },
+        "faction": "Flint Workshop",
+        "available" : false,
+        "displayText": ""
+    },
+    {
         "id": "caesar",
         "name": "Caesar",
         "image": "./assets/characters/caesar.webp",
