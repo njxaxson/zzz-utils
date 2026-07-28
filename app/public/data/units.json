@@ -506,13 +506,13 @@
         "image": "./assets/characters/nekomata.webp",
         "rank": "S",
         "limited": false,
-        "tier": 2.5,
+        "tier": 2,
         "tags": ["attack", "physical", "assist:defensive"],
-        "join": ["physical", "faction"],
+        "join": ["physical", "faction", "support"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {},
         "faction": "Cunning Hares",
-        "displayText": "Cat girl is the bane of 50/50s everywhere. With her potential vision buffs, she is usuable; without them her best use is as a low-energy-consumption teammate for Seed."
+        "displayText": "Cat girl was the bane of 50/50s everywhere, but with her potential vision buffs, she gains a join on support and becomes considerably more useful."
     },
     {
         "id": "nicole",
