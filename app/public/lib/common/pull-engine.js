@@ -51,6 +51,34 @@ export function getBestTier(units) {
     return Math.min(...units.map(u => u.tier));
 }
 
+// Unconditional pseudoRole entries (plain strings) — always active regardless of team context.
+function unconditionalPseudo(unit) {
+    const pr = unit.mechanics?.pseudoRole;
+    if (!Array.isArray(pr)) return [];
+    return pr.filter(e => typeof e === 'string');
+}
+
+// A unit is a primary DPS if either its base tags include a DPS archetype, or its
+// pseudoRole unconditionally contains both `dps` and a DPS archetype (e.g. Claret's
+// ["attack", "dps"] — she's a defense-role unit designed to function as a primary
+// attack DPS).
+export function hasDPSRole(unit) {
+    if (DPS_ARCHETYPES.some(a => unit.tags.includes(a))) return true;
+    const p = unconditionalPseudo(unit);
+    return p.includes('dps') && p.some(r => DPS_ARCHETYPES.includes(r));
+}
+
+// Returns the archetype tag ('attack' | 'anomaly' | 'rupture') for a unit that
+// functions as a primary DPS, or null. Tag archetype takes precedence over
+// pseudoRole; the pseudoRole branch requires an unconditional `dps` marker.
+export function getPrimaryDPSArchetype(unit) {
+    const tagArch = DPS_ARCHETYPES.find(a => unit.tags.includes(a));
+    if (tagArch) return tagArch;
+    const p = unconditionalPseudo(unit);
+    if (!p.includes('dps')) return null;
+    return DPS_ARCHETYPES.find(a => p.includes(a)) ?? null;
+}
+
 export function isSubdps(unit, team = null) {
     const pr = unit.mechanics?.pseudoRole;
     if (!Array.isArray(pr)) return false;
@@ -134,9 +162,10 @@ function mechanicsFitScore(supplier, consumer) {
     const cElement = getUnitElement(consumer);
     const sElement = getUnitElement(supplier);
 
-    const isAtkDPS = cTags.includes('attack');
-    const isAnoDPS = cTags.includes('anomaly');
-    const isRupDPS = cTags.includes('rupture');
+    const primaryArch = getPrimaryDPSArchetype(consumer);
+    const isAtkDPS = primaryArch === 'attack' || cTags.includes('attack');
+    const isAnoDPS = primaryArch === 'anomaly' || cTags.includes('anomaly');
+    const isRupDPS = primaryArch === 'rupture' || cTags.includes('rupture');
     const isDPS = isAtkDPS || isAnoDPS || isRupDPS;
     if (!isDPS) return 0;
 
@@ -165,6 +194,11 @@ function mechanicsFitScore(supplier, consumer) {
     const atkW = w(sBuf.atk);
     if (atkW > 0 && isDPS) {
         score += atkW * (isRupDPS ? 0.33 : 1) * 2;
+    }
+    // DEF buff → DPS units that explicitly scale with DEF (e.g. Claret)
+    const defW = w(sBuf.def);
+    if (defW > 0 && w(cScaling.def) > 0) {
+        score += defW * 2;
     }
     if (w(sBuf.anomaly) > 0 && isAnoDPS) score += w(sBuf.anomaly) * 3;
     if (w(sBuf.sheer) > 0 && isRupDPS) score += w(sBuf.sheer) * 5;
@@ -268,8 +302,7 @@ export function checkTeamDependencies(candidate, ownedUnits, allUnits) {
 
     if (!candidate.mechanics?.scaling?.codependent) return empty;
 
-    const isDPSUnit = DPS_ARCHETYPES.some(a => candidate.tags.includes(a));
-    if (!isDPSUnit && !isSubdps(candidate)) return empty;
+    if (!hasDPSRole(candidate) && !isSubdps(candidate)) return empty;
 
     const scaling = getEffectiveScaling(candidate);
     const notes = [];
@@ -477,20 +510,19 @@ export function analyze(allUnits, unitStates, ownedUnits, { maxRecommendations =
     for (const el of ELEMENTS) ownedByElement[el] = [];
 
     for (const unit of ownedUnits) {
-        for (const arch of DPS_ARCHETYPES) {
-            if (unit.tags.includes(arch)) {
-                ownedDPS[arch].push(unit);
-                const el = getUnitElement(unit);
-                if (el !== 'unknown' && !ownedByElement[el].some(u => u.id === unit.id)) {
-                    ownedByElement[el].push(unit);
-                }
+        const primaryArch = getPrimaryDPSArchetype(unit);
+        if (primaryArch) {
+            ownedDPS[primaryArch].push(unit);
+            const el = getUnitElement(unit);
+            if (el !== 'unknown' && !ownedByElement[el].some(u => u.id === unit.id)) {
+                ownedByElement[el].push(unit);
             }
         }
         if (isSubdps(unit, ownedUnits)) {
             if (unit.tags.includes('anomaly')) ownedSubdps.anomaly.push(unit);
             if (unit.tags.includes('attack')) ownedSubdps.attack.push(unit);
         }
-        if (unit.tags.includes('support') || unit.tags.includes('defense')) {
+        if ((unit.tags.includes('support') || unit.tags.includes('defense')) && !primaryArch) {
             ownedSupports.push(unit);
         }
         if (unit.tags.includes('stun')) {
@@ -833,7 +865,7 @@ function detectDPSGaps(gaps, dpsQuality, ownedDPS, unownedLimitedS, sortCandidat
             : `You have decent ${arch} coverage, but a premium option would strengthen your roster`;
 
         const candidates = sortCandidatesFn(
-            unownedLimitedS.filter(u => u.tags.includes(arch) && !isSubdps(u))
+            unownedLimitedS.filter(u => getPrimaryDPSArchetype(u) === arch && !isSubdps(u))
         );
 
         if (candidates.length > 0) {
@@ -845,7 +877,7 @@ function detectDPSGaps(gaps, dpsQuality, ownedDPS, unownedLimitedS, sortCandidat
 function detectSupportGaps(gaps, ownedSupports, ownedDPS, dpsQuality, unownedLimitedS) {
     const ownedLimitedSupports = ownedSupports.filter(u => u.rank === 'S' && u.limited);
     const supportCandidates = unownedLimitedS.filter(u =>
-        u.tags.includes('support') || u.tags.includes('defense')
+        !hasDPSRole(u) && (u.tags.includes('support') || u.tags.includes('defense'))
     );
     if (supportCandidates.length === 0) return;
 
@@ -1095,7 +1127,7 @@ function detectElementGaps(gaps, elementQuality, unownedLimitedS, sortCandidates
         // Primary DPS candidates first
         let candidates = sortCandidatesFn(
             unownedLimitedS.filter(u =>
-                getUnitElement(u) === el && DPS_ARCHETYPES.some(a => u.tags.includes(a)) && !isSubdps(u)
+                getUnitElement(u) === el && hasDPSRole(u) && !isSubdps(u)
             )
         );
 
@@ -1104,7 +1136,7 @@ function detectElementGaps(gaps, elementQuality, unownedLimitedS, sortCandidates
         if (candidates.length === 0) {
             candidates = sortCandidatesFn(
                 unownedLimitedS.filter(u =>
-                    getUnitElement(u) === el && DPS_ARCHETYPES.some(a => u.tags.includes(a))
+                    getUnitElement(u) === el && hasDPSRole(u)
                 )
             );
         }
@@ -1223,7 +1255,7 @@ function detectSynergies(gaps, ownedUnits, unownedLimitedS, unitByName, ownedByN
     for (const group of Object.values(groups)) {
         const rec = group.recommended;
 
-        const recDPSArch = DPS_ARCHETYPES.find(a => rec.tags.includes(a));
+        const recDPSArch = getPrimaryDPSArchetype(rec);
         if (recDPSArch && !isSubdps(rec)) {
             const recEl = getUnitElement(rec);
             if (dpsQuality[recDPSArch] >= 75 && recEl !== 'unknown' && elementQuality[recEl] >= 55) {
@@ -1272,11 +1304,12 @@ function detectMechanicalSynergies(gaps, ownedUnits, unownedLimitedS, dpsQuality
     const MIN_PAIR_QUALITY = 40; // tier ≤ 1.5; excludes T2+ S-ranks like Harumasa
     const ownedSRankDPS = ownedUnits.filter(u =>
         u.rank === 'S' &&
-        DPS_ARCHETYPES.some(a => u.tags.includes(a)) &&
+        hasDPSRole(u) &&
         tierToQuality(u.tier ?? 4) >= MIN_PAIR_QUALITY
     );
     const ownedSRankNonDPS = ownedUnits.filter(u =>
-        u.rank === 'S' && (u.tags.includes('support') || u.tags.includes('defense') || u.tags.includes('stun'))
+        u.rank === 'S' && !hasDPSRole(u) &&
+        (u.tags.includes('support') || u.tags.includes('defense') || u.tags.includes('stun'))
     );
 
     // Precompute the best existing fit an owned non-DPS provides per (DPS id, team slot).
@@ -1284,7 +1317,7 @@ function detectMechanicalSynergies(gaps, ownedUnits, unownedLimitedS, dpsQuality
     // Slot is 'stun' for stunners, 'support' for everything else (support/defense).
     const ownedStunUnits = ownedUnits.filter(u => u.tags.includes('stun'));
     const ownedSupportDefUnits = ownedUnits.filter(u =>
-        u.tags.includes('support') || u.tags.includes('defense')
+        !hasDPSRole(u) && (u.tags.includes('support') || u.tags.includes('defense'))
     );
     const bestOwnedFitForDPS = new Map();
     for (const dps of ownedSRankDPS) {
@@ -1305,7 +1338,7 @@ function detectMechanicalSynergies(gaps, ownedUnits, unownedLimitedS, dpsQuality
     // and Yixuan independently, even if one pair scores slightly higher than the other.
     const scoredCandidates = [];
     for (const candidate of unownedLimitedS) {
-        const isDPSCandidate = DPS_ARCHETYPES.some(a => candidate.tags.includes(a)) && !isSubdps(candidate);
+        const isDPSCandidate = hasDPSRole(candidate) && !isSubdps(candidate);
         const el = getUnitElement(candidate);
 
         // DPS candidates that also supply buffs (mechanics.conditional.buffs or a
@@ -1321,7 +1354,7 @@ function detectMechanicalSynergies(gaps, ownedUnits, unownedLimitedS, dpsQuality
         // Quality gate: skip DPS candidates whose archetype+element are already well-covered
         // Lumen DPS skip the element quality check — they don't deal lumen damage
         if (isDPSCandidate) {
-            const arch = DPS_ARCHETYPES.find(a => candidate.tags.includes(a));
+            const arch = getPrimaryDPSArchetype(candidate);
             const skipElementCheck = el === 'lumen';
             if (arch && dpsQuality[arch] >= 75 && !skipElementCheck && el !== 'unknown' && elementQuality[el] >= 55) {
                 continue;
@@ -1359,7 +1392,7 @@ function detectMechanicalSynergies(gaps, ownedUnits, unownedLimitedS, dpsQuality
         // A-rank partners, lower-tier units) via conditional buffs and Refringe.
         if (isHybridSupplier) {
             const hybridTargets = ownedUnits.filter(u =>
-                u.rank === 'S' && DPS_ARCHETYPES.some(a => u.tags.includes(a))
+                u.rank === 'S' && hasDPSRole(u)
             );
             for (const owned of hybridTargets) {
                 if (!canJoinWith(candidate, owned)) continue;
@@ -1447,7 +1480,7 @@ function detectDepthGap(gaps, ownedDPS, dpsQuality, unownedLimitedS, sortCandida
         const primaryOwned = ownedDPS[arch].filter(u => u.rank === 'S' && u.limited && !isSubdps(u));
 
         const candidates = sortCandidatesFn(
-            unownedLimitedS.filter(u => u.tags.includes(arch) &&
+            unownedLimitedS.filter(u => getPrimaryDPSArchetype(u) === arch &&
                 (!isSubdps(u) || (isTitled(u) && u.tier === 0)))
         );
         if (candidates.length === 0) continue;

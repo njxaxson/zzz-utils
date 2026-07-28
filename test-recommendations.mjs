@@ -19,7 +19,9 @@ import {
     qualityLabel,
     capitalize,
     checkTeamDependencies,
-    DPS_ARCHETYPES
+    DPS_ARCHETYPES,
+    hasDPSRole,
+    getPrimaryDPSArchetype
 } from './app/public/lib/common/pull-engine.js';
 
 function assert(cond, msg) {
@@ -751,6 +753,74 @@ await runTest(42, 'Remielle is High priority for anomaly-loaded roster', () => {
     assert(remRec, 'Remielle should appear in recommendations for an anomaly-loaded roster');
     assert(remRec.priority === 'High',
         `Remielle should be High priority, got ${remRec.priority} — titled T0 creates new archetypes`);
+});
+
+// ===========================================================================
+// TESTS 43-45: Claret — defense-tag primary DPS via `dps` pseudorole
+// ===========================================================================
+// Claret has tags=["defense","fire",...] with pseudoRole=["attack","dps"].
+// The pull engine must classify her as a primary fire attack DPS, not as a
+// supporting defense unit.
+
+await runTest(43, 'Claret classifies as attack DPS via pseudoRole', () => {
+    const claret = unitByName(allUnits, 'Claret');
+    if (!claret) return; // unreleased data not present
+    assert(hasDPSRole(claret), 'hasDPSRole(Claret) should be true');
+    assert(getPrimaryDPSArchetype(claret) === 'attack',
+        `getPrimaryDPSArchetype(Claret) should be 'attack', got ${getPrimaryDPSArchetype(claret)}`);
+});
+
+await runTest(44, 'Claret surfaces as fire attack DPS candidate in fire-weak roster', () => {
+    const claret = unitByName(allUnits, 'Claret');
+    if (!claret) return;
+    // Roster with no premium fire DPS: no Evelyn, Burnice, Soldier-11, Ju Fufu, Orphie
+    const roster = [
+        'Miyabi', 'Nangong', 'Yuzuha', 'Astra', 'Rina',
+        'Nicole', 'Anby', 'Billy'
+    ];
+    const { unitStates, ownedUnits } = buildSyntheticRoster(allUnits, roster);
+    const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 20 });
+
+    // Claret should appear in a fire-element or attack-DPS gap card.
+    const claretGaps = result.allGaps.filter(g =>
+        g.units?.some(u => u.id === 'claret')
+    );
+    assert(claretGaps.length > 0,
+        `Claret should appear in at least one gap; got: ${result.allGaps.map(g => g.id).join(', ')}`);
+
+    const claretGapIds = claretGaps.map(g => g.id);
+    const inDPSOrFireGap = claretGapIds.some(id =>
+        id === 'dps-attack' || id === 'element-fire' || id === 'depth-attack'
+    );
+    assert(inDPSOrFireGap,
+        `Claret should appear in dps-attack / element-fire / depth-attack, got: ${claretGapIds.join(', ')}`);
+
+    // She should NOT be classified into a support gap.
+    const supportGap = result.allGaps.find(g => g.id.startsWith('support'));
+    if (supportGap) {
+        assert(!supportGap.units?.some(u => u.id === 'claret'),
+            'Claret should not appear in support gaps');
+    }
+});
+
+await runTest(45, 'Fire element coverage improves when Claret is added to roster', () => {
+    const claret = unitByName(allUnits, 'Claret');
+    if (!claret) return;
+    const baseRoster = [
+        'Miyabi', 'Nangong', 'Yuzuha', 'Astra', 'Rina',
+        'Nicole', 'Anby', 'Billy'
+    ];
+    const { unitStates: s0, ownedUnits: o0 } = buildSyntheticRoster(allUnits, baseRoster);
+    const r0 = analyze(allUnits, s0, o0, { maxRecommendations: 10 });
+    const fire0 = r0.coverage.elementQuality?.fire ?? 0;
+
+    const withClaret = [...baseRoster, 'Claret'];
+    const { unitStates: s1, ownedUnits: o1 } = buildSyntheticRoster(allUnits, withClaret);
+    const r1 = analyze(allUnits, s1, o1, { maxRecommendations: 10 });
+    const fire1 = r1.coverage.elementQuality?.fire ?? 0;
+
+    assert(fire1 > fire0,
+        `Fire coverage should improve when Claret is added — before: ${fire0}, after: ${fire1}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

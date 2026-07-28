@@ -1406,6 +1406,95 @@ async function main() {
         }
     });
 
+    // ========================================================================
+    // TEST 66: Claret pseudo-DPS — dps pseudorole activates attack DPS scoring
+    // ========================================================================
+    // Claret has tags=["defense","fire","..."] with pseudoRole=["attack","dps"].
+    // She should score as a primary attack DPS, NOT as a supporting defense unit.
+    // Compare against Ben (T4 fire defense without the dps pseudorole) — the DPS
+    // team should score wildly higher than the "defense-partner" alternative.
+    run('TEST 66: Claret scores as attack DPS (Pompey)', () => {
+        if (!allUnits.find(u => u.id === 'claret')) return; // preview-only unit
+        for (const b of withBosses(bosses, 'Pompey')) {
+            const t = 'Lycaon/Claret/Rina,Lycaon/Ben/Rina';
+            const m = scoreMapForBoss(scoreForTeamString(t, allUnits, { preview: true }), b);
+            const claretTeam = m.get('Lycaon / Claret / Rina');
+            const benTeam = m.get('Lycaon / Ben / Rina');
+            assert(claretTeam > 0,
+                `${b.name}: Lycaon/Claret/Rina should be viable (${claretTeam?.toFixed(1)})`);
+            assert(claretTeam > benTeam + 80,
+                `${b.name}: Claret DPS team(${claretTeam?.toFixed(1)}) should dominate Ben defense-partner team(${benTeam?.toFixed(1)})`);
+        }
+    });
+
+    // ========================================================================
+    // TEST 67: DEF buff → Claret's def scaling — Rina outperforms Lucy control
+    // ========================================================================
+    // Rina and Lucy both provide buffs.atk:2. Only Rina provides buffs.def:2.
+    // Claret has scaling.def:3 — the DEF buff should emerge as measurable synergy.
+    run('TEST 67: Rina beats Lucy for Claret via DEF buff (Pompey)', () => {
+        if (!allUnits.find(u => u.id === 'claret')) return;
+        for (const b of withBosses(bosses, 'Pompey')) {
+            const t = 'Lycaon/Claret/Rina,Lycaon/Claret/Lucy';
+            const m = scoreMapForBoss(scoreForTeamString(t, allUnits, { preview: true }), b);
+            const rina = m.get('Lycaon / Claret / Rina');
+            const lucy = m.get('Lycaon / Claret / Lucy');
+            assert(rina > lucy,
+                `${b.name}: Rina(${rina?.toFixed(1)}) > Lucy(${lucy?.toFixed(1)}) — DEF buff should tilt the comparison`);
+        }
+    });
+
+    // ========================================================================
+    // TEST 68: Fire resistance disqualifies Claret (Discordant Solo)
+    // ========================================================================
+    // Solo resists fire but does NOT anti-attack. With the dps pseudorole,
+    // Claret is a real DPS and should be DQ'd on element resistance —
+    // the defense-unit resistance free pass no longer applies.
+    run('TEST 68: Fire resistance DQs Claret on Solo', () => {
+        if (!allUnits.find(u => u.id === 'claret')) return;
+        for (const b of withBosses(bosses, 'Solo')) {
+            const t = 'Lycaon/Claret/Rina';
+            const m = scoreMapForBoss(scoreForTeamString(t, allUnits, { preview: true }), b);
+            const s = m.get('Lycaon / Claret / Rina');
+            assert(s <= 0,
+                `${b.name}: Fire-resistant boss should DQ Claret attack team (${s?.toFixed(1)})`);
+        }
+    });
+
+    // ========================================================================
+    // TEST 69: Attack shill applies to Claret (The Defiler)
+    // ========================================================================
+    // Defiler has shill=attack; Claret satisfies via her activated attack pseudorole.
+    // Comparing against a Claret team on a non-attack-shill boss with matched
+    // element setup would isolate the shill bonus, but a simpler positive-viability
+    // assertion suffices: the team should be strongly viable on Defiler.
+    run('TEST 69: Claret satisfies attack shill (Defiler)', () => {
+        if (!allUnits.find(u => u.id === 'claret')) return;
+        for (const b of withBosses(bosses, 'Defiler')) {
+            const t = 'Lycaon/Claret/Rina';
+            const m = scoreMapForBoss(scoreForTeamString(t, allUnits, { preview: true }), b);
+            const s = m.get('Lycaon / Claret / Rina');
+            assert(s > 0,
+                `${b.name}: Claret attack team should be viable on attack-shill boss (${s?.toFixed(1)})`);
+        }
+    });
+
+    // ========================================================================
+    // TEST 70 (regression): Remielle scoring unchanged by dps-pseudorole fix
+    // ========================================================================
+    // Remielle has pseudoRole=["subdps","support"] — no `dps` marker — so none
+    // of the changes should affect her. The canonical Alice/Vivian/Remielle
+    // triple-anomaly team on Solo should remain strong.
+    run('TEST 70: Remielle regression on Solo (Alice/Vivian/Remielle)', () => {
+        if (!allUnits.find(u => u.id === 'ramiel')) return;
+        for (const b of withBosses(bosses, 'Solo')) {
+            const parsed = scoreForTeamString('Alice/Vivian/Remielle', allUnits, { preview: true });
+            const s = scoreTeamForBoss(parsed[0].team, b, {});
+            assert(s > 300,
+                `${b.name}: Alice/Vivian/Remielle should remain strong (${s?.toFixed(1)}) — no dps pseudorole regression`);
+        }
+    });
+
     // ------------------------------------------------------------------------
     // Summary
     // ------------------------------------------------------------------------

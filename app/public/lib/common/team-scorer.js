@@ -131,10 +131,12 @@ export function isStun(unit) {
 }
 
 function isEffectiveSupport(unit) {
+    if (unit._activatedRoles?.includes('dps')) return false;
     return isSupport(unit) || unit._activatedRoles?.includes('support');
 }
 
 function isEffectiveDefense(unit) {
+    if (unit._activatedRoles?.includes('dps')) return false;
     return isDefense(unit) || unit._activatedRoles?.includes('defense');
 }
 
@@ -562,6 +564,8 @@ function resolveBaselineWeight(consumer, category) {
             if (roles.includes('attack') || roles.includes('rupture')) return 2;
             if (roles.includes('anomaly')) return 0.3;
             return 0;
+        case 'def':
+            return w(scaling?.def);
         case 'stun-infra':
             if (isStunlessUnit(consumer)) return 0;
             if (roles.includes('attack') || roles.includes('rupture')) return 1;
@@ -630,6 +634,8 @@ function getBuffRelevance(key, consumer) {
             if (roles.includes('attack') || roles.includes('rupture')) return 1;
             if (roles.includes('anomaly')) return 0.3;
             return 0;
+        case 'def':
+            return consumer.mechanics?.scaling?.def ? 1 : 0;
         case 'stun-multiplier':
             return dps ? 1 : 0;
         case 'chains':
@@ -1269,7 +1275,7 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
     
     const dpsUnits = team.filter(isDPS);
     const stunUnits = team.filter(isStun);
-    const defenseUnits = team.filter(isDefense);
+    const defenseUnits = team.filter(isEffectiveDefense);
 
     if (debug) console.log('\n  LAYER 3: BOSS MATCHUP');
 
@@ -1277,7 +1283,9 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
     if (bossShill) {
         const isDPSShill = DPS_ROLES.includes(bossShill);
         if (isDPSShill) {
-            const hasShilledDPS = dpsUnits.some(u => u.tags.includes(bossShill) && !isEffectiveSupport(u) && !isEffectiveDefense(u));
+            const hasShilledDPS = dpsUnits.some(u =>
+                (u.tags.includes(bossShill) || (u._activatedRoles?.includes('dps') && u._activatedRoles?.includes(bossShill)))
+                && !isEffectiveSupport(u) && !isEffectiveDefense(u));
             if (hasShilledDPS) {
                 score += 8;
                 if (debug) console.log(`    Shill match (${bossShill}): +8`);
@@ -1640,6 +1648,16 @@ function scoreBaselineAffinity(supplier, consumer, debug, options = {}) {
             const val = w(supplierBuffs.cd) * cw * MULT.CD_BUFF;
             score += val;
             dbg('cd', val);
+        }
+    }
+
+    // DEF buffs → consumers that explicitly scale with DEF (e.g. defense-DPS units)
+    if (supplierBuffs.def) {
+        const cw = resolveBaselineWeight(consumer, 'def');
+        if (cw > 0) {
+            const val = w(supplierBuffs.def) * cw * MULT.ATK_BUFF;
+            score += val;
+            dbg('def', val);
         }
     }
 

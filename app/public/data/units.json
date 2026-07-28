@@ -173,7 +173,7 @@
         "join": ["stun", "support"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
-            "pseudoRole": ["attack"],
+            "pseudoRole": ["attack", "dps"],
             "onfield": true,
             "damage": { "ultimate:weak": 2, "chain" : 3, "enhanced" : 3 },
             "scaling" : { "cr" : 3, "cd" : 3, "atk": 3, "def" : 3 }
