@@ -697,7 +697,6 @@
             "utility": { "daze": 2,  "rotations": "limited" },
             "onfield": false
         },
-        "available": false,
         "faction": "Covenant of Dayat",
         "displayText": "First-generation void hunter is an off-field support rather than an on-field hypercarry DPS. Requires a triple-anomaly team composition to be effective."
     },
@@ -707,7 +706,7 @@
         "image": "./assets/characters/rina.webp",
         "rank": "S",
         "limited": false,
-        "tier": 2,
+        "tier": 1,
         "tags": ["support", "electric", "assist:evasive"],
         "join": ["faction", "electric"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
@@ -718,7 +717,7 @@
             "utility": { "quick-assists": true }
         },
         "faction": "Victoria Housekeeping",
-        "displayText": "Electric support agent that specializes in buffing PEN. Her potential vision upgrades her to buff attack and defense."
+        "displayText": "Electric support agent that specializes in buffing PEN. Her potential vision upgrades her to buff attack and defense and makes her considerably better than without it."
     },
     {
         "id": "sanby",
@@ -880,7 +879,7 @@
             "scaling": { "er": 3 }
         },
         "faction": "External Strategy Department",
-        "displayText" : "Tall anomaly gentlelady sub-DPS with oversized fan creates on-field tornado traps. Pairs well with Jane and Promeia."
+        "displayText" : "Tall anomaly gentlelady sub-DPS with oversized fan creates on-field tornado traps. Pairs well with Jane, Burnice, Aria and Promeia."
     },
     {
         "id": "vivian",
