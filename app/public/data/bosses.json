@@ -253,18 +253,18 @@
         }
     },
     {
-        "id": "bashmu",
-        "name": "Aberrant Beast",
-        "shortName": "Beast",
-        "image": null,
+        "id": "aberrant",
+        "name": "Stagnant Aberrant",
+        "shortName": "Aberrant",
+        "image": "./assets/bosses/aberrant.webp",
         "favored": ["Remielle"],
-        "available" : false,
         "mechanics": {
             "weaknesses": [],
             "resistances": [],
             "shill": "anomaly",
             "anti": ["attack", "rupture"],
-            "assists": 2
+            "assists": 2,
+            "shillIntensity" : 3
         }
     }
 ]
