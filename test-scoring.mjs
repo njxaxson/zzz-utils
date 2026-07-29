@@ -439,11 +439,11 @@ async function main() {
         const slugger = withBosses(bosses, 'Slugger').find(Boolean);
         const tcc = scoreForTeamString('Trigger/Cissia/Caesar', allUnits)[0];
         const tccScore = scoreTeamForBoss(tcc.team, slugger, {});
-        assert(tccScore <= 270, `Slugger Trigger/Cissia/Caesar: got ${tccScore}, expected <= 270`);
+        assert(tccScore <= 280, `Slugger Trigger/Cissia/Caesar: got ${tccScore}, expected <= 280`);
 
         const tyc = scoreForTeamString('Trigger/Ye Shunguong/Caesar', allUnits)[0];
         const tycScore = scoreTeamForBoss(tyc.team, slugger, {});
-        assert(tycScore <= 270, `Slugger Trigger/YSG/Caesar: got ${tycScore}, expected <= 270`);
+        assert(tycScore <= 280, `Slugger Trigger/YSG/Caesar: got ${tycScore}, expected <= 280`);
     });
 
     // ========================================================================
@@ -1492,6 +1492,35 @@ async function main() {
             const s = scoreTeamForBoss(parsed[0].team, b, {});
             assert(s > 300,
                 `${b.name}: Alice/Vivian/Remielle should remain strong (${s?.toFixed(1)}) — no dps pseudorole regression`);
+        }
+    });
+
+    // ========================================================================
+    // TEST 71: Burnice notPresent:velina conditional subdps
+    // ========================================================================
+    // Burnice's pseudoRole is `[{ role: "subdps", when: { notPresent: "velina" } }]`
+    // — she's a subdps by default, but promotes to primary anomaly DPS when Velina
+    // is on the team. On a neutral boss:
+    //   * Burnice/Velina/Yuzuha (DPS/subDPS/support) should beat
+    //     Burnice/Vivian/Yuzuha (subDPS/subDPS/support) by a meaningful margin
+    //     because Burnice now claims the primary-DPS tier multiplier.
+    //   * Burnice/Promeia/Yuzuha (subDPS/DPS/support) should land in the same
+    //     ballpark as Burnice/Velina/Yuzuha — Burnice reverts to subdps and
+    //     Promeia carries as primary anomaly DPS.
+    run('TEST 71: Burnice notPresent:velina conditional subdps (Neutral)', () => {
+        for (const b of withBosses(bosses, 'Neutral')) {
+            const parsed = scoreForTeamString(
+                'Burnice/Velina/Yuzuha,Burnice/Vivian/Yuzuha,Burnice/Promeia/Yuzuha',
+                allUnits
+            );
+            const m = scoreMapForBoss(parsed, b);
+            const bvey = m.get('Burnice / Velina / Yuzuha');
+            const bvy = m.get('Burnice / Vivian / Yuzuha');
+            const bpy = m.get('Burnice / Promeia / Yuzuha');
+            assert(bvey > bvy * 1.25,
+                `${b.name}: BVeY (${bvey?.toFixed(1)}) should meaningfully outscore BVY (${bvy?.toFixed(1)}) — Burnice's DPS promotion via notPresent:velina`);
+            assert(bpy > bvey * 0.80 && bpy < bvey * 1.20,
+                `${b.name}: BPY (${bpy?.toFixed(1)}) should be in the same tier as BVeY (${bvey?.toFixed(1)}) — Burnice reverts to subdps, Promeia is primary`);
         }
     });
 

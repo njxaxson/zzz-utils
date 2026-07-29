@@ -326,6 +326,9 @@ function isPseudoRoleActive(entry, team) {
     if (when.hasUnit !== undefined) {
         return team.some(u => u.id === when.hasUnit);
     }
+    if (when.notPresent !== undefined) {
+        return !team.some(u => u.id === when.notPresent);
+    }
     const count = team.filter(u => u.tags.includes(when.countTag)).length;
     return count >= when.minCount;
 }
@@ -490,6 +493,7 @@ function teamHasDisorderGenerationFromReactions(team, reactions) {
 }
 
 export function hasSubDPSRole(unit) {
+    if (unit._activatedRoles) return unit._activatedRoles.includes('subdps');
     const pr = unit.mechanics?.pseudoRole;
     if (!Array.isArray(pr)) return false;
     return pr.some(entry => pseudoRoleName(entry) === 'subdps');

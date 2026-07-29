@@ -86,8 +86,14 @@ export function isSubdps(unit, team = null) {
         const role = typeof entry === 'string' ? entry : entry?.role;
         if (role !== 'subdps') return false;
         if (typeof entry === 'string' || !entry?.when) return true;
-        if (team === null) return false;
         const when = entry.when;
+        // `notPresent` activates whenever the named unit is absent. In the
+        // recommendation engine, roster/no-team contexts are treated permissively —
+        // as long as the unit itself can be teamed without the named unit, the subdps
+        // role is considered activatable. Yanagi (`hasUnit`) defaults to primary DPS
+        // when the roster is unknown; Burnice (`notPresent`) defaults to subdps.
+        if (when.notPresent !== undefined) return true;
+        if (team === null) return false;
         if (when.hasUnit !== undefined) return team.some(u => u.id === when.hasUnit);
         if (when.countTag !== undefined) {
             const selfCount = unit.tags.includes(when.countTag) ? 1 : 0;

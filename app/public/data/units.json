@@ -155,7 +155,7 @@
         "join": ["anomaly", "faction"],
         "synergy": { "units": ["Velina"], "tags": [], "avoid": [] },
         "mechanics": {
-            "pseudoRole": ["subdps"],
+            "pseudoRole": [{ "role": "subdps", "when": { "notPresent": "velina" } }],
             "onfield": false,
             "damage": { "abloom": 1 }
         },
