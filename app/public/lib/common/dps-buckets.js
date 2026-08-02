@@ -10,15 +10,18 @@
 
 import { teamsOverlap } from './team-builder.js';
 import { ELEMENTS, DPS_ROLES } from './constants.js';
+import { isSubdps } from './pull-engine.js';
 
 export const DEFAULT_BUCKET_CAP = 15;
 export const DEFAULT_PER_BOSS_FLOOR_RATIO = 0.5;
 export const DEFAULT_MIN_RESULTS_BEFORE_FLOOR = 3;
 
-export function isPrimaryDps(u) {
+// Pass `team` whenever it's available: sub-DPS status can be conditional on a
+// teammate (e.g. Yanagi is only a sub-DPS alongside Miyabi), and those
+// conditional roles resolve to false without team context.
+export function isPrimaryDps(u, team = null) {
     const dpsRole = u.tags.find(t => DPS_ROLES.includes(t));
-    const isSubdps = u.synergy && u.synergy.tags && u.synergy.tags.includes('subdps');
-    return dpsRole && !isSubdps;
+    return Boolean(dpsRole) && !isSubdps(u, team);
 }
 
 export function unitFingerprint(u) {
@@ -29,7 +32,7 @@ export function unitFingerprint(u) {
 }
 
 export function getTeamDpsBuckets(team) {
-    return team.filter(isPrimaryDps).map(u => unitFingerprint(u));
+    return team.filter(u => isPrimaryDps(u, team)).map(u => unitFingerprint(u));
 }
 
 export function teamDpsFingerprint(team) {
@@ -37,7 +40,7 @@ export function teamDpsFingerprint(team) {
 }
 
 export function getPrimaryDpsNames(team) {
-    return team.filter(isPrimaryDps).map(u => u.name);
+    return team.filter(u => isPrimaryDps(u, team)).map(u => u.name);
 }
 
 /**

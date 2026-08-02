@@ -37,13 +37,13 @@ function printDpsBucketDiagnostics(boss, viableTeams, disqualified, keyDpsNames)
     console.log(`  DPS buckets: ${buckets.size}`);
     for (const [fp, entries] of [...buckets.entries()].sort((a, b) => b[1][0].score - a[1][0].score)) {
         const best = entries.reduce((a, b) => a.score > b.score ? a : b);
-        const dpsUnit = best.team.find(u => isPrimaryDps(u) && unitFingerprint(u) === fp);
+        const dpsUnit = best.team.find(u => isPrimaryDps(u, best.team) && unitFingerprint(u) === fp);
         const name = dpsUnit ? dpsUnit.name : '?';
         console.log(`    [${fp}] ${name} — best: ${best.score.toFixed(0)}, ${entries.length} teams`);
     }
 
     const missingDps = keyDpsNames.filter(name =>
-        !viableTeams.some(entry => entry.team.some(u => u.name === name && isPrimaryDps(u)))
+        !viableTeams.some(entry => entry.team.some(u => u.name === name && isPrimaryDps(u, entry.team)))
     );
     if (missingDps.length > 0) {
         console.log(`  Missing key DPS: ${missingDps.join(', ')}`);

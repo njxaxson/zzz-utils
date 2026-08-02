@@ -11,6 +11,7 @@ import {
     extendTeamsWithUniversalUnits
 } from '../common/team-builder.js';
 import { scoreTeamForBoss } from '../common/team-scorer.js';
+import { isSubdps } from '../common/pull-engine.js';
 import { createStrengthLabelHtml } from '../common/strength-rating.js';
 import { 
     initRoster, getUnitStates, getAllUnits,
@@ -25,6 +26,9 @@ import { ELEMENTS, DPS_ROLES } from '../common/constants.js';
 const DPS_ARCHETYPES = DPS_ROLES;
 const MIN_UNITS_REQUIRED = 3;
 const PAGE_STORAGE_KEY = 'zzz-team-recommendations';
+// Lumen isn't a real damage element — Lumen units morph their damage to a teammate's
+// element via Attribute Mutation, so a boss can never be weak to or resist "Lumen" itself.
+const BOSS_ELEMENTS = ELEMENTS.filter(e => e !== 'lumen');
 
 // ============================================================================
 // STATE
@@ -80,10 +84,10 @@ function loadPageFromStorage() {
         if (saved) {
             const data = JSON.parse(saved);
             if (Array.isArray(data.selectedWeaknesses)) {
-                selectedWeaknesses = data.selectedWeaknesses.filter(e => ELEMENTS.includes(e));
+                selectedWeaknesses = data.selectedWeaknesses.filter(e => BOSS_ELEMENTS.includes(e));
             }
             if (Array.isArray(data.selectedResistances)) {
-                selectedResistances = data.selectedResistances.filter(e => ELEMENTS.includes(e));
+                selectedResistances = data.selectedResistances.filter(e => BOSS_ELEMENTS.includes(e));
             }
             if (Array.isArray(data.selectedArchetypes)) {
                 selectedArchetypes = data.selectedArchetypes.filter(a => DPS_ARCHETYPES.includes(a));
@@ -124,13 +128,15 @@ function buildCustomBoss() {
         id: 'custom',
         name: 'Custom Boss',
         shortName: 'Custom Boss',
-        weaknesses: [...selectedWeaknesses],
-        resistances: [...selectedResistances],
-        shill,
-        anti,
-        assists: 1,
         favored: [],
-        shillIntensity: 1
+        mechanics: {
+            weaknesses: [...selectedWeaknesses],
+            resistances: [...selectedResistances],
+            shill,
+            anti,
+            assists: 1,
+            shillIntensity: 1
+        }
     };
 }
 
@@ -415,13 +421,9 @@ function calculateRecommendations() {
 
 const DPS_TAGS = ['attack', 'anomaly', 'rupture'];
 
-function isSubdps(unit) {
-    return unit.synergy?.tags?.includes('subdps');
-}
-
 function getTeamPrimaryDpsNames(team) {
     return team
-        .filter(u => u.tags.some(t => DPS_TAGS.includes(t)) && !isSubdps(u))
+        .filter(u => u.tags.some(t => DPS_TAGS.includes(t)) && !isSubdps(u, team))
         .map(u => u.name);
 }
 

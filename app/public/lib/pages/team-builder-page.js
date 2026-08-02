@@ -18,7 +18,11 @@ import { ELEMENTS, DPS_ROLES } from '../common/constants.js';
 const FILTERS_STORAGE_KEY = 'zzz-team-builder-filters';
 const MIN_TEAMS_TO_SHOW = 6;
 
-const GRID_ELEMENTS = ELEMENTS;
+// Lumen isn't a real damage element — Lumen units morph their damage to a teammate's
+// element via Attribute Mutation, so there's no such thing as a "Lumen team." Lumen
+// remains a valid roster filter (see team-builder.html), but it's excluded from the
+// results grid's element rows/badges since it can never be the archetype a team is built around.
+const GRID_ELEMENTS = ELEMENTS.filter(e => e !== 'lumen');
 const GRID_DPS_TYPES = DPS_ROLES;
 
 /**
@@ -166,7 +170,7 @@ function applyFilterStates() {
         elementsDropdown.querySelectorAll('input[type="checkbox"]').forEach(cb => {
             cb.checked = filters.elements.includes(cb.value);
         });
-        updateDropdownText(elementsDropdown, filters.elements, 'Any element');
+        updateDropdownText(elementsDropdown, capitalizedList(filters.elements), 'Any element');
     }
     
     // DPS roles dropdown
@@ -234,6 +238,12 @@ function updateDropdownText(dropdown, selected, defaultText) {
     } else {
         textEl.textContent = `${selected.length} selected`;
     }
+}
+
+// Raw filter values (e.g. checkbox values like "fire", "lumen") are lowercase;
+// capitalize them for display in the dropdown summary text.
+function capitalizedList(values) {
+    return values.map(capitalizeFirst);
 }
 
 // ============================================================================
@@ -421,7 +431,7 @@ function handleDropdownChange(dropdown) {
     switch (filterType) {
         case 'elements':
             filters.elements = values;
-            updateDropdownText(dropdown, values, 'Any element');
+            updateDropdownText(dropdown, capitalizedList(values), 'Any element');
             break;
         case 'dps-role':
             filters.dpsRoles = values;
@@ -659,56 +669,6 @@ function selectBestTeams(teams, availableUnits) {
         }
     }
     
-    // Helper to count how many units in a team have a specific element
-    const countUnitsWithElement = (team, element) => {
-        return team.filter(u => u.tags.includes(element)).length;
-    };
-    
-    // Helper to check if anomaly team has preferred role pairing
-    const hasPreferredAnomalyPairing = (team, element) => {
-        const anomalyUnits = team.filter(u => u.tags.includes('anomaly'));
-        const onElementAnomaly = anomalyUnits.find(u => u.tags.includes(element));
-        
-        const supportUnits = team.filter(u => u.tags.includes('support'));
-        const hasOnElementSupport = supportUnits.some(u => u.tags.includes(element));
-        
-        return onElementAnomaly && hasOnElementSupport;
-    };
-    
-    // Helper to score anomaly teams for special cases (dual anomaly, subdps)
-    const scoreAnomalyTeamSpecial = (team, element) => {
-        const anomalyUnits = team.filter(u => u.tags.includes('anomaly'));
-        
-        // Check if we have 2 different-element anomaly agents
-        const anomalyElements = new Set(anomalyUnits.map(u => getElement(u)));
-        const hasDualAnomaly = anomalyUnits.length >= 2 && anomalyElements.size >= 2;
-        
-        // Check if on-element anomaly is NOT a subdps
-        const onElementAnomaly = anomalyUnits.find(u => u.tags.includes(element));
-        const onElementIsMainDPS = onElementAnomaly && !onElementAnomaly.synergy?.tags?.includes('subdps');
-        
-        // Scoring (higher is better):
-        // 1000 points for dual anomaly
-        // 100 points for on-element being main DPS (not subdps)
-        let score = 0;
-        if (hasDualAnomaly) score += 1000;
-        if (onElementIsMainDPS) score += 100;
-        
-        return score;
-    };
-    
-    // Helper to check if attack/rupture team has preferred role pairing
-    const hasPreferredAttackRupturePairing = (team, element) => {
-        // Find DPS and stun units
-        const dpsUnits = team.filter(u => u.tags.includes('attack') || u.tags.includes('rupture'));
-        const stunUnits = team.filter(u => u.tags.includes('stun'));
-        
-        // Check if DPS + stun both match the element
-        const hasOnElementDPS = dpsUnits.some(u => u.tags.includes(element));
-        const hasOnElementStun = stunUnits.some(u => u.tags.includes(element));
-        return hasOnElementDPS && hasOnElementStun;
-    };
-    
     // First pass: Prefer teams with 2+ units matching the archetype's element
     // For anomaly archetypes, use special scoring that prioritizes dual-anomaly compositions
     for (const element of availableElements) {
@@ -837,21 +797,26 @@ function getDpsTypeForUnit(unit) {
 function getAvailableElements(availableUnits) {
     // Elements available in roster (considering filters)
     const elements = new Set();
-    
+
+    // Lumen has no grid row of its own (see GRID_ELEMENTS) — a Lumen-only element
+    // filter shouldn't suppress every real-element row, it should surface whatever
+    // real elements Lumen units end up morphing/pairing into.
+    const realElementFilters = filters.elements.filter(e => e !== 'lumen');
+
     // Only consider elements that have DPS units
     for (const unit of availableUnits) {
         if (filters.exclude.includes(unit.id)) continue;
         if (isDPS(unit)) {
             const element = getElement(unit);
-            if (element) {
-                // If element filter is active, only include those elements
-                if (filters.elements.length === 0 || filters.elements.includes(element)) {
+            if (element && element !== 'lumen') {
+                // If a real-element filter is active, only include those elements
+                if (realElementFilters.length === 0 || realElementFilters.includes(element)) {
                     elements.add(element);
                 }
             }
         }
     }
-    
+
     return elements;
 }
 
@@ -892,34 +857,34 @@ function getTeamElements(team) {
     if (dpsUnits.length > 0) {
         for (const unit of dpsUnits) {
             const el = getElement(unit);
-            if (el && !elements.includes(el)) {
+            if (el && el !== 'lumen' && !elements.includes(el)) {
                 elements.push(el);
             }
         }
         return elements;
     }
-    
+
     // Priority 2: Stun units
     const stunUnits = team.filter(isStun);
     if (stunUnits.length > 0) {
         for (const unit of stunUnits) {
             const el = getElement(unit);
-            if (el && !elements.includes(el)) {
+            if (el && el !== 'lumen' && !elements.includes(el)) {
                 elements.push(el);
             }
         }
         return elements;
     }
-    
+
     // Priority 3: Support/Defense units
     const supportDefenseUnits = team.filter(u => isSupport(u) || isDefense(u));
     for (const unit of supportDefenseUnits) {
         const el = getElement(unit);
-        if (el && !elements.includes(el)) {
+        if (el && el !== 'lumen' && !elements.includes(el)) {
             elements.push(el);
         }
     }
-    
+
     return elements;
 }
 
@@ -1000,11 +965,15 @@ function createTeamGrid(teams) {
     let displayElements;
     let displayDpsTypes;
     
-    if (filters.elements.length > 0) {
-        // User has selected specific elements - show only those (maintain order)
-        displayElements = GRID_ELEMENTS.filter(el => filters.elements.includes(el));
+    // Lumen has no grid row of its own — a Lumen-only element filter falls back to
+    // showing every real-element row that has teams, same as no filter at all.
+    const realElementFilters = filters.elements.filter(el => el !== 'lumen');
+
+    if (realElementFilters.length > 0) {
+        // User has selected specific real elements - show only those (maintain order)
+        displayElements = GRID_ELEMENTS.filter(el => realElementFilters.includes(el));
     } else {
-        // No filter - show only elements that have teams
+        // No real-element filter - show only elements that have teams
         const elementsWithTeams = new Set(teams.map(t => t.element).filter(Boolean));
         displayElements = GRID_ELEMENTS.filter(el => elementsWithTeams.has(el));
     }
