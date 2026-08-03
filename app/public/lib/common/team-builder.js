@@ -77,9 +77,9 @@ export function getTeams(units) {
 
 /**
  * Sorts a team array in-place by role order, then by name within the same role.
- * Order: stun, anomaly, attack, rupture, defense, support
+ * Order: stun, anomaly, attack, rupture, armorer, defense, support
  */
-export const ROLE_ORDER = ["stun", "anomaly", "attack", "rupture", "defense", "support"];
+export const ROLE_ORDER = ["stun", "anomaly", "attack", "rupture", "armorer", "defense", "support"];
 
 export function sortTeamByRole(team) {
     team.sort((a, b) => {

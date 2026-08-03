@@ -127,7 +127,7 @@ function renderMustIncludeDropdown() {
         .sort((a, b) => a.name.localeCompare(b.name))
         .map(unit => {
             const checked = filters.mustInclude.includes(unit.id) ? 'checked' : '';
-            const roles = unit.tags.filter(t => ['stun', 'attack', 'anomaly', 'rupture', 'support', 'defense'].includes(t));
+            const roles = unit.tags.filter(t => ['stun', 'attack', 'anomaly', 'rupture', 'armorer', 'support', 'defense'].includes(t));
             return `
                 <label class="dropdown-item" data-name="${unit.name.toLowerCase()}" data-roles="${roles.join(',')}">
                     <input type="checkbox" value="${unit.id}" ${checked}>
@@ -791,6 +791,7 @@ function getDpsTypeForUnit(unit) {
     if (unit.tags.includes('attack')) return 'attack';
     if (unit.tags.includes('anomaly')) return 'anomaly';
     if (unit.tags.includes('rupture')) return 'rupture';
+    if (unit.tags.includes('armorer')) return 'armorer';
     return null;
 }
 
@@ -899,12 +900,14 @@ function getTeamDpsType(team) {
     const hasAttack = dpsUnits.some(u => u.tags.includes('attack'));
     const hasAnomaly = dpsUnits.some(u => u.tags.includes('anomaly'));
     const hasRupture = dpsUnits.some(u => u.tags.includes('rupture'));
-    
+    const hasArmorer = dpsUnits.some(u => u.tags.includes('armorer'));
+
     // Attack+Anomaly hybrid = attack
     if (hasAttack && hasAnomaly) return 'attack';
     if (hasAttack) return 'attack';
     if (hasAnomaly) return 'anomaly';
     if (hasRupture) return 'rupture';
+    if (hasArmorer) return 'armorer';
     
     return null;
 }

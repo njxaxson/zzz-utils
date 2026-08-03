@@ -74,7 +74,7 @@
         "join": ["anomaly", "attack", "rupture"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
-            "buffs": { "atk": 3, "cd": 3 },
+            "buffs": { "atk": 3, "cd": 3, "dmg": 3 },
             "utility": { "quick-assists": 3, "chains": 2, "heal:team": true, "rotations": "limited" }
         },
         "faction": "Stars of Lyra",
@@ -165,22 +165,17 @@
     {
         "id": "claret",
         "name": "Claret",
-        "image": null,
+        "image": "./assets/characters/claret.webp",
         "rank": "S",
         "limited": true,
-        "tier":0.5,
-        "tags": ["defense", "fire", "assist:defensive"],
-        "join": ["stun", "support"],
+        "tier": 0.5,
+        "tags": ["armorer", "electric", "assist:defensive"],
+        "join": ["stun", "support", "armorer"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
-        "mechanics": {
-            "pseudoRole": ["attack", "dps"],
-            "onfield": true,
-            "damage": { "ultimate:weak": 2, "chain" : 3, "enhanced" : 3 },
-            "scaling" : { "cr" : 3, "cd" : 3, "atk": 3, "def" : 3 }
-        },
+        "mechanics": {},
         "faction": "Flint Workshop",
-        "available" : false,
-        "displayText": ""
+        "available": false,
+        "displayText": "Goth Barbie is the first armorer unit and craves crit rate and defense; crit damage is useless for her. Her favorite support is Rina P6."
     },
     {
         "id": "caesar",
@@ -195,6 +190,7 @@
         "mechanics": {
             "pseudoRole": ["stun"],
             "buffs": { "atk": 2 },
+            "debuffs": { "dmg": 3 },
             "utility": { "shields": 2, "interrupt-resistance": 2 },
             "scaling": { "buffs": 2 }
         },
@@ -370,8 +366,9 @@
         "mechanics": {
             "onfield": false,
             "damage": { "aftershock": true },
-            "buffs": { "cd": 3 },
-            "utility": { "ultimates": 1 }
+            "buffs": { "cd": 4 },
+            "utility": { "ultimates": 1 },
+            "scaling": { "buffs": 2 }
         },
         "faction": "Yunkui Summit",
         "displayText": "Smol tiger lady will remind you that she is your senior. An off-field stun agent that refunds decibels and boosts crit damage."
@@ -382,16 +379,21 @@
         "image": "./assets/characters/koleda.webp",
         "rank": "S",
         "limited": false,
-        "tier": 2.5,
+        "tier": 1.5,
         "tags": ["stun", "fire", "assist:defensive"],
-        "join": ["fire", "faction", "rupture"],
+        "join": ["fire", "faction", "rupture", "armorer"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
-            "buffs": { "chains": 1 },
+            "buffs": {
+                "chains": 1,
+                "dmg": 4,
+                "cr": { "cases": [ { "when": { "role": "armorer" }, "value": 1 }, { "value": 0 } ] },
+                "cd": { "cases": [ { "when": { "role": "armorer" }, "value": 0 }, { "value": 3 } ] }
+            },
             "utility": { "daze": 1 }
         },
         "faction": "Belobog Heavy Industries",
-        "displayText": "CEO of Belobog, this maniac likes to smash things. Has the fastest stun rate of any agent."
+        "displayText": "CEO of Belobog, this maniac likes to smash things. Has the fastest stun rate of any agent. Her upgraded kit delivers the game's largest general-damage buff, plus a P6 that hands armorers crit rate and everyone else a hefty crit damage buff."
     },
     {
         "id": "komano",
@@ -439,7 +441,7 @@
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "damage": { "aftershock": true },
-            "buffs": { "sheer": 3, "cd": 1 },
+            "buffs": { "sheer": 3, "cd": 3, "dmg": 3 },
             "utility": { "veils": true, "heal:team": 1 },
             "scaling": { "hp": 3 }
         },
@@ -606,6 +608,7 @@
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "buffs": { "sheer": 2 },
+            "debuffs": { "dmg": 3 },
             "utility": { "quick-assists": true }
         },
         "faction": "Yunkui Summit",
@@ -706,13 +709,16 @@
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "pseudoRole": ["subdps", "support"],
-            "conditional": {
-                "buffs": {
-                    "atk": { "countTag": "anomaly", "levels": [0, 0, 2, 4] }
-                }
-            },
             "damage": { "ultimate:double": 3, "aftershock": 2, "luminize": 3 },
-            "buffs": { "anomaly": 2 },
+            "buffs": {
+                "anomaly": 2,
+                "dmg": 3,
+                "atk": { "cases": [
+                    { "when": { "countTag": "anomaly", "minCount": 3 }, "value": 4 },
+                    { "when": { "countTag": "anomaly", "minCount": 2 }, "value": 2 },
+                    { "value": 0 }
+                ] }
+            },
             "scaling": { "ap": 3, "atk": 3, "codependent" : true, "buffs": 3 },
             "utility": { "daze": 2,  "rotations": "limited" },
             "onfield": false

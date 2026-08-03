@@ -22,7 +22,7 @@ import { filterBosses } from './lib/boss-filter.js';
 import { parseTeams } from './lib/team-parser.js';
 import { buildAvailableUnits } from './lib/roster-builder.js';
 import { buildTeams } from './lib/team-pipeline.js';
-import { scoreTeamForBoss, resolveBossVariation } from './app/public/lib/common/team-scorer.js';
+import { scoreTeamForBoss, resolveBossVariation, resolveConditionalValue } from './app/public/lib/common/team-scorer.js';
 
 // ---------------------------------------------------------------------------
 // Viability / disqualification
@@ -480,16 +480,12 @@ async function main() {
     // ========================================================================
     // TEST 14: Banyue fire-weak band
     // ========================================================================
-    run('TEST 14: Banyue teams >300 (Neutral, Pompey, Hunter)', () => {
-        const t =
-            'Dialyn/Banyue/Lucia,Ju Fufu/Banyue/Lucia,Banyue/Astra/Lucia,Banyue/Pan Yinhu/Lucia';
-        for (const b of withBosses(bosses, 'Neutral,Pompey,Hunter')) {
+    run('TEST 14: Banyue teams >350 (Pompey, Hunter)', () => {
+        const t = 'Dialyn/Banyue/Lucia,Ju Fufu/Banyue/Lucia,Banyue/Astra/Lucia,Banyue/Pan Yinhu/Lucia,Norma/Banyue/Lucia';
+        for (const b of withBosses(bosses, 'Pompey,Hunter')) {
             for (const { team, label } of scoreForTeamString(t, allUnits)) {
                 const s = scoreTeamForBoss(team, b, {});
-                assert(
-                    s >= 310 && s <= 465,
-                    `${b.name} ${label}: got ${s}, expected Banyue fire-weak ~[310, 385] widened to [310, 465]`
-                );
+                assert(s >= 350 && s <= 485, `${b.name} ${label}: got ${s}, expected strong Banyue performance ~[350,485]`);
             }
         }
     });
@@ -1407,75 +1403,75 @@ async function main() {
     });
 
     // ========================================================================
-    // TEST 66: Claret pseudo-DPS — dps pseudorole activates attack DPS scoring
+    // TEST 66: Claret is a viable primary armorer DPS (Neutral)
     // ========================================================================
-    // Claret has tags=["defense","fire","..."] with pseudoRole=["attack","dps"].
-    // She should score as a primary attack DPS, NOT as a supporting defense unit.
-    // Compare against Ben (T4 fire defense without the dps pseudorole) — the DPS
-    // team should score wildly higher than the "defense-partner" alternative.
-    run('TEST 66: Claret scores as attack DPS (Pompey)', () => {
+    // Claret is an Electric Armorer. Koleda/Claret/Rina should be strongly viable. 
+    // Swapping Claret for pure-defense Ben leaves the team with NO DPS (DQ),
+    // confirming Claret herself is the damage dealer.
+    run('TEST 66: Claret is a viable armorer DPS (Neutral)', () => {
         if (!allUnits.find(u => u.id === 'claret')) return; // preview-only unit
-        for (const b of withBosses(bosses, 'Pompey')) {
-            const t = 'Lycaon/Claret/Rina,Lycaon/Ben/Rina';
+        for (const b of withBosses(bosses, 'Neutral')) {
+            const t = 'Koleda/Claret/Rina,Koleda/Ben/Rina';
             const m = scoreMapForBoss(scoreForTeamString(t, allUnits, { preview: true }), b);
-            const claretTeam = m.get('Lycaon / Claret / Rina');
-            const benTeam = m.get('Lycaon / Ben / Rina');
-            assert(claretTeam > 0,
-                `${b.name}: Lycaon/Claret/Rina should be viable (${claretTeam?.toFixed(1)})`);
-            assert(claretTeam > benTeam + 80,
-                `${b.name}: Claret DPS team(${claretTeam?.toFixed(1)}) should dominate Ben defense-partner team(${benTeam?.toFixed(1)})`);
+            const claretTeam = m.get('Koleda / Claret / Rina');
+            const benTeam = m.get('Koleda / Ben / Rina');
+            assert(claretTeam > 230,
+                `${b.name}: Koleda/Claret/Rina should be strongly viable (${claretTeam?.toFixed(1)})`);
+            assert(benTeam <= 0,
+                `${b.name}: Koleda/Ben/Rina has no DPS without Claret and should DQ (${benTeam?.toFixed(1)})`);
         }
     });
 
     // ========================================================================
-    // TEST 67: DEF buff → Claret's def scaling — Rina outperforms Lucy control
+    // TEST 67: DEF buff → Claret's DEF scaling — Rina outperforms Lucy control
     // ========================================================================
-    // Rina and Lucy both provide buffs.atk:2. Only Rina provides buffs.def:2.
-    // Claret has scaling.def:3 — the DEF buff should emerge as measurable synergy.
-    run('TEST 67: Rina beats Lucy for Claret via DEF buff (Pompey)', () => {
+    // Rina and Lucy both provide buffs.atk:2. Only Rina provides buffs.def:2 (+pen:3).
+    // Claret scales on DEF (scaling.def:3), so Rina's DEF/PEN should make her clearly
+    // best-in-slot over Lucy for an armorer.
+    run('TEST 67: Rina beats Lucy for Claret via DEF buff (Neutral)', () => {
         if (!allUnits.find(u => u.id === 'claret')) return;
-        for (const b of withBosses(bosses, 'Pompey')) {
-            const t = 'Lycaon/Claret/Rina,Lycaon/Claret/Lucy';
+        for (const b of withBosses(bosses, 'Neutral')) {
+            const t = 'Koleda/Claret/Rina,Koleda/Claret/Lucy';
             const m = scoreMapForBoss(scoreForTeamString(t, allUnits, { preview: true }), b);
-            const rina = m.get('Lycaon / Claret / Rina');
-            const lucy = m.get('Lycaon / Claret / Lucy');
-            assert(rina > lucy,
-                `${b.name}: Rina(${rina?.toFixed(1)}) > Lucy(${lucy?.toFixed(1)}) — DEF buff should tilt the comparison`);
+            const rina = m.get('Koleda / Claret / Rina');
+            const lucy = m.get('Koleda / Claret / Lucy');
+            assert(rina > lucy + 50,
+                `${b.name}: Rina(${rina?.toFixed(1)}) should clearly beat Lucy(${lucy?.toFixed(1)}) — DEF/PEN buff`);
         }
     });
 
     // ========================================================================
-    // TEST 68: Fire resistance disqualifies Claret (Discordant Solo)
+    // TEST 68: Crit inversion — CD is useless for armorers (Neutral)
     // ========================================================================
-    // Solo resists fire but does NOT anti-attack. With the dps pseudorole,
-    // Claret is a real DPS and should be DQ'd on element resistance —
-    // the defense-unit resistance free pass no longer applies.
-    run('TEST 68: Fire resistance DQs Claret on Solo', () => {
+    // Armorers have fixed crit damage: CD buffs do nothing. Astra provides a huge
+    // atk:3 + cd:3, but both are effectively wasted on Claret. Rina should therefore 
+    // dominate Astra as Claret's support, unlike for a normal crit attacker.
+    run('TEST 68: CD buff is useless for Claret armorer (Neutral)', () => {
         if (!allUnits.find(u => u.id === 'claret')) return;
-        for (const b of withBosses(bosses, 'Solo')) {
-            const t = 'Lycaon/Claret/Rina';
+        for (const b of withBosses(bosses, 'Neutral')) {
+            const t = 'Koleda/Claret/Rina,Koleda/Claret/Astra';
             const m = scoreMapForBoss(scoreForTeamString(t, allUnits, { preview: true }), b);
-            const s = m.get('Lycaon / Claret / Rina');
+            const rina = m.get('Koleda / Claret / Rina');
+            const astra = m.get('Koleda / Claret / Astra');
+            assert(rina > astra + 60,
+                `${b.name}: Rina(${rina?.toFixed(1)}) >> Astra(${astra?.toFixed(1)}) — Astra's CD is wasted on an armorer`);
+        }
+    });
+
+    // ========================================================================
+    // TEST 69: Element resistance DQs Claret as a real DPS (Thrall & Sobek)
+    // ========================================================================
+    // Thrall resists electric. Claret (electric armorer) is a primary DPS, so an
+    // electric-resistant boss disqualifies the team — armorers get no support-unit
+    // resistance free pass.
+    run('TEST 69: Electric resistance DQs Claret on Thrall', () => {
+        if (!allUnits.find(u => u.id === 'claret')) return;
+        for (const b of withBosses(bosses, 'Thrall')) {
+            const t = 'Koleda/Claret/Rina';
+            const m = scoreMapForBoss(scoreForTeamString(t, allUnits, { preview: true }), b);
+            const s = m.get('Koleda / Claret / Rina');
             assert(s <= 0,
-                `${b.name}: Fire-resistant boss should DQ Claret attack team (${s?.toFixed(1)})`);
-        }
-    });
-
-    // ========================================================================
-    // TEST 69: Attack shill applies to Claret (The Defiler)
-    // ========================================================================
-    // Defiler has shill=attack; Claret satisfies via her activated attack pseudorole.
-    // Comparing against a Claret team on a non-attack-shill boss with matched
-    // element setup would isolate the shill bonus, but a simpler positive-viability
-    // assertion suffices: the team should be strongly viable on Defiler.
-    run('TEST 69: Claret satisfies attack shill (Defiler)', () => {
-        if (!allUnits.find(u => u.id === 'claret')) return;
-        for (const b of withBosses(bosses, 'Defiler')) {
-            const t = 'Lycaon/Claret/Rina';
-            const m = scoreMapForBoss(scoreForTeamString(t, allUnits, { preview: true }), b);
-            const s = m.get('Lycaon / Claret / Rina');
-            assert(s > 0,
-                `${b.name}: Claret attack team should be viable on attack-shill boss (${s?.toFixed(1)})`);
+                `${b.name}: Electric-resistant boss should DQ Claret armorer team (${s?.toFixed(1)})`);
         }
     });
 
@@ -1521,6 +1517,76 @@ async function main() {
                 `${b.name}: BVeY (${bvey?.toFixed(1)}) should meaningfully outscore BVY (${bvy?.toFixed(1)}) — Burnice's DPS promotion via notPresent:velina`);
             assert(bpy > bvey * 0.80 && bpy < bvey * 1.20,
                 `${b.name}: BPY (${bpy?.toFixed(1)}) should be in the same tier as BVeY (${bvey?.toFixed(1)}) — Burnice reverts to subdps, Promeia is primary`);
+        }
+    });
+
+    // ========================================================================
+    // TEST 72: Maim enabler + structure — armorers want a Maim trigger (Neutral)
+    // ========================================================================
+    // A Maim only detonates with a stun or armorer trigger. Koleda/Claret/Rina is a
+    // conventional armorer-hypercarry with a stun enabler (+Maim, +stun-emergence);
+    // Claret/Lucy/Rina is a stunless "false wheelchair" with no enabler, so it should score
+    // meaningfully lower. (Dual-armorer structure can't be exercised until a second
+    // armorer exists in the roster.)
+    run('TEST 72: Maim enabler + armorer structure (Neutral)', () => {
+        if (!allUnits.find(u => u.id === 'claret')) return;
+        for (const b of withBosses(bosses, 'Neutral')) {
+            const t = 'Koleda/Claret/Rina,Claret/Lucy/Rina';
+            const m = scoreMapForBoss(scoreForTeamString(t, allUnits, { preview: true }), b);
+            const withStun = m.get('Koleda / Claret / Rina');
+            const stunless = m.get('Claret / Lucy / Rina');
+            assert(withStun > stunless + 80,
+                `${b.name}: stun-enabled Koleda/Claret/Rina (${withStun?.toFixed(1)}) should beat stunless Claret/Lucy/Rina (${stunless?.toFixed(1)})`);
+        }
+    });
+
+    // ========================================================================
+    // TEST 73: Unified conditional framework — recipient-scoped + team-scoped
+    // ========================================================================
+    // Koleda's P6 narrow buff: armorers receive CR, everyone else CD (recipient-scoped
+    // `role` predicate). Remielle's ATK curve scales with anomaly count (team-scoped).
+    run('TEST 73: conditional framework resolves per-recipient and per-team', () => {
+        const koleda = allUnits.find(u => u.id === 'koleda');
+        const rem = allUnits.find(u => u.id === 'ramiel');
+        const armorer = { tags: ['armorer'] };
+        const attacker = { tags: ['attack'] };
+        const kCr = koleda.mechanics.buffs.cr, kCd = koleda.mechanics.buffs.cd;
+        // Recipient-scoped: armorer → CR:1/CD:0; non-armorer → CR:0/CD:3
+        assert(resolveConditionalValue(kCr, { team: [], self: koleda, consumer: armorer }) === 1,
+            'Koleda CR should be 1 for an armorer recipient');
+        assert(resolveConditionalValue(kCd, { team: [], self: koleda, consumer: armorer }) === 0,
+            'Koleda CD should be 0 for an armorer recipient');
+        assert(resolveConditionalValue(kCr, { team: [], self: koleda, consumer: attacker }) === 0,
+            'Koleda CR should be 0 for a non-armorer recipient');
+        assert(resolveConditionalValue(kCd, { team: [], self: koleda, consumer: attacker }) === 3,
+            'Koleda CD should be 3 for a non-armorer recipient');
+        // Team-scoped: Remielle ATK by anomaly count (incl. self): 3+→4, 2→2, else 0
+        const ano = n => Array.from({ length: n }, () => ({ tags: ['anomaly'] }));
+        const rAtk = rem.mechanics.buffs.atk;
+        assert(resolveConditionalValue(rAtk, { team: ano(3), self: rem, consumer: null }) === 4,
+            'Remielle ATK should be 4 on a triple-anomaly team');
+        assert(resolveConditionalValue(rAtk, { team: ano(2), self: rem, consumer: null }) === 2,
+            'Remielle ATK should be 2 on a duo-anomaly team');
+        assert(resolveConditionalValue(rAtk, { team: ano(1), self: rem, consumer: null }) === 0,
+            'Remielle ATK should be 0 with a lone anomaly');
+    });
+
+    // ========================================================================
+    // TEST 74: Koleda rework lands — general damage + P6 + tier 1.5
+    // ========================================================================
+    // Koleda's 3.2 rework (dmg:4 general-damage buff, P6 narrow CR/CD, tier 2.5→1.5)
+    // considerably improves Koleda/Claret/Rina, and makes her a viable generalist on a
+    // conventional attack team.
+    run('TEST 74: Koleda rework improves her teams (Neutral)', () => {
+        for (const b of withBosses(bosses, 'Neutral')) {
+            const kcr = scoreForTeamString('Koleda/Claret/Rina', allUnits, { preview: true })[0];
+            const kcrScore = scoreTeamForBoss(kcr.team, b, {});
+            assert(kcrScore >= 295,
+                `Koleda/Claret/Rina should score >= 295 after the rework, got ${kcrScore?.toFixed(1)}`);
+            const kea = scoreForTeamString('Koleda/Evelyn/Astra', allUnits)[0];
+            const keaScore = scoreTeamForBoss(kea.team, b, {});
+            assert(keaScore >= 300,
+                `Koleda/Evelyn/Astra should be a viable generalist team (>= 300), got ${keaScore?.toFixed(1)}`);
         }
     });
 

@@ -40,9 +40,33 @@ const MULT = {
     DIAMETRIC: 3,
     VORTEX_BUFF: 4,
     REPLACEMENT_COST: 0.5,
+    // DEF buff → DEF-scaling consumers (armorer's primary stat, and generic
+    // defense-DPS builds). Higher than ATK_BUFF because DEF is the defining stat
+    // for these units, analogous to SHEER_BUFF for rupture. Tunable — this is the
+    // key lever for making DEF-buffers (e.g. Rina) best-in-slot for armorers.
+    DEF_BUFF: 2.5,
+    // Generic damage buff/debuff (`dmg`): a universal multiplier on ALL damage — the
+    // last term in the formula, so it lifts attack/anomaly/vortex/totalize/Sharp/etc.
+    // Never misses (every DPS benefits). A debuff is worth slightly less than a buff:
+    // a buff helps the team against every enemy/wave, a debuff only marks one enemy —
+    // irrelevant on single-target Deadly Assault, but real on multi-enemy Shiyu Defense.
+    // Both are primary calibration dials (bounded by the Caesar diametric guard test).
+    DMG_BUFF: 1.5,
+    DMG_DEBUFF: 1.2,
 };
 
 const RUPTURE_ATK_EFFICIENCY = 0.33;
+// Armorers scale off ATK at only ~15% — roughly half of rupture's rate — so ATK buffs are
+// nearly dead for them. Their real stat levers are crit rate and defense.
+const ARMORER_ATK_EFFICIENCY = 0.15;
+
+// Maim: only armorers open Gash meters; all meters share one pool of marks (max 3). Only
+// stun/armorer agents build that pool (+ units Claret grants gash-build to via
+// utility["gash-build"]), and only stun/armorer agents detonate it into a Maim burst
+// (parallel to a disorder). More gash builders → the shared pool fills faster → more/bigger
+// maims — which is why armorers favour dual-DPS (Stun/Armorer/Armorer, Armorer/Armorer/Support).
+const MAIM_BASE = 8;
+const MAIM_ENABLER_BONUS = 6;
 
 const BOSS_WEAK = {
     DISORDER_PER_UNIT: 4,
@@ -54,7 +78,7 @@ const BOSS_WEAK = {
     DAZE_DEBUFF_PER_UNIT: 10,
 };
 
-const BURST_DAMAGE_TYPES = ['enhanced', 'ultimate:strong', 'ultimate:double', 'chain', 'totalize'];
+const BURST_DAMAGE_TYPES = ['enhanced', 'ultimate:strong', 'ultimate:double', 'chain', 'totalize', 'maim'];
 const NEED_FULFILLMENT_KEYS = [
     'disorders', 'ablooms', 'chains', 'ultimates', 'veils',
     'quick-assists', 'interrupt-resistance', 'vortex'
@@ -113,6 +137,11 @@ export function isAnomaly(unit) {
 export function isRupture(unit) {
     if (unit._activatedRoles) return unit._activatedRoles.includes('rupture');
     return unit.tags.includes("rupture");
+}
+
+export function isArmorer(unit) {
+    if (unit._activatedRoles) return unit._activatedRoles.includes('armorer');
+    return unit.tags.includes("armorer");
 }
 
 export function isSupport(unit) {
@@ -284,31 +313,117 @@ function w(value) {
     return 0;
 }
 
-function resolveConditionalBuffValue(supplier, team, buffKey) {
-    const cb = supplier.mechanics?.conditional?.buffs?.[buffKey];
-    if (!cb) return null;
-    const count = team.filter(u => u.tags.includes(cb.countTag)).length;
-    const idx = Math.min(count, cb.levels.length - 1);
-    return cb.levels[idx];
+// ============================================================================
+// UNIFIED CONDITIONAL FRAMEWORK
+// A single predicate vocabulary and value form shared by pseudoRole activation
+// and by conditional-valued buffs/debuffs/damage/scaling/utility.
+//
+// Predicate (`when`) primitives:
+//   { countTag, minCount }  team (incl. self) has >= minCount units with the tag
+//   { hasUnit }             a specific unit id is on the team
+//   { notPresent }          a specific unit id is NOT on the team
+//   { role }                the RECIPIENT's (consumer's) effective roles include role
+//
+// A mechanic value is either a scalar (number/true) or { cases: [{ when?, value }, …] };
+// the first case whose predicate passes wins (a case with no `when` always passes).
+// ============================================================================
+
+function evaluatePredicate(when, ctx) {
+    if (!when) return true;
+    if (when.hasUnit !== undefined) return (ctx.team || []).some(u => u.id === when.hasUnit);
+    if (when.notPresent !== undefined) return !(ctx.team || []).some(u => u.id === when.notPresent);
+    if (when.role !== undefined) {
+        // Recipient-scoped: needs a consumer. Team-global reads (no consumer) fall through
+        // to the default case by treating role predicates as unmet.
+        return ctx.consumer ? getEffectiveRoles(ctx.consumer).includes(when.role) : false;
+    }
+    if (when.countTag !== undefined) {
+        const count = (ctx.team || []).filter(u => u.tags.includes(when.countTag)).length;
+        return count >= (when.minCount ?? 1);
+    }
+    return true;
 }
 
-function getEffectiveBuffValue(supplier, team, buffKey) {
-    const conditional = resolveConditionalBuffValue(supplier, team, buffKey);
-    if (conditional !== null) return conditional;
-    return w(supplier.mechanics?.buffs?.[buffKey]);
+export function isConditionalSpec(spec) {
+    return spec !== null && typeof spec === 'object' && Array.isArray(spec.cases);
 }
 
+// True when a conditional's cases depend on team composition (not purely recipient role).
+// Team-scoped conditionals are subject to the under-activation penalty; recipient-scoped
+// ones (role-only) are not — a per-recipient buff is never "under-activated".
+export function isTeamScopedConditional(spec) {
+    if (!isConditionalSpec(spec)) return false;
+    return spec.cases.some(c => c.when && (
+        c.when.countTag !== undefined || c.when.hasUnit !== undefined || c.when.notPresent !== undefined
+    ));
+}
+
+export function maxConditionalValue(spec) {
+    if (!isConditionalSpec(spec)) return w(spec);
+    return Math.max(0, ...spec.cases.map(c => w(c.value)));
+}
+
+// Resolve a mechanic value spec (scalar or { cases }) to a numeric weight given a context.
+export function resolveConditionalValue(spec, ctx) {
+    if (isConditionalSpec(spec)) {
+        for (const c of spec.cases) {
+            if (evaluatePredicate(c.when, ctx)) return w(c.value);
+        }
+        return 0;
+    }
+    return w(spec);
+}
+
+// Back-compat helper: resolve a supplier's buff key against a team (+ optional consumer).
+function getEffectiveBuffValue(supplier, team, buffKey, consumer = null) {
+    return resolveConditionalValue(supplier.mechanics?.buffs?.[buffKey], { team, self: supplier, consumer });
+}
+
+// Resolve every value in a mechanics sub-map (buffs/debuffs/…) to numbers for a context.
+function resolveValueMap(map, ctx) {
+    if (!map) return {};
+    const out = {};
+    for (const [k, spec] of Object.entries(map)) out[k] = resolveConditionalValue(spec, ctx);
+    return out;
+}
+
+// Resolve a supplier's buff/debuff map for utilization/cohesion. Recipient-scoped
+// conditionals (role predicates) resolve to the best value that actually reaches a DPS
+// consumer — so a narrow buff correctly routed to a different key (e.g. Koleda giving an
+// armorer CR instead of CD) is not charged as an unlanded CD. Team-scoped/scalar values
+// resolve once (consumer-independent), preserving existing behaviour (e.g. Remielle).
+function resolveMapForUtil(map, supplier, team) {
+    if (!map) return {};
+    const dpsConsumers = team.filter(t => t !== supplier && (isDPS(t) || hasSubDPSRole(t)));
+    const out = {};
+    for (const [key, spec] of Object.entries(map)) {
+        if (isConditionalSpec(spec) && !isTeamScopedConditional(spec)) {
+            let best = 0;
+            for (const c of dpsConsumers) {
+                best = Math.max(best, resolveConditionalValue(spec, { team, self: supplier, consumer: c }));
+            }
+            if (dpsConsumers.length === 0) best = resolveConditionalValue(spec, { team, self: supplier, consumer: null });
+            out[key] = best;
+        } else {
+            out[key] = resolveConditionalValue(spec, { team, self: supplier, consumer: null });
+        }
+    }
+    return out;
+}
+
+// Under-activation penalty for team-scoped conditional buffs (e.g. Remielle's ATK curve).
+// Recipient-scoped conditionals are exempt.
 function computeConditionalBuffPenalty(supplier, team) {
-    const cb = supplier.mechanics?.conditional?.buffs;
-    if (!cb) return 0;
+    const buffs = supplier.mechanics?.buffs;
+    if (!buffs) return 0;
     let totalPenalty = 0;
-    for (const [buffKey, config] of Object.entries(cb)) {
-        const maxLevel = Math.max(...config.levels);
+    for (const [buffKey, spec] of Object.entries(buffs)) {
+        if (!isTeamScopedConditional(spec)) continue;
+        const maxLevel = maxConditionalValue(spec);
         if (maxLevel <= 0) continue;
-        const resolved = resolveConditionalBuffValue(supplier, team, buffKey);
+        const resolved = resolveConditionalValue(spec, { team, self: supplier, consumer: null });
         if (resolved >= maxLevel) continue;
         // Squared-gap: large drops are disproportionately punished.
-        // duo-anomaly Rem (gap 2): 4*10=40; solo Rem (gap 4): 16*10=160.
         const gap = maxLevel - resolved;
         totalPenalty += gap * gap * CONDITIONAL_BUFF_PENALTY_MULT;
     }
@@ -321,22 +436,13 @@ function pseudoRoleName(entry) {
 
 function isPseudoRoleActive(entry, team) {
     if (typeof entry === 'string') return true;
-    if (!entry?.when) return true;
-    const when = entry.when;
-    if (when.hasUnit !== undefined) {
-        return team.some(u => u.id === when.hasUnit);
-    }
-    if (when.notPresent !== undefined) {
-        return !team.some(u => u.id === when.notPresent);
-    }
-    const count = team.filter(u => u.tags.includes(when.countTag)).length;
-    return count >= when.minCount;
+    return evaluatePredicate(entry.when, { team, self: null, consumer: null });
 }
 
 export function getEffectiveRoles(unit) {
     if (unit._activatedRoles) return unit._activatedRoles;
     const roles = [];
-    for (const role of ['attack', 'anomaly', 'rupture', 'stun', 'support', 'defense']) {
+    for (const role of ['attack', 'anomaly', 'rupture', 'armorer', 'stun', 'support', 'defense']) {
         if (unit.tags.includes(role)) roles.push(role);
     }
     const pseudoRole = unit.mechanics?.pseudoRole;
@@ -351,7 +457,7 @@ export function getEffectiveRoles(unit) {
 
 function computeActivatedRoles(unit, team) {
     const roles = [];
-    for (const role of ['attack', 'anomaly', 'rupture', 'stun', 'support', 'defense']) {
+    for (const role of ['attack', 'anomaly', 'rupture', 'armorer', 'stun', 'support', 'defense']) {
         if (unit.tags.includes(role)) roles.push(role);
     }
     const pseudoRole = unit.mechanics?.pseudoRole;
@@ -518,6 +624,8 @@ export function getEffectiveScaling(unit) {
     if (roles.includes('attack'))  Object.assign(baseline, { cr: 2, cd: 2 });
     if (roles.includes('anomaly')) Object.assign(baseline, { am: 2, ap: 1 });
     if (roles.includes('rupture')) Object.assign(baseline, { sheer: 3, hp: 2, cr: 2, cd: 2 });
+    // Armorer: DEF primary, elevated CR (overcritical, useful to 200%), NO cd (fixed crit damage).
+    if (roles.includes('armorer')) Object.assign(baseline, { def: 3, cr: 2 });
     if (roles.includes('stun'))    Object.assign(baseline, { daze: 1 });
     if (isDPSByRoles(roles)) {
         const damage = unit.mechanics?.damage || {};
@@ -560,19 +668,24 @@ function resolveBaselineWeight(consumer, category) {
             return (isDPSByRoles(roles) && !roles.includes('rupture')) ? 1 : 0;
         case 'cr':
             if (scaling?.cr) return w(scaling.cr);
+            // Armorer values CR above attackers: the overcritical second check keeps CR
+            // useful all the way to 200% (beyond that it's dead, like 100%+ for everyone else).
+            if (roles.includes('armorer')) return 3;
             if (roles.includes('attack') || roles.includes('rupture')) return 2;
             if (roles.includes('anomaly')) return 0.3;
             return 0;
         case 'cd':
             if (scaling?.cd) return w(scaling.cd);
+            // Armorer crit damage is FIXED — CD is worthless to them (no armorer branch).
             if (roles.includes('attack') || roles.includes('rupture')) return 2;
             if (roles.includes('anomaly')) return 0.3;
             return 0;
         case 'def':
-            return w(scaling?.def);
+            if (scaling?.def) return w(scaling.def);
+            return roles.includes('armorer') ? 3 : 0;
         case 'stun-infra':
             if (isStunlessUnit(consumer)) return 0;
-            if (roles.includes('attack') || roles.includes('rupture')) return 1;
+            if (roles.includes('attack') || roles.includes('rupture') || roles.includes('armorer')) return 1;
             if (roles.includes('anomaly')) return 0.5;
             if (roles.includes('stun')) {
                 const pseudo = consumer.mechanics?.pseudoRole;
@@ -607,10 +720,26 @@ function getMaxBurstWeight(unit) {
     const explicit = Math.max(0, ...BURST_DAMAGE_TYPES.map(type => w(damage[type])));
     if (explicit > 0) return explicit;
     const roles = getEffectiveRoles(unit);
+    // Maim is the armorer's inherent burst (parallel to a disorder), so armorers carry a
+    // role-default burst weight without needing an explicit damage.maim in their kit.
+    if (roles.includes('armorer')) return 2;
     return isDPSByRoles(roles) ? 1 : 0;
 }
 
 const BUFF_UTIL_FLOOR = 0;
+// Cohesion multiplier applied (per key) when a support's directional stat buff whiffs —
+// i.e. NO consumer can use it. `sheer` whiffs with no rupture consumer; `cd` whiffs when
+// every DPS is an armorer (fixed crit damage) or otherwise crit-damage-agnostic. Until the
+// armorer class, CD always landed, so the engine never treated it as missable.
+const WHIFF_COHESION_PENALTY = 0.8;
+const WHIFF_PENALTY_BUFFS = ['sheer', 'cd'];
+// Armorer crit-rate dependency: an armorer with no CR-supplying teammate takes this cohesion
+// hit (weighted like a hard need). Strong, because CR is an armorer's defining stat.
+const ARMORER_CR_MISS_UTIL = 0.55;
+const ARMORER_CR_WEIGHT = 0.6;
+// Undersupply is worse than linear: when a provider supplies less of a need than the
+// consumer scales for, the partial credit is further discounted (0.6 → ~30% at half).
+const UNDERSUPPLY_FACTOR = 0.6;
 
 function getBuffRelevance(key, consumer) {
     const roles = getEffectiveRoles(consumer);
@@ -620,7 +749,9 @@ function getBuffRelevance(key, consumer) {
     switch (key) {
         case 'atk':
             if (!dps) return 0;
-            return roles.includes('rupture') ? RUPTURE_ATK_EFFICIENCY : 1;
+            if (roles.includes('rupture')) return RUPTURE_ATK_EFFICIENCY;
+            if (roles.includes('armorer')) return ARMORER_ATK_EFFICIENCY;
+            return 1;
         case 'anomaly':
             return roles.includes('anomaly') ? 1 : 0;
         case 'sheer':
@@ -630,18 +761,22 @@ function getBuffRelevance(key, consumer) {
             return (dps && !roles.includes('rupture')) ? 1 : 0;
         case 'cr':
             if (consumer.mechanics?.scaling?.cr) return 1;
+            if (roles.includes('armorer')) return 1;
             if (roles.includes('attack') || roles.includes('rupture')) return 1;
             if (roles.includes('anomaly')) return 0.3;
             return 0;
         case 'cd':
             if (consumer.mechanics?.scaling?.cd) return 1;
+            // Armorer: no cd relevance (fixed crit damage) — CD-buffing supports earn no credit.
             if (roles.includes('attack') || roles.includes('rupture')) return 1;
             if (roles.includes('anomaly')) return 0.3;
             return 0;
         case 'def':
-            return consumer.mechanics?.scaling?.def ? 1 : 0;
+            return (consumer.mechanics?.scaling?.def || roles.includes('armorer')) ? 1 : 0;
         case 'stun-multiplier':
             return dps ? 1 : 0;
+        case 'dmg':
+            return dps ? 1 : 0; // generic damage: never misses on any DPS
         case 'chains':
             return 1;
         case 'abloom':
@@ -670,6 +805,8 @@ function getDebuffRelevance(key, consumer) {
             return ((dps || roles.includes('stun')) && !roles.includes('rupture')) ? 1 : 0;
         case 'recovery':
             return (dps && !isStunlessUnit(consumer)) ? 1 : 0;
+        case 'dmg':
+            return dps ? 1 : 0; // generic damage debuff: never misses on any DPS
         default:
             if (ELEMENTS.includes(key) && element === key && (dps || roles.includes('stun'))) return 1;
             return 0;
@@ -683,6 +820,11 @@ const BUFF_IMPACT = {
     sheer: MULT.SHEER_BUFF, anomaly: MULT.ANOMALY_BUFF, pen: MULT.PEN_BUFF,
     'stun-multiplier': MULT.STUN_MULT_BUFF,
 };
+
+// Generic damage is a flat, always-on damage term scored in baseline affinity. It is
+// EXCLUDED from cohesion/utilization: it must not rescue a support whose designed buffs
+// are mismatched (e.g. Pan's sheer on an attack team), nor inflate diametric/core stacking.
+const COHESION_EXCLUDED_BUFFS = new Set(['dmg', 'vortex']);
 
 function getScalingBuffs(unit) {
     const explicit = unit.mechanics?.scaling?.buffs;
@@ -700,23 +842,16 @@ function computeBuffUtilization(supplier, team) {
     const nConsumers = consumers.length;
 
     if (isDPS(supplier)) {
-        const buffs = { ...(supplier.mechanics?.buffs || {}) };
-        const conditionalBuffs = supplier.mechanics?.conditional?.buffs;
-        if (conditionalBuffs) {
-            for (const [key] of Object.entries(conditionalBuffs)) {
-                const val = resolveConditionalBuffValue(supplier, team, key);
-                if (val > 0) buffs[key] = val;
-            }
-        }
-        const debuffs = supplier.mechanics?.debuffs || {};
+        const buffs = resolveMapForUtil(supplier.mechanics?.buffs, supplier, team);
+        const debuffs = resolveMapForUtil(supplier.mechanics?.debuffs, supplier, team);
         // vortex is a contextual situational bonus, not a must-use designed mechanic.
         // Exclude it from cohesion evaluation; the positive signal comes from L4 baseline affinity.
-        const GENERIC_DPS_BUFFS = new Set(['atk', 'cr', 'cd', 'pen', 'stun-multiplier', 'vortex']);
+        const GENERIC_DPS_BUFFS = new Set(['atk', 'cr', 'cd', 'pen', 'stun-multiplier', 'vortex', 'dmg']);
         const evaluatableBuffs = Object.entries(buffs).filter(
             ([key, value]) => !GENERIC_DPS_BUFFS.has(key) && w(value) >= 2
         );
         const evaluatableDebuffs = Object.entries(debuffs).filter(
-            ([key, value]) => w(value) >= 2
+            ([key, value]) => !COHESION_EXCLUDED_BUFFS.has(key) && w(value) >= 2
         );
         if (evaluatableBuffs.length === 0 && evaluatableDebuffs.length === 0) return 1.0;
         let totalWeight = 0;
@@ -747,16 +882,9 @@ function computeBuffUtilization(supplier, team) {
         return 1 - (1 - baseUtil) * (scalingBuffs / 3);
     }
 
-    const buffs = { ...(supplier.mechanics?.buffs || {}) };
-    const conditionalBuffsNonDPS = supplier.mechanics?.conditional?.buffs;
-    if (conditionalBuffsNonDPS) {
-        for (const [key] of Object.entries(conditionalBuffsNonDPS)) {
-            const val = resolveConditionalBuffValue(supplier, team, key);
-            if (val > 0) buffs[key] = val;
-        }
-    }
-    const debuffs = supplier.mechanics?.debuffs || {};
-    const utility = supplier.mechanics?.utility || {};
+    const buffs = resolveMapForUtil(supplier.mechanics?.buffs, supplier, team);
+    const debuffs = resolveMapForUtil(supplier.mechanics?.debuffs, supplier, team);
+    const utility = resolveMapForUtil(supplier.mechanics?.utility, supplier, team);
     let totalWeight = 0;
     let effectiveWeight = 0;
     let coreWeight = 0;
@@ -764,6 +892,7 @@ function computeBuffUtilization(supplier, team) {
     let coreImpact = 0;
 
     for (const [key, value] of Object.entries(buffs)) {
+        if (COHESION_EXCLUDED_BUFFS.has(key)) continue; // dmg/vortex: flat L4 only, not cohesion
         const bw = w(value);
         if (bw <= 0) continue;
         totalWeight += bw;
@@ -796,6 +925,7 @@ function computeBuffUtilization(supplier, team) {
     }
 
     for (const [key, value] of Object.entries(debuffs)) {
+        if (COHESION_EXCLUDED_BUFFS.has(key)) continue; // dmg: flat L4 only, not cohesion
         const dw = w(value);
         if (dw <= 0) continue;
         totalWeight += dw;
@@ -840,7 +970,16 @@ function computeBuffUtilization(supplier, team) {
     const rawCoreRatio = coreWeight > 0 ? coreEffective / coreWeight : 0;
     const coreActivation = Math.min(1.0, coreImpact / CORE_IMPACT_BASELINE);
     const coreRatio = rawCoreRatio * coreActivation;
-    const baseUtil = Math.min(1.0, Math.max(adjustedRatio, threshold, coreRatio));
+    let baseUtil = Math.min(1.0, Math.max(adjustedRatio, threshold, coreRatio));
+    // A whiffed directional stat buff (no consumer can use it) is a strong signal the support
+    // is on the wrong team — it wastes a defining buff. Apply a direct cohesion hit beyond the
+    // ratio effect (which the absolute-supply threshold masks). Covers sheer (no rupture
+    // consumer) and cd (all-armorer / crit-damage-agnostic teams).
+    for (const wk of WHIFF_PENALTY_BUFFS) {
+        if (w(buffs[wk]) >= 2 && !consumers.some(c => getBuffRelevance(wk, c) > 0)) {
+            baseUtil *= WHIFF_COHESION_PENALTY;
+        }
+    }
     return 1 - (1 - baseUtil) * (scalingBuffs / 3);
 }
 
@@ -946,6 +1085,7 @@ function scoreTeamStructure(team, debug) {
     const attackers = team.filter(u => isAttacker(u) && !isEffectiveSupport(u) && !isEffectiveDefense(u) && !isStun(u));
     const anomalyUnits = team.filter(u => isAnomaly(u) && !isEffectiveSupport(u) && !isEffectiveDefense(u) && !isStun(u));
     const ruptureUnits = team.filter(u => isRupture(u) && !isEffectiveSupport(u) && !isEffectiveDefense(u) && !isStun(u));
+    const armorerUnits = team.filter(u => isArmorer(u) && !isEffectiveSupport(u) && !isEffectiveDefense(u) && !isStun(u));
     const stunUnits = team.filter(isStun);
     const supportLike = team.filter(u => isEffectiveSupport(u) || isEffectiveDefense(u));
     const dpsUnits = team.filter(isDPS);
@@ -953,15 +1093,35 @@ function scoreTeamStructure(team, debug) {
     const nAtk = attackers.length;
     const nAno = anomalyUnits.length;
     const nRup = ruptureUnits.length;
+    const nArm = armorerUnits.length;
     const nStun = stunUnits.length;
     const nSup = supportLike.length;
 
     // --- CONVENTIONAL COMPOSITIONS ---
 
     // Attacker + Stunner + Support/Defense
-    if (nAtk === 1 && nStun >= 1 && nSup >= 1 && nAno === 0 && nRup === 0) {
+    if (nAtk === 1 && nStun >= 1 && nSup >= 1 && nAno === 0 && nRup === 0 && nArm === 0) {
         if (debug) console.log('    Structure: CONVENTIONAL (attacker + stunner + support)');
         return STRUCTURE.CONVENTIONAL_BONUS;
+    }
+
+    // Armorer hypercarry: Armorer + Stunner + Support/Defense
+    if (nArm === 1 && nStun >= 1 && nSup >= 1 && nAtk === 0 && nAno === 0 && nRup === 0) {
+        if (debug) console.log('    Structure: CONVENTIONAL (armorer + stunner + support)');
+        return STRUCTURE.CONVENTIONAL_BONUS;
+    }
+
+    // 2x Armorer + Support/Defense or 2x Armorer + Stunner (dual gash meters, Maim-driven).
+    // Unlike double anomaly, no subdps is required — Maim is the shared-resource payoff.
+    if (nArm >= 2 && (nSup >= 1 || nStun >= 1)) {
+        if (debug) console.log('    Structure: CONVENTIONAL (double armorer + support/stunner)');
+        return STRUCTURE.CONVENTIONAL_BONUS;
+    }
+
+    // Lone armorer + 2x Support/Defense (wheelchair — no strong Maim enabler beyond self)
+    if (nArm === 1 && nSup >= 2 && nAtk === 0 && nAno === 0 && nRup === 0) {
+        if (debug) console.log('    Structure: UNCONVENTIONAL viable (armorer wheelchair)');
+        return STRUCTURE.UNCONVENTIONAL_VIABLE;
     }
 
     // 2x Anomaly + Support/Defense
@@ -1099,6 +1259,7 @@ function scoreInherentQuality(team, { lenient = false, debug = false, boss = nul
     });
     const attackers = team.filter(u => isAttacker(u) && !isEffectiveSupport(u) && !isEffectiveDefense(u) && !isStun(u));
     const anomalyUnits = team.filter(u => isAnomaly(u) && !isEffectiveSupport(u) && !isEffectiveDefense(u) && !isStun(u));
+    const armorerUnits = team.filter(u => isArmorer(u) && !isEffectiveSupport(u) && !isEffectiveDefense(u) && !isStun(u));
     const supportUnits = team.filter(isEffectiveSupport);
     const stunUnits = team.filter(isStun);
     const defenseUnits = team.filter(isEffectiveDefense);
@@ -1127,7 +1288,8 @@ function scoreInherentQuality(team, { lenient = false, debug = false, boss = nul
             hasDualDPSSupport ||
             (isAttacker(unit) && isForcedSecondaryDPS(unit, attackers)) ||
             (isAnomaly(unit) && isForcedSecondaryDPS(unit, anomalyUnits)) ||
-            (isRupture(unit) && isForcedSecondaryDPS(unit, team.filter(isRupture)));
+            (isRupture(unit) && isForcedSecondaryDPS(unit, team.filter(isRupture))) ||
+            (isArmorer(unit) && isForcedSecondaryDPS(unit, armorerUnits));
         if (forcedSecondary) forcedSecondaryUnits.add(unit);
         let tierMult = (isSecondaryAttacker || isSecondaryAnomaly || forcedSecondary) ? 0.5 : 1.0;
         const unitReaction = reactions.get(unit);
@@ -1392,7 +1554,8 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
     // effectiveCd = cdBaseline + teamCdSupply - cdDebuff.
     const cdDebuffVal = w(boss.mechanics?.debuffs?.cd);
     if (cdDebuffVal > 0) {
-        const teamCdSupply = team.reduce((sum, u) => sum + w(u.mechanics?.buffs?.cd), 0);
+        const teamCdSupply = team.reduce((sum, u) =>
+            sum + resolveConditionalValue(u.mechanics?.buffs?.cd, { team, self: u, consumer: null }), 0);
         for (const unit of dpsUnits) {
             const cdBaseline = w(getEffectiveScaling(unit).cd);
             if (cdBaseline > 0) {
@@ -1418,8 +1581,10 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
         if (shortfall > 0) {
             for (const unit of dpsUnits) {
                 const roles = getEffectiveRoles(unit);
-                const isAttackOrRupture = roles.includes('attack') || roles.includes('rupture');
-                if (!isAttackOrRupture || isStunlessUnit(unit)) continue;
+                // Attack/rupture/armorer want stun windows (armorer's Maim is stun-assisted);
+                // anomaly damage is less window-dependent and is not penalized.
+                const isWindowDependent = roles.includes('attack') || roles.includes('rupture') || roles.includes('armorer');
+                if (!isWindowDependent || isStunlessUnit(unit)) continue;
                 const penalty = Math.round(shortfall * BOSS_WEAK.DAZE_DEBUFF_PER_UNIT);
                 score -= penalty;
                 if (debug) console.log(`    Boss daze debuff: ${unit.name} supply=${teamDazeSupply} shortfall=${shortfall.toFixed(1)} → -${penalty}`);
@@ -1552,8 +1717,11 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
 
 function scoreBaselineAffinity(supplier, consumer, debug, options = {}) {
     let score = 0;
-    const supplierBuffs = supplier.mechanics?.buffs || {};
-    const supplierDebuffs = supplier.mechanics?.debuffs || {};
+    // Resolve conditional buff/debuff values against THIS (supplier, consumer) pair so
+    // recipient-scoped (role) conditionals route correctly per teammate.
+    const _ctx = { team: options.team || [], self: supplier, consumer };
+    const supplierBuffs = resolveValueMap(supplier.mechanics?.buffs, _ctx);
+    const supplierDebuffs = resolveValueMap(supplier.mechanics?.debuffs, _ctx);
     const consumerRoles = getEffectiveRoles(consumer);
     const consumerElement = getElement(consumer);
     const firedCategories = new Set();
@@ -1563,12 +1731,14 @@ function scoreBaselineAffinity(supplier, consumer, debug, options = {}) {
     };
 
     // ATK buffs → all DPS (supports conditional buffs)
-    const effectiveAtk = getEffectiveBuffValue(supplier, options.team || [], 'atk');
+    const effectiveAtk = supplierBuffs.atk || 0;
     if (effectiveAtk > 0) {
         const cw = resolveBaselineWeight(consumer, 'atk');
         if (cw > 0) {
-            const isRup = consumerRoles.includes('rupture');
-            const supply = isRup ? effectiveAtk * RUPTURE_ATK_EFFICIENCY : effectiveAtk;
+            const atkEfficiency = consumerRoles.includes('rupture') ? RUPTURE_ATK_EFFICIENCY
+                : consumerRoles.includes('armorer') ? ARMORER_ATK_EFFICIENCY
+                : 1;
+            const supply = effectiveAtk * atkEfficiency;
             const val = supply * cw * MULT.ATK_BUFF;
             score += val;
             dbg('atk', val);
@@ -1655,11 +1825,12 @@ function scoreBaselineAffinity(supplier, consumer, debug, options = {}) {
         }
     }
 
-    // DEF buffs → consumers that explicitly scale with DEF (e.g. defense-DPS units)
+    // DEF buffs → consumers that scale with DEF (armorers + generic defense-DPS units).
+    // DEF is the armorer's primary stat, so it carries a dedicated (higher) multiplier.
     if (supplierBuffs.def) {
         const cw = resolveBaselineWeight(consumer, 'def');
         if (cw > 0) {
-            const val = w(supplierBuffs.def) * cw * MULT.ATK_BUFF;
+            const val = w(supplierBuffs.def) * cw * MULT.DEF_BUFF;
             score += val;
             dbg('def', val);
         }
@@ -1672,6 +1843,21 @@ function scoreBaselineAffinity(supplier, consumer, debug, options = {}) {
             const val = w(supplierBuffs['stun-multiplier']) * cw * MULT.STUN_MULT_BUFF;
             score += val;
             dbg('stun-multiplier', val);
+        }
+    }
+
+    // Generic damage buff/debuff → all DPS, always lands. Debuff worth slightly less
+    // (single-enemy vs team-wide). This is the whole point of Koleda's rework.
+    if (isDPSByRoles(consumerRoles)) {
+        if (supplierBuffs.dmg) {
+            const val = w(supplierBuffs.dmg) * MULT.DMG_BUFF;
+            score += val;
+            dbg('dmg', val);
+        }
+        if (supplierDebuffs.dmg) {
+            const val = w(supplierDebuffs.dmg) * MULT.DMG_DEBUFF;
+            score += val;
+            dbg('dmg-debuff', val);
         }
     }
 
@@ -1758,9 +1944,10 @@ function scoreBaselineAffinity(supplier, consumer, debug, options = {}) {
 function scoreNeedFulfillment(supplier, consumer, debug, options = {}) {
     let score = 0;
     const scaling = getEffectiveScaling(consumer);
-    const supplierBuffs = supplier.mechanics?.buffs || {};
-    const supplierDebuffs = supplier.mechanics?.debuffs || {};
-    const supplierUtility = supplier.mechanics?.utility || {};
+    const _ctx = { team: options.team || [], self: supplier, consumer };
+    const supplierBuffs = resolveValueMap(supplier.mechanics?.buffs, _ctx);
+    const supplierDebuffs = resolveValueMap(supplier.mechanics?.debuffs, _ctx);
+    const supplierUtility = resolveValueMap(supplier.mechanics?.utility, _ctx);
 
     const converts = consumer.mechanics?.converts;
     const replaces = supplier.mechanics?.replaces;
@@ -1797,7 +1984,10 @@ function scoreNeedFulfillment(supplier, consumer, debug, options = {}) {
         }
 
         if (supplyWeight > 0) {
-            const fulfillment = Math.min(1, supplyWeight / scalingWeight);
+            // Undersupply is worse than linear: partially meeting a need (e.g. Lucia's
+            // veils:1 for YSG's veils:2) helps, but not enough to do the job.
+            let fulfillment = Math.min(1, supplyWeight / scalingWeight);
+            if (supplyWeight < scalingWeight) fulfillment *= UNDERSUPPLY_FACTOR;
             const val = supplyWeight * scalingWeight * MULT.NEED_FULFILLMENT * fulfillment;
             score += val;
             if (debug) console.log(`        need(${key}): ${val.toFixed(1)}${fulfillment < 1 ? ` (gated ${Math.round(fulfillment * 100)}%)` : ''}`);
@@ -1911,8 +2101,8 @@ function countDiametricPairs(consumer, team, { antiRupture = false } = {}) {
     const elemDebuffSuppliers = new Map();
 
     for (const s of suppliers) {
-        const buffs = s.mechanics?.buffs || {};
-        const debuffs = s.mechanics?.debuffs || {};
+        const buffs = resolveValueMap(s.mechanics?.buffs, { team, self: s, consumer: null });
+        const debuffs = resolveValueMap(s.mechanics?.debuffs, { team, self: s, consumer: null });
         const atkCdWeight = Math.max(getEffectiveBuffValue(s, team, 'atk'), w(buffs.cd));
         if (atkCdWeight > 0) atkCdSuppliers.set(s.name, atkCdWeight);
         const defWeight = w(debuffs.defense);
@@ -2068,6 +2258,25 @@ function scoreMechanicalSynergy(team, debug, options = {}) {
         }
     }
 
+    // Maim reaction bonus. Only armorers open Gash meters; all meters share one pool of marks
+    // (max 3), and only stun/armorer agents build that pool (+ non-stun/non-armorer units that
+    // Claret has granted gash-build to, via utility["gash-build"]). More gash builders → the
+    // shared pool fills faster → more/bigger Maims (only stun/armorer detonate). This is why
+    // armorers favour stun/armorer-dense comps (Stun/Armorer/Armorer, Armorer/Armorer/Support).
+    // The shared-pool cap is modelled by capping the builder count.
+    const armorerUnits = team.filter(u => getEffectiveRoles(u).includes('armorer'));
+    if (armorerUnits.length > 0) {
+        const grantsGashBuild = team.some(u => w(u.mechanics?.utility?.['gash-build']) > 0);
+        const buildsGash = (u) => isStun(u) || isArmorer(u)
+            || (grantsGashBuild && !isStun(u) && !isArmorer(u));
+        for (const unit of armorerUnits) {
+            const builderCount = Math.min(2, team.filter(u => u !== unit && buildsGash(u)).length);
+            const maimBonus = MAIM_BASE + MAIM_ENABLER_BONUS * builderCount;
+            consumerScores.set(unit.name, (consumerScores.get(unit.name) || 0) + maimBonus);
+            if (debug) console.log(`    Maim: ${unit.name} +${maimBonus} (base ${MAIM_BASE}, ${builderCount} gash-builder(s))`);
+        }
+    }
+
     // Diametric synergy: proportional amplifier on consumer's incoming L4
     if (debug) console.log('    Diametric synergy:');
     for (const consumer of team) {
@@ -2194,9 +2403,7 @@ function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs =
         const buffs = unit.mechanics?.buffs || {};
         const debuffs = unit.mechanics?.debuffs || {};
         const utility = unit.mechanics?.utility || {};
-        const conditionalBuffs = unit.mechanics?.conditional?.buffs || {};
         const hasBuffContributions = Object.keys(buffs).length > 0 || Object.keys(debuffs).length > 0
-            || Object.keys(conditionalBuffs).length > 0
             || (!isDPS(unit) && NEED_FULFILLMENT_KEYS.some(k => w(utility[k]) > 0))
             || isStun(unit);
         if (!hasBuffContributions && isDPS(unit)) {
@@ -2263,6 +2470,18 @@ function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs =
                 const weight = Math.min(0.5, needsTotal * 0.25);
                 logSum += weight * Math.log(Math.max(receptionUtil * receptionUtil, 0.01));
                 totalWeight += weight;
+            }
+            // Armorer crit-rate dependency (dedicated, strong). Armorers scale almost entirely
+            // off CR (overcritical, useful to 200%) and DEF; ATK is nearly dead (15%) and CD is
+            // fixed. Unlike other DPS — for whom CR is a generic equipment stat — an armorer with
+            // NO CR-supplying teammate is badly under-powered. Koleda's P6 narrow CR and
+            // Nicole/Cissia satisfy it; a plain stunner like Trigger does not.
+            if (isArmorer(unit)) {
+                const hasCrSupplier = team.some(s => s !== unit &&
+                    resolveConditionalValue(s.mechanics?.buffs?.cr, { team, self: s, consumer: unit }) > 0);
+                const crUtil = hasCrSupplier ? 1.0 : ARMORER_CR_MISS_UTIL;
+                logSum += ARMORER_CR_WEIGHT * Math.log(Math.max(crUtil * crUtil, 0.01));
+                totalWeight += ARMORER_CR_WEIGHT;
             }
             continue;
         }

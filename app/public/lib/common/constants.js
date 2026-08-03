@@ -4,4 +4,4 @@
  */
 
 export const ELEMENTS = ['fire', 'ice', 'electric', 'physical', 'ether', 'wind', 'lumen'];
-export const DPS_ROLES = ['attack', 'anomaly', 'rupture'];
+export const DPS_ROLES = ['attack', 'anomaly', 'rupture', 'armorer'];

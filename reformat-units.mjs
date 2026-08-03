@@ -18,35 +18,15 @@ function formatPseudoRole(arr) {
     return '[\n' + lines.join(',\n') + '\n            ]';
 }
 
-// Formats one conditional group (e.g. "buffs", "debuffs", "scaling") whose entries
-// share the { countTag, levels } shape.
-function formatConditionalGroup(group, indent) {
-    const innerIndent = indent + '    ';
-    const lines = Object.entries(group).map(([bk, bv]) => {
-        const levStr = '[' + bv.levels.join(', ') + ']';
-        return `${innerIndent}${JSON.stringify(bk)}: { "countTag": ${JSON.stringify(bv.countTag)}, "levels": ${levStr} }`;
-    });
-    return '{\n' + lines.join(',\n') + '\n' + indent + '}';
-}
-
-// Formats the top-level "conditional" block, e.g. { buffs: {...}, debuffs: {...} }.
-function formatConditional(cond, indent) {
-    const innerIndent = indent + '    ';
-    const lines = Object.entries(cond).map(([k, v]) =>
-        `${innerIndent}${JSON.stringify(k)}: ${formatConditionalGroup(v, innerIndent)}`
-    );
-    return '{\n' + lines.join(',\n') + '\n' + indent + '}';
-}
-
 function formatMechanics(mech) {
     const lines = [];
     const indent = '            ';
     for (const [k, v] of Object.entries(mech)) {
         if (k === 'pseudoRole') {
             lines.push(`${indent}"pseudoRole": ${formatPseudoRole(v)}`);
-        } else if (k === 'conditional') {
-            lines.push(`${indent}"conditional": ${formatConditional(v, indent)}`);
         } else if (typeof v === 'object' && v !== null && !Array.isArray(v)) {
+            // buffs/debuffs/damage/scaling/utility — values may be scalars or conditional
+            // { cases: [...] } specs; JSON.stringify renders either inline and valid.
             lines.push(`${indent}${JSON.stringify(k)}: ${inlineObj(v)}`);
         } else {
             lines.push(`${indent}${JSON.stringify(k)}: ${JSON.stringify(v)}`);

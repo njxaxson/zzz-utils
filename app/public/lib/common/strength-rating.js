@@ -1,4 +1,4 @@
-const DPS_TAGS = ['attack', 'anomaly', 'rupture'];
+const DPS_TAGS = ['attack', 'anomaly', 'rupture', 'armorer'];
 
 const STRENGTH_TIERS = [
     { min: 375, label: 'Excellent', cssClass: 'strength-excellent', color: '#00e676' },

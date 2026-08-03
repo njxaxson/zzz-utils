@@ -756,24 +756,24 @@ await runTest(42, 'Remielle is High priority for anomaly-loaded roster', () => {
 });
 
 // ===========================================================================
-// TESTS 43-45: Claret — defense-tag primary DPS via `dps` pseudorole
+// TESTS 43-45: Claret — Electric Armorer (new DPS role)
 // ===========================================================================
-// Claret has tags=["defense","fire",...] with pseudoRole=["attack","dps"].
-// The pull engine must classify her as a primary fire attack DPS, not as a
-// supporting defense unit.
+// Claret has tags=["armorer","electric",...] and a vanilla armorer kit
+// (mechanics:{}). The pull engine must classify her as a primary armorer DPS,
+// not as a supporting defense unit, and credit electric-DPS coverage.
 
-await runTest(43, 'Claret classifies as attack DPS via pseudoRole', () => {
+await runTest(43, 'Claret classifies as armorer DPS', () => {
     const claret = unitByName(allUnits, 'Claret');
     if (!claret) return; // unreleased data not present
     assert(hasDPSRole(claret), 'hasDPSRole(Claret) should be true');
-    assert(getPrimaryDPSArchetype(claret) === 'attack',
-        `getPrimaryDPSArchetype(Claret) should be 'attack', got ${getPrimaryDPSArchetype(claret)}`);
+    assert(getPrimaryDPSArchetype(claret) === 'armorer',
+        `getPrimaryDPSArchetype(Claret) should be 'armorer', got ${getPrimaryDPSArchetype(claret)}`);
 });
 
-await runTest(44, 'Claret surfaces as fire attack DPS candidate in fire-weak roster', () => {
+await runTest(44, 'Claret surfaces as armorer/electric DPS candidate', () => {
     const claret = unitByName(allUnits, 'Claret');
     if (!claret) return;
-    // Roster with no premium fire DPS: no Evelyn, Burnice, Soldier-11, Ju Fufu, Orphie
+    // Roster with no armorer and no primary electric DPS.
     const roster = [
         'Miyabi', 'Nangong', 'Yuzuha', 'Astra', 'Rina',
         'Nicole', 'Anby', 'Billy'
@@ -781,7 +781,7 @@ await runTest(44, 'Claret surfaces as fire attack DPS candidate in fire-weak ros
     const { unitStates, ownedUnits } = buildSyntheticRoster(allUnits, roster);
     const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 20 });
 
-    // Claret should appear in a fire-element or attack-DPS gap card.
+    // Claret should appear in an armorer-DPS or electric-element gap card.
     const claretGaps = result.allGaps.filter(g =>
         g.units?.some(u => u.id === 'claret')
     );
@@ -789,11 +789,11 @@ await runTest(44, 'Claret surfaces as fire attack DPS candidate in fire-weak ros
         `Claret should appear in at least one gap; got: ${result.allGaps.map(g => g.id).join(', ')}`);
 
     const claretGapIds = claretGaps.map(g => g.id);
-    const inDPSOrFireGap = claretGapIds.some(id =>
-        id === 'dps-attack' || id === 'element-fire' || id === 'depth-attack'
+    const inDPSOrElemGap = claretGapIds.some(id =>
+        id === 'dps-armorer' || id === 'element-electric' || id === 'depth-armorer'
     );
-    assert(inDPSOrFireGap,
-        `Claret should appear in dps-attack / element-fire / depth-attack, got: ${claretGapIds.join(', ')}`);
+    assert(inDPSOrElemGap,
+        `Claret should appear in dps-armorer / element-electric / depth-armorer, got: ${claretGapIds.join(', ')}`);
 
     // She should NOT be classified into a support gap.
     const supportGap = result.allGaps.find(g => g.id.startsWith('support'));
@@ -803,24 +803,26 @@ await runTest(44, 'Claret surfaces as fire attack DPS candidate in fire-weak ros
     }
 });
 
-await runTest(45, 'Fire element coverage improves when Claret is added to roster', () => {
+await runTest(45, 'Electric DPS coverage improves when Claret is added to roster', () => {
     const claret = unitByName(allUnits, 'Claret');
     if (!claret) return;
+    // Base roster has electric support (Rina) and electric stun (Anby) but no primary
+    // electric DPS, so electric-DPS element coverage should be zero until Claret arrives.
     const baseRoster = [
         'Miyabi', 'Nangong', 'Yuzuha', 'Astra', 'Rina',
         'Nicole', 'Anby', 'Billy'
     ];
     const { unitStates: s0, ownedUnits: o0 } = buildSyntheticRoster(allUnits, baseRoster);
     const r0 = analyze(allUnits, s0, o0, { maxRecommendations: 10 });
-    const fire0 = r0.coverage.elementQuality?.fire ?? 0;
+    const electric0 = r0.coverage.elementQuality?.electric ?? 0;
 
     const withClaret = [...baseRoster, 'Claret'];
     const { unitStates: s1, ownedUnits: o1 } = buildSyntheticRoster(allUnits, withClaret);
     const r1 = analyze(allUnits, s1, o1, { maxRecommendations: 10 });
-    const fire1 = r1.coverage.elementQuality?.fire ?? 0;
+    const electric1 = r1.coverage.elementQuality?.electric ?? 0;
 
-    assert(fire1 > fire0,
-        `Fire coverage should improve when Claret is added — before: ${fire0}, after: ${fire1}`);
+    assert(electric1 > electric0,
+        `Electric coverage should improve when Claret is added — before: ${electric0}, after: ${electric1}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

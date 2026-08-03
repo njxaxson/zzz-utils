@@ -158,7 +158,7 @@
             "weaknesses": ["fire", "ice"],
             "resistances": ["physical"],
             "shill": "rupture",
-            "anti": ["anomaly", "attack"],
+            "anti": ["anomaly", "attack", "armorer"],
             "assists": 2
         }
     },
@@ -247,7 +247,7 @@
             "weaknesses": ["wind"],
             "resistances": [],
             "shill": "anomaly",
-            "anti": ["attack", "rupture"],
+            "anti": ["attack", "rupture", "armorer"],
             "assists": 3,
             "chainParry": true
         }
@@ -262,7 +262,7 @@
             "weaknesses": [],
             "resistances": [],
             "shill": "anomaly",
-            "anti": ["attack", "rupture"],
+            "anti": ["attack", "rupture", "armorer"],
             "assists": 2,
             "shillIntensity" : 3
         }

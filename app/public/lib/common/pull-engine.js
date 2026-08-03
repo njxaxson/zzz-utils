@@ -8,7 +8,11 @@ import { ELEMENTS, DPS_ROLES } from './constants.js';
 import {
     getElement,
     getEffectiveScaling,
-    getEffectiveRoles
+    getEffectiveRoles,
+    resolveConditionalValue,
+    isConditionalSpec,
+    isTeamScopedConditional,
+    maxConditionalValue
 } from './team-scorer.js';
 import { getTeams, isValidTeam } from './team-builder.js';
 
@@ -172,34 +176,27 @@ function mechanicsFitScore(supplier, consumer) {
     const isAtkDPS = primaryArch === 'attack' || cTags.includes('attack');
     const isAnoDPS = primaryArch === 'anomaly' || cTags.includes('anomaly');
     const isRupDPS = primaryArch === 'rupture' || cTags.includes('rupture');
-    const isDPS = isAtkDPS || isAnoDPS || isRupDPS;
+    const isArmDPS = primaryArch === 'armorer' || cTags.includes('armorer');
+    const isDPS = isAtkDPS || isAnoDPS || isRupDPS || isArmDPS;
     if (!isDPS) return 0;
 
-    // Resolve supplier buffs: merge mechanics.conditional.buffs with static buffs when
-    // the consumer would actually satisfy the condition (e.g. Rem's ATK buff activates
-    // when there are anomaly teammates — so an anomaly consumer would benefit).
-    const sBufBase = supplier.mechanics?.buffs || {};
-    const sBuf = { ...sBufBase };
-    const condBuffs = supplier.mechanics?.conditional?.buffs;
-    if (condBuffs) {
-        for (const [key, config] of Object.entries(condBuffs)) {
-            if (sBuf[key] !== undefined) continue;
-            const tag = config.countTag;
-            // If the consumer has the counted tag, credit at least the 2-count level
-            // (supplier + consumer = 2 matching units). This is a conservative estimate.
-            if (tag && consumer.tags.includes(tag)) {
-                const levels = config.levels;
-                const level = levels[Math.min(2, levels.length - 1)];
-                if (level > 0) sBuf[key] = level;
-            }
-        }
+    // Resolve supplier buffs against a conservative 2-unit context (supplier + consumer).
+    // Conditional-valued buffs (e.g. Remielle's ATK curve by anomaly count, or Koleda's
+    // recipient-scoped CR/CD) resolve to what THIS consumer would actually receive.
+    const fitCtx = { team: [supplier, consumer], self: supplier, consumer };
+    const sBuf = {};
+    for (const [key, spec] of Object.entries(supplier.mechanics?.buffs || {})) {
+        sBuf[key] = resolveConditionalValue(spec, fitCtx);
     }
-    const sDebuf = supplier.mechanics?.debuffs || {};
+    const sDebuf = {};
+    for (const [key, spec] of Object.entries(supplier.mechanics?.debuffs || {})) {
+        sDebuf[key] = resolveConditionalValue(spec, fitCtx);
+    }
     const sUtil = supplier.mechanics?.utility || {};
 
     const atkW = w(sBuf.atk);
     if (atkW > 0 && isDPS) {
-        score += atkW * (isRupDPS ? 0.33 : 1) * 2;
+        score += atkW * (isRupDPS ? 0.33 : isArmDPS ? 0.5 : 1) * 2;
     }
     // DEF buff → DPS units that explicitly scale with DEF (e.g. Claret)
     const defW = w(sBuf.def);
@@ -209,16 +206,20 @@ function mechanicsFitScore(supplier, consumer) {
     if (w(sBuf.anomaly) > 0 && isAnoDPS) score += w(sBuf.anomaly) * 3;
     if (w(sBuf.sheer) > 0 && isRupDPS) score += w(sBuf.sheer) * 5;
     const crW = w(sBuf.cr), cdW = w(sBuf.cd);
-    if (crW > 0) score += crW * (isAnoDPS ? 0.3 : 2);
-    if (cdW > 0) score += cdW * (isAnoDPS ? 0.3 : 2);
+    // Armorers (overcritical) value CR highly; CD is worthless to them (fixed crit damage).
+    if (crW > 0) score += crW * (isAnoDPS ? 0.3 : isArmDPS ? 3 : 2);
+    if (cdW > 0 && !isArmDPS) score += cdW * (isAnoDPS ? 0.3 : 2);
     if (w(sBuf.pen) > 0 && isDPS && !isRupDPS) score += w(sBuf.pen) * 2;
+    // Generic damage (dmg) is intentionally NOT scored here: it's a broad baseline that
+    // benefits every DPS equally, so it carries no signal for ranking WHICH support best
+    // fits a given DPS, and crediting it drowns out specialist synergies (aftershock, veils).
     if (w(sDebuf.defense) > 0 && isDPS && !isRupDPS) score += w(sDebuf.defense) * 3;
     if (w(sDebuf.recovery) > 0 && isDPS) {
         const burst = Math.max(1, ...Object.values(cDamage).map(v => typeof v === 'number' ? v : 1));
         score += w(sDebuf.recovery) * burst;
     }
     const isStunless = cMech.utility?.stunless === true;
-    if (!isStunless && (isAtkDPS || isRupDPS)) {
+    if (!isStunless && (isAtkDPS || isRupDPS || isArmDPS)) {
         const sDaze = supplier.tags.includes('stun') ? 1 : w(sUtil.daze) * 0.5;
         const sStunMult = w(sBuf['stun-multiplier']);
         score += (sDaze + sStunMult) * 2;
@@ -278,11 +279,16 @@ function mechanicsFitScore(supplier, consumer) {
     // specific tag (e.g., Rem needs anomaly teammates for her ATK buff), a supplier that
     // DOESN'T have that tag is actively taking up a team slot that should go to someone
     // who does. Heavy discount — generic support value is mostly wasted.
-    const consumerCondBuffs = consumer.mechanics?.conditional?.buffs;
-    if (consumerCondBuffs && score > 0) {
-        for (const config of Object.values(consumerCondBuffs)) {
-            const tag = config.countTag;
-            if (tag && !supplier.tags.includes(tag)) {
+    if (score > 0) {
+        const condBuffTags = new Set();
+        for (const spec of Object.values(consumer.mechanics?.buffs || {})) {
+            if (!isConditionalSpec(spec)) continue;
+            for (const c of spec.cases) {
+                if (c.when?.countTag) condBuffTags.add(c.when.countTag);
+            }
+        }
+        for (const tag of condBuffTags) {
+            if (!supplier.tags.includes(tag)) {
                 score = Math.round(score * 0.2);
                 break;
             }
@@ -360,16 +366,18 @@ export function checkTeamDependencies(candidate, ownedUnits, allUnits) {
     // to fully activate conditional buffs. If the roster can't reach at least half
     // max activation, the unit is effectively non-functional — treat same as can't
     // activate. Partial (>50%) still flags as unmet for a 1-level priority drop.
-    const cb = candidate.mechanics?.conditional?.buffs;
-    if (cb) {
-        for (const [buffKey, config] of Object.entries(cb)) {
-            const maxLevel = Math.max(...config.levels);
+    const candBuffs = candidate.mechanics?.buffs || {};
+    for (const [buffKey, spec] of Object.entries(candBuffs)) {
+        if (isTeamScopedConditional(spec)) {
+            const maxLevel = maxConditionalValue(spec);
             if (maxLevel <= 0) continue;
-            const selfCount = candidate.tags.includes(config.countTag) ? 1 : 0;
-            const rosterCount = selfCount + ownedUnits.filter(u => u.tags.includes(config.countTag)).length;
-            const bestIdx = Math.min(rosterCount, config.levels.length - 1);
-            const bestAchievable = config.levels[bestIdx];
-            const neededTag = config.countTag;
+            const neededTag = spec.cases.map(c => c.when?.countTag).find(Boolean);
+            if (!neededTag) continue; // hasUnit/notPresent conditionals: no tag-based feasibility
+            const selfCount = candidate.tags.includes(neededTag) ? 1 : 0;
+            const rosterCount = selfCount + ownedUnits.filter(u => u.tags.includes(neededTag)).length;
+            // Best achievable value: resolve the spec against a pseudo-team of that many tagged units.
+            const pseudoTeam = Array.from({ length: rosterCount }, () => ({ tags: [neededTag] }));
+            const bestAchievable = resolveConditionalValue(spec, { team: pseudoTeam, self: candidate, consumer: null });
             const providers = allUnits
                 .filter(u => u.id !== candidate.id && u.limited && u.rank === 'S'
                     && u.tags.includes(neededTag))
@@ -508,7 +516,9 @@ const SUPPORT_GOOD_FIT = 15;
  * @returns {{ assessment, recommendations, coverage, allGaps, compositeScore, calibration }}
  */
 export function analyze(allUnits, unitStates, ownedUnits, { maxRecommendations = 5 } = {}) {
-    const ownedDPS = { attack: [], anomaly: [], rupture: [] };
+    const ownedDPS = { attack: [], anomaly: [], rupture: [], armorer: [] };
+    // TODO(armorer subdps): no armorer sub-DPS units exist yet; when one ships, add an
+    // 'armorer' bucket here and a corresponding gap detector (cf. detectSubdpsGap).
     const ownedSubdps = { anomaly: [], attack: [] };
     const ownedSupports = [];
     const ownedStunners = [];
@@ -537,7 +547,7 @@ export function analyze(allUnits, unitStates, ownedUnits, { maxRecommendations =
     }
 
     const allOwnedDPS = [
-        ...new Set([...ownedDPS.attack, ...ownedDPS.anomaly, ...ownedDPS.rupture])
+        ...new Set([...ownedDPS.attack, ...ownedDPS.anomaly, ...ownedDPS.rupture, ...ownedDPS.armorer])
     ];
 
     const dpsQuality = {};
@@ -558,7 +568,7 @@ export function analyze(allUnits, unitStates, ownedUnits, { maxRecommendations =
     }
 
     const qualities = [
-        dpsQuality.attack, dpsQuality.anomaly, dpsQuality.rupture,
+        dpsQuality.attack, dpsQuality.anomaly, dpsQuality.rupture, dpsQuality.armorer,
         supportQuality, stunnerQuality
     ];
     const compositeScore = qualities.reduce((sum, q) => sum + q, 0) / qualities.length;
@@ -982,8 +992,8 @@ function detectStunnerGap(gaps, stunnerQuality, ownedStunners, dpsQuality, unown
         }
     } else if (limitedStunnerCount === 1) {
         let score = 40;
-        if (dpsQuality.attack >= 75 || dpsQuality.rupture >= 75) score = 50;
-        if (dpsQuality.attack >= 75 && dpsQuality.rupture >= 75) score = 60;
+        if (dpsQuality.attack >= 75 || dpsQuality.rupture >= 75 || dpsQuality.armorer >= 75) score = 50;
+        if (dpsQuality.attack >= 75 && (dpsQuality.rupture >= 75 || dpsQuality.armorer >= 75)) score = 60;
 
         const reason = 'You only have one limited stunner — a second option would give flexibility across different team compositions';
         const candidates = sortCandidatesFn(unownedLimitedS.filter(u => u.tags.includes('stun')));
@@ -1347,11 +1357,11 @@ function detectMechanicalSynergies(gaps, ownedUnits, unownedLimitedS, dpsQuality
         const isDPSCandidate = hasDPSRole(candidate) && !isSubdps(candidate);
         const el = getUnitElement(candidate);
 
-        // DPS candidates that also supply buffs (mechanics.conditional.buffs or a
+        // DPS candidates that also supply buffs (a conditional-valued buff or a
         // conditional support pseudo-role) are hybrid units like Remielle — they should
         // be evaluated both as consumers of owned non-DPS AND as suppliers to owned DPS.
         const isHybridSupplier = isDPSCandidate && (
-            candidate.mechanics?.conditional?.buffs ||
+            Object.values(candidate.mechanics?.buffs || {}).some(isConditionalSpec) ||
             (Array.isArray(candidate.mechanics?.pseudoRole) &&
              candidate.mechanics.pseudoRole.some(e => (typeof e === 'string' ? e : e?.role) === 'support'))
         );
@@ -1522,7 +1532,7 @@ function detectDepthGap(gaps, ownedDPS, dpsQuality, unownedLimitedS, sortCandida
 
 function buildAssessment(dpsQuality, supportQuality, stunnerQuality, elementQuality, compositeScore, limitedSCount, coverage, highPriorityGapCount = 0, gaps = []) {
     const totalSCount = coverage.ownedDPS.attack.concat(
-        coverage.ownedDPS.anomaly, coverage.ownedDPS.rupture,
+        coverage.ownedDPS.anomaly, coverage.ownedDPS.rupture, coverage.ownedDPS.armorer,
         coverage.ownedSupports, coverage.ownedStunners
     ).filter(u => u.rank === 'S').length;
     const investmentFactor = totalSCount === 0 ? 0.3

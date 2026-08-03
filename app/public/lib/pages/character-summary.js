@@ -6,7 +6,7 @@ let filters = { rank: [], element: [], role: [], faction: [], tier: [], owned: f
 
 const FILTERS_STORAGE_KEY = 'zzz-char-summary-filters';
 const ROSTER_STORAGE_KEY = 'zzz-roster';
-const ROLES = ['attack', 'stun', 'anomaly', 'support', 'defense', 'rupture'];
+const ROLES = ['attack', 'stun', 'anomaly', 'support', 'defense', 'rupture', 'armorer'];
 
 
 
@@ -346,10 +346,12 @@ function buildSynergyLine(unit) {
         if (mechanics.buffs.abloom) buffs.push(formatMechanic('Abloom', mechanics.buffs.abloom));
         if (mechanics.buffs.chain) buffs.push(formatMechanic('Chain Attacks', mechanics.buffs.chain));
         if (mechanics.buffs.sheer) buffs.push(formatMechanic('Sheer Damage', mechanics.buffs.sheer));
+        if (mechanics.buffs.def) buffs.push(formatMechanic('DEF', mechanics.buffs.def));
         if (mechanics.buffs.pen) buffs.push(formatMechanic('PEN', mechanics.buffs.pen));
         if (mechanics.buffs['stun-multiplier']) buffs.push(formatMechanic('Stun Multiplier', mechanics.buffs['stun-multiplier']));
         if (mechanics.buffs.cr) buffs.push(formatMechanic('Crit Rate', mechanics.buffs.cr));
         if (mechanics.buffs.cd) buffs.push(formatMechanic('Crit Damage', mechanics.buffs.cd));
+        if (mechanics.buffs.dmg) buffs.push(formatMechanic('General Damage', mechanics.buffs.dmg));
         if (mechanics.buffs.disorders) buffs.push(formatMechanic('Disorders', mechanics.buffs.disorders));
         if (mechanics.buffs.vortex) buffs.push(formatMechanic('Vortex', mechanics.buffs.vortex));
 
@@ -369,6 +371,7 @@ function buildSynergyLine(unit) {
     if (mechanics.debuffs) {
         if (mechanics.debuffs.defense) debuffs.push(formatMechanic('Defense Shred', mechanics.debuffs.defense));
         if (mechanics.debuffs.recovery) debuffs.push(formatMechanic('Delayed Stun Recovery', mechanics.debuffs.recovery));
+        if (mechanics.debuffs.dmg) debuffs.push(formatMechanic('General Damage Taken', mechanics.debuffs.dmg));
         
         // Elemental debuffs
         if (mechanics.debuffs.ice) debuffs.push(formatElementalMechanic('Ice Defense Shred', mechanics.debuffs.ice, 'ice'));
@@ -384,7 +387,7 @@ function buildSynergyLine(unit) {
     // Kit (damage types + utility merged)
     const kitItems = [];
     
-    // Damage types
+    // Damage types that are kit-relevant; i.e. uniquely interesting for team-building concerns
     if (mechanics.damage) {
         if (mechanics.damage.polarity) kitItems.push(formatMechanic('Polarities', mechanics.damage.polarity));
         if (mechanics.damage.abloom) kitItems.push(formatMechanic('Abloom', mechanics.damage.abloom));
@@ -458,18 +461,27 @@ function buildSynergyLine(unit) {
         <div class="char-synergy">${parts.join('<br>')}</div>`;
 }
 
+function isConditionalValue(val) {
+    return val !== null && typeof val === 'object' && Array.isArray(val.cases);
+}
+
 function normalizeValue(val) {
     if (val === true) return 1;
     if (typeof val === 'number') return val;
+    // Conditional { cases: [...] } value — represent by its maximum achievable weight.
+    if (isConditionalValue(val)) {
+        return Math.max(0, ...val.cases.map(c => normalizeValue(c.value)));
+    }
     return 0;
 }
 
 function formatMechanic(name, value) {
     const val = normalizeValue(value);
-    if (val === 3) {
-        return `<strong>${name}</strong>`;
+    const label = isConditionalValue(value) ? `${name} <em>(conditional)</em>` : name;
+    if (val >= 3) {
+        return `<strong>${label}</strong>`;
     }
-    return name;
+    return label;
 }
 
 function formatElementalMechanic(name, value, element) {

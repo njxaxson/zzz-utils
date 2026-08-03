@@ -419,7 +419,7 @@ function calculateRecommendations() {
 // RESULTS DISPLAY
 // ============================================================================
 
-const DPS_TAGS = ['attack', 'anomaly', 'rupture'];
+const DPS_TAGS = DPS_ARCHETYPES; // ['attack', 'anomaly', 'rupture', 'armorer'] — single source
 
 function getTeamPrimaryDpsNames(team) {
     return team
