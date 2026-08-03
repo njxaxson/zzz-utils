@@ -67,6 +67,10 @@ const ARMORER_ATK_EFFICIENCY = 0.15;
 // maims — which is why armorers favour dual-DPS (Stun/Armorer/Armorer, Armorer/Armorer/Support).
 const MAIM_BASE = 8;
 const MAIM_ENABLER_BONUS = 6;
+// Element-scoped anomaly scaling (e.g. Roxy/Pyrois `scaling["anomaly:wind"]`): bonus per
+// same-element anomaly source on the team. Linear — oversupply always helps. A wind
+// pseudo-anomaly (Roxy) counts herself; a non-anomaly consumer (Pyrois) needs teammates.
+const ANOMALY_ELEMENT_MULT = 4;
 
 const BOSS_WEAK = {
     DISORDER_PER_UNIT: 4,
@@ -320,18 +324,29 @@ function w(value) {
 //
 // Predicate (`when`) primitives:
 //   { countTag, minCount }  team (incl. self) has >= minCount units with the tag
-//   { hasUnit }             a specific unit id is on the team
-//   { notPresent }          a specific unit id is NOT on the team
+//   { hasUnit }             a unit is on the team — a plain id ("velina"), OR a colon-qualified
+//                           "<role>:<element>" type ("anomaly:wind" = any effective wind-anomaly unit)
+//   { notPresent }          same identifier forms, negated
 //   { role }                the RECIPIENT's (consumer's) effective roles include role
 //
 // A mechanic value is either a scalar (number/true) or { cases: [{ when?, value }, …] };
 // the first case whose predicate passes wins (a case with no `when` always passes).
 // ============================================================================
 
+// Match a unit against a `hasUnit`/`notPresent` identifier: a colon-qualified "role:element"
+// (e.g. "anomaly:wind") matches by effective role + element; a plain string matches by id.
+function unitMatchesIdentifier(u, ident) {
+    if (typeof ident === 'string' && ident.includes(':')) {
+        const [role, element] = ident.split(':');
+        return getEffectiveRoles(u).includes(role) && getElement(u) === element;
+    }
+    return u.id === ident;
+}
+
 function evaluatePredicate(when, ctx) {
     if (!when) return true;
-    if (when.hasUnit !== undefined) return (ctx.team || []).some(u => u.id === when.hasUnit);
-    if (when.notPresent !== undefined) return !(ctx.team || []).some(u => u.id === when.notPresent);
+    if (when.hasUnit !== undefined) return (ctx.team || []).some(u => unitMatchesIdentifier(u, when.hasUnit));
+    if (when.notPresent !== undefined) return !(ctx.team || []).some(u => unitMatchesIdentifier(u, when.notPresent));
     if (when.role !== undefined) {
         // Recipient-scoped: needs a consumer. Team-global reads (no consumer) fall through
         // to the default case by treating role predicates as unmet.
@@ -628,12 +643,14 @@ export function getEffectiveScaling(unit) {
     if (roles.includes('armorer')) Object.assign(baseline, { def: 3, cr: 2 });
     if (roles.includes('stun'))    Object.assign(baseline, { daze: 1 });
     if (isDPSByRoles(roles)) {
-        const damage = unit.mechanics?.damage || {};
+        const damage = unit._resolvedDamage || unit.mechanics?.damage || {};
         if (!hasSubDPSRole(unit)) {
             let implicitUlt = 1;
             if (w(damage['ultimate:strong']) >= 2) implicitUlt = Math.max(implicitUlt, 2);
             if (w(damage['ultimate:double']) >= 2) implicitUlt = Math.max(implicitUlt, 3);
-            if (damage['ultimate:weak']) implicitUlt = 0;
+            // A (possibly conditional) ultimate:strong OVERRIDES ultimate:weak — e.g. Pyrois's
+            // ultimate becomes a real burst under wind anomaly, lifting the weak-ultimate penalty.
+            if (w(damage['ultimate:weak']) > 0 && w(damage['ultimate:strong']) === 0) implicitUlt = 0;
             baseline.ultimates = implicitUlt;
         }
         baseline['quick-assists'] = 0.25;
@@ -716,7 +733,7 @@ function getStunInfraWeight(supplier) {
 }
 
 function getMaxBurstWeight(unit) {
-    const damage = unit.mechanics?.damage || {};
+    const damage = unit._resolvedDamage || unit.mechanics?.damage || {};
     const explicit = Math.max(0, ...BURST_DAMAGE_TYPES.map(type => w(damage[type])));
     if (explicit > 0) return explicit;
     const roles = getEffectiveRoles(unit);
@@ -1928,7 +1945,10 @@ function scoreBaselineAffinity(supplier, consumer, debug, options = {}) {
     const supplierUtility = supplier.mechanics?.utility || {};
     const ultimatesWeight = w(supplierUtility.ultimates);
     if (ultimatesWeight > 0 && isDPSByRoles(consumerRoles) && !hasSubDPSRole(consumer)) {
-        if (!consumer.mechanics?.damage?.['ultimate:weak']) {
+        // ultimate:strong (possibly conditional) overrides ultimate:weak — provision counts again.
+        const cDmg = consumer._resolvedDamage || consumer.mechanics?.damage || {};
+        const weakUltActive = w(cDmg['ultimate:weak']) > 0 && w(cDmg['ultimate:strong']) === 0;
+        if (!weakUltActive) {
             const burstWeight = getMaxBurstWeight(consumer);
             const val = ultimatesWeight * burstWeight * MULT.ULTIMATES_PROVISION;
             score += val;
@@ -2021,7 +2041,7 @@ function scoreNeedFulfillment(supplier, consumer, debug, options = {}) {
     // Damage-type need fulfillment: consumer's damage types create implicit scaling
     // for matching supplier buffs (aftershock buff → aftershock dealer, etc.)
     // Polarity is a subclass of disorders: buffs.disorders also satisfies damage.polarity
-    const consumerDamage = consumer.mechanics?.damage || {};
+    const consumerDamage = consumer._resolvedDamage || consumer.mechanics?.damage || {};
     for (const [damageType, damageWeight] of Object.entries(consumerDamage)) {
         const dw = w(damageWeight);
         if (dw === 0) continue;
@@ -2274,6 +2294,31 @@ function scoreMechanicalSynergy(team, debug, options = {}) {
             const maimBonus = MAIM_BASE + MAIM_ENABLER_BONUS * builderCount;
             consumerScores.set(unit.name, (consumerScores.get(unit.name) || 0) + maimBonus);
             if (debug) console.log(`    Maim: ${unit.name} +${maimBonus} (base ${MAIM_BASE}, ${builderCount} gash-builder(s))`);
+        }
+    }
+
+    // Anomaly-quantity scaling: a unit that deals extra damage the more anomaly is on the enemy.
+    //   `scaling.anomaly`         — generic: fed by ANY effective anomaly agent (any element).
+    //   `scaling["anomaly:wind"]` — element-scoped: fed ONLY by wind anomaly agents.
+    // A wind-anomaly source is still anomaly, so it satisfies BOTH the generic and the wind need.
+    // Supply counts effective anomaly agents on the team INCLUDING self (a wind pseudo-anomaly
+    // self-fulfils its own wind need). Linear in supply — oversupply always helps (two anomaly
+    // agents feed Harumasa's generic anomaly scaling a lot; Vivian's ether gives a wind-scaler nothing).
+    for (const consumer of team) {
+        const cScaling = getEffectiveScaling(consumer);
+        for (const [skey, sval] of Object.entries(cScaling)) {
+            let element;
+            if (skey === 'anomaly') element = null;              // generic: any element
+            else if (skey.startsWith('anomaly:')) element = skey.slice('anomaly:'.length);
+            else continue;
+            const scalingWeight = w(sval);
+            if (scalingWeight <= 0) continue;
+            const supply = team.filter(u =>
+                getEffectiveRoles(u).includes('anomaly') && (element === null || getElement(u) === element)).length;
+            if (supply <= 0) continue;
+            const bonus = ANOMALY_ELEMENT_MULT * scalingWeight * supply;
+            consumerScores.set(consumer.name, (consumerScores.get(consumer.name) || 0) + bonus);
+            if (debug) console.log(`    Anomaly(${element ?? 'any'}): ${consumer.name} +${bonus} (${supply} anomaly source(s))`);
         }
     }
 
@@ -2600,6 +2645,12 @@ export function scoreTeamForBoss(team, boss, options = {}) {
     for (const unit of team) {
         unit._activatedRoles = computeActivatedRoles(unit, team);
     }
+    // Resolve conditional damage values (e.g. Pyrois's ultimate:strong under wind anomaly) once
+    // against the team, after roles are known. Damage is always team-scoped (a unit's own output),
+    // so consumer context isn't needed. Damage-reading helpers prefer `_resolvedDamage`.
+    for (const unit of team) {
+        unit._resolvedDamage = resolveValueMap(unit.mechanics?.damage, { team, self: unit, consumer: null });
+    }
 
     if (debug) {
         const teamLabel = team.map(u => u.name).join(' / ');
@@ -2615,6 +2666,7 @@ export function scoreTeamForBoss(team, boss, options = {}) {
         for (const u of team) {
             delete u._activatedRoles;
             delete u._morphedElement;
+            delete u._resolvedDamage;
         }
     };
 

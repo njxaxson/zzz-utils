@@ -312,7 +312,7 @@
         "join": ["stun", "anomaly"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
-            "damage": { "aftershock": 1 },
+            "damage": { "aftershock": 1, "enhanced" : 3 },
             "scaling": { "anomaly": 2 }
         },
         "faction": "Section 6",
@@ -675,10 +675,16 @@
         "join": ["support", "stun"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
-            "damage": { "chain": 3, "totalize": 1, "ultimate:double": 1, "ultimate:weak": 1 }
+            "damage": {
+                "chain": 3,
+                "totalize": 1,
+                "ultimate:double": 1,
+                "ultimate:weak": 1,
+                "ultimate:strong": { "cases": [ { "when": { "hasUnit": "anomaly:wind" }, "value": 1 }, { "value": 0 } ] }
+            }
         },
         "faction": "Phaethon",
-        "displayText" : "Proxy made manifest? We shall see!"
+        "displayText" : "Proxy made manifest? We shall see! This unit is received as part of the story."
     },
     {
         "id": "qingyi",
@@ -744,6 +750,30 @@
         },
         "faction": "Victoria Housekeeping",
         "displayText": "Electric support agent that specializes in buffing PEN. Her potential vision upgrades her to buff attack and defense and makes her considerably better than without it."
+    },
+    {
+        "id": "roxy",
+        "name": "Roxy",
+        "image": "./assets/characters/roxy.webp",
+        "rank": "S",
+        "limited": true,
+        "tier": 0.5,
+        "tags": ["stun", "wind", "assist:defensive"],
+        "join": ["attack", "armorer"],
+        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {
+            "pseudoRole": ["anomaly", "subdps"],
+            "buffs": {
+                "stun-multiplier": 2,
+                "cr": { "cases": [ { "when": { "role": "armorer" }, "value": 1 }, { "value": 0 } ] },
+                "cd": { "cases": [ { "when": { "role": "armorer" }, "value": 0 }, { "value": 3 } ] }
+            },
+            "debuffs": { "recovery": 2 },
+            "scaling": { "def": 3, "anomaly:wind": 1 }
+        },
+        "faction": "Flint Workshop",
+        "available": false,
+        "displayText": "Generalized wind stun agent designed to work best with Claret, but also has interesting synergy with Pyrois and Harumasa."
     },
     {
         "id": "sanby",

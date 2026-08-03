@@ -77,7 +77,7 @@ async function main() {
         //valid = valid && team.every(unit => unit.tags.includes("electric"));
         //valid = valid && team.every(unit => unit.tags.includes("physical"));
         //valid = valid && team.every(unit => unit.tags.includes("ether"));
-        valid = valid && team.some(unit => unit.name == "Promeia");
+        valid = valid && team.some(unit => unit.name == "Velina") && team.some(unit => unit.name == "Pyrois");
         //valid = valid && team.filter(unit => unit.tags.includes("stun")).length >= 1;
         //valid = valid && team.some(unit => unit.tags.includes("title"));
 
