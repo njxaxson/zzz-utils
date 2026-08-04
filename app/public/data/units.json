@@ -840,11 +840,11 @@
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "damage": { "enhanced": 3, "ultimate:weak": 2 },
-            "scaling": { "chains" : 3 }
+            "scaling": { "chains" : 3, "anomaly:wind": 1 }
         },
         "available": false,
         "faction": "Airspace Patrol Department",
-        "displayText": "Horse lady with spear. "
+        "displayText": "Horse lady with spear."
     },
     {
         "id": "soldier-11",

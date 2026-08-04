@@ -1682,6 +1682,26 @@ async function main() {
         }
     });
 
+    // ========================================================================
+    // TEST 80: Sigrid's wind-anomaly passive is a bonus, never a penalty
+    // ========================================================================
+    // Sigrid has scaling["anomaly:wind"]:1 (passive: extra damage under wind anomaly). It must
+    // NOT inhibit her when no wind source is present — a wind-less team (Lighter/Sigrid/Astra)
+    // must hold at its normal value (> 350). A wind source (Roxy) adds a mild bonus.
+    run('TEST 80: Sigrid not penalized without wind anomaly (Neutral)', () => {
+        if (!allUnits.find(u => u.id === 'sigrid')) return;
+        for (const b of withBosses(bosses, 'Neutral')) {
+            const noWind = scoreForTeamString('Lighter/Sigrid/Astra', allUnits, { preview: true })[0];
+            const ns = scoreTeamForBoss(noWind.team, b, {});
+            assert(ns > 350,
+                `Lighter/Sigrid/Astra should hold above 350 (no wind penalty), got ${ns?.toFixed(1)}`);
+            const wind = scoreForTeamString('Roxy/Sigrid/Astra', allUnits, { preview: true })[0];
+            const ws = scoreTeamForBoss(wind.team, b, {});
+            assert(ws > ns,
+                `Roxy/Sigrid/Astra (${ws?.toFixed(1)}) should beat the wind-less line (${ns?.toFixed(1)}) — mild wind bonus`);
+        }
+    });
+
     // ------------------------------------------------------------------------
     // Summary
     // ------------------------------------------------------------------------
