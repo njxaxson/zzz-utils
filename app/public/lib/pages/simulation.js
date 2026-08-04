@@ -19,6 +19,8 @@ import { replaceSelect } from '../common/custom-dropdown.js';
 // DOM Elements
 const polychromeInput = document.getElementById('polychrome');
 const tapesInput = document.getElementById('tapes');
+const useMonochromeInput = document.getElementById('use-monochrome');
+const monochromeInput = document.getElementById('monochrome');
 const totalPullsDisplay = document.getElementById('total-pulls');
 const targetCInput = document.getElementById('target-c');
 const targetWInput = document.getElementById('target-w');
@@ -69,14 +71,23 @@ function initCustomDropdowns() {
 // Update total pulls display
 function updateTotalPulls() {
     const polychrome = parseInt(polychromeInput.value) || 0;
+    const monochrome = useMonochromeInput.checked ? (parseInt(monochromeInput.value) || 0) : 0;
     const tapes = parseInt(tapesInput.value) || 0;
-    const totalPulls = Math.floor(polychrome / 160) + tapes;
+    const totalPulls = Math.floor((polychrome + monochrome) / 160) + tapes;
     totalPullsDisplay.textContent = totalPulls;
+}
+
+// Toggle monochrome input editability
+function updateMonochromeState() {
+    monochromeInput.disabled = !useMonochromeInput.checked;
+    updateTotalPulls();
 }
 
 // Add event listeners for pull calculation
 polychromeInput.addEventListener('input', updateTotalPulls);
 tapesInput.addEventListener('input', updateTotalPulls);
+monochromeInput.addEventListener('input', updateTotalPulls);
+useMonochromeInput.addEventListener('change', updateMonochromeState);
 
 // Show/hide tactic option based on targets
 function updateTacticVisibility() {
@@ -156,8 +167,9 @@ function runSimulation() {
         try {
             // Build context from inputs
             const polychrome = parseInt(polychromeInput.value) || 0;
+            const monochrome = useMonochromeInput.checked ? (parseInt(monochromeInput.value) || 0) : 0;
             const tapes = parseInt(tapesInput.value) || 0;
-            let totalPulls = Math.floor(polychrome / 160) + tapes;
+            let totalPulls = Math.floor((polychrome + monochrome) / 160) + tapes;
 
             const includeRefunds = includeRefundsInput.checked;
 
@@ -530,6 +542,8 @@ function saveInputs() {
     const inputs = {
         polychrome: polychromeInput.value,
         tapes: tapesInput.value,
+        useMonochrome: useMonochromeInput.checked,
+        monochrome: monochromeInput.value,
         targetC: targetCInput.value,
         targetW: targetWInput.value,
         pitySC: pitySCInput.value,
@@ -555,6 +569,8 @@ function loadInputs() {
         const inputs = JSON.parse(saved);
         if (inputs.polychrome !== undefined) polychromeInput.value = inputs.polychrome;
         if (inputs.tapes !== undefined) tapesInput.value = inputs.tapes;
+        if (inputs.useMonochrome !== undefined) useMonochromeInput.checked = inputs.useMonochrome;
+        if (inputs.monochrome !== undefined) monochromeInput.value = inputs.monochrome;
         if (inputs.targetC !== undefined) targetCInput.value = inputs.targetC;
         if (inputs.targetW !== undefined) targetWInput.value = inputs.targetW;
         if (inputs.pitySC !== undefined) pitySCInput.value = inputs.pitySC;
@@ -596,6 +612,6 @@ simulateBtn.addEventListener('click', () => {
 loadInputs();
 initCustomDropdowns();
 syncCustomDropdowns();
-updateTotalPulls();
+updateMonochromeState();
 updatePityHints();
 updateTacticVisibility();

@@ -753,6 +753,55 @@ section h2:not(:first-child) {
     accent-color: var(--accent-primary);
 }
 
+.compound-input {
+    display: flex;
+    align-items: stretch;
+    width: 100%;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    overflow: hidden;
+}
+
+.compound-input:focus-within {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
+.compound-input input[type="checkbox"] {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    margin: 0 0 0 1rem;
+    align-self: center;
+    accent-color: var(--accent-primary);
+    cursor: pointer;
+}
+
+.compound-input input[type="number"] {
+    flex: 1;
+    width: 100%;
+    padding: 0.7rem 1rem;
+    background: transparent;
+    border: none;
+    border-left: 1px solid var(--border-color);
+    margin-left: 1rem;
+    color: var(--text-primary);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 1rem;
+    font-weight: 500;
+}
+
+.compound-input input[type="number"]:focus {
+    outline: none;
+}
+
+.compound-input input[type="number"]:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 .tactic-select {
     font-size: 0.9rem;
     font-weight: inherit;
