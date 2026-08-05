@@ -165,6 +165,7 @@ function renderBossSection() {
             <button class="boss-mode-toggle-btn" data-mode="variant" title="Tap a boss to cycle its variation">
                 Mode: Boss Variant
             </button>
+            <p class="boss-mode-toggle-hint" id="boss-mode-toggle-hint">Bosses with a <span class="boss-variation-hint-dot">&#9679;</span> have alternate versions &mdash; long-press a boss to cycle, or turn this mode on to tap instead.</p>
         `;
         container.parentNode.insertBefore(modeBar, container);
         modeBar.addEventListener('click', handleBossModeToggle);
@@ -174,10 +175,12 @@ function renderBossSection() {
     const availableBosses = allBosses.filter(boss => boss.available !== false);
     container.innerHTML = availableBosses.map(boss => createBossCard(boss)).join('');
 
-    // Show the right-click hint only when at least one boss has an enabled variation
+    // Only show the mode toggle (and hints) when at least one boss has an enabled variation
+    const anyHasVariants = availableBosses.some(boss => getBossEnabledVariationKeys(boss).length > 0);
+    modeBar.style.display = anyHasVariants ? '' : 'none';
+
     const hint = document.getElementById('boss-variation-hint');
     if (hint) {
-        const anyHasVariants = availableBosses.some(boss => getBossEnabledVariationKeys(boss).length > 0);
         hint.style.display = anyHasVariants ? '' : 'none';
     }
 }
