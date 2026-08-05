@@ -56,9 +56,9 @@ const MULT = {
 };
 
 const RUPTURE_ATK_EFFICIENCY = 0.33;
-// Armorers scale off ATK at only ~15% — roughly half of rupture's rate — so ATK buffs are
-// nearly dead for them. Their real stat levers are crit rate and defense.
-const ARMORER_ATK_EFFICIENCY = 0.15;
+// Armorers do NOT scale off ATK at all (0%) — ATK buffs are worthless to them. Their only
+// stat levers are crit rate and defense.
+const ARMORER_ATK_EFFICIENCY = 0;
 
 // Maim: only armorers open Gash meters; all meters share one pool of marks (max 3). Only
 // stun/armorer agents build that pool (+ units Claret grants gash-build to via

@@ -50,8 +50,9 @@ temp/
 .eslintcache
 
 .cursor/
-
+.claude/
 archive/
+
 
 
 
