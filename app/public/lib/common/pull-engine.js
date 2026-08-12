@@ -330,7 +330,8 @@ export function checkTeamDependencies(candidate, ownedUnits, allUnits) {
         const scalingW = w(level);
         if (scalingW === 0) continue;
 
-        // P22: skip self-provided needs
+        // Skip self-provided needs: a unit that supplies its own scaling key (e.g. Banyue's
+        // interrupt-resistance) has no team dependency for it.
         const selfSupply = Math.max(w(selfBuffs[key]), w(selfUtil[key]));
         if (selfSupply >= scalingW) continue;
 

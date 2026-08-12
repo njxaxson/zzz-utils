@@ -54,7 +54,7 @@
         "tier": 0.5,
         "tags": ["anomaly", "ether", "assist:defensive"],
         "join": ["stun", "support", "anomaly"],
-        "synergy": { "units": ["sunna", "nangong"], "tags": [], "avoid": [] },
+        "synergy": { "units": ["Sunna", "Nangong"], "tags": [], "avoid": [] },
         "mechanics": {
             "damage": { "enhanced": 2, "abloom": 2 },
             "scaling": { "veils": 2 }
@@ -291,9 +291,9 @@
         "tier": 2,
         "tags": ["anomaly", "electric", "assist:evasive"],
         "join": ["electric", "faction"],
-        "synergy": { "units": ["Velina"], "tags": [], "avoid": [] },
+        "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
-            "pseudoRole": ["subdps"],
+            "pseudoRole": [{ "role": "subdps", "when": { "notPresent": "velina" } }],
             "damage": { "abloom": 1 },
             "scaling": { "pen": true }
         },
