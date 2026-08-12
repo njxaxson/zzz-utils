@@ -1,762 +1,800 @@
-# Team Scoring Engine Context
+ZZZ Engine Context
 
-This document provides domain knowledge for the ZZZ team scoring engine (`app/public/lib/common/team-scorer.js`). It is the primary reference for understanding the game mechanics, data model, engine architecture, and diagnostic tooling needed to implement new features or fix scoring issues.
+Domain knowledge for the ZZZ team scoring engine and the pull recommendation engine.
+The two are one system: pull recommendations answer "which unit would most improve the
+teams you can build", so they reason over the same mechanics vocabulary the scorer does.
 
-**Source of truth for tier rankings:** `app/public/data/units.json`
-**Source of truth for boss data:** `app/public/data/bosses.json`
-**Source of truth for scoring logic:** `app/public/lib/common/team-scorer.js`
+**Sources of truth — the code and data win, always:**
 
-This document captures gameplay mechanics and design decisions. Specific scoring numbers mentioned are illustrative only and may differ from the current implementation — always consult the code for exact values.
+| What | Where |
+|----|----|
+| Scoring logic | `app/public/lib/common/team-scorer.js` |
+| Pull recommendations | `app/public/lib/common/pull-engine.js` |
+| Team legality (`join`) | `app/public/lib/common/team-builder.js` |
+| Unit data, tiers, mechanics | `app/public/data/units.json` |
+| Boss data | `app/public/data/bosses.json` |
+| Elements / DPS roles | `app/public/lib/common/constants.js` |
 
-## Game Fundamentals
+**This document deliberately contains no tuning constants, thresholds, or formulas.**
+Those live in the code, which is densely commented with its own rationale. What lives here
+is the game-domain knowledge and design intent that the code *can't* tell you. Constant and
+function names appear only as grep anchors. If a number matters, read it from source.
+
+
+## 1. Game Fundamentals
 
 ### Elements
 
-The game has seven standard elements: **Fire**, **Ice**, **Electric**, **Ether**, **Physical**, **Wind** (added in version 2.8), and **Lumen** (added in version 3.1 with Remielle).
+Seven elements: **fire, ice, electric, ether, physical, wind, lumen**.
 
-Each element has standard interactions with boss weaknesses and resistances. A DPS unit whose element matches a boss weakness receives a bonus; a DPS unit whose element is resisted by a boss is disqualified (with limited exceptions for pseudosupports). Lumen is fully independent of ether — no boss in the current roster has lumen weakness or resistance.
+A DPS whose element matches a boss weakness gets a bonus; a DPS whose element is resisted is
+disqualified (support/defense units are penalized instead, not disqualified — see
+*Support element irrelevance* below). No boss currently has lumen weakness or resistance.
 
-**Lumen anomaly mechanics (Patch 3.1):** Lumen agents have three unique mechanics:
+**Element variants.** Three "titled" units track anomaly buildup on a separate gauge that still
+counts as their base element for weakness/resistance:
 
-* **Attribute Mutation**: Lumen damage morphs to the element of the next agent in team order (wraps around). The lumen agent deals that element's damage for weakness/resistance purposes but does NOT fill that element's anomaly gauge. Lumen units therefore cannot trigger disorders or vortex. The scoring engine tries every possible morph target and picks the highest-scoring result (i.e., assumes optimal team ordering). A lumen unit is DQ'd only if all morph targets are resisted by the boss. Attribute Mutation directly increases the damage output of anomaly procs.
-* **Lumiflux Buildup (LB)**: A separate resource built up by specific heavy lumen hits (independent of anomaly gauges). Persists across agent swaps. Builds a **Mutation Coefficient** that scales the damage boost from Refringe.
-* **Refringe**: When a non-lumen anomaly teammate procs an anomaly while LB is present, the proc deals an additional large hit based on the Mutation Coefficient. Modeled as `REFRINGE_BONUS` applied to each non-lumen anomaly teammate when a lumen agent is on the team. **Cascade effect**: since disorder and vortex damage derives from anomaly proc damage, Refringe-boosted procs also increase disorder/vortex damage. Partners with active disorders receive `REFRINGE_DISORDER_CASCADE` bonus; partners with active vortex receive `REFRINGE_VORTEX_CASCADE` bonus. This means multi-element triple-anomaly teams (e.g., Alice/Vivian/Remielle generating disorders) score higher than same-element triple-anomaly teams (e.g., Alice/Jane/Remielle with no reactions to cascade into).
-* **Luminize**: A lumen-specific damage type. All lumen units deal luminize damage, calculated uniquely per unit. For Remielle, luminize takes the form of **anomaly rebound**: she tracks the last three attribute mutations (anomaly procs boosted by the Mutation Coefficient), combines their damage, multiplies by her Anomaly Proficiency (AP), and deals it as one massive luminize hit. Modeled as `mechanics.damage.luminize` in units.json.
-
-Because lumen doesn't open its own anomaly gauge, it is excluded from `teamHasImplicitDisorders` element diversity checks. Disorders on a lumen team come from non-lumen anomaly pairs only.
-
-### Element Variants
-
-Some exceptionally powerful characters - “titled” units Miyabi, Yixuan, and YSG - have unique element variants that behave like their base element for weakness/resistance purposes but track anomaly buildup separately:
-
-| Unit | Base Element | Variant | Disorder Interaction |
+| Unit | Base | Variant | Why it matters |
 |----|----|----|----|
-| Miyabi | Ice | Frost | Frost + Ice = disorder (e.g., Miyabi + Soukaku) |
-| Yixuan | Ether | Auric Ink | Auric Ink + Ether = disorder (rarely relevant) |
-| YSG | Physical | Honed Edge | Honed Edge + Physical = disorder (rarely relevant) |
+| Miyabi | ice | `frost` | Frost + ice = disorder (e.g. with Soukaku) |
+| Yixuan | ether | `auricInk` | Rarely relevant |
+| Ye Shunguong | physical | `honedEdge` | Rarely relevant |
 
-The `mechanics.elementalVariant` variable marks this; right now only titled units have elemental variants but it could be expanded to others in the future. It is used in disorder generation checks and vortex tier determination. Some elemental variant units receive only flat/negligible vortex damage in comparison to their base element — a deliberate design choice that limits or enhances their synergy with the wind/vortex mechanic (e.g., Miyabi's frost variant has near-zero vortex tier).
+Marked by `mechanics.elementalVariant`. Used for disorder generation and vortex tiering.
+A variant can have a deliberately different vortex tier from its base element — Miyabi's frost
+is effectively zero, which is the whole reason Promeia (pure ice) beats her on vortex bosses.
 
 ### Roles
 
-Every unit has a primary role in their `tags` array:
+Every unit's primary role is a tag: **attack**, **anomaly**, **rupture**, **armorer** (the four
+DPS roles), plus **stun**, **support**, **defense**.
 
-* **Attack** — On-field DPS dealing damage through standard attacks, chains, and ultimates during stun windows
-* **Anomaly** — DPS dealing damage through anomaly buildup, disorders, and enhanced attacks
-* **Rupture** — DPS dealing sheer damage (a special classification of damage) that ignores enemy defense entirely
-* **Armorer** — DPS dealing Sharp damage, scaling primarily off DEF (added in version 3.2 with Claret). See Armorer / Sharp / Gash / Maim below.
-* **Stun** — Creates high-damage windows by stunning enemies; stunners also deal meaningful damage
-* **Support** — Buffs teammates and provides utility; negligible personal damage
-* **Defense** — Provides shields, healing, damage mitigation and often buff teammates; negligible personal damage
+* **Attack** — on-field DPS through basics, chains, ultimates during stun windows
+* **Anomaly** — DPS through anomaly buildup, disorders, enhanced attacks
+* **Rupture** — deals Sheer damage, which **ignores enemy defense** (so defense shred and PEN are dead)
+* **Armorer** — deals Sharp damage, scales off DEF (see below)
+* **Stun** — creates damage windows; also deals meaningful damage
+* **Support** — buffs and utility, negligible personal damage
+* **Defense** — shields/healing/mitigation, usually also buffs; negligible personal damage
 
-The first four (attack, anomaly, rupture, armorer) are **DPS roles**. Units can have additional roles via `pseudoRole` in their mechanics data — either always-active (plain strings) or conditionally activated (objects with `when` conditions). See Role Activation below.
+Despite the name, **defense units are not played defensively** — the game rewards aggression,
+so they function as alternate supports that happen to deal slightly more personal damage.
+(Ben converts DEF into crit damage and is usually built as a DPS by people who run him.)
 
-### Armorer / Sharp / Gash / Maim (Patch 3.2)
-
-Armorers are a fourth DPS class — an "analogous parallel hodgepodge" of attack, anomaly, and rupture — with several deliberate inversions of the standard model:
-
-* **DEF + CR are the only real stat levers.** Armorers scale mainly off **DEF**, with **0% ATK scaling** (`ARMORER_ATK_EFFICIENCY = 0`), so ATK buffs are worthless to them. Crit damage is fixed (also worthless), leaving **crit rate and defense** as their only meaningful stat buffs. DEF buffs (e.g. Rina's `buffs.def`) route through a dedicated baseline-affinity path (`MULT.DEF_BUFF`). These are **role defaults** (`getEffectiveScaling` gives armorers `def:3, cr:2`) — a vanilla armorer needs no explicit `scaling`.
-* **Sharp damage** — The armorer's damage type, parallel to rupture's Sheer, **but applied against standard enemy defense**. Unlike rupture, armorers therefore *benefit* from defense shred (Nicole, Trigger) and PEN. Sharp is inherent to the role; only supports that specifically buff `buffs.sharp` need reference it.
-* **Overcritical crit + CR dependency** — Crit rate gets a *second* crit check between 100–200%, so CR stays useful up to **200%** (beyond that it's dead, as 100%+ is for everyone else). CD is **fixed** → worthless (Astra's `+CD` earns them nothing; no CD branch). Because armorers lean so hard on CR, an armorer with **no CR-supplying teammate** takes a dedicated cohesion hit (`ARMORER_CR_MISS_UTIL`, weighted by `ARMORER_CR_WEIGHT` in `computeTeamworkMultiplier`) — unlike other DPS, for whom CR is a generic equipment stat. CR suppliers: Koleda's P6 narrow CR, Nicole, Cissia. A whiffed **CD** buff (e.g. Ju Fufu's `cd:3` on an all-armorer-DPS team) now also hits the supplier's cohesion (`WHIFF_PENALTY_BUFFS` = `['sheer', 'cd']`) — until armorers, CD always landed, so the engine never treated it as missable.
-* **Gash → Maim** — Only **armorers open Gash meters**, and all meters **share one pool of marks (max 3)**. Only **stun and armorer agents build** that pool and **only they detonate** it into a **Maim** (burst parallel to a disorder). Other units can't build gash — *unless* Claret **grants** it via `utility["gash-build"]` (grantees build, they still can't trigger). More gash builders → the shared pool fills faster → more/bigger Maims, so armorers favour stun/armorer-dense comps: **Stun/Armorer/Armorer** or **Armorer/Armorer/Support**. Modeled as a builder-scaled L4 reaction bonus (`MAIM_BASE + MAIM_ENABLER_BONUS × builders`, builders capped at 2 for the shared-pool ceiling). Maim is also the armorer's inherent **burst** (role-default `getMaxBurstWeight` of 2), so it benefits from stun windows/recovery debuffs without an explicit `damage.maim`.
+Units gain additional roles via `mechanics.pseudoRole`. **An activated pseudo-role IS the unit's
+role** for scoring — every role predicate (`isDPS`, `isSupport`, …) reads activated roles first.
 
 ### Anomaly Reactions
 
-When two different-element anomalies are applied to the same target simultaneously, a reaction occurs:
+Two *different-element* anomalies on the same target react:
 
-* **Disorder**: Both anomalies are non-wind. Standard reaction. Bonus damage dealt.
-* **Vortex**: Exactly one anomaly is wind. Damage depends on the non-wind element's tier:
+* **Disorder** — both non-wind. The standard reaction.
+* **Vortex** — exactly one is wind. Damage scales off the **non-wind** element's tier.
 
-| Non-wind element | Tier | Relative weight |
-|----|----|----|
-| Ice | Highest | 4.5 |
-| Fire, Physical | Medium | 2 |
-| Ether, Electric | Low | 1 |
-| Elemental variants (Frost, Auric Ink, Honed Edge) | Flat/negligible | <1 |
+Same-element pairs (including wind+wind) do nothing.
 
-Same-element pairs (including wind+wind) produce no reaction.
+Vortex tiers, highest to lowest: **ice ≫ fire ≈ physical ≈ ether > electric > elemental variants**
+(frost is effectively zero; auricInk/honedEdge are low). Exact values: `VORTEX_TIERS`.
+This tiering is what differentiates ice anomaly agents from frost-variant Miyabi on wind bosses.
 
-**Boss anomaly state**: A boss with `mechanics["anomaly:state"]` permanently has that element's anomaly applied. The boss's anomaly immediately consumes every team-applied anomaly, suppressing all team-side reactions between agents. Each agent only reacts with the boss's anomaly (one reaction per agent). Same-element agents get nothing.
+**Boss anomaly state** (`mechanics["anomaly:state"]`) is the big modifier. Such a boss permanently
+carries that element's anomaly, and it *immediately consumes every team-applied anomaly*. This
+suppresses all team-side reactions: each agent reacts only with the boss, once. Same-element
+agents get nothing.
 
-**Critical distinction**: Boss weakness to wind (just a `weaknesses[]` entry) does NOT affect anomaly reactions. Boss anomaly state (`mechanics["anomaly:state"]`) does. A boss can have wind weakness without wind anomaly state, or vice versa.
+> **Critical distinction:** a boss being *weak to wind* (a `weaknesses[]` entry) does nothing to
+> anomaly reactions. A boss having *wind anomaly state* does. These are independent; a boss can
+> have either without the other.
 
-### Polarity and Disorders
+**Polarity disorders** are a subclass of disorder. `buffs.disorders` (Yuzuha) buffs them, and
+`utility.disorders` providers force disorder occurrences that bypass anomaly-state suppression.
+Occurrence still feeds `scaling.disorders` at full weight (so Miyabi's transformative scaling
+keeps working), but polarity *damage* is heavily discounted on wind-anomaly bosses
+(`POLARITY_VORTEX_DISCOUNT`).
 
-Polarity disorders are a subclass of disorders. Any buff that targets disorders (e.g., Yuzuha's `buffs.disorders: 3`) directly buffs polarity disorder damage. In the engine, `buffs.disorders` supplies both the baseline affinity `disorder-buff` path AND `damage.polarity` need fulfillment (via the damage-type loop, where `damage.polarity` checks `supplierBuffs.disorders` as a fallback). Polarity providers (`utility.disorders`) generate forced disorder occurrences regardless of boss anomaly state, but on vortex bosses (wind anomaly state), polarity disorder *damage* is reduced to \~25% (`POLARITY_VORTEX_DISCOUNT`). Their occurrence still fully feeds `scaling.disorders`.
+### Lumen (Remielle)
 
-### Mindscapes, Weapons, and Potential Silhouettes
+Lumen has three mechanics that make it unlike any other element:
 
-Units range from M0W0 to M6W5.
+* **Attribute Mutation** — lumen damage morphs to the element of the next agent in team order.
+  It counts as that element for weakness/resistance but **does not fill that element's anomaly
+  gauge**, so lumen units generate no disorders and no vortex, and are excluded from element-diversity
+  checks. The scorer tries every morph target and keeps the best result (assuming the player orders
+  their team optimally). A lumen unit is only DQ'd if *all* morph targets are resisted.
+* **Lumiflux Buildup → Refringe** — when a *non-lumen* anomaly teammate procs an anomaly while
+  Lumiflux is up, that proc deals a large extra hit. Because disorder/vortex damage derives from
+  proc damage, Refringe **cascades** into reactions. This is why multi-element partners beat
+  same-element ones: Alice/Vivian/Remielle (disorders to cascade into) > Alice/Jane/Remielle.
+* **Luminize** — a lumen-only damage type. For Remielle it takes the form of *anomaly rebound*:
+  she tracks the last three mutations, combines their Refringe-boosted damage, multiplies by her
+  Anomaly Proficiency, and delivers it as one enormous hit. Modeled as `damage.luminize`.
 
-* **Mindscapes (M0–M6):** Each pull beyond the first adds a mindscape. M1/M2/M4/M6 add unique abilities; M3/M5 increase skill levels. M6 S-ranks are extremely powerful but require heavy investment. For many limited DPS units, M2 is a substantial power spike (e.g., M2 Miyabi generates her own disorder fuel, reducing teammate dependency).
-* **Weapons (W0–W5):** W0 = no signature weapon; W1 = signature weapon equipped (often \~20% DPS increase). W2–W5 provide diminishing stat returns. For non-DPS agents, even W1 may not be worth the investment.
-* **Potential Silhouettes (P0–P6):** Supplemental buffs unlocked at M0+. P1/P2 add new capabilities and even potentially new joins to expand their legal teammates; P3–P6 are stat increases. Impact varies by unit (e.g., P6 SAnby is significant; P6 Grace is negligible). For units with available silhouettes, the algorithm assumes P6.
+### Armorer / Sharp / Gash / Maim
 
-**Scoring assumptions:** S-rank DPS at M0W1, non-DPS S-ranks at M0W0, A-rank units at M6W5. Mindscape-specific synergies (e.g., M2 Alice/Jane/Yuzuha being one of the best teams in the game) are deliberately not modeled because the engine cannot accept mindscape levels as input.
+The fourth DPS class is a deliberate inversion of the standard model:
+
+* **DEF and CR are the only stat levers.** Armorers have **zero ATK scaling**
+  (`ARMORER_ATK_EFFICIENCY`), so ATK buffs are worthless. Crit damage is **fixed**, so CD buffs
+  are worthless too (Astra earns nothing from an armorer). DEF buffs route through a dedicated
+  affinity path (`MULT.DEF_BUFF`), which is what makes Rina best-in-slot.
+* **Overcritical crit rate.** Armorers get a second crit check between 100–200%, so CR stays
+  useful to 200% rather than dying at 100%. Because they lean so hard on it, an armorer with
+  **no CR-supplying teammate** takes a dedicated cohesion hit (`ARMORER_CR_MISS_UTIL`).
+  CR suppliers: Koleda's P6 narrow buff, Roxy's, Nicole, Cissia.
+* **Sharp damage** is the armorer's damage type — parallel to rupture's Sheer, **but applied
+  against normal enemy defense**. So unlike rupture, armorers *do* benefit from defense shred and PEN.
+* **Gash → Maim.** Only armorers open Gash meters, and all meters share **one pool of marks**.
+  Only stun and armorer agents build that pool, and only they detonate it into a **Maim** (a burst
+  parallel to a disorder). More builders fill the shared pool faster, which is why armorers want
+  stun/armorer-dense comps rather than double support. Modeled as a builder-scaled bonus
+  (`MAIM_BASE`, `MAIM_ENABLER_BONUS`), with the builder count capped to represent the shared ceiling.
+* Sharp and Maim are **role-inherent**. A vanilla armorer needs no `scaling` and no `damage` at all —
+  Claret's entire kit is `mechanics: {}`.
 
 ### Additional Abilities (`join`)
 
-Each unit has a `join` array representing the tags required to activate their Additional Ability. At least one teammate must carry a matching tag. The team-builder uses `join` as a **hard prerequisite** — teams that don't satisfy every unit's `join` condition are never formed or scored.
-
-A small number of "flex" units (e.g., Nicole, Lucy) provide enough value even without their additional ability activated, but these are exceptions.
+Each unit's `join` array lists tags that at least one teammate must carry to activate its
+Additional Ability. `join` is a **hard prerequisite**: illegal teams are never formed and are
+disqualified if passed to the scorer directly. `isValidTeam` requires *every* member's join to be
+satisfied; the scorer relaxes this slightly for trios, accepting a team where any *pair* mutually
+joins (the odd one out is a flex slot). The literal token `faction` in a `join` array expands to
+the unit's own `faction` value.
 
 ### Defensive Assists
 
-When an enemy telegraphs an attack (gold flash), the player can switch in a teammate. Each unit carries either `assist:defensive` or `assist:evasive` in their tags. Some bosses require a minimum number of defensive assist units; teams that don't meet the requirement are disqualified. Boss `assists` field specifies the requirement (0 = no requirement, 3 = all three must be defensive).
+Each unit carries `assist:defensive` or `assist:evasive`. Bosses specify a minimum number of
+defensive-assist units via `mechanics.assists`; teams below the threshold are disqualified.
+`utility.rotations: "limited"` (Astra, Remielle) means the unit removes itself from the assist
+rotation, reducing the boss's effective requirement by one — unless the boss sets `chainParry: true`
+(Girtablullu), whose mechanic needs two genuinely off-field defensive assists at once.
 
-## Team Archetypes
+### Investment Assumptions
 
-These are the common gameplay patterns that the engine recognizes through its mechanics-driven architecture. The engine does not hardcode composition templates — these patterns emerge from mechanical interactions scored in Layers 1–4.
+Units range M0W0–M6W5. The scorer **cannot accept investment levels as input**, so it assumes:
 
-### Attack Teams
+* S-rank DPS at **M0W1**, non-DPS S-ranks at **M0W0**, A-ranks at **M6W5**
+* Potential Silhouettes at **P6** where available
 
-**Typical:** Stunner + Attacker + Support/Defense
+Consequences worth remembering: mindscape-specific synergies are deliberately unmodeled
+(M2 Alice/Jane/Yuzuha is a top-tier team the engine cannot see), and P-level unlocks that expand
+a unit's `join` list (Lycaon at P1+) are baked into the data rather than conditional.
 
-Attackers need stun windows to deal damage. The stunner creates vulnerability periods; the support amplifies the attacker's output during those windows. Double attacker is viable in some scenarios, such as when one has `subdps` pseudoRole.
 
-**Stunless Exception (YSG):** YSG receives the same stun damage multiplier even when the enemy is stunned; so inflicting stuns does not actually increase her damage output like it would for other attackers. (She does signficantly benefit from any increase to the stun damage multiplier, though, for this same reason - the increased multiplier is applied all of the time, not just during stun windows.) Her ideal composition is double-support (YSG + 2 supports). Having a stunner with YSG is suboptimal — except Dialyn, who provides free ultimate attacks and a stun multiplier increase. YSG's double-ultimate is the highest burst damage in the game, making Dialyn's ultimate provision uniquely valuable.
+## 2. Team Archetypes
 
-### Anomaly Teams
+The engine hardcodes no composition templates beyond the structure classifier in L1.5 — these
+patterns *emerge* from mechanical interactions. They're listed here so you know what "correct"
+output looks like.
 
-**Modern meta:** Stunner (Nangong/Lycaon) + Anomaly DPS + Support (Yuzuha/Sunna)
-**Classic:** Anomaly DPS + Anomaly SubDPS (Vivian/Burnice) + Support (Yuzuha)
-**Triple-anomaly (Remielle):** Anomaly DPS + Remielle (pseudo-support) + Anomaly DPS/SubDPS
+* **Attack** — Stunner + Attacker + Support/Defense. Attackers need stun windows; the support
+  amplifies output inside them.
+* **Anomaly (modern)** — Stunner (Nangong/Lycaon) + Anomaly DPS + Support (Yuzuha/Sunna/Astra). Nangong's release changed anomaly team-building: as a hybrid stun/anomaly unit providing anomaly buffs, extended windows, and polarity triggers, `Nangong/<DPS>/Yuzuha` displaced the classic
+  `<DPS>/Vivian/Yuzuha`. Both still exist — Promeia sometimes prefers Vivian for abloom volume.
+* **Anomaly (triple)** — three primary-anomaly units, enabled by Remielle. Traditional anomaly
+  wheelchairs are strongly *sub*optimal for her.
+* **Rupture** — Stunner + Rupture DPS + Lucia or Pan Yinhu. Defense shred is useless here. Dialyn or Norma > Ju Fufu > Astra as the stunner; Norma is strong because she converts sheer buffs into personal ATK.
+* **Totalize (Hugo)** — DPS + double stunner. Hugo converts accumulated stun *time* into damage,
+  so a second low-tier stunner beats a good support. He's `onfield: false` — he enters for chains
+  and totalize bursts, then hands field time back.
+* **Stunless (YSG)** — YSG + double support. She receives her stun damage multiplier whether or not
+  the enemy is stunned, so inflicting stuns gains her nothing (though *raising* the multiplier helps
+  her constantly, unlike everyone else). Dialyn is the exception worth bringing: her free ultimates
+  feed YSG's double-ultimate, the highest burst in the game.
+* **"Monoshock"** — hybrid anomaly + attacker. Named for the old triple-electric Grace/Harumasa/Rina
+  team, but the name now just means any hybrid anomaly/attack comp; it need not be electric or triple.
+  Niche but legal — Harumasa's `scaling.anomaly` is what makes it score.
 
-Nangong's release fundamentally changed anomaly team building. As a T0 hybrid stun/anomaly unit, Nangong provides anomaly buffs, extended stun windows, and polarity disorder triggers — making `Nangong/<Anomaly DPS>/Yuzuha` the strongest anomaly template, replacing `<Anomaly DPS>/Vivian/Yuzuha`. Lycaon (at P1+) serves as a budget alternative with ice defense shred. Interestingly enough, Promeia is the latest anomaly agent and in some cases she prefers Vivian over Nangong because of the higher quantity of abloom-specific damage, which Promeia buffs. So both compositions exist in modern play.
+**Wheelchairs** — support pairings that uplift almost any compatible DPS: Astra+Nicole (attack), Nangong+Yuzuha and Vivian+Yuzuha (anomaly), Velina+Remielle (anomaly), Nangong+Sunna (attack/anomaly), Dialyn+Lucia (rupture), Norma+Astra (attack) / Norma+Lucia (rupture). These are *emergent*; their high scores are evidence the mechanics are modeled well, not something the engine is told.
 
-Remielle introduces a third archetype: **triple-anomaly** teams where all three units have the primary `anomaly` tag. Remielle's `support` pseudo-role is **conditional** — it only activates when the team has 3+ primary anomaly units. On a triple-anomaly team she provides the game's highest ATK buff (engine value 4) to all teammates and is classified as support for L1.5 structure. On non-triple-anomaly teams (e.g., Nangong/Remielle/Yuzuha), her support identity doesn't activate: the team has no effective support, structure degrades, and her conditional ATK buff resolves to 0 (only 1 primary anomaly = Remielle herself). Traditional anomaly wheelchairs are strongly suboptimal for Remielle.
 
-**Disorder generation:** When two anomaly-typed units of different elements are on the same team, they naturally generate disorders for bonus damage; unless one of them is wind, in which they generate a vortex instead. Disorders are especially critical for units with transformative scaling that is based on disorders, such as Miyabi who converts disorders into enhanced attacks.
+## 3. Data Model
 
-### Rupture Teams
+This is the contract a human edits by hand. Everything below is read from `units.json` / `bosses.json`.
 
-**Typical:** Stunner + Rupture DPS + Support/Defense (Lucia, Pan Yinhu)
-
-Rupture deals Sheer damage that **ignores enemy defense**. This means defense debuffs (Nicole's 40% defense shred) are useless for rupture teams, and PEN ratio is irrelevant. The primary support is Lucia (specialist, +1200 Sheer) or Pan Yinhu (A-rank specialist).
-
-**Synergistic stunners:** Dialyn and Ju Fufu (who has `synergy.tags: ["rupture"]`) are preferred over generic stunners. Dialyn's free ultimates are particularly valuable for rupture DPS (whose ultimates are strong). Ordering: Dialyn > Ju Fufu > Astra for rupture teams. Note: Dialyn's `replaces: { "ultimates": "chains" }` penalizes chain-dependent DPS (Sigrid, Evelyn, etc.). Norma converts sheer damage buffs from Lucia or Pan back into her own personal attack buffs, and converts quick assists into chain attacks — making her the second-best stunner for rupture teams after Dialyn, and potentially the best stunner for Evelyn on fire-weak bosses via QA→chain conversion.
-
-### Totalize Teams (Hugo)
-
-**Typical:** DPS + Double Stunner
-
-Hugo converts accumulated stun time into damage (totalize mechanic). More stun uptime = more totalize damage. Hugo prefers two stunners over a stunner + support, even if the second stunner is low-tier. Hugo is marked `onfield: false` because he enters briefly for chain attacks and totalize bursts, then returns field time to his stunners.  Pyrois, a free agent who will be available in an upcoming release, also deals totalize damage, although is not as reliant upon it as Hugo as his main damage output.
-
-### “Monoshock” Teams
-
-**Typical but not essential:** Anomaly + Attacker + Stunner or Support
-
-There is technically the possibility to have hybrid attack+anomaly compositions; the classic example is the long-outdated  Grace/Harumasa/Rina team. This "monoshock" team — named because it is a triple-electric team whose strategy is to keep ongoing shock bonuses during the whole fight — is no longer all that competitive, but hybrid anomaly+attack compositions *are* technically still possible and can be used in some niche cases.  The “monoshock” moniker is typically used to refer to these hybrid anomaly/attacker teams (because of the original team that met this composition) but it does not need to be a triple-electric team; it is just a nickname for an unusual hybrid archetype.
-
-## Notable Units Reference
-
-| Unit | Tier | Role | Key Mechanics | Notes |
-|----|----|----|----|----|
-| **Miyabi** | Titled T0 | Anomaly (Frost) | `scaling.disorders:3, damage.enhanced:3` | Transformative scaling — disorders fuel enhanced attacks. Can execute \~5 ultimate-equivalent attacks in one stun window. Frost variant triggers disorders with ice units (Soukaku). |
-| **Yixuan** | Titled T0 | Rupture (Auric Ink) | `damage.ultimate:double` | Best-in-slot with Dialyn+Lucia. |
-| **YSG** | Titled T0 | Attack (Honed Edge) | Stunless, `scaling.veils:2, damage.ultimate:double` | Built-in stun multiplier. Double-support ideal; Dialyn exception for free ultimates. |
-| **Nangong** | T0 | Stun + pseudoAnomaly | `buffs.anomaly:3, debuffs.recovery:3, utility.disorders:2` | Hybrid stun/anomaly. Replaces Vivian as Miyabi's best teammate. Forms the Nangong+Yuzuha and Nangong+Sunna wheelchairs. |
-| **Hugo** | T1 | Attack (Ice) | `damage.totalize:3` | Totalize mechanic. Wants double-stun. `onfield: false`. |
-| **Aria** | T1 | Anomaly (Ether) | `damage.enhanced:2, abloom:2, scaling.veils:2` | Plays like an attacker (wants stun windows). Ether veil scaling makes Sunna her best support. AoD faction. |
-| **Evelyn** | T0.5 | Attack (Fire) | `damage.chain:3, scaling.chains:3, scaling.recovery:1` | Chain attack specialist. Strongly prefers Astra (chain provision). Benefits from recovery debuffs (Lighter). |
-| **SAnby** | T0.5 | Attack (Electric) | `damage.aftershock:2, buffs.aftershock:3` | Buffs aftershock teammates (Trigger, Orphie). Teams without aftershock consumers waste her buff. |
-| **Seed** | T1 | Attack (Electric) | `join: ["attack"]` | Requires a second attacker. Best with Cissia (burst duo) or Orphie. |
-| **Harumasa** | T1.5 | Attack (Electric) | `synergy.tags: ["anomaly"]` | Currently the only attack agent who supports hybrid anomaly/attack compositions. |
-| **Soukaku** | T1.5 | Support (Ice) + conditional pseudoAnomaly | `buffs.ice:3, atk:3` | Ice specialist only. Anomaly pseudo-role activates conditionally (`when: { countTag: "anomaly", minCount: 1 }`). On-field status derived dynamically from role activation. |
-| **Orphie** | T1 | Attack (Fire) + pseudoSupport/SubDPS | `buffs.atk:2, damage.aftershock:3` | Support-like attacker. Scored as T1 support (not T1 DPS) in L2. Cannot satisfy attack shill as pseudosupport. SubDPS still benefits from stun bonuses. |
-| **Caesar** | T0 | Defense + pseudoStun | `buffs.atk:2, utility.shields:2` | Pseudo-stun always activates. Provides daze + ATK buff + interrupt resistance. |
-| **Lycaon** | T1 | Stun (Ice) | `debuffs.ice:2, buffs.stun-multiplier:2` | At P1+, `join` expands to anomaly agents. Ice defense shred benefits Miyabi/Promeia. Budget Nangong alternative. |
-| **Cissia** | T1.5 | Attack (Electric) + SubDPS | `buffs.cr:1, debuffs.electric:2, utility.daze:1` | Seed's ideal partner. Can function support-like on electric teams. |
-| **Vivian** | T0.5 | Anomaly (Ether) + SubDPS | `damage.abloom:3, scaling.am:2, onfield:false` | Was Miyabi's best partner before Nangong. Still strong but dropped from T0. |
-| **Promeia** | T0.5 | Anomaly (Ice) | `damage.abloom:3, buffs.abloom:3, debuffs.defense:2` | Ice anomaly with tier-3 vortex. Abloom buffer. Direct Miyabi alternative on Scaled Horizon — pure ice vortex vs. frost variant. |
-| **Jane Doe** | T1.5 | Anomaly (Physical) | `buffs.vortex:3` | Physical anomaly with a retroactive vortex buff. Contextual bonus — no cohesion penalty when inactive. When Jane causes a physical anomaly that triggers a vortex, the vortex is considered a critical hit and gets the crit damage modifier. This is modeled as a generic vortex buff rather than to complexly model a narrow game mechanic, and so it provides a modest boost to average out its actual value. |
-| **Sigrid** | T0.5 | Attack (Ice) | `damage.enhanced:3, damage["ultimate:weak"]:2, scaling.chains:3` | Chain-enhanced attack specialist. Her ultimate is weaker than her enhanced attacks (`ultimate:weak`), so ultimate provision from stunners is wasted. Wants chain providers (Lycaon, Lighter) not ultimate providers (Dialyn). Dialyn is actively anti-synergistic: ultimates replace chains (P32) while providing no ultimate benefit (P31). |
-| **Norma** | T0.5 | Stun (Fire) | `damage.chain:3, converts: {quick-assists: chain}, scaling.sheer, scaling.quick-assists` | Stunner designed as a subdps for attack and rupture teams. Two unique features: converts quick assists into chain attacks via `converts` (huge damage boost when paired with Astra — P33), and converts sheer buffs into ATK (huge damage boost when paired with Lucia). Chain attack damage modifiers almost as high as Evelyn. Two capable wheelchair compositions: Norma/Astra (attack) and Norma/Lucia (rupture). |
-| **Remielle** | Titled T0 | Anomaly (Lumen) + `pseudoRole: ["subdps", "support"]` | `conditional.buffs.atk: [0,0,2,4]` by anomaly count; `damage["ultimate:double"]: 3, "luminize": 3, "aftershock": 2`; `scaling: { ap: 3, atk: 3, buffs: 3 }`; `onfield: false` | Lumen anomaly void hunter. Faction: Covenant of Dayat. Her ATK buff (+1600 ATK at 4000 ATK, game's highest — 40% of her personal ATK stat) scales with team composition via `conditional.buffs`. `pseudoRole: ["subdps", "support"]` — both always active; she functions as an off-field subdps/support hybrid. Scales heavily on AP (anomaly rebound multiplier) and ATK (buff percentage + personal damage). Damage output is relatively large for a support unit. Signature weapon gives 743 base ATK + 105 AP, enabling 4000+ ATK / 600+ AP — far beyond typical anomaly agents. **Luminize / Anomaly Rebound**: tracks last 3 attribute mutations, combines their Refringe-boosted damage, multiplies by AP, deals as one colossal luminize hit. **Refringe cascade**: multi-element partners preferred — Alice/Vivian/Rem (disorders cascade) > Alice/Jane/Rem (same-element, no cascade). `scaling.buffs: 3` — her anomaly buff and conditional ATK buff are critical to her team value. `scaling.codependent: true` — recommendation engine checks for viable triple-anomaly teams. `utility.rotations: "limited"` — removes herself from the assist rotation pool, reducing the effective boss assist requirement by 1 (but still counts as a reliable defensive assist herself). Best teams: Velina/Remielle/Promeia, Alice/Vivian/Remielle (multi-element for cascade). |
-
-### SubDPS Units
-
-Units with `pseudoRole: ["subdps"]` need a main DPS teammate (any DPS without subdps tag). SubDPS units receive 50% tier multiplier but still benefit from offensive buffs and stun infrastructure. They do NOT receive implicit ultimates scaling (ultimates are a limited resource reserved for the primary DPS), but DO receive quick-assists baseline. (These are engine scoring mechanics that will be explained later.)
-
-Example subdps units: Burnice (fire anomaly), Grace (electric anomaly), Vivian (ether anomaly), Orphie (fire attack, also pseudosupport), Cissia (electric attack).
-
-### Support Classification
-
-Conceptually, many support agents are effectively designed to be either specialists or generalists, and their mechanics reflect this. Sometimes, their specialist domain is not broadly applicable and so they can be excellent in some cases and near-useless in others.
-
-| Type | Units | Notes |
-|----|----|----|
-| **Specialists** | Lucia (rupture), Yuzuha (anomaly), Pan Yinhu (rupture) | Are typically found in best available teams for their archetype |
-| **Conditional** | Zhao (YSG), Nicole (defense shred, avoid rupture), Sunna (AoD/YSG, veils), Rina (electric PEN) | Strong in niche, weak/useless elsewhere |
-| **Universal** | Astra (ATK+CD, chains), Caesar (ATK, shields, pseudo-stun), Lucy (ATK, fire) | Work with almost any team, although not necessarily as the optimal support unit |
-
-## Boss Reference
-
-### Notable Bosses
-
-| Boss | Weak | Resist | Shill | Anti | Assists | Key Mechanics |
-|----|----|----|----|----|----|----|
-| **Dead End Butcher** (Notorious) | ice, ether | — | anomaly | — | 0 | Weak to disorders. Debuffs daze accumulation (`debuffs.daze:2`), penalizing attack/rupture teams; mitigated by high-daze stunners. Anomaly teams unaffected. |
-| **Discordant Solo** | ether, wind | ice, fire | anomaly | rupture | 2 | Favors Aria, Sunna, Nangong. Weak to ether veils. Sunna's ether veil stacking creates unique multiplicative debuffs — this boss was designed to require Sunna. One of only two bosses with dual resistance. |
-| **Sacrifice Bringer** | ice | physical | anomaly | — | 0 | Favors Miyabi and Promeia. Vulnerable to Freeze status; Miyabi/Promeia trivializes this fight. |
-| **Sanguine Sweeper** | electric, ether | fire | anomaly | rupture | 2 | Weak to stun. Benefits heavily from stunners on anomaly teams. |
-| **Primordial Nightmare** | physical | ice, ether | attack | rupture, anomaly | 0 | Heavily shills YSG: Anti-rupture AND anti-anomaly — only attack teams viable. Dual resistance against ice and ether was designed to lock out brute force attempts from Miyabi and Yixuan. |
-| **Wandering Hunter** | fire, ice | physical | rupture | anomaly, attack | 2 | Anti-anomaly AND anti-attack — only rupture teams viable. Physical resistance hurts YSG from trying to brute force it. |
-| **The Defiler** | electric, physical | ice | attack | anomaly | 2 | Attack-shill. Anti-anomaly. Ice resistance hurts Miyabi. |
-| **Thrall & Sobek** | ice, physical, wind | electric | stun | anomaly | 2 | Stun shill is a **hard requirement** — teams without a stunner are disqualified. |
-| **Typhon Slugger** | electric, wind | fire | — | — | 3 | All three units must have `assist:defensive`. Fire resistance. No shill. |
-| **Miasma Priest** | ether | ice | rupture | — | 2 | Ice resistance hurts Miyabi. Rupture shill means rupture teams get bonus. |
-| **Scorched Horizon** | wind, ice | electric | anomaly | — | 2 | `mechanics["anomaly:state"]: "wind"`. Permanent self-applied wind anomaly. All team anomalies react with the boss (vortex for non-wind, nothing for same-element). Disorders replaced by vortex; polarity disorder damage severely reduced. Also debuffs CD (`debuffs.cd:2`). Designed to favor Promeia over Miyabi. |
-
-### Shill Behavior
-
-* **DPS shills** (attack, anomaly, rupture): Matching the shill gives a flat bonus. Not matching gives no bonus — but no penalty either. Teams compete on their own merits.
-* **Non-DPS shills** (stun): Hard requirement. No stunner = disqualified. These bosses have mechanics that make the shilled role essential.
-
-### Shill Intensity
-
-Bosses with `shillIntensity > 1` have fight mechanics that make their favored units disproportionately valuable. The first favored unit gets the full amplified bonus; additional favored units receive diminishing returns. At the moment, this is no longer in use as it has been replaced by mechanics-driven scoring instead.
-
-## Data Model
-
-### Unit Data Object
+### Unit object
 
 ```json
 {
-  "id": "aria",
-  "name": "Aria",
-  "aliases": ["..."],
+  "id": "aria", "name": "Aria", "aliases": ["..."],
   "image": "./assets/characters/aria.webp",
-  "rank": "S",
-  "limited": true,
-  "tier": 1.0,
+  "rank": "S", "limited": true, "tier": 0.5,
   "tags": ["anomaly", "ether", "aod", "assist:defensive"],
   "join": ["stun", "support"],
-  "available": false,
-  "synergy": { "units": ["Sunna", "Nangong"], "tags": [], "avoid": [] },
-  "mechanics": {
-    "damage": { "enhanced": 2, "abloom": 2 },
-    "scaling": { "veils": 2 }
-  },
   "faction": "Angels of Delusion",
-  "displayText" : "Free character text"
+  "available": true,
+  "synergy": { "units": [], "tags": [], "avoid": [] },
+  "mechanics": { "damage": { "enhanced": 2, "abloom": 2 }, "scaling": { "veils": 2 } },
+  "displayText": "Free text shown on the character summary"
 }
 ```
 
-* `id` — Unique identifier
-* `name` — Display name
-* `aliases` — Common abbreviations (e.g., "S11" for Soldier 11, "YSG" for Ye Shunguong). Used by CLI tools for fuzzy name matching.
-* `image` — Path to portrait image (used directly by UI)
-* `rank` — `"S"` or `"A"`
-* `limited` — Whether the unit is gacha-limited
-* `tier` — Numeric tier (T0 = best, T4 = worst)
-* `tags` — Role, element, faction, and assist type tags
-* `join` — Tags at least one teammate must have for Additional Ability activation; also a hard prerequisite for team formation
-* `available` — (optional, default `true`) When `false`, unit is unreleased. Added to JSON with preliminary data for pre-release testing.
-* `synergy` — Synergy configuration (see below)
-* `mechanics` — Mechanics object (see below)
-* `faction` — Faction name (used as part of team construction with the `faction` keyword in the join array.
-* `displayText` — Free text that is displayed on the character summary
+* `tier` — numeric, **T0 = best**. Tiers change often; never quote them from this document.
+* `tags` — role + element + faction + assist type. `title` marks a titled unit.
+* `available: false` — unreleased; included for pre-release testing, surfaced by CLI `--preview`.
+* `aliases` — used for CLI fuzzy matching ("S11", "YSG").
 
-### Synergy Object
+`synergy` is largely retired — mechanics express nearly everything now.
+`synergy.units` is a named-pair bonus (L5), currently only the Angels of Delusion trio and a
+couple of one-way entries. `synergy.tags` survives only on Ju Fufu (`["rupture"]`) as a stopgap.
+`synergy.avoid` is a near-disqualification for anti-synergy that's too awkward to model
+mechanically (hard DQ in strict mode, large penalty in lenient mode) — currently unused.
+
+### `mechanics`
+
+The `mechanics` object describes what is **distinctive** about a unit beyond its role baseline.
+Units with nothing distinctive have `mechanics: {}` — and that's a complete, valid kit.
+
+Weights throughout: `true`/`1` = minor, `2` = strong, `3` = defining. (Values above 3 exist where a unit is deliberately off the conventional scale, e.g. Remielle's `atk: 4`.)
+
+| Key | Meaning |
+|----|----|
+| `pseudoRole` | Secondary roles (see below) |
+| `elementalVariant` | Alternate anomaly-gauge tracking |
+| `onfield` | Explicit on-field demand override |
+| `damage` | Distinctive damage types this unit deals |
+| `buffs` | What it buffs for teammates |
+| `debuffs` | What it debuffs on enemies |
+| `utility` | Non-stat contributions |
+| `scaling` | What it benefits *from* |
+| `replaces` | Supplier-side: this provision costs the consumer another resource |
+| `converts` | Consumer-side: self-conversion of one resource into another |
+
+#### The unified conditional framework
+
+**One predicate vocabulary drives both pseudo-role activation and conditional mechanic values.**
+Anything new added to `evaluatePredicate` is automatically available everywhere.
+
+Predicates (`when`):
+
+* `{ "countTag": "<tag>", "minCount": n }` — team (including self) has ≥ n units with that tag
+* `{ "hasUnit": "<ident>" }` — a plain id (`"miyabi"`) matches by id; a **colon-qualified**
+  `"<role>:<element>"` (`"anomaly:wind"`) matches any unit with that *effective* role and element
+* `{ "notPresent": "<ident>" }` — the inverse, same identifier forms
+* `{ "role": "<role>" }` — **recipient-scoped**: the *consumer receiving the value* has that
+  effective role. Only meaningful for conditional mechanic values, not for pseudoRole activation
+  (which is self-scoped). In team-global contexts with no consumer it evaluates false and falls
+  through to the default case.
+
+Any mechanic value may be a scalar **or** `{ "cases": [ { "when": …, "value": n }, …, { "value": default } ] }`.
+First passing case wins; a case with no `when` always passes.
+
+Two distinct uses:
+
+* **Team-scoped** (`countTag`/`hasUnit`/`notPresent`) — resolved once per team. Remielle's ATK
+  curve by anomaly count. These are subject to an **under-activation penalty**: a squared gap
+  between the resolved value and the max possible value, so large misses are punished
+  disproportionately. This is what pushes Remielle hard toward triple-anomaly comps.
+* **Recipient-scoped** (`role` only) — resolved per consumer. This is how **narrow buffs** work:
+  Koleda and Roxy give `cr` to armorers and `cd` to everyone else, as two conditionals on the same
+  kit. Exempt from the under-activation penalty — a per-recipient buff is never "under-activated",
+  and utilization resolves it to the best value that actually reaches a DPS so a correctly-routed
+  narrow buff is never charged as unlanded.
+
+#### `pseudoRole`
+
+A mixed array of plain strings (always active) and `{ "role": …, "when": … }` objects.
+Activation is **entirely data-driven** — there are no hardcoded activation rules in the engine.
+
+Live examples worth knowing:
+
+| Unit | Definition | Behaviour |
+|----|----|----|
+| Caesar | `["stun"]` | Always a pseudo-stunner |
+| Remielle | `["subdps", "support"]` | Both always active; off-field subdps/support hybrid |
+| Roxy | `["anomaly", "subdps"]` | Wind stunner who is also a wind anomaly source |
+| Nangong | `[{anomaly, when countTag anomaly ≥1}]` | Anomaly only alongside an anomaly-tagged unit |
+| Soukaku | `[{anomaly, when hasUnit miyabi}]` | Anomaly *only* with Miyabi, else pure support |
+| Yanagi | `[{subdps, when hasUnit miyabi}]` | Demoted to subdps when Miyabi is present |
+| Burnice | `[{subdps, when notPresent velina}]` | *Promoted* to primary DPS when Velina is present |
+| Cissia | `[{subdps, when countTag attack ≥2}]` | Subdps only on a double-attacker team |
+
+Yanagi and Burnice are inverse patterns, and their **pull-engine defaults differ accordingly**:
+with no team context, `hasUnit` defaults to *not* activating (Yanagi reads as primary DPS) while
+`notPresent` defaults to activating (Burnice reads as subdps).
+
+The special `"dps"` pseudo-role marks a support/defense unit as a primary DPS participant for L2
+scoring. A unit declaring both `dps` and `support` is always treated as forced-secondary — its kit
+is split between personal damage and team support, so it never earns full primary DPS credit.
+
+**On-field derivation:** defaults are attack/anomaly/rupture/armorer/stun = on-field,
+support/defense = off-field. When a pseudo-role activates, on-field status follows the *activated*
+role unless `mechanics.onfield` overrides explicitly. Soukaku has no override, so she is on-field
+exactly when her anomaly role fires.
+
+#### `damage`
+
+Distinctive damage types: `enhanced`, `chain`, `aftershock`, `abloom`, `polarity`, `totalize`,
+`luminize`, `sharp`, `maim`, and the ultimate variants.
+
+The ultimate keys are load-bearing:
+
+* `ultimate:strong` / `ultimate:double` raise the unit's implicit ultimate scaling
+* `ultimate:weak` marks a unit whose ultimate is *not* a meaningful burst (Sigrid's ultimate is
+  weaker than her enhanced attacks; Pyrois uses his as a mode switch). Implicit ultimate scaling is
+  zeroed and ultimate-provision bonuses from stunners are suppressed, so ultimate-providing stunners
+  don't earn unearned credit. **A** `ultimate:strong` overrides `ultimate:weak` — which is exactly
+  how Pyrois's conditional works: his ultimate becomes a real burst when a wind-anomaly unit is
+  present, lifting the weak-ultimate penalty.
+
+`sharp` and `maim` are role-inherent to armorers — only list them to override the role default.
+
+Conditional `damage` values are resolved once per team into `unit._resolvedDamage` (damage is
+always team-scoped — it's the unit's own output — so no consumer context is needed).
+
+#### `buffs` / `debuffs`
+
+Buff keys: `atk`, `anomaly`, `aftershock`, `abloom`, `chain`, `chains`, `sheer`, `pen`, `def`,
+`stun-multiplier`, `cr`, `cd`, `dmg`, `disorders`, `vortex`, element names.
+Debuff keys: `defense`, `recovery`, `dmg`, element names.
+
+Two keys behave unlike the rest and are excluded from cohesion (`COHESION_EXCLUDED_BUFFS`):
+
+* `dmg` — generic damage. A universal multiplier on all damage that is relevant to every DPS
+  unconditionally. There is no team where it fails to land, so it's scored as a flat term and
+  **must not count toward utilization** — otherwise it would rescue the cohesion of a support whose
+  *designed* buffs are mismatched (a rupture support's `sheer` on an attack team). This lets an
+  otherwise-thin `dmg`-heavy kit like Koleda's be universally valuable without distorting fit.
+  Debuff-side `dmg` is worth slightly less than buff-side: a buff helps the team against every
+  enemy, a debuff marks only one — irrelevant on single-target Deadly Assault, real on Shiyu Defense.
+* `vortex` — a contextual bonus (Jane Doe's retroactive vortex crit, generalized). It scores
+  only when consumers actually generate vortex this fight, tier-scaled, and carries no cohesion
+  penalty when it doesn't apply.
+
+Buff relevance (`getBuffRelevance`) is where role asymmetries live: rupture units get reduced ATK
+efficiency, armorers get zero; anomaly units get low CR/CD relevance because their damage comes from
+ATK/AP/reactions rather than crits (Miyabi is the exception — she has effectively 100% crit rate
+and explicit `scaling.cr`/`cd`, so both are fully valuable to her). `abloom` and `disorders` are
+always relevant to anomaly-role units, and to others only if they have matching damage types.
+
+#### `utility`
+
+`disorders`, `quick-assists`, `chains`, `ultimates`, `veils`, `heal:team`, `heal:self`, `shields`,
+`interrupt-resistance`, `kaleidoscope`, `daze`, `stunless`, `rotations`, `gash-build`.
+
+`gash-build` grants Gash buildup to a non-stun/non-armorer teammate — they add to the shared Maim
+pool's builder count but still cannot detonate it. *(Engine support exists; no unit uses it yet.)*
+
+#### `scaling`
+
+What the unit benefits from. Non-stat keys go through Need Fulfillment; stat keys feed Baseline
+Affinity. Includes element-scoped anomaly quantity scaling: `scaling.anomaly` is fed by *any*
+effective anomaly agent, `scaling["anomaly:wind"]` only by wind ones — and since wind anomaly is
+still anomaly, a wind source satisfies both. Supply counts anomaly agents *including self*, so a
+wind pseudo-anomaly like Roxy self-fulfils.
+
+**How** `scaling` interacts with role baselines — read this carefully, it is easy to get wrong:
+
+`getEffectiveScaling` returns `{ ...roleBaseline, ...explicitScaling }` — a **per-key merge, not a
+wholesale replacement**. An attacker with `scaling: { ultimates: 3 }` still has `cr: 2, cd: 2` from
+the attack baseline *and* gains `ultimates: 3`. Only keys the unit names explicitly are overridden.
+
+Role baselines:
+
+| Role | Baseline scaling |
+|----|----|
+| Attack | `cr`, `cd` |
+| Anomaly | `am`, `ap` |
+| Rupture | `sheer`, `hp`, `cr`, `cd` |
+| Armorer | `def`, `cr` (no `cd` — fixed crit damage) |
+| Stun | `daze` |
+
+(IMPORTANT HUMAN FEEDBACK FOR LATER ASSESSMENT: Attack and Anomaly should theoretically have `atk`=2 in their baseline scaling, and Rupture should theoretically have `atk`=1. This may be directly modeled in the code rather than through scaling definitions. Needs review.)
+
+
+Plus, for any DPS: implicit `ultimates` (skipped for subdps — see below), a small implicit
+`quick-assists`, and implicit `recovery` scaled off `damage.totalize` if present.
+
+Note that Baseline *Affinity* uses a separate resolver (`resolveBaselineWeight`) with its own
+defaults — e.g. armorers get elevated CR weight there. Don't conflate the two paths.
+
+Two `scaling` keys are meta-flags rather than game mechanics:
+
+* `scaling.buffs` (0–3) — how badly this unit suffers when its own buffs/debuffs go unconsumed. Not every buff provider is equally dependent on landing: SAnby without aftershock consumers is significantly hindered from reaching her damage ceiling (3); Nangong needs at least one anomaly teammate (2); Promeia's abloom buff is nice but not critical (1); Lycaon's ice debuff is irrelevant to his job as a generic anomaly stunner (0). Defaults come from the unit's **native role tags** — pseudoRole does *not* override:
+  support/defense = 3, stun = 2, DPS roles = 0. At 0 the penalty is skipped entirely.
+  Only weight-2+ buffs are evaluated; weight-1 entries are assumed to always land.
+* `scaling.codependent` (boolean) — consumed by the **pull engine only**, never the scorer.
+  See §5.
+
+#### `replaces` and `converts`
+
+* `replaces` (supplier side) — `{ "cost_resource": "provided_resource" }`, read as "replaces
+  cost with provided". Providing the resource *costs* the consumer the other one. Dialyn's
+  `{ "chains": "ultimates" }` means her free ultimates consume a chain attack, penalizing her pairing with chain-dependent DPS.
+* `converts` (consumer side) — `{ "input": "output" }`. The consumer turns one resource into
+  another for itself, so a supplier's input provision augments the output's effective supply in both
+  need fulfillment and damage-type scoring. *(Engine support exists; no unit currently uses it.)*
+
+### Boss object
 
 ```json
 {
-  "units": ["Specific unit names"],
-  "tags": ["DPS roles or special tags"],
-  "avoid": ["DPS roles to avoid"]
-}
-```
-
-* `synergy.units` — Named partnerships scored in Layer 5. Currently only used for **Angels of Delusion** (Aria/Nangong/Sunna) whose faction cohesion is deliberately strong. All other unit synergies are expressed through mechanics.
-* `synergy.tags` — Largely retired. Only Ju Fufu retains `["rupture"]` as a stopgap for rupture-team optimization that is not easily modeled in mechanics.
-* `synergy.avoid` — Largely retired. Used to express conflicts that cannot easily be modeled.
-
-### Unit Mechanics Object
-
-The `mechanics` object describes what is **distinctive** about a unit beyond its role baseline. Units with no distinctive mechanics have `mechanics: {}`.
-
-```json
-{
-  "mechanics": {
-    "pseudoRole": ["subdps", { "role": "anomaly", "when": { "countTag": "anomaly", "minCount": 1 } }],
-    "elementalVariant": "variant-type",
-    "onfield": false,
-    "damage": { "polarity": true, "abloom": true },
-    "buffs": { "anomaly": 3 },
-    "debuffs": { "recovery": 3 },
-    "utility": { "disorders": 2, "daze": true },
-    "scaling": { "am": 3 }
-  }
-}
-```
-
-All fields are optional. Values are weighted: `true` (or 1) = minor, `2` = strong, `3` = defining.
-
-**Fields:**
-
-* `pseudoRole` — Secondary roles as a mixed JSON array of strings (always active) and objects (conditionally active). Plain strings like `"subdps"`, `"stun"`, `"dps"` always activate. Conditional entries use the format `{ "role": "<role>", "when": <predicate> }`. The **predicate vocabulary is shared** with conditional mechanic values (`evaluatePredicate`); the primitives are:
-  * `{ "countTag": "<tag>", "minCount": <n> }` — team has at least `minCount` units whose `tags` contain `countTag` (including self).
-  * `{ "hasUnit": "<identifier>" }` — a unit is on the team. A plain string matches by `id` (`"miyabi"`); a **colon-qualified `"<role>:<element>"`** matches by effective role + element (`"anomaly:wind"` = any effective wind-anomaly unit — e.g. Roxy or Velina — used for Pyrois's conditional ultimate).
-  * `{ "notPresent": "<identifier>" }` — inverse of `hasUnit` (same id / `role:element` forms).
-  * `{ "role": "<role>" }` — **recipient-scoped**: the consumer receiving the value has that effective role. Only meaningful for conditional mechanic *values* applied to a consumer (not for pseudoRole activation, which is self-scoped); in team-global contexts with no consumer it evaluates false (falls through to the default case).
-    Examples: `["subdps"]` (always), `[{ "role": "anomaly", "when": { "countTag": "anomaly", "minCount": 1 } }]` (needs an anomaly teammate), `[{ "role": "subdps", "when": { "hasUnit": "miyabi" } }]` (subdps only when Miyabi is present), `[{ "role": "subdps", "when": { "notPresent": "velina" } }]` (subdps unless Velina is present — Burnice becomes primary DPS on Velina teams), `["dps", { "role": "support", "when": { "countTag": "anomaly", "minCount": 3 } }]` (dps always, support only on triple-anomaly). The special `"dps"` pseudo-role marks a unit as a primary DPS participant for L2 scoring, overriding exclusion based on support/defense roles.
-* **Conditional mechanic values** — Any mechanic value (a `buffs.*`, `debuffs.*`, `damage.*`, `scaling.*`, or `utility.*` entry) may be either a scalar (`3`, `true`) **or** a conditional form `{ "cases": [ { "when": <predicate>, "value": <n> }, …, { "value": <default> } ] }`. `resolveConditionalValue` returns the first case whose predicate passes (a case with no `when` always passes; default 0). Predicates use the **same vocabulary as pseudoRole `when`** (see below), including the recipient-scoped `{ "role": "<role>" }`. This unifies the former `conditional.buffs` container and per-recipient "narrow" buffs into one mechanism. Examples: Remielle's team-scoped ATK curve `{ "cases": [ { "when": { "countTag": "anomaly", "minCount": 3 }, "value": 4 }, { "when": { "countTag": "anomaly", "minCount": 2 }, "value": 2 }, { "value": 0 } ] }`; Koleda's recipient-scoped P6 narrow buffs `cr: { "cases": [ { "when": { "role": "armorer" }, "value": 1 }, { "value": 0 } ] }` and `cd: { "cases": [ { "when": { "role": "armorer" }, "value": 0 }, { "value": 3 } ] }`. **Under-activation penalty:** team-scoped conditionals (cases using `countTag`/`hasUnit`/`notPresent`) whose resolved value is below `max(case values)` incur a squared-gap penalty (`(max − resolved)² × CONDITIONAL_BUFF_PENALTY_MULT`); recipient-scoped (`role`-only) conditionals are exempt (a per-recipient buff is never "under-activated").
-* `elementalVariant` — Marks units with alternate element tracking.
-* `onfield` — Explicit on-field demand override. Accepts `true` or `false`. Defaults: attack/anomaly/rupture/stun = `true`; support/defense = `false`. When a unit's pseudoRole activates as a different role, on-field status is derived from the activated role unless explicitly overridden.
-* `damage` — Distinctive damage types. Keys: `enhanced`, `ultimate:strong`, `ultimate:double`, `ultimate:weak`, `chain`, `aftershock`, `abloom`, `polarity`, `totalize`, `sharp`, `maim`, etc. The `ultimate:weak` key marks a unit whose ultimate is not a significant burst source (weaker than or equivalent to their chain/enhanced attacks). When present, implicit ultimate scaling is zeroed and ultimate provision bonuses from stunners are suppressed — see P31. `sharp` and `maim` are the armorer's damage types; both are role-inherent (see Armorer above), so armorer units only list them when overriding the role defaults.
-* `buffs` — What the unit buffs for teammates. Keys: `atk`, `anomaly`, `aftershock`, `abloom`, `chain`, `sheer`, `pen`, `def`, `stun-multiplier`, `cr`, `cd`, `dmg`, `disorders`, element names, and `vortex`. The `dmg` key is **generic damage** (see the Generic Damage section): a universal multiplier that benefits every DPS and never misses, scored as a flat L4 term (`MULT.DMG_BUFF`) and, like `vortex`, **excluded from cohesion** (`COHESION_EXCLUDED_BUFFS`) so it cannot rescue a mismatched support. The `vortex` key is a **contextual bonus** — it is excluded from DPS cohesion evaluation (added to `GENERIC_DPS_BUFFS`) and scores in L4 baseline affinity only when consumers actually generate vortex reactions this fight, tier-scaled so high-tier vortex generators (ice) receive proportionally more benefit. The `abloom` and `disorders` keys have explicit relevance cases in `getBuffRelevance`: anomaly-role units always consume them (relevance 1); non-anomaly units with matching `damage.abloom` consume abloom; non-anomaly units with `damage.polarity` or `damage.disorders` consume disorders. For generic damage-type buffs (the default case), consumer relevance is 1.0 when the consumer's damage weight for that type is >= 2, and 0.5 when the weight is 1 (minor interaction).
-* `debuffs` — What the unit debuffs on enemies. Keys: `defense`, `recovery`, `dmg`, and element names. `debuffs.dmg` is generic damage on the debuff side — identical to a `buffs.dmg` against a single target, but scored slightly lower (`MULT.DMG_DEBUFF < MULT.DMG_BUFF`) since a debuff only marks one enemy (relevant on multi-enemy Shiyu Defense, not single-target Deadly Assault).
-* `replaces` — (supplier-side) Declares that providing one resource costs the consumer another. Format: `{ "cost_resource": "provided_resource" }` (read as "replaces cost_resource with provided_resource"). Reduces effective supply of the cost resource in `scoreNeedFulfillment` — see P32. Example: Dialyn's `replaces: { "chains": "ultimates" }` (her ultimates replace a chain attack window).
-* `converts` — (consumer-side) Declares self-conversion of one resource into another. Format: `{ "input_resource": "output_resource" }`. Augments effective supply of the output resource in need fulfillment and damage-type scoring — see P33. Example: Norma's `converts: { "quick-assists": "chain" }`.
-* `utility` — Non-stat team contributions. Keys: `disorders`, `quick-assists`, `chains`, `ultimates`, `heal:team`, `heal:self`, `shields`, `interrupt-resistance`, `kaleidoscope`, `veils`, `daze`, `stunless`, `rotations`, `gash-build`. The `gash-build` key (Claret's unique mechanic) grants **gash buildup** to a non-stun/non-armorer teammate — they add to the shared Maim pool's builder count, but still cannot detonate a Maim (only stun/armorer agents trigger). The `rotations: "limited"` value indicates the unit has limited participation in assist rotations and removes itself from the pool of assisting agents — the boss's effective assist requirement is reduced by 1 for each team member with limited rotations, unless the boss has `chainParry: true` (which enforces the full requirement). Currently set on Remielle and Astra.
-* `scaling` — What the unit benefits from. Overrides role baseline when present. Non-stat keys go through Need Fulfillment; stat keys enhance Baseline Affinity.
-  * `scaling.codependent` (boolean) — When `true`, the **pull recommendation engine** (not the team scorer) runs team dependency checks before finalizing the unit's recommendation. The checks verify: (1) specialist scaling providers exist in the player's roster (excluding naturally-available keys like `chains`/`ultimates` and foundational stats like `cr`/`cd`/`atk`/`pen`/`hp`/`def`/`ap`/`am`), (1b) conditional buff activation — if the unit has a team-scoped conditional buff (a `buffs.*` with `cases` keyed on `countTag`/`hasUnit`/`notPresent`), the best achievable buff level given the roster is computed; if it's at or below half the max level, `cannotActivateBuffs` is set and the unit is **excluded from all gap candidate lists** (not just priority-dropped), (2) disorder feasibility if `scaling.disorders` is present (a different-base-element, non-wind anomaly/pseudo-anomaly partner must exist), and (3) at least one valid 3-person team can be formed via `getTeams()`. Severity: `cannotFormTeam` or `cannotActivateBuffs` → excluded from gaps entirely; `hasUnmetDependency` (partial activation, >50% of max) → priority drops one rank (High→Medium, Medium→Low, Low→removed) with a note naming missing providers. Currently set on YSG and Remielle.
-  * `scaling.buffs` (integer 0–3) — Controls how much a unit is penalized for unmet buff/debuff consumption by teammates. Defaults by **native role** (pseudoRole does NOT override): support/defense = 3, stun = 2, attack/anomaly/rupture = 0. When 0, `computeBuffUtilization` returns 1.0 immediately (no penalty). Only buffs/debuffs with **weight >= 2** are evaluated for penalties; weight-1 entries are assumed to always "land" and contribute to totalWeight without being checked for relevance. The penalty formula is: `adjustedUtil = 1 - (1 - baseUtil) * (scalingBuffs / 3)`. This flows into both L2 tier penalties (via buff utilization gating) and teamwork cohesion. Units with explicit overrides: SAnby (3 — without aftershock consumers she cannot reach her damage ceiling), Caesar (2), Cissia (2), Lighter (1 — either fire or ice landing is fine), Lycaon (0 — ice debuff not essential for his role as a generic anomaly stunner), Orphie (2), Promeia (1 — abloom buff is nice but not critical). The `buffs` key is excluded from `CODEPENDENT_SKIP_KEYS` in the pull engine so it does not trigger false team dependency checks.
-
-**Override rule:** When `scaling` is present, it replaces the role-baseline scaling for Need Fulfillment. An attacker with no `scaling` gets baseline (cr:2, cd:2). An attacker with `scaling: { "ultimates": 3 }` scales ONLY with ultimates through Need Fulfillment. ***{TODO: This is almost certainly incorrect!!! But it hasn’t been changed because scoring currently works as-is; but it may need to change in the future!}*** Baseline Affinity rules (ATK, defense shred, element matching, stun infrastructure) still apply regardless.
-
-**Role baselines (implicit when no explicit scaling):**
-
-* Attacker: cr:2, cd:2
-* Anomaly: am:2, ap:1, anomaly:2
-* Rupture: sheer:3, hp:2, cr:2, cd:2
-* Armorer: def:3, cr:2 (elevated CR weight of 3 in affinity via `resolveBaselineWeight`; **no** cd — fixed crit damage). Sharp damage and a Maim burst (burst weight 2) are role-inherent, so a vanilla armorer's kit can be `mechanics: {}`.
-* Stunner: daze:1
-
-### Boss Data Object
-
-```json
-{
-  "id": "vesper",
-  "name": "Discordant Solo",
-  "shortName": "Discordant Solo",
+  "id": "vesper", "name": "Discordant Solo", "shortName": "Discordant Solo",
   "image": "./assets/bosses/solo.webp",
   "favored": ["Aria", "Sunna", "Nangong"],
   "available": true,
   "mechanics": {
-    "weaknesses": ["ether", "wind"],
-    "resistances": ["ice", "fire"],
-    "shill": "anomaly",
-    "anti": ["rupture"],
-    "assists": 2,
-    "shillIntensity": 2,
-    "anomaly:state": "wind",
-    "weak": ["veils"],
-    "debuffs": { "cd": 2 }
+    "weaknesses": ["ether", "wind"], "resistances": ["ice", "fire"],
+    "shill": "anomaly", "anti": ["rupture"], "assists": 2,
+    "weak": ["veils"], "anomaly:state": "wind",
+    "freezable": true, "chainParry": false, "shillIntensity": 2,
+    "debuffs": { "cd": 2, "daze": 2 }
   },
-  "variations": {
-    "example": {
-      "enabled": false,
-      "mechanics": {
-        "anti": null
-      }
-    }
-  }
+  "variations": { "raging": { "enabled": false, "mechanics": { "anti": null } } }
 }
 ```
 
-* `favored` — Named units with enhanced bonuses on this boss (top-level; not overridden by mechanics)
-* `available` — (optional, default `true`) When `false`, boss is unreleased
-* `mechanics` — Boss mechanics block. All gameplay properties live here:
-  * `weaknesses` / `resistances` — Element arrays
-  * `shill` — DPS archetype or non-DPS role the boss prefers
-  * `anti` — DPS archetypes disqualified against this boss
-  * `assists` — Required number of defensive assist units. The effective requirement is reduced by the number of team members with `utility.rotations: "limited"` (units that remove themselves from the assist rotation pool), unless `chainParry` is `true`.
-  * `chainParry` — (optional, default `false`) When `true`, the assist requirement cannot be reduced by limited-rotation units. Used on Girtablullu, whose Chain Parry mechanic requires two off-field defensive assist characters simultaneously — all units must genuinely have defensive assist.
-  * `shillIntensity` — (optional, default 1) Amplifies favored unit bonuses
-  * `"anomaly:state": "<element>"` — Boss permanently has the specified element's anomaly applied. Changes how anomaly reactions work against this boss (see Anomaly Reactions section).
-  * `freezable` — Boss is particularly vulnerable to ice anomalies; ice anomaly units receive a very significant bonus. Pseudo-anomaly agents get half the bonus.
-  * `weak` — Array of mechanic weaknesses. Each entry gives teams that leverage that mechanic a bonus. Supported values: `"disorders"`, `"veils"`, `"stun"`, `"abloom"`. (Array format allows a boss to be weak to multiple mechanics simultaneously.)
-  * `debuffs` — Boss inflicts debuffs on the player team. Supported keys:
-    * `"cd"` — Critical Damage debuff. Penalizes DPS agents that scale with CD when the boss's CD debuff exceeds the team's total CD buff supply.
-    * `"daze"` — Daze debuff. Slows daze accumulation, making stun windows harder to trigger. Penalizes attack and rupture DPS proportionally to the shortfall between the debuff level and team daze supply. High-daze stunners mitigate the effect. Anomaly DPS are not penalized since their damage is less stun-window-dependent. Unlike anti-shill, this penalty can be fully eliminated by bringing a sufficiently high-daze stunner.
-* `variations` — (optional) Named alternate configurations for the boss. Each key is a variation ID (e.g. `"raging"`). Variation objects are merged onto the base boss using shallow merge semantics: omitted keys inherit from the base; an explicit `null` value erases the corresponding base property. The `mechanics` sub-object is merged key-by-key with the same semantics.
-  * `enabled` — (optional, default `true`) When `false`, the variation is **UI-only hidden**: it will not appear in the boss selection UI, the orange dot indicator, or the cycling affordance. **CLI tools ignore this flag entirely** and will always resolve a variation when explicitly requested (e.g. `--bosses "butcher:raging"`). Set to `false` for variations that are defined but not yet active in the current game rotation.
+* `favored` — named units with enhanced bonuses (top-level, not inside `mechanics`)
+* `shill` — the role this boss prefers. **DPS shills are a bonus with no penalty for mismatching**
+  — teams compete on merit. **Non-DPS shills (stun) are a hard requirement** — no stunner, no score.
+* `anti` — DPS archetypes disqualified outright
+* `weak` — array of mechanic weaknesses (`disorders`, `veils`, `stun`, `abloom`); a boss can have several
+* `freezable` — ice anomaly agents get a large bonus; pseudo-anomaly agents get half
+* `debuffs.cd` — penalizes CD-scaling DPS when the debuff exceeds the team's CD supply
+* `debuffs.daze` — slows daze accumulation, penalizing attack/rupture/armorer DPS proportionally to
+  the shortfall. Anomaly DPS are exempt (less window-dependent). Unlike anti-shill this is
+  **fully mitigable** by bringing a high-daze stunner.
+* `shillIntensity` — amplifies `favored` bonuses; superseded in practice by mechanics-driven scoring
+* `variations` — named alternate configurations, shallow-merged onto the base. An explicit `null`
+  erases a base property. `enabled: false` hides a variation from the **UI only** — CLI tools ignore
+  the flag and will always resolve an explicitly requested variation (`--bosses "butcher:raging"`).
+
+All boss properties are read through accessors (`getBossWeaknesses`, `getBossAnti`, …) so variation
+resolution stays transparent.
+
+**Bosses whose mechanics are worth knowing by name:**
+
+| Boss | Why it's interesting |
+|----|----|
+| **Scorched Horizon** | The wind-`anomaly:state` boss. Team-side reactions suppressed, disorders replaced by vortex, polarity damage gutted, plus a CD debuff. Designed to favour Promeia (pure ice vortex) over Miyabi (frost ≈ 0). |
+| **Thrall & Sobek** | `shill: stun` — a hard requirement, not a bonus. No stunner = DQ. |
+| **Notorious Dead End Butcher** | `debuffs.daze` — penalizes attack/rupture unless you bring daze. Anomaly teams unaffected. Also `weak: disorders`. |
+| **Typhon Slugger** | `assists: 3` — every unit must have `assist:defensive`. |
+| **Girtablullu** | `chainParry: true` — the assist requirement cannot be reduced by limited-rotation units. |
+| **Sacrifice Bringer** | `freezable` — ice anomaly agents get a large bonus. |
+| **Discordant Solo** | `weak: veils` — built around Sunna's ether veil stacking. |
+| **Primordial Nightmare / Wandering Hunter / Stagnant Aberrant** | Multiple `anti` entries narrow the field to a single viable archetype. |
+
+Everything else — full weakness/resistance lists, current anti sets — belongs in `bosses.json`, not here.
+
+
+## 4. The Scoring Engine
+
+### Design premise
+
+The original engine used hardcoded composition rules and named synergies. Nangong broke it: a
+hybrid stun/anomaly unit can't be described by archetype-level rules. The engine was rebuilt so that
+scoring **emerges from pairwise mechanical interactions** rather than template matching. The guiding
+constraint is: *a mechanic's existence has no value; points are only awarded when something consumes
+it.* The exception is foundational stats (ATK/CR/CD), which have automatic role-gated value because
+every DPS intrinsically benefits from them.
+
+### Pipeline
+
+`scoreTeamForBoss` starts from a base score, resolves activated roles and conditional damage against
+the team, then runs:
+
+| Layer | What it does |
+|----|----|
+| **L1 Disqualifications** | Hard failures returning −1. Deliberately narrow: illegal `join` arrangement, no DPS, three *pure* DPS, a DPS whose tag matches boss `anti`, a DPS whose element is resisted, too few reliable defensive assists. `synergy.avoid` is checked alongside. |
+| **L1.5 Structure** | Classifies the composition (anomaly hypercarry, double armorer, rupture + stun + support, …) into conventional / unconventional-viable / no-interaction / wildly-unconventional. Feeds the teamwork multiplier — **it is not added to the score**. Also scores field-time economy. |
+| **L2 Inherent Quality** | Individual power independent of team context: tier and rank. DPS at full weight; support/defense/stun at reduced weight **gated by buff utilization**. Titled bonus. Totalize stun-demand penalty. Wasted-DPS-buff penalty. |
+| **L3 Boss Matchup** | Shill, favored units, `weak` mechanics, element weakness/resistance, boss debuffs, assist bonus. Also where a **missing non-DPS shill disqualifies**. |
+| **L4 Mechanical Synergy** | The core. Directional pairwise evaluation of every ordered teammate pair, plus team-level reaction bonuses. |
+| **L5 Additional Synergies** | Hand-curated `synergy.units` / `synergy.tags`. Low-weighted; a fallback for what mechanics can't express. |
+
+Final score = `raw × teamworkMultiplier`.
+
+**Field-time economy:** one on-field agent is a bonus (efficient solo carry), two is neutral, three
+or more is a penalty (field competition), zero is a penalty (no primary damage dealer).
+
+### L4 components
+
+Per ordered (supplier → consumer) pair:
+
+* **Baseline Affinity** — broad stat interactions: ATK/CR/CD to attackers, anomaly buffs to anomaly
+  agents, DEF buffs to DEF scalers, defense/element debuffs to damage contributors, stun
+  infrastructure to window-dependent DPS.
+* **Need Fulfillment** — the supplier provides something the consumer explicitly *scales* with.
+  The highest-value category, and where `replaces`/`converts` apply.
+* **Stun Emergence** — the consumer has burst damage that benefits from the supplier's stun infrastructure.
+
+Then, team-wide: anomaly reaction bonuses (vortex/disorder per agent), Refringe and its cascades,
+Maim, anomaly-quantity scaling, diametric synergy, an on/off-element L4 modifier, and the conditional
+under-activation penalty. The total passes through a **hyperbolic soft cap** — low scores pass
+through untouched, high scores compress — which preserves mid-range differentiation while preventing
+runaway mechanical stacking.
+
+Principles that govern L4 scoring:
+
+* **Scarcity determines value.** Foundational stats (ATK/CR/CD) are replaceable through equipment
+  and score low. Specialist mechanics (veils, chains, aftershock, abloom) are irreplaceable and score
+  high. A rare mechanic matching a consumer's scaling always beats a common stat buff, all else equal.
+* **Supply gates fulfillment,** and **undersupply is worse than linear.** Partially meeting a need
+  (Lucia's `veils:1` against YSG's `veils:2`) helps, but disproportionately less than half.
+* **Ultimates are a limited primary-DPS resource.** Only one unit gets the free ultimate per window,
+  so it goes to the best damage dealer — subdps units get **no** implicit ultimate scaling. Quick
+  assists are *not* limited and benefit everyone including subdps. Ultimate provision is also scaled
+  by the consumer's burst potential: a free ultimate is worth far more to Evelyn than to a unit with
+  a basic one.
+* **Ultimates and chains are naturally available.** A dedicated provider makes them arrive *faster*,
+  which is correctly rewarded — but lacking one is not a cohesion failure.
+* **Self-provision excludes a need from cohesion.** Banyue both scales with and provides
+  interrupt-resistance, so it never counts as unmet. This differs from damage mechanics like
+  aftershock or abloom, where a large part of the ceiling is damage dealt *by buffed teammates*.
+* **Scaling comes in three flavours.** *Direct* — scaling matches an existing damage type, so feeding
+  it leverages a high multiplier (Evelyn: `scaling.chains` + `damage.chain`). *Transformative* —
+  scaling feeds a conversion into something else, and missing it leaves the unit far below its ceiling
+  (Miyabi: disorders → enhanced attacks). *Constant* — steady passive amplification, where a buff
+  pays twice (Alice/Vivian convert AM into AP, making AM buffs doubly valuable).
+
+### Diametric synergy
+
+When two *different* suppliers contribute through complementary dimensions, the in-game effect is
+multiplicative. The engine recognizes two diametric pairs:
+
+* an ATK-or-CD buff from one supplier + a defense debuff from another
+* a same-element buff + a same-element debuff (Soukaku's `buffs.ice` + Lycaon's `debuffs.ice`)
+
+A sufficiently strong pair establishes a **cohesion floor** the team cannot drop below, scaling with
+the weights of both halves. Defense-debuff diametrics are **suppressed on anti-rupture bosses**,
+where the debuff can't be fully exploited.
+
+### Teamwork multiplier
+
+`structureFactor × f(cohesion)`, where `f` maps cohesion onto a floored range so a bad team is
+crushed but never zeroed.
+
+**Structure factor** comes from the L1.5 classification. One important override: a team classified
+*conventional* is **downgraded** if any support-like member's buff utilization falls below half — a
+conventional shape staffed by a mismatched support isn't really conventional.
+
+**Cohesion** is a weighted geometric mean of per-unit buff utilization. Non-DPS units enter squared
+and at full weight; DPS enter unsquared at half weight. The geometric mean is the point: one badly
+mismatched member drags the whole team down multiplicatively rather than being averaged away.
+
+What feeds utilization (`computeBuffUtilization`):
+
+* **Wasting buffs = wasting DPS potential.** When a DPS provides buffs (SAnby's aftershock, Cissia's
+  electric debuff) and no teammate consumes them, that DPS was fielded on the wrong team.
+  Severity is controlled by `scaling.buffs`.
+* **Buff utilization gates support quality.** A support's tier and rank only matter to the extent
+  their buffs are actually used, with squared gating in L2 — a support at 30% utilization keeps
+  roughly 9% of their quality bonus.
+* **Whiffed directional buffs** (`sheer` with no rupture consumer, `cd` on an all-armorer team) take
+  a direct cohesion hit beyond the ratio effect, because the absolute-supply path would otherwise
+  mask a wasted specialist buff.
+* **Armorer CR dependency** — an armorer with no CR supplier takes a dedicated hit.
+* **DPS reception** — a DPS with no buff contributions of its own is instead checked on what fraction
+  of its scaling needs the team meets. This is what penalizes "duo + deadweight" teams.
+* **Wasted vortex** — a wind anomaly subdps whose vortex generation has no beneficiary (no native
+  primary anomaly DPS with a meaningful vortex tier) counts as an unmet need. Velina + Miyabi is
+  penalized because frost gains nothing; Velina + Promeia is not. This deliberately ignores
+  *pseudo*-anomaly roles — only units natively tagged `anomaly` count as the primary here.
+* **Dual-anomaly teams are inherently cohesive** — a primary anomaly DPS plus an off-field anomaly
+  subdps of a different element takes no penalty for the subdps "not providing buffs".
+* **Damage buffs on pure support/defense are irrelevant** — offensive buffs landing on a non-damage
+  contributor don't count, and a support's matching element does not inflate a supplier's utilization.
+  SubDPS units are *always* damage contributors even with a support pseudo-role.
 
-**Boss property accessors:** All boss gameplay properties are accessed via exported helper functions (`getBossWeaknesses`, `getBossResistances`, `getBossShill`, `getBossAnti`, `getBossAssists`, `getBossChainParry`, `getBossShillIntensity`) from `team-scorer.js`. These centralize access and support boss variation resolution transparently via `resolveBossVariation(boss, variationId)`.
+### Role activation ripple effects
 
-## Engine Architecture: Five-Layer Scoring
+Activated roles are computed once per team and cached (`_activatedRoles`), then cleaned up. Because
+a pseudo-role *is* a role, activation ripples across every layer:
+
+* **L1** — only "pure DPS" (no concurrent support/defense/stun role) count toward the triple-DPS DQ.
+  The `anti` check reads base **tags**, not effective roles.
+* **L1.5** — stun units are excluded from DPS category counts to prevent double-classification;
+  Nangong is counted as a stunner, not a second anomaly.
+* **L2** — units are scored in one category only; a unit scored in the DPS loop is excluded from the
+  non-DPS loop. Forced-secondary detection excludes stun/support/defense units.
+* **L3** — pseudosupports cannot satisfy a DPS shill. Element-resistance DQ skips support/defense
+  units. A *pseudo*-role matching the boss `anti` is a penalty, not a DQ.
 
-### Design Evolution
+Separately, `isEffectiveSupport` / `isEffectiveDefense` check base tags **and** activated pseudo-roles;
+plain `isSupport`/`isDefense` check tags and `_activatedRoles` only. Structure classification,
+inherent quality, disqualification and the teamwork multiplier all use the effective wrappers.
+
+### Element resistance and role
 
-The original scoring engine relied on hardcoded composition rules, synergy tags, and named unit synergies. The release of Nangong Yu exposed a fundamental limitation: archetype-level rules couldn't handle units with cross-archetype mechanical synergies. The engine was rebuilt around a mechanics-driven architecture where scoring emerges from pairwise mechanical interactions rather than template matching.
+* Pure support and defense units are **not disqualified** by element resistance — they contribute
+  buffs and utility, not damage. Defense units keep a small on-element bonus (they deal a little
+  damage); support units get nothing either way.
+* Any support/defense unit with meaningful `damage` still takes a damage-proportional penalty when
+  resisted.
+* Standard subdps units **are** disqualified when resisted, like any DPS. Only pseudosupports bypass it.
 
-### Layer Overview
+### Lenient mode
 
-The scoring engine evaluates a team of 3 units against a boss through five sequential layers, producing a raw score that is then adjusted by a teamwork multiplier:
+For players with limited rosters. Hard violations become steep penalties instead of DQs so teams stay
+in the ranking and relative quality remains visible: L1 disqualifications become large penalties,
+L2 low-tier penalties shrink, and `synergy.avoid` degrades from DQ to a heavy penalty. The base score
+also starts higher.
 
 
-1. **Layer 1: Disqualifications** — Hard failures that return score -1: boss `anti` matching team's DPS archetype, resisted DPS element, insufficient defensive assists, no DPS, non-DPS shill role missing. Minimal and deliberately narrow.
-2. **Layer 1.5: Team Structure** — Classifies the team composition (anomaly hypercarry, double anomaly, rupture + stunner + support, etc.) and determines the structural factor for the teamwork multiplier. Also scores field-time economy based on how many agents demand on-field time.
-3. **Layer 2: Inherent Quality** — Individual unit power independent of team context. DPS tier/rank scored at full weight; support/defense/stun tier/rank scored at reduced weight gated by buff utilization. Titled units receive a bonus. SubDPS units receive 50% tier multiplier.
-4. **Layer 3: Boss Matchup** — Element weakness/resistance scoring, shill preference bonuses, favored unit bonuses (amplified by `shillIntensity`), defensive assist bonus.
-5. **Layer 4: Mechanical Synergy** — The core of the engine. Pairwise directional evaluation of all teammate pairs using the `mechanics` object. Components:
-   * **Baseline Affinity**: Broad stat interactions (e.g. ATK/CR/CD help attackers; anomaly buffs help anomaly agents; defense/element debuffs help damage contributors; stun infrastructure helps attackers/rupture, etc.)
-   * **Damage Amplification**: Supplier buffs a damage type the consumer deals
-   * **Need Fulfillment**: Supplier provides something the consumer explicitly scales with (highest-value matches)
-   * **Stun Emergence**: Consumer has burst damage that benefits from stun infrastructure
-   * **Diametric Synergy**: Multiplicative buff/debuff interaction bonus (see below)
-   * **L4 Element Modifier**: On-element pairs get amplified L4 scores; off-element get reduced
-   * **Anomaly Reaction Scoring**: Per-agent vortex/disorder bonuses computed via `computeAnomalyReactions()` based on team composition and boss anomaly state
-6. **Layer 5: Additional Synergies** — Hand-curated `synergy.units` bonuses and `synergy.tags` bonuses for edge cases that mechanics alone can't fully capture. Lower-weighted than in the old algorithm.
+## 5. The Pull Recommendation Engine
 
-**Final score:** `raw_score × teamwork_multiplier`
+`pull-engine.js` answers a different question — *which unowned unit would most improve this roster?* —
+but it reasons over the same mechanics vocabulary, and it imports directly from `team-scorer.js`
+(`getEffectiveScaling`, `getEffectiveRoles`, the conditional resolvers) so a data change propagates
+to both. The connection is conceptual, not just mechanical: a unit is worth pulling because of the
+teams it lets you build, so roster gaps are expressed in the same terms the scorer uses to reward teams.
 
-### Teamwork Multiplier
+**Flow:** bucket the roster → score coverage → detect gaps → rank candidates per gap → regroup
+gaps into per-unit cards → assign priority → apply codependency gating.
 
-The teamwork multiplier combines two factors:
+### Coverage
 
-* **Structure factor**: Based on team composition classification from L1.5. Conventional compositions (standard archetypes) get 1.0; unconventional compositions get reduced multipliers.
-* **Cohesion factor**: How well the team's buff providers serve the team. Computed from buff utilization across all providers as a geometric mean. Low cohesion (mismatched buffs) crushes the score multiplicatively.
+Owned units are bucketed into DPS-by-archetype, subdps, supports, stunners, and by element. Each
+bucket's quality is derived from its **best tier** (`tierToQuality`, labeled Elite → Strong → Decent →
+Borderline → Weak → Marginal → None). A composite score averages the archetype, support, and stunner
+qualities, and drives a **calibration factor** that compresses gap scores for well-developed rosters —
+so a player who owns everything isn't told they have five urgent gaps.
 
-The multiplier is `structureFactor × cohesion²` (cohesion is squared for stronger gating).
+Note that only **primary** DPS count toward archetype and element quality: `isSubdps` filters them out,
+because owning Vivian doesn't mean you have an ether anomaly carry.
 
-### Diametric Synergy
+### Gap detectors
 
-When a team has suppliers contributing through complementary dimensions — specifically, generic damage amplification (ATK and/or crit damage buffs) combined with generic defense debuffs, or same-element buff + same-element debuff — the combined effect is multiplicative in-game.
+Each detector emits a gap with a title, reason, score, and candidate list (drawn from unowned limited
+S-ranks): DPS-by-archetype, support, stunner (premium and depth), stunner-element, subdps, anomaly
+partner, element coverage, named synergies, mechanical synergies, and a **depth** gap that fires for
+titled T0 candidates regardless of archetype quality — recognizing paradigm-shift units that create
+entirely new archetypes.
 
-The engine recognizes **diametric pairs**:
+### `mechanicsFitScore`
 
-* ATK/CD buff (from supplier A) + defense debuff (from supplier B)
-* Same-element buff + same-element debuff (e.g., Lycaon's `debuffs.ice` + Soukaku's `buffs.ice`)
+A lightweight, L4-shaped pairwise heuristic: how well would this supplier serve that DPS? It mirrors
+the scorer's relevance rules (rupture/armorer ATK discounts, armorer CR premium with CD excluded,
+element buff/debuff matching, need fulfillment, damage-type matching) and resolves conditional buffs
+against a conservative two-unit context so narrow and conditional buffs resolve to what *this*
+consumer would actually receive.
 
-The strength of the diametric pair determines a **cohesion floor**: the team's cohesion cannot drop below this floor regardless of other factors. Scaling:
+Two deliberate divergences from the scorer:
 
-* 3 & 3 (e.g., Astra ATK/CD:3 + Nicole defense:3): floor = 1.0
-* 2 & 3 or 3 & 2: floor = 0.9
-* 2 & 2: floor = 0.8
-* Below 2 & 2: no guaranteed floor
+* `dmg` is not scored here. It benefits every DPS equally, so it carries no signal for ranking
+  *which* support fits a given DPS, and crediting it would drown out specialist synergies.
+* **Conditional-buff anti-synergy.** If a consumer's value depends on teammates carrying a specific
+  tag (Remielle needing anomaly teammates), a supplier *without* that tag is heavily discounted —
+  it's occupying a slot that should go to someone who activates the buff.
 
-**Anti-rupture suppression:** Diametric synergy from defense debuffs is suppressed on anti-rupture bosses (Nightmare, Solo, Sweeper), because the defense debuff cannot be fully utilized.
+Candidate sorting is titled-first, then tier, then accumulated fit against the owned DPS roster.
 
-### Role Activation
+### Codependency gating (`scaling.codependent`)
 
-At the start of scoring, each unit's activated roles are computed and cached as `_activatedRoles`. All role-checking functions (`isDPS`, `isAttacker`, `isAnomaly`, `isRupture`, `isSupport`, `isDefense`, `isStun`) check `_activatedRoles` first, falling back to tags when activated roles haven't been computed (e.g., during team formation).
+Some units are non-functional without specific partners, and recommending them to a roster that can't
+support them is actively bad advice. Units flagged `scaling.codependent` (currently Remielle, SAnby,
+Ye Shunguong) run a dependency check before surfacing:
 
-**Pseudo-role activation is data-driven.** Each pseudo-role entry is either a plain string (always activates) or an object with a `when` condition (activates only when the team meets the threshold). There are no hard-coded activation rules in the engine — all conditional logic lives in the unit data.
 
-**Effective role wrappers:** For scoring functions that classify units by role in a team context, `isEffectiveSupport(unit)` and `isEffectiveDefense(unit)` check both base tags AND activated pseudo-roles. These are used by `scoreTeamStructure`, `scoreInherentQuality`, `checkDisqualifications`, and `computeTeamworkMultiplier`. The base `isSupport`/`isDefense` functions only check tags and `_activatedRoles`.
 
-Examples:
 
-* Soukaku (`pseudoRole: [{ role: "anomaly", when: { countTag: "anomaly", minCount: 1 } }]`, tags: support) on a Miyabi team: team has anomaly unit → condition met → anomaly activates → she participates in disorder generation
-* Soukaku on a Lycaon/Yixuan team: no `anomaly`-tagged unit → condition not met → anomaly does NOT activate → she's a pure support
-* Nangong (`pseudoRole: [{ role: "anomaly", when: { countTag: "anomaly", minCount: 1 } }]`, tags: stun) on Nangong/YSG/Sunna: no `anomaly`-tagged unit → Nangong is just a stunner
-* Caesar (`pseudoRole: ["stun"]`, tags: defense): pseudo-stun is a plain string → always activates unconditionally
-* Remielle (`pseudoRole: ["subdps", "support"]`, tags: anomaly): Both pseudo-roles are unconditional plain strings → both always activate → she's subdps + support → classified as support in L1.5 structure, off-field (`onfield: false`). Her ATK buff still scales with team composition via a team-scoped conditional `buffs.atk` (`cases` by anomaly count), but her role identity no longer depends on team comp.
-* Yanagi (`pseudoRole: [{ role: "subdps", when: { hasUnit: "miyabi" } }]`, tags: anomaly) on Miyabi/Yanagi/Yuzuha: Miyabi is present → subdps activates → Yanagi is treated as anomaly subdps instead of primary DPS. On Nangong/Yanagi/Yuzuha: no Miyabi → subdps does NOT activate → Yanagi is a standard primary anomaly DPS.
-* Burnice (`pseudoRole: [{ role: "subdps", when: { notPresent: "velina" } }]`, tags: anomaly) on Nangong/Burnice/Yuzuha: no Velina → subdps activates → Burnice is a standard anomaly subdps. On Velina/Burnice/Yuzuha: Velina is present → subdps does NOT activate → Burnice becomes the primary anomaly DPS. Inverse pattern to Yanagi: `hasUnit` activates on presence, `notPresent` activates on absence, and their pull-engine defaults (no team context) flip accordingly — Yanagi defaults to primary, Burnice defaults to subdps.
+1. **Specialist provider check** — does the roster contain a provider for each specialist scaling key?
+   Naturally-available keys (`chains`, `ultimates`), foundational stats, and the `buffs` meta-flag are
+   skipped, so they never trigger false dependencies.
+2. **Conditional buff feasibility** — for team-scoped conditional buffs, compute the best achievable
+   level given the roster. At or below half the max, the unit can't function as designed.
+3. **Disorder feasibility** — a unit with `scaling.disorders` needs a different-base-element,
+   non-wind anomaly (or pseudo-anomaly) partner.
+4. **Team formation** — can at least one legal three-person team be built via `getTeams`?
 
-**On-field derivation:** When a unit's pseudoRole activates as a different role, on-field status is derived from the activated role's default unless the unit has an explicit `mechanics.onfield` override. For example, Soukaku has no explicit `onfield` flag — when her anomaly pseudoRole activates, she's on-field (anomaly default); when it doesn't, she's off-field (support default).
+Severity determines the consequence: *cannot form a team* or *cannot activate buffs* → the unit is
+**removed from every gap candidate list entirely**, not merely deprioritized, because the gap's
+reasoning wouldn't apply. Partial activation → the recommendation drops one priority rank, with a
+note naming the missing providers.
 
-`dps` pseudo-role: The `"dps"` pseudo-role (as a plain string) always activates. It marks a unit as a primary DPS participant for L2 tier/rank scoring, overriding the normal exclusion of support/defense units from the DPS scoring loop. Units whose pseudo-role definitions include both `dps` and `support` (even conditionally) are always treated as forced-secondary in L2 — their kit is inherently split between personal DPS and team support, so they never receive full primary DPS credit.
+### Cards and priority
 
-### Scoring Ripple Effects of Role Activation
+Gaps are scored, calibrated, and sorted; then the results are **inverted into unit-centric cards**.
+Each candidate collects every gap it appears in; its highest-scoring gap becomes its *primary* and
+determines which single card it lives in, while the rest surface as "Also:" reasons. This removes all
+dedup complexity — a unit appears in exactly one card.
 
-* **L1 Disqualifications**: Only "pure DPS" units (those without concurrent support, defense, or stun roles) count toward triple-DPS disqualification.
-* **L1.5 Structure**: Stun units are excluded from attacker/anomaly/rupture DPS category counts to prevent double-classification. Nangong is counted as a stunner, not a second anomaly.
-* **L2 Tier/Rank**: Units are scored in their primary role category. Attackers, anomaly units, and rupture unit lists for forced-secondary-DPS detection exclude stun/support/defense units. A unit scored in the DPS loop is excluded from the non-DPS loop.
-* **L3 Boss Matchup**: Pseudosupports cannot satisfy DPS archetype shills. Element resistance disqualification skips support/defense units (they are penalized, not disqualified).
+Priority is absolute by default (score thresholds) but switches to **relative** for well-developed
+rosters, where calibration compresses everything below the absolute thresholds and the top remaining
+gap should still read as the most urgent. A unit accumulating several medium-priority contributions is
+promoted, on the theory that broad usefulness beats a single narrow fit.
 
-### Off-Field / On-Field Scoring
 
-The engine scores field-time economy based on how many agents demand on-field time:
+## 6. Reading Scores
 
-* **1 on-field (solo carry):** Bonus — efficient field economy
-* **2 on-field (standard):** No modifier
-* **3 on-field (crowded):** Penalty — field-time competition
-* **0 on-field:** Penalty — no primary damage dealer
+The app's authoritative bands live in `strength-rating.js` (`STRENGTH_TIERS`): **Excellent → Good →
+Fair → Tough → Risky**, descending. A team containing an A-rank DPS is capped at *Good* regardless of score.
 
-Units with explicit `onfield: false`: Ju Fufu, Trigger, Pulchra (off-field stunners via aftershocks); Burnice, Grace, Vivian (off-field anomaly subdps); Orphie (off-field pseudosupport).
+Interpretively: the top band is a near-optimal matchup; *Good* clears comfortably; *Fair* clears with
+skill; *Tough* is difficult even played well; *Risky* is not viable for endgame content. Thresholds
+shift whenever the engine is retuned — read them from the file, don't memorize them.
 
-### Lenient Mode
+**DPS bucketing** (`dps-buckets.js`) sits downstream of scoring. When optimizing three Deadly Assault
+teams, raw top scores cluster around the same DPS with interchangeable supports, so five "options"
+that differ by one support are useless. Results are grouped by a DPS *fingerprint* (role + element +
+tier band) and one representative is taken per distinct assignment pattern, preferring the
+highest-scoring realization. The webapp toggles between this diversity view (default) and raw score order.
 
-The engine supports a "lenient" mode for players with limited rosters. In strict mode (default), hard violations (resisted DPS, etc.) result in disqualification. In lenient mode, these become steep score reductions instead, keeping teams in the ranking so players can see their relative quality.
 
-Within the five-layer architecture, lenient mode affects:
+## 7. Tooling
 
-* L1: Most disqualifications become large penalties instead of hard returns of -1
-* L2: Tier penalties for low-tier units are reduced
-* L5: `synergy.avoid` pairs apply large penalties instead of disqualification
+All CLI scripts share `lib/cli.js`, so the flag set below is common to them (individual scripts
+enable a subset).
 
-## Scoring Engine Design Principles
-
-These principles govern how the mechanics-driven engine evaluates teams. They are grouped thematically for reference.
-
-### Buff and Damage Mechanics
-
-**Mechanics Only Score When Consumed (P1):** A mechanic's existence has no inherent value. Points are only awarded when consumed by another unit's scaling or need. Exception: foundational mechanics (ATK, CR, CD) have automatic value through baseline affinity because every DPS intrinsically benefits from them, gated by role.
-
-**Generic Damage Never Misses (P35):** The `dmg` buff/debuff is a universal multiplier on all damage, so it is relevant to every DPS unconditionally — there is no team in which it fails to land. It is therefore scored as a flat baseline-affinity term for all DPS and deliberately **excluded from cohesion/utilization**: it must not rescue the cohesion of a support whose *designed* buffs are mismatched (e.g. a rupture support's sheer on an attack team). This lets a `dmg`-heavy, otherwise-thin kit (Koleda) become universally valuable via its flat term without distorting how well mismatched supports "fit". Debuff-side `dmg` is worth slightly less than buff-side (single enemy vs whole team).
-
-**Conditional Mechanics Share One Predicate Vocabulary (P36):** pseudoRole activation and conditional-valued buffs/debuffs/damage/scaling/utility all resolve through the same `evaluatePredicate`/`resolveConditionalValue` pair. Team-scoped predicates (`countTag`/`minCount`, `hasUnit`, `notPresent`) are evaluated once per team; the recipient-scoped `role` predicate is evaluated per consumer, enabling **narrow buffs** (a value that differs by recipient, e.g. Koleda's CR-to-armorers / CD-to-everyone-else). Any new predicate primitive added here is automatically available everywhere.
-
-**Damage Buffs on Non-DPS Are Negligible (P2):** Offensive buffs landing on pure support/defense units are strategically irrelevant. The engine does not count element buffs as "relevant" for non-damage-contributor units. This extends to buff utilization — a support's matching element does not inflate a supplier's utilization score.
-
-**Damage Contribution Determines Buff Relevance (P26):** Units divide into damage contributors (any unit with a DPS or stun role) and non-damage contributors (pure support/defense). SubDPS units are always damage contributors even with a support pseudoRole. Only pure non-DPS units get zeroed out for offensive buff relevance.
-
-**Wasting Buffs = Wasting DPS Potential (P3):** When a DPS provides buffs (SAnby's aftershock buff, Cissia's electric debuff), teammates must consume them. Unused buffs indicate the DPS was fielded in the wrong team, and the engine applies a cohesion penalty proportional to the unused buff weight. The severity of this penalty is controlled by `scaling.buffs` — not all buff providers are equally dependent on their buffs landing (see P33).
-
-**CR/CD Role Asymmetry (P9):** CR/CD are critical for attackers and rupture. For anomaly agents, damage comes primarily from ATK/AP/disorders/vortex, not crits — CR/CD return only 0.3 weight. Exception: Miyabi has effectively 100% crit rate and explicit `scaling: { cr: 3, cd: 3 }`, making CR/CD fully valuable for her.
-
-**Stun Multiplier Is a Real Buff (P12):** The `stun-multiplier` buff (Dialyn, Sunna, Lycaon, etc) increases damage during stun windows. It benefits all DPS units, not just specific archetypes. Scored in baseline affinity.
-
-### Need Fulfillment and Scaling
-
-**Scarcity Determines Value (P4):** Foundational stats (ATK, CR, CD) are common and replaceable through equipment — scored at lower multipliers. Specialist mechanics (veils, chains, aftershock, abloom) are rare and irreplaceable — scored at higher multipliers. This structural premium means a unit providing a rare mechanic matching a consumer's scaling always outscores one providing a common stat buff, all else equal.
-
-**Need Fulfillment Supply/Scaling Gating (P5):** Supplier must provide sufficient supply to satisfy the consumer's scaling need. Fulfillment score is multiplied by `min(1, supply / scaling)`. Sunna (veils:3) gets full credit for YSG (veils:2); Lucia (veils:1) gets only 50%.
-
-**Buff Utilization Gates Support Quality (P6):** A support's tier/rank only matters to the extent their buffs are utilized. Utilization is the weighted proportion of buffs/debuffs that fire for at least one consumer, with squared gating. A support with 30% utilization sees quality crushed to 9%. The `scaling.buffs` value modulates how harshly this penalty applies — weight-1 buffs/debuffs are excluded from penalty evaluation entirely (they contribute to totalWeight but are simple bonuses rather than foundations of team composition).
-
-**Buff Penalty Severity Is Unit-Specific (P33):** Not all buff providers are equally dependent on their buffs landing. `scaling.buffs` (0–3) controls the penalty gradient: 3 = full penalty (SAnby without aftershock consumers is cooked), 2 = moderate penalty (Nangong needs at least one anomaly teammate), 1 = minor penalty (Promeia's abloom buff is nice but not critical), 0 = no penalty at all (Lycaon's ice debuff is irrelevant to his role as a generic anomaly stunner). Defaults by native role: support/defense = 3, stun = 2, attack/anomaly/rupture = 0. PseudoRole does NOT override the default — it is derived from the unit's primary tags. Most units with buffs/debuffs either match their role default or have an explicit override in `units.json`.
-
-**Scaling Types (P10):** Three flavors:
-
-* *Direct* (scaling matches damage type): Evelyn's `scaling.chains:3` + `damage.chain:3`. This indicates that because the unit deals high damage of that type, feeding that type just leverages an existing high-multiplier damage output. Unit does X, so giving it more X than normal is a direct benefit.
-* *Transformative* (scaling feeds enhanced attack frequency): Miyabi's `scaling.disorders:3` + `damage.enhanced:3`. Disorders are converted into enhanced attack resources. Missing this is very impactful — the unit will function at a significant gap from their potential damage ceiling.
-* *Constant* (steady stat amplification): Alice/Vivian's `scaling.am` converts AM into AP passively. This means that bonuses to AM benefit both AM and AP for these units, not just AM.  So for these units, buffs to AM are twice as valuable as other common buffs.
-
-**Ultimates Are a Primary DPS Resource (P28):** Free ultimates (Dialyn, Ju Fufu, etc) are limited — only one unit gets them per stun window. SubDPS units receive implicit ultimates scaling, but additional ultimates scaling above the implicit scaling only goes to the primary DPS. For example - anything that boosts ultimate damage will benefit a subDPS, because they implicitly improve when ultimates occur. But Dialyn’s free ultimates are only going to the primary DPS, because it is a highly limited resource and you want to allocate it to the optimal damage dealer. By comparison, quick assists are NOT limited and benefit all DPS including subdps.
-
-**Ultimates Provision Scales with Burst Potential (P13):** Free ultimates are worth more for high-burst DPS (Evelyn 4000% multiplier ultimate vs. a basic 1000% ultimate). Scaled by consumer's `getMaxBurstWeight`.
-
-**Naturally Available Needs (P19):** Ultimates and chains are always available via normal gameplay. Having a dedicated provider (Ju Fufu's `utility.ultimates`) makes them available faster, which is correctly rewarded in L4. But the DPS reception cohesion check skips these keys — not having a provider is not a cohesion failure.
-
-**Self-Provision Excludes Needs from Cohesion (P22):** When a DPS scales with a non-damage mechanic it also provides to itself (Banyue has both `scaling.interrupt-resistance:2` and `utility.interrupt-resistance:2`), the cohesion check doesn't count it as unmet. This is different than damage mechanics like aftershock or abloom, where a significant part of the damage ceiling for that DPS is the damage dealt by buffed teammates.
-
-### Role and Structure Rules
-
-**A Pseudorole IS a Role (P25):** Activated pseudoroles become the unit's identity for scoring. All role functions check `_activatedRoles` first. See Role Activation section for full implications across L1–L3.
-
-**Pseudo-Role Activation Is Data-Driven (P23):** Pseudo-role activation conditions are specified per-entry in the unit data. Plain string entries always activate. Object entries with `when` conditions activate only when the team meets the condition (`countTag`/`minCount` for tag-counting, or `hasUnit` for specific unit presence). There are no hard-coded activation rules in the engine.
-
-**Tier Degradation Rates Differ by Role (P8):** DPS tier quality matters enormously (T2 DPS = significant compromise). Stunner tier matters less (stun is stun). Support/defense tier matters least (buffs are buffs). Penalty curves are steeper for DPS.
-
-**DPS Reception and Team Completeness (P14):** DPS units without buff contributions are checked for what fraction of their scaling needs are met by the team. A "duo + deadweight" team gets penalized for the third member riding free.
-
-**Stunner Value Discount on Stunless Teams (P16):** When all DPS are stunless (YSG), stunner tier/rank bonuses are multiplied by 0.4. Their L4 contributions (stun-multiplier, ultimates) still score normally.
-
-**synergy.avoid as Near-Disqualification (P17):** Explicit `avoid` annotations represent game-mechanically-rooted anti-synergy that is hard (or excessively complicated) to model via mechanics. Normal mode: disqualification. Lenient mode: massive penalty.
-
-### Anomaly-Specific Rules
-
-**Anomaly Reactions Are Boss-Context-Dependent (P15):** When two anomaly-typed units of different elements are on the same team, both receive a reaction bonus. Against normal bosses, team-side pairs react independently: wind+non-wind = vortex; non-wind+non-wind = disorder. Against anomaly-state bosses, the boss intercepts all applied anomalies — each agent reacts with the boss (one reaction per agent), and team-side reactions are suppressed. Units with explicit `scaling.disorders` (Miyabi) are excluded from the implicit bonus to prevent double-counting with need fulfillment.
-
-**Vortex Rewards Element-Specific Tiers (P29):** Vortex bonuses are tiered by element: ice highest, fire medium, physical/ether/electric low, elemental variants with custom rates. This creates meaningful differentiation between ice anomaly agents (Promeia, Soukaku) and frost-variant agents (Miyabi) against wind-anomaly-state bosses, because frost has a miniscule vortex damage multiplier while ice has one of the highest.
-
-**Boss Anomaly State Suppresses Team-Side Reactions (P30):** A boss with permanent self-applied anomaly intercepts and consumes every team-applied anomaly. This suppresses all team-side disorder/vortex generation between agents. Each agent reacts directly with the boss's anomaly only.
-
-**Polarity Disorders Survive Anomaly State (P31):** Polarity disorders are forced occurrences that bypass anomaly state suppression. They still feed `scaling.disorders` at full weight (feeding Miyabi's transformative scaling). However, their `damage.polarity` contribution is reduced to \~25% on vortex bosses, reflecting heavily nerfed polarity damage.
-
-**Polarity Is a Subclass of Disorder (P32):** `buffs.disorders` supplies both `damage.polarity` (via the damage-type fallback in need fulfillment) and the disorder-buff baseline affinity path. Any unit buffing disorders (e.g., Yuzuha) inherently buffs polarity damage.
-
-**Dual-Anomaly Teams Are Inherently Cohesive (P24):** Primary anomaly DPS + off-field anomaly subdps of different element = inherently cohesive. No cohesion penalty for the subdps "not providing buffs."
-
-**Totalize and Stun Dependency (P11):** Totalize units convert stun time into damage. They want double-stun teams. For agents heavily dependent on totalize (e.g. Hugo), the engine applies non-linear penalties when stun infrastructure is below 2.0 credits (proper stunner = 1.0, pseudo-stunner = 0.9, high-daze support = 0.4). For agents who deal some totalize damage but it is not an essential part of their damage output (e.g. Pyrois), then this penalty is waived.
-
-### Structural Principles
-
-**Faction Synergies Require Explicit Modeling (P7):** Some synergies are faction-based and don't emerge purely from mechanics (e.g., the full AoD trio). These could be expressed through `synergy.units` if they don’t naturally emerge from the mechanics alone.
-
-**Quick-Assists Baseline Value (P18):** Quick-assists are useful but not transformative. Implicit scaling baseline is 0.25 — modest need fulfillment credit. Units with explicit `scaling['quick-assists']` override this.
-
-**Support Element Irrelevance (P20):** Pure support and defense units provide value through buffs and utility, not damage. Element resistance penalties are removed for support and defense units. For defense agents, a small on-element bonus is retained (unlike support agents, defense agents can deal small quantities of material damage). Despite the name, defense units’ value typically does not come from defensive strategies as the game does not really reward defensive approaches and instead heavily rewards aggressive offense. So even though some units are ‘defense’ units, their primary purpose is an alternate form of support agent that is typically capable of slightly higher damage output; albeit a negligible difference for modeling purposes. For example, T4 fire defense unit Ben converts his defense stat into a critical damage multiplier, and players who actually run Ben typically build him as a DPS rather than a support.
-
-**Element Resistance and SubDPS/PseudoSupport Handling (P21):** Standard subdps units are disqualified when resisted, like any DPS. Only pseudosupports bypass disqualification (they still contribute as supports when their damage element is resisted), but receive a damage-proportional penalty.
-
-**Shill Is a Bonus, Not a Penalty (P27):** DPS shill matching gives a flat bonus. No penalty for mismatching. Non-DPS shills (stun) remain hard requirements.
-
-**Conditional Buffs Are Team-Composition-Dependent (P30):** Some units provide buffs that scale with team composition (e.g., Remielle's ATK buff scales with the number of primary `anomaly` teammates). These are modeled via `mechanics.conditional.buffs` — resolved at score time using the actual team. `conditional` is a container keyed by mechanic kind (`buffs` today; `debuffs`/`scaling`/`utility` groups can be added the same way without engine changes to unrelated units). Units with unmaximized conditional buffs incur a squared-gap underutilization penalty in L4: `(maxLevel - resolved)² × CONDITIONAL_BUFF_PENALTY_MULT` per buff key. The squared gap ensures that large drops (e.g., Remielle at atk:2 on a duo-anomaly team vs. atk:4 on triple-anomaly, gap=2 → penalty=140) are disproportionately punished compared to small drops. This strongly pushes compositions toward full buff activation — duo-anomaly Rem teams score in the 300s while triple-anomaly teams score 500+.
-
-**Weak Ultimates (P31):** Some DPS units have ultimates that are weaker than or equivalent to their chain attacks (e.g., Sigrid's ultimate deals less than her enhanced attacks, Pyrois uses his ultimate as a mode switch rather than a burst). These are marked with `damage["ultimate:weak"]`. For such units: (1) implicit ultimate scaling is zeroed out in `getEffectiveScaling`, and (2) ultimate provision bonuses in `scoreBaselineAffinity` are skipped. This prevents ultimate-providing stunners from receiving unearned synergy credit with these units. This is independent of burst damage type — a unit can have `ultimate:weak` while still having strong burst via other damage types (enhanced, chain, etc.).
-
-**Resource Replacement (P32):** A supplier may provide a resource that comes at the cost of another resource for the consumer. Modeled via `mechanics.replaces: { "cost_resource": "provided_resource" }` on the supplier side (read as "replaces cost with provided"). In `scoreNeedFulfillment`, when a supplier's provided resource matches a replaces entry and the consumer has scaling for the cost resource, effective supply of the cost resource is reduced by `provisionWeight × scalingWeight × MULT.REPLACEMENT_COST`. Example: Dialyn's `replaces: { "chains": "ultimates" }` means her free ultimates consume a chain attack window — penalizing her synergy with chain-dependent DPS like Sigrid.
-
-**Resource Conversion (P33):** A consumer may convert one resource into another for themselves, increasing effective supply. Modeled via `mechanics.converts: { "input_resource": "output_resource" }` on the consumer side. In `scoreNeedFulfillment` and the damage-type loop, if a supplier provides the input resource, the output resource's effective supply is augmented (via `Math.max`). Example: Norma's `converts: { "quick-assists": "chain" }` means Astra's quick-assist provision also feeds Norma's chain damage scaling.
-
-**Wasted Vortex Cohesion Penalty (P34):** A wind anomaly subdps (e.g., Velina) generates vortex reactions as their primary team contribution. If no native primary anomaly DPS (non-subdps, native `anomaly` tag) has a meaningful vortex tier (>= `VORTEX_PRIMARY_MIN`), the subdps's vortex generation is wasted — the hypercarry cannot exploit it. This is counted as an unmet need for that subdps in `computeTeamworkMultiplier`, reducing team cohesion. Example: Velina + Miyabi (frost variant, vortex tier 0.001) is penalized because Miyabi gains nothing from vortex. Velina + Promeia (ice, vortex tier 4.5) is not penalized. The penalty does not fire based on pseudo-anomaly roles (Nangong's anomaly pseudo-role is irrelevant — only units with native `anomaly` in their `tags` count as primary DPS for this check).
-
-## Wheelchair Compositions
-
-Powerful support/utility pairings that uplift almost any compatible DPS:
-
-* **Astra + Nicole** — Universal attack/anomaly wheelchair, although better for attack. ATK buff + defense shred = massive damage differential. Not for rupture (defense shred useless).
-* **Nangong + Sunna** — Attack/anomaly wheelchair, although better for Aria specifically than others. Anomaly procs + stun buffs amd benefits + ATK buff + stun multiplier. Not for rupture.
-* **Nangong + Yuzuha** — Anomaly-specific wheelchair. Stun buffs and benefits + ATK buff + anomaly buffs + kaleidoscope element flex to help disorder generation. Replaced Vivian's slot in the top anomaly template.
-* **Vivian + Yuzuha** — Anomaly-specific wheelchair (for non-ether anomaly agents). ATK buff + anomaly buffs + lots of disorder generation.
-* **Dialyn + Lucia** — Definitive rupture wheelchair. Free ultimates + stun + rupture specialist support. Best-in-slot for all rupture agents.  (The upcoming stunner Norma may also form a wheelchair with Lucia.)
-* Upcoming: Norma/Astra | Norma/Lucia - Stun+Support that self-reinforces with Norma acting as a secondary DPS for attack and rupture teams due to Norma’s interactions with quick assists and sheer buffs.
-
-These emerge naturally from the mechanics engine — their high scores are evidence of well-modeled mechanics.
-
-## Scoring Results Scale
-
-Rough boundaries for team quality:
-
-* 500+ — Exceptional matchup, essentially best possible team of choice
-* **400+** — Great matchup, near-optimal/optimal
-* **300–399** — Ideal; solid team for this boss and can achieve full clear with minimal skill required
-* **230–299** — Playable; can achieve full clears with sufficient skill
-* **145–229** — Suboptimal; full clears may be difficult even with great skill
-* **Below 145** — Nigh unplayable for endgame content
-
-These boundaries are approximate and shift as the scoring algorithms are tuned.
-
-## DPS Bucketing and Diversity Selection
-
-(This section describes `app/public/lib/common/dps-buckets.js`, which consumes team scores as inputs — not the scoring engine itself.)
-
-When optimizing 3 teams for Deadly Assault's 3 bosses, raw top scores tend to be near-identical — the same DPS with minor support variations. Showing five "options" that differ only by swapping one support is not useful.
-
-Results are grouped by which type of DPS is assigned to each boss (considering role, element, and power tier). The algorithm selects one representative from each distinct DPS assignment pattern, preferring the highest-scoring realization. The webapp provides a toggle between this diversity-aware view (default) and the raw score-sorted view.
-
-## Diagnostic Tooling
-
-### Debugging Workflow
-
-When investigating a scoring issue, the typical workflow may include any of the following diagnostic tool commands:
-
-
-1. **Reproduce the issue** — Use `node matchups` with explicit teams to see the scores:
-
-   ```
-   node matchups -t "Nangong/Aria/Sunna,Aria/Burnice/Sunna" -b Priest
-   ```
-2. **Examine the scoring breakdown** — Add `--debug` (or `-d`) to see the full layer-by-layer scoring:
-
-   ```
-   node matchups -t "Nangong/Aria/Sunna,Aria/Burnice/Sunna" -b Priest --debug
-   ```
-
-   This shows L1.5 structure classification, L2 tier/rank scoring per unit, L3 element/shill/favored bonuses, L4 pairwise mechanical synergy with individual pair scores, L5 synergy bonuses, and the final teamwork multiplier breakdown.
-3. **Compare across bosses** — Use comma-separated boss names:
-
-   ```
-   node matchups -t "Dialyn/Evelyn/Astra,Lighter/Evelyn/Astra" -b "Neutral,Pompey,Corruption"
-   ```
-4. **Review full landscape for a unit** — Use `-i` (include) to see all teams containing a specific unit:
-
-   ```
-   node matchups -i Miyabi -b Butcher -10
-   ```
-
-   (Shows top 10 teams including Miyabi against Butcher)
-5. **Generate per-agent matchup files** — Run `agent-matchups.mjs` to produce a `matchups/<unit-id>.txt` for every limited S-rank, showing their top teams against all bosses:
-
-   ```
-   node agent-matchups.mjs -7
-   ```
-
-   (Depth 7 per boss, writes to `matchups/` folder)
-6. **Run the test suite** — Verify all assertions pass:
-
-   ```
-   node test-scoring.mjs
-   ```
-
-### CLI Reference (`matchups.js`)
-
-| Flag | Short | Description |
+| Flag | Short | Purpose |
 |----|----|----|
 | `--teams` | `-t` | Explicit teams: slash-separated units, comma-separated teams |
-| `--bosses` | `-b` | Boss name filter (comma-separated, fuzzy-matched) |
-| `--debug` | `-d` | Show full scoring breakdown per team |
-| `--include` | `-i` | Teams must include at least one of these units (comma-separated) |
-| `--depth` | `-N` | Number of results per boss (shorthand: `-10` for top 10) |
+| `--bosses` | `-b` | Boss filter, comma-separated, fuzzy-matched (`"butcher:raging"` selects a variation) |
+| `--debug` | `-d` | Full layer-by-layer scoring breakdown |
+| `--include` | `-i` | Teams must include at least one of these units |
+| `--depth` | `-N` | Results per boss (shorthand: `-10`) |
 | `--only-mine` | `-m` | Use personal roster from `roster.json` |
-| `--preview` | `-p` | Include unreleased/unavailable units |
-| `--units` | `-u` | Comma-separated unit whitelist |
-| `--exclude` | `-x` | Comma-separated units to exclude |
-| `--score` | `-s` | Minimum raw team score filter |
-| `--range` | `-r` | Inclusive raw score range (two integers) |
-| `--flat` |    | Output teams in condensed format for use as `-t` value |
-| `--query` | `-q` | Share URL query string for roster/bosses |
+| `--preview` | `-p` | Include unreleased (`available: false`) units |
+| `--units` / `--exclude` | `-u` / `-x` | Unit whitelist / blacklist |
+| `--flex` | `-f` | Universal units that may join any team |
+| `--rank` / `--element` | `-R` / `-e` | Filter by rank (S/A) or element |
+| `--score` / `--range` | `-s` / `-r` | Minimum raw score / inclusive raw score range |
+| `--omit` | `-o` | Suppress headers and context (terse output) |
+| `--flat` |    | Emit teams in condensed form, suitable as a `-t` value |
+| `--query` | `-q` | Share-URL query string for roster/bosses |
+|    | `+Unit` / `-Unit` | Add / remove a unit from the roster override |
 
-Unit additions/removals: `+Unit` adds a unit, `-Unit` removes one from the roster override.
+`-h` / `--help` on any script prints its actual supported flags.
 
-### Test Suite (`test-scoring.mjs`)
+**Scripts:**
 
-The test suite contains assertion-based test cases that verify scoring behavior. Each test case:
+| Script | Purpose |
+|----|----|
+| `matchups.js` | Top teams per boss. The main diagnostic. Adds a synthetic neutral boss for baseline comparison. |
+| `compositions.js` | Pivot of matchups: top teams per *agent*, with the bosses they excel against |
+| `deadly-assault.js` | Three-boss allocation with no unit overlap |
+| `teams.js` | Valid team enumeration (join conditions only, no scoring) |
+| `pull-debug.js` | Runs the pull recommendation engine from the CLI |
+| `pulled.js` / `tiers.js` | Roster by mindscape/weapon; units by tier |
+| `scoring-diff.js` | Diffs two saved score dumps and highlights what actually changed |
+| `test-scoring.mjs` | Scorer assertion suite |
+| `test-recommendations.mjs` | Pull engine assertion suite |
+| `reformat-units.mjs` | Normalizes `units.json` formatting |
 
-* Constructs specific teams using `scoreForTeamString` (which parses slash/comma-separated unit names)
-* Scores them against specific bosses using `scoreTeamForBoss`
-* Asserts ordering relationships (team A > team B), score thresholds (score >= X), or count-based checks (at least N teams above threshold)
+**Typical debugging loop:**
 
-**Running:** `node test-scoring.mjs`
-
-**Adding a test case:**
-
-
-1. Add a new `run('TEST N: description', () => { ... })` block before the Summary section
-2. Use `scoreForTeamString('Unit1/Unit2/Unit3,Unit4/Unit5/Unit6', allUnits)` to parse teams
-3. Use `withBosses(bosses, 'BossName')` to filter bosses
-4. Use `scoreMapForBoss(teams, boss)` for easy score lookups by team label
-5. Use `assert(condition, failureMessage)` for assertions — failure messages should include actual scores for debugging
-
-**Conventions:** Test numbers are sequential. Each test has a comment block explaining what it checks and why. When a test needs threshold adjustment (due to engine changes), update the threshold and note why.
-
-### Generating a Full Scoring Report
-
-For a comprehensive review of the engine's output:
-
-```
-node matchups -20 > deep-scoring.txt
-node agent-matchups.mjs -7
+```bash
+node matchups -t "Nangong/Aria/Sunna,Aria/Burnice/Sunna" -b Priest --debug
 ```
 
-The first command produces a top-20-per-boss report across all bosses. The second produces per-agent files in `matchups/`. Together, these provide a complete picture for manual review.
+Then widen to the full landscape for a unit, and confirm nothing else regressed:
 
-There is a `scoring-baseline.txt` file that can be compared to. It establishes the baseline list of matchups and scores so that there is what to compare to when making changes. The `scoring-diff.js` script can be used to compare two scores files and highlight what actually changed.
+```bash
+node matchups -i Miyabi -b Butcher -10
+```
 
-## Latest Mechanics
+```bash
+node test-scoring.mjs && node test-recommendations.mjs
+```
 
-The latest mechanics update is **Patch 3.2 — the Armorer DPS class** (debut unit: Claret, Electric Armorer):
+> **Debug-mode caveat:** lumen morph search is **skipped when** `--debug` is set. Normal scoring tries
+> every Attribute Mutation target and keeps the best; the debug path scores one un-morphed pass so the
+> trace stays readable. A debug score for a lumen team will therefore not match its real score.
 
-* **New `armorer` DPS role** added to `DPS_ROLES` in `constants.js`; `isArmorer()` helper and armorer branches added throughout `team-scorer.js` (role enumerations, structure templates, forced-secondary detection, daze-debuff group). See the **Armorer / Sharp / Gash / Maim** section above for mechanics.
-* **DEF + CR scaling** reuses the pre-existing DEF-scaling groundwork (`resolveBaselineWeight`/`getBuffRelevance` `def` cases, the DEF-buff→DEF-scaler baseline-affinity block) with a dedicated `MULT.DEF_BUFF`. **ATK efficiency for armorers is 0** (`ARMORER_ATK_EFFICIENCY`) — ATK is worthless, so DEF and CR are their only real stat levers. Role default `def:3, cr:2` via `getEffectiveScaling`.
-* **New constants:** `ARMORER_ATK_EFFICIENCY` (0.5), `MULT.DEF_BUFF`, `MAIM_BASE` / `MAIM_ENABLER_BONUS`, and `'maim'` added to `BURST_DAMAGE_TYPES`. Armorer role-default burst weight of 2 in `getMaxBurstWeight`.
-* **Crit inversion + CR dependency:** elevated CR (weight 3, useful to 200% via overcritical), **zero** CD relevance, and a dedicated cohesion hit when an armorer has no CR supplier (`ARMORER_CR_MISS_UTIL`/`ARMORER_CR_WEIGHT`). A whiffed **CD** buff now hits the supplier's cohesion too (`WHIFF_PENALTY_BUFFS` = sheer + cd).
-* **Maim reaction (reworked):** only armorers open Gash meters; all meters share one 3-mark pool; only stun/armorer agents build and detonate it. `MAIM_BASE + MAIM_ENABLER_BONUS × builders` (builders = stun/armorer teammates + `utility["gash-build"]` grantees, capped at 2). New conventional structure templates: armorer + stunner + support, double armorer + support/stunner (no subdps required), plus a lone-armorer wheelchair (unconventional-viable).
-* **Claret** added as a preview (`available: false`) vanilla armorer (`mechanics: {}` — all scaling/damage/burst inherited by role). `"armorer"` added to Koleda's `join` so Koleda/Claret/Rina is a mutual valid team (her other reworks, and the wind stunner Roxy, come later).
-* **UI & pull engine:** `armorer` added to role filters (team-builder, character-summary, recommendations archetype toggles), `ownedDPS`/quality buckets, and `mechanicsFitScore` (DEF/CR fit, CD excluded). Tests: `test-scoring.mjs` 66–69 + 72 and `test-recommendations.mjs` 43–45 cover the armorer.
+For a full-landscape review, dump scores to a file and diff against a previous dump with
+`scoring-diff.js`. (There is no committed baseline file — generate one before a change and compare after.)
 
-Patch 3.2 also introduced the **unified conditional framework, generic damage, and the Koleda rework**:
+**Test conventions:** each case is a `run('TEST N: description', () => { … })` block; build teams with
+`scoreForTeamString`, filter bosses with `withBosses`, look up scores with `scoreMapForBoss`, and assert
+with `assert(condition, message)`. Failure messages should embed actual scores — that's what makes a
+regression diagnosable. Test numbers are sequential; when engine retuning forces a threshold change,
+update it and note why in the comment block.
 
-* **Unified conditional framework.** One predicate vocabulary (`evaluatePredicate`: `countTag`/`minCount`, `hasUnit`, `notPresent`, and the new recipient-scoped `role`) and one conditional-value form (`{ cases: [...] }`, `resolveConditionalValue`) now drive pseudoRole activation AND any conditional-valued buff/debuff/damage/scaling/utility. The old `mechanics.conditional` container was removed; Remielle's ATK curve migrated inline to `buffs.atk` cases (behavior-preserving). `resolveConditionalValue`/`isConditionalSpec`/`isTeamScopedConditional`/`maxConditionalValue` are exported for the pull engine. The under-activation penalty applies to team-scoped conditionals only.
-* **Narrow (per-recipient) buffs** are just recipient-`role` conditionals — no separate field. `scoreBaselineAffinity` resolves buffs per `(supplier, consumer)` pair; `computeBuffUtilization` resolves recipient-scoped conditionals to the best value reaching a DPS consumer (`resolveMapForUtil`) so a narrow buff routed to a different key is never charged as unlanded.
-* **Generic damage (`dmg`).** New `MULT.DMG_BUFF` (1.5) / `MULT.DMG_DEBUFF` (1.2). A universal, never-misses damage multiplier scored as a flat L4 term for all DPS, **excluded from cohesion** (`COHESION_EXCLUDED_BUFFS = { dmg, vortex }`) so it can't rescue a mismatched support (e.g. Pan's sheer on an attack team). Debuff worth slightly less than buff (single-enemy vs team-wide). Data: Astra/Lucia/Remielle `buffs.dmg:3`; Pan/Caesar `debuffs.dmg:3`; Koleda `buffs.dmg:4` (largest). Deliberately NOT scored in `mechanicsFitScore` (no signal for *which* support fits a given DPS). New tests: scoring 73 (framework) + 74 (Koleda).
-* **Koleda rework:** tier 2.5 → 1.5; `buffs.dmg:4`; P6 narrow buffs (armorers → `cr:1`, everyone else → `cd:3`) as recipient-`role` conditionals. Koleda/Claret/Rina 273.5 → ~307, and she becomes a viable generalist stunner on every team. (Her potential-vision beyond P6 and the wind stunner Roxy come later.)
-* **Whiffed directional-buff cohesion penalty + undersupply gating.** Two mismatched-support levers (and restored TEST 5/14 after Lucia's `buffs.cd` was raised 1 → 3): (1) `WHIFF_COHESION_PENALTY` (0.8) applied per whiffed directional buff in `WHIFF_PENALTY_BUFFS` (`sheer`, `cd`) — a support whose `sheer` has no rupture consumer, or whose `cd` lands on no crit-damage user (e.g. Ju Fufu's `cd:3` on an all-armorer-DPS team), takes a direct cohesion hit, because the absolute-supply `threshold` path otherwise masks the wasted specialist buff; (2) `UNDERSUPPLY_FACTOR` (0.6) in `scoreNeedFulfillment` — partially meeting a scaling need (Lucia's `veils:1` for YSG's `veils:2`) is worse than linear (~30% vs ~50%). Both leave on-archetype supports unaffected.
-* **Armorer stat rebalance + CR dependency.** `ARMORER_ATK_EFFICIENCY` lowered to **0** (ATK worthless for armorers), leaving **DEF and CR** as their only real stat levers. An armorer with **no CR-supplying teammate** takes a dedicated cohesion hit (`ARMORER_CR_MISS_UTIL`/`ARMORER_CR_WEIGHT`) — so CR providers (Koleda P6, Nicole, Cissia) are favoured and a plain no-CR stunner is not.
-* **Roxy (wind stunner) + anomaly-quantity scaling.** New `ANOMALY_ELEMENT_MULT` (4). Anomaly-quantity scaling is now consumed: `scaling.anomaly` (generic) is fed by ANY effective anomaly agent, and `scaling["anomaly:<element>"]` only by that element's anomaly agents — a wind source satisfies both, since wind anomaly *is* anomaly. Supply counts effective anomaly agents on the team **including self** (a wind pseudo-anomaly self-fulfils), linear so oversupply always helps. This also **fixes a latent bug**: Harumasa's `scaling.anomaly:2` was previously dead (only the monoshock check read it); it now scores (+16 from two anomaly sources on Roxy/Harumasa/Velina). **Roxy** (`stun`+`wind`, pseudoRole `anomaly`/`subdps`, `scaling` `def:3` + `anomaly:wind:1`, Koleda's same P6 narrow CR/CD, `available:false`) is Claret's BiS stunner (Roxy/Claret/Rina ≈ 363 > Koleda 306) and a premier enabler for **Pyrois**, whose `damage["ultimate:strong"]` is a conditional `{ cases: [{ when: { hasUnit: "anomaly:wind" }, value: 1 }, …] }` — a colon-qualified `hasUnit` matches by effective **role:element**, so his ultimate strengthens whenever a wind-anomaly unit (Roxy/Velina) is on the team. Conditional `damage` values are resolved once per team into `unit._resolvedDamage` (damage is always team-scoped), read by `getMaxBurstWeight`/`getEffectiveScaling`/need-fulfillment. The Maim gash-build grant key is `utility["gash-build"]`. New scoring tests 75–77 (Roxy Claret BiS, Roxy/Pyrois wind enabler, Roxy/Harumasa/Velina viable on Typhon).
 
----
+## 8. Known Issues and Dead Mechanics
 
-The prior mechanics update was Patch 3.1 (Remielle / Lumen element release) and the subsequent scoring recalibration:
+Kept deliberately — these are things that look wrong when you read the code, and are.
 
-**Scoring engine:**
-
-* Lumen element is fully modeled with Attribute Mutation (element morphing via try-all-and-pick-best), Lumiflux Buildup, Refringe bonus (with disorder/vortex cascade constants), and luminize damage type.
-* Conditional buff penalty uses squared-gap formula (`(max - resolved)² × 35`) to severely punish duo-anomaly Rem compositions relative to triple-anomaly.
-* Remielle updated to `onfield: false` (no longer `"shared"`), `pseudoRole: ["subdps", "support"]` (unconditional). The `"shared"` field time model is retained as dead code for potential future use.
-* New `utility.rotations: "limited"` mechanic for units that remove themselves from the assist rotation pool. Applied to Remielle and Astra. Reduces the boss's effective defensive assist requirement by 1 per limited-rotation unit. Girtablullu has `chainParry: true` which prevents this reduction (Chain Parry requires two off-field defensive assists simultaneously).
-
-**Scoring recalibration:**
-
-* New `scaling.buffs` mechanic (0–3) replaces the former uniform buff penalty divisor. Controls how much a unit is penalized for unmet buff/debuff consumption, defaulting by native role (support/defense=3, stun=2, attack/anomaly/rupture=0). Only weight-2+ buffs/debuffs are evaluated; weight-1 entries are assumed to always land. See P33.
-* Stepped L4 soft cap: raw L4 scores below `L4_PASSTHROUGH` (100) pass through uncompressed; scores above the threshold are compressed hyperbolically: `L4_PASSTHROUGH + (raw - L4_PASSTHROUGH) * L4_SOFT_CAP / (raw - L4_PASSTHROUGH + L4_SOFT_CAP)`. This preserves differentiation for mid-range synergy while capping runaway mechanical stacking.
-* `getBuffRelevance` additions: explicit `abloom` and `disorders` cases. Anomaly-role units always consume both; non-anomaly units consume them only when they have matching `damage.abloom`, `damage.polarity`, or `damage.disorders`. Generic damage-type relevance now uses binary thresholds: weight >= 2 → relevance 1.0, weight 1 → relevance 0.5.
-* Ice vortex tier increased from 3 to 4.5, strengthening Promeia and other ice anomaly agents on vortex-relevant bosses.
-* Promeia `damage.enhanced` increased from 1 to 2 for stronger stun emergence scoring.
-
-**Pull recommendation engine:**
-
-* Codependent units (`scaling.codependent: true`) undergo team dependency checks before surfacing in recommendations. This now includes conditional buff activation feasibility: if the roster can't reach more than half of the max buff level, the unit is excluded from all gap candidate lists entirely (not just priority-dropped).
-* `'buffs'` added to `CODEPENDENT_SKIP_KEYS` so that `scaling.buffs` is not treated as a team dependency to be satisfied by the recommendation engine.
-* Depth gap fires for titled T0 candidates regardless of archetype quality, recognizing paradigm-shift units that create new team archetypes.
-* DPS gap text accounts for primary agent count — a single primary DPS is described as "limited" rather than "decent coverage."
-* Lumen-specific partner gaps were removed in favor of generic systems (conditional buff checks, scoring-emergent Refringe benefits).
+* **Armorer ATK efficiency disagrees between engines.** The scorer treats it as zero — ATK is worthless
+  to armorers. `mechanicsFitScore` in the pull engine still applies a partial multiplier, so pull
+  recommendations credit ATK supports for armorers that the scorer would not.
+* `converts` is implemented but unused. No unit in `units.json` declares it. It was built for Norma (quick-assists → chain attacks) but her unit was changed last minute to upgrade a teammate rather than herself. It is retained for potential future agents that may need it.
+* `utility["gash-build"]` is implemented but unused. Built for Claret, whose kit is currently `mechanics: {}`. Her kit is still in early beta and armorer mechanics are still undergoing many changes.
+* `shillIntensity` is effectively retired, superseded by mechanics-driven scoring. Still read by
+  `getBossShillIntensity` and still amplifies `favored` bonuses where set. Retained for potential future use as a lever that can be activated if necessary.
+* **The** `"shared"` field-time model is dead code, retained for possible future use. Remielle used it
+  before moving to `onfield: false`.
+* **No armorer subdps exists yet.** `pull-engine.js` carries a TODO for the bucket and detector that
+  will be needed when one ships.
 
 
