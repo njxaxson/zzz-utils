@@ -1702,6 +1702,29 @@ async function main() {
         }
     });
 
+    // ========================================================================
+    // TEST 81: a stunless DPS satisfies a stun shill on its own (Thrall & Sobek)
+    // ========================================================================
+    // Thrall's `shill: stun` is a hard requirement because damage only lands inside
+    // stun windows. A stunless DPS (YSG) carries that multiplier permanently and never
+    // needs a window opened, so YSG/Sunna/Zhao must be viable — and strong — without a
+    // stunner. The requirement still holds for everyone else: an equally stunnerless
+    // team with a window-dependent DPS (Evelyn) stays disqualified.
+    run('TEST 81: stunless DPS satisfies the stun shill on Thrall', () => {
+        if (!allUnits.find(u => u.id === 'ysg')) return;
+        for (const b of withBosses(bosses, 'Thrall')) {
+            const stunless = scoreForTeamString('YSG/Sunna/Zhao', allUnits, { preview: true })[0];
+            const ss = scoreTeamForBoss(stunless.team, b, {});
+            assert(ss > 400,
+                `${b.name}: YSG/Sunna/Zhao is stunless — must be viable and strong without a stunner, got ${ss?.toFixed(1)}`);
+
+            const windowDependent = scoreForTeamString('Evelyn/Astra/Nicole', allUnits, { preview: true })[0];
+            const ws = scoreTeamForBoss(windowDependent.team, b, {});
+            assert(ws <= 0,
+                `${b.name}: Evelyn/Astra/Nicole has no stunner and no stunless DPS — must stay disqualified, got ${ws?.toFixed(1)}`);
+        }
+    });
+
     // ------------------------------------------------------------------------
     // Summary
     // ------------------------------------------------------------------------

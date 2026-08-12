@@ -1474,12 +1474,19 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
                 if (debug) console.log(`    Shill match (${bossShill}): +8`);
             }
         } else {
-            if (!team.some(u => u.tags.includes(bossShill))) {
+            // A stun shill is a hard requirement because the boss only takes real damage
+            // inside stun windows, where the stun multiplier applies. A stunless DPS holds
+            // that multiplier permanently and bursts without a window, so it satisfies the
+            // requirement on its own — no stunner needed.
+            const hasShillRole = team.some(u => u.tags.includes(bossShill));
+            const stunlessException = !hasShillRole && bossShill === 'stun'
+                && team.some(u => isDPS(u) && isStunlessUnit(u));
+            if (!hasShillRole && !stunlessException) {
                 if (debug) console.log(`    DISQUALIFIED: Missing required role ${bossShill}`);
                 return { score: -1, disqualified: true };
             }
             score += 8;
-            if (debug) console.log(`    Non-DPS shill match (${bossShill}): +8`);
+            if (debug) console.log(`    Non-DPS shill match (${bossShill})${stunlessException ? ' via stunless DPS' : ''}: +8`);
         }
     }
     

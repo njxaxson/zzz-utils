@@ -179,7 +179,9 @@ output looks like.
 * **Stunless (YSG)** — YSG + double support. She receives her stun damage multiplier whether or not
   the enemy is stunned, so inflicting stuns gains her nothing (though *raising* the multiplier helps
   her constantly, unlike everyone else). Dialyn is the exception worth bringing: her free ultimates
-  feed YSG's double-ultimate, the highest burst in the game.
+  feed YSG's double-ultimate, the highest burst in the game. This is also why a stunless DPS clears
+  a stun-shill boss's hard stunner requirement (see `shill` under Boss Mechanics) — the boss's
+  damage gate *is* the stun window, and YSG doesn't need one.
 * **"Monoshock"** — hybrid anomaly + attacker. Named for the old triple-electric Grace/Harumasa/Rina
   team, but the name now just means any hybrid anomaly/attack comp; it need not be electric or triple.
   Niche but legal — Harumasa's `scaling.anomaly` is what makes it score.
@@ -426,6 +428,12 @@ Two `scaling` keys are meta-flags rather than game mechanics:
 * `favored` — named units with enhanced bonuses (top-level, not inside `mechanics`)
 * `shill` — the role this boss prefers. **DPS shills are a bonus with no penalty for mismatching**
   — teams compete on merit. **Non-DPS shills (stun) are a hard requirement** — no stunner, no score.
+  The requirement exists because a stun-shill boss gives you few damage openings: you stun it, and
+  the stun multiplier lets you dump a burst into that window. Without a stunner you can't open
+  windows reliably, so your damage never lands. **A stunless DPS is exempt** — it holds the stun
+  multiplier permanently and bursts without needing a window at all, so it satisfies the stun shill
+  by itself and takes the same `+8`. The exemption is stun-specific and requires an actual stunless
+  *DPS*; every other stunnerless team is still disqualified.
 * `anti` — DPS archetypes disqualified outright
 * `weak` — array of mechanic weaknesses (`disorders`, `veils`, `stun`, `abloom`); a boss can have several
 * `freezable` — ice anomaly agents get a large bonus; pseudo-anomaly agents get half
@@ -446,7 +454,7 @@ resolution stays transparent.
 | Boss | Why it's interesting |
 |----|----|
 | **Scorched Horizon** | The wind-`anomaly:state` boss. Team-side reactions suppressed, disorders replaced by vortex, polarity damage gutted, plus a CD debuff. Designed to favour Promeia (pure ice vortex) over Miyabi (frost ≈ 0). |
-| **Thrall & Sobek** | `shill: stun` — a hard requirement, not a bonus. No stunner = DQ. |
+| **Thrall & Sobek** | `shill: stun` — a hard requirement, not a bonus. No stunner = DQ, *unless* the team fields a stunless DPS (YSG), which bypasses stun windows entirely. |
 | **Notorious Dead End Butcher** | `debuffs.daze` — penalizes attack/rupture unless you bring daze. Anomaly teams unaffected. Also `weak: disorders`. |
 | **Typhon Slugger** | `assists: 3` — every unit must have `assist:defensive`. |
 | **Girtablullu** | `chainParry: true` — the assist requirement cannot be reduced by limited-rotation units. |
@@ -478,7 +486,7 @@ the team, then runs:
 | **L1 Disqualifications** | Hard failures returning −1. Deliberately narrow: illegal `join` arrangement, no DPS, three *pure* DPS, a DPS whose tag matches boss `anti`, a DPS whose element is resisted, too few reliable defensive assists. `synergy.avoid` is checked alongside. |
 | **L1.5 Structure** | Classifies the composition (anomaly hypercarry, double armorer, rupture + stun + support, …) into conventional / unconventional-viable / no-interaction / wildly-unconventional. Feeds the teamwork multiplier — **it is not added to the score**. Also scores field-time economy. |
 | **L2 Inherent Quality** | Individual power independent of team context: tier and rank. DPS at full weight; support/defense/stun at reduced weight **gated by buff utilization**. Titled bonus. Totalize stun-demand penalty. Wasted-DPS-buff penalty. |
-| **L3 Boss Matchup** | Shill, favored units, `weak` mechanics, element weakness/resistance, boss debuffs, assist bonus. Also where a **missing non-DPS shill disqualifies**. |
+| **L3 Boss Matchup** | Shill, favored units, `weak` mechanics, element weakness/resistance, boss debuffs, assist bonus. Also where a **missing non-DPS shill disqualifies** (a stunless DPS exempts a stunnerless team from the stun shill). |
 | **L4 Mechanical Synergy** | The core. Directional pairwise evaluation of every ordered teammate pair, plus team-level reaction bonuses. |
 | **L5 Additional Synergies** | Hand-curated `synergy.units` / `synergy.tags`. Low-weighted; a fallback for what mechanics can't express. |
 
@@ -587,8 +595,9 @@ a pseudo-role *is* a role, activation ripples across every layer:
   Nangong is counted as a stunner, not a second anomaly.
 * **L2** — units are scored in one category only; a unit scored in the DPS loop is excluded from the
   non-DPS loop. Forced-secondary detection excludes stun/support/defense units.
-* **L3** — pseudosupports cannot satisfy a DPS shill. Element-resistance DQ skips support/defense
-  units. A *pseudo*-role matching the boss `anti` is a penalty, not a DQ.
+* **L3** — pseudosupports cannot satisfy a DPS shill. A stunless DPS *can* satisfy a stun shill,
+  standing in for the stunner the boss would otherwise demand. Element-resistance DQ skips
+  support/defense units. A *pseudo*-role matching the boss `anti` is a penalty, not a DQ.
 
 Separately, `isEffectiveSupport` / `isEffectiveDefense` check base tags **and** activated pseudo-roles;
 plain `isSupport`/`isDefense` check tags and `_activatedRoles` only. Structure classification,
