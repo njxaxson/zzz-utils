@@ -290,7 +290,7 @@
         "limited": false,
         "tier": 2,
         "tags": ["anomaly", "electric", "assist:evasive"],
-        "join": ["electric", "faction"],
+        "join": ["electric", "faction", "anomaly"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "pseudoRole": [{ "role": "subdps", "when": { "notPresent": "velina" } }],
