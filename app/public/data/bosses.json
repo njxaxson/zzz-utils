@@ -187,7 +187,8 @@
             "resistances": ["ice", "ether"],
             "shill": "attack",
             "anti": ["rupture", "anomaly"],
-            "assists": 0
+            "assists": 0,
+            "control": 1
         }
     },
     {
@@ -202,7 +203,8 @@
             "shill": "anomaly",
             "anti": ["rupture"],
             "assists": 2,
-            "weak": ["veils"]
+            "weak": ["veils"],
+            "control": 2
         }
     },
     {
@@ -217,7 +219,8 @@
             "shill": "anomaly",
             "anti": ["rupture"],
             "assists": 2,
-            "weak": ["stun"]
+            "weak": ["stun"],
+            "control": 1
         }
     },
     {
@@ -234,7 +237,8 @@
             "assists": 2,
             "anomaly:state": "wind",
             "weak": ["abloom"],
-            "debuffs": { "cd": 2 }
+            "debuffs": { "cd": 2 },
+            "control": 1
         }
     },
     {
@@ -264,7 +268,8 @@
             "shill": "anomaly",
             "anti": ["attack", "rupture", "armorer"],
             "assists": 2,
-            "shillIntensity" : 3
+            "shillIntensity" : 3,
+            "control": 1
         }
     }
 ]
