@@ -172,10 +172,13 @@
         "tags": ["armorer", "electric", "assist:defensive"],
         "join": ["stun", "support", "armorer"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
-        "mechanics": {},
+        "mechanics": {
+            "buffs" : { "laceration": 3 },
+            "scaling": { "buffs" : 0, "cd" : 1 }
+        },
         "faction": "Flint Workshop",
         "available": false,
-        "displayText": "Goth Barbie is the first armorer unit and craves crit rate and defense; crit damage is useless for her. Her favorite support is Rina P6."
+        "displayText": "Goth Barbie is the first armorer unit and craves crit rate and defense. Her favorite support is Rina P6."
     },
     {
         "id": "caesar",
@@ -387,13 +390,13 @@
             "buffs": {
                 "chains": 1,
                 "dmg": 4,
-                "cr": { "cases": [ { "when": { "role": "armorer" }, "value": 1 }, { "value": 0 } ] },
-                "cd": { "cases": [ { "when": { "role": "armorer" }, "value": 0 }, { "value": 3 } ] }
+                "laceration": { "cases": [ { "when": { "role": "armorer" }, "value": 1 }, { "value": 0 } ] },
+                "cd":         { "cases": [ { "when": { "role": "armorer" }, "value": 0 }, { "value": 3 } ] }
             },
             "utility": { "daze": 1 }
         },
         "faction": "Belobog Heavy Industries",
-        "displayText": "CEO of Belobog, this maniac likes to smash things. Has the fastest stun rate of any agent. Her upgraded kit delivers the game's largest general-damage buff, plus a P6 that hands armorers crit rate and everyone else a hefty crit damage buff."
+        "displayText": "CEO of Belobog, this maniac likes to smash things. Has the fastest stun rate of any agent. Her upgraded kit delivers a large general-damage buff, plus a P6 that buffs armorers laceration and everyone else a nice crit damage buff."
     },
     {
         "id": "komano",
@@ -765,11 +768,11 @@
             "pseudoRole": ["anomaly", "subdps"],
             "buffs": {
                 "stun-multiplier": 2,
-                "cr": { "cases": [ { "when": { "role": "armorer" }, "value": 1 }, { "value": 0 } ] },
-                "cd": { "cases": [ { "when": { "role": "armorer" }, "value": 0 }, { "value": 3 } ] }
+                "laceration": { "cases": [ { "when": { "role": "armorer" }, "value": 3 }, { "value": 0 } ] },
+                "cd":         { "cases": [ { "when": { "role": "armorer" }, "value": 0 }, { "value": 3 } ] }
             },
             "debuffs": { "recovery": 2 },
-            "scaling": { "def": 3, "anomaly:wind": 1 }
+            "scaling": { "er": 4, "anomaly:wind": 1, "am" : 1, "ap" : 0 }
         },
         "faction": "Flint Workshop",
         "available": false,

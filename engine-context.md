@@ -52,7 +52,7 @@ DPS roles), plus **stun**, **support**, **defense**.
 * **Attack** — on-field DPS through basics, chains, ultimates during stun windows
 * **Anomaly** — DPS through anomaly buildup, disorders, enhanced attacks
 * **Rupture** — deals Sheer damage, which **ignores enemy defense** (so defense shred and PEN are dead)
-* **Armorer** — deals Sharp damage, scales off DEF (see below)
+* **Armorer** — deals Laceration damage, scales off DEF (see below)
 * **Stun** — creates damage windows; also deals meaningful damage
 * **Support** — buffs and utility, negligible personal damage
 * **Defense** — shields/healing/mitigation, usually also buffs; negligible personal damage
@@ -109,27 +109,51 @@ Lumen has three mechanics that make it unlike any other element:
   she tracks the last three mutations, combines their Refringe-boosted damage, multiplies by her
   Anomaly Proficiency, and delivers it as one enormous hit. Modeled as `damage.luminize`.
 
-### Armorer / Sharp / Gash / Maim
+### Armorer / Laceration / Gash / Maim
 
 The fourth DPS class is a deliberate inversion of the standard model:
 
-* **DEF and CR are the only stat levers.** Armorers have **zero ATK scaling**
-  (`ARMORER_ATK_EFFICIENCY`), so ATK buffs are worthless. Crit damage is **fixed**, so CD buffs
-  are worthless too (Astra earns nothing from an armorer). DEF buffs route through a dedicated
-  affinity path (`MULT.DEF_BUFF`), which is what makes Rina best-in-slot.
-* **Overcritical crit rate.** Armorers get a second crit check between 100–200%, so CR stays
-  useful to 200% rather than dying at 100%. Because they lean so hard on it, an armorer with
-  **no CR-supplying teammate** takes a dedicated cohesion hit (`ARMORER_CR_MISS_UTIL`).
-  CR suppliers: Koleda's P6 narrow buff, Roxy's, Nicole, Cissia.
-* **Sharp damage** is the armorer's damage type — parallel to rupture's Sheer, **but applied
+* **Laceration damage** is the armorer's damage type — parallel to rupture's Sheer, **but applied
   against normal enemy defense**. So unlike rupture, armorers *do* benefit from defense shred and PEN.
-* **Gash → Maim.** Only armorers open Gash meters, and all meters share **one pool of marks**.
-  Only stun and armorer agents build that pool, and only they detonate it into a **Maim** (a burst
-  parallel to a disorder). More builders fill the shared pool faster, which is why armorers want
-  stun/armorer-dense comps rather than double support. Modeled as a builder-scaled bonus
+* **Two crit checks, no crit damage.** The first check (0–100% CR) deals 150% Laceration; a second,
+  overcritical check (100–200% CR) deals 300%. So CR stays useful all the way to 200% rather than
+  dying at 100% — but crit *damage* is fixed, so CD buffs do nothing (Astra earns essentially
+  nothing from an armorer). ATK scaling is **zero** (`ARMORER_ATK_EFFICIENCY`).
+* **The reduced-lever problem.** An attacker can stack ATK, CR and CD; an anomaly agent can stack
+  ATK and AM/AP. An armorer's entire lever set is **CR, Laceration, PEN, defense shred** and
+  generic/elemental damage. Because the set is so small, each remaining lever is worth *more* to an
+  armorer than to anyone else — which is why `resolveBaselineWeight` gives armorers an elevated
+  weight on `pen` and `defense`, and why DEF buffs route through a dedicated, higher-multiplier
+  affinity path (`MULT.DEF_BUFF`) that makes Rina best-in-slot.
+* **Defense shred stacks.** Shred is cumulative across suppliers — Trigger (`defense: 2`) plus
+  Nicole (`defense: 3`) reach roughly 60% between them — and it raises armorer damage *without the
+  armorer receiving a buff at all*, which matters precisely because their buff-receiving surface is
+  so narrow. `Trigger/Claret/Nicole` is a stacked-shred team first and a CR team second.
+* **Laceration buffs** (`buffs.laceration`, `MULT.LACERATION_BUFF`) are the armorer analogue of
+  `sheer` for rupture: a direct amplifier on the class's own damage type, supplied by almost nobody
+  (Claret, and Koleda/Roxy's armorer-only P6 conditionals). Priced above `DEF_BUFF` for rarity,
+  below `SHEER_BUFF` because an armorer still keeps CR, PEN and shred.
+* **Damage-lever dependency.** A team supplying *none* of an armorer's levers takes a dedicated
+  cohesion hit (`ARMORER_LEVER_MISS_UTIL`). It is **graded, not binary**: total supply is summed as
+  `Σ max(cr, laceration) + ARMORER_SECONDARY_LEVER_FACTOR × Σ (pen + defense shred)` and compared
+  against `ARMORER_LEVER_FULL`. Laceration suppliers: Koleda, Roxy. CR: Nicole, Cissia. PEN: Rina.
+  Shred: Nicole, Trigger. A plain stunner like Lighter supplies nothing.
+* **Diametric pairing is armorer-adjusted.** The ATK/CD × defense-shred pair would otherwise hand an
+  armorer a cohesion floor for buffs it cannot use, so for armorer consumers the buff half of that
+  pair becomes PEN/CR/Laceration. The element buff × element debuff pair is untouched — elemental
+  damage is a full-value armorer lever. (In practice that pair is currently *unreachable* for an
+  armorer: Claret is electric, and Cissia's `debuffs.electric` is the roster's only electric-element
+  supplier, so there is no electric buff to pair it with.)
+* **Control skills.** Armorers intercept a boss control skill and reduce it to a simple quicktime
+  event, so their value rises with `mechanics.control` — see the Boss object section.
+* Laceration and Maim are **role-inherent**. A vanilla armorer needs no `scaling` and no `damage`
+  at all; Claret declares only a Laceration buff for fellow armorers and `scaling.cd: 1`, a token
+  conversion of crit damage into Laceration that overrides the class's default of no CD scaling.
+* **Gash → Maim.** Only armorers **open** Gash meters, and all meters share **one pool of marks**.
+  Stun and armorer agents **build** that pool, but only armorers **detonate** it into a **Maim** (a
+  burst parallel to a disorder). More builders fill the shared pool faster, which is why armorers
+  want stun/armorer-dense comps rather than double support. Modeled as a builder-scaled bonus
   (`MAIM_BASE`, `MAIM_ENABLER_BONUS`), with the builder count capped to represent the shared ceiling.
-* Sharp and Maim are **role-inherent**. A vanilla armorer needs no `scaling` and no `damage` at all —
-  Claret's entire kit is `mechanics: {}`.
 
 ### Additional Abilities (`join`)
 
@@ -267,7 +291,7 @@ Two distinct uses:
   between the resolved value and the max possible value, so large misses are punished
   disproportionately. This is what pushes Remielle hard toward triple-anomaly comps.
 * **Recipient-scoped** (`role` only) — resolved per consumer. This is how **narrow buffs** work:
-  Koleda and Roxy give `cr` to armorers and `cd` to everyone else, as two conditionals on the same
+  Koleda and Roxy give `laceration` to armorers and `cd` to everyone else, as two conditionals on the same
   kit. Exempt from the under-activation penalty — a per-recipient buff is never "under-activated",
   and utilization resolves it to the best value that actually reaches a DPS so a correctly-routed
   narrow buff is never charged as unlanded.
@@ -306,7 +330,7 @@ exactly when her anomaly role fires.
 #### `damage`
 
 Distinctive damage types: `enhanced`, `chain`, `aftershock`, `abloom`, `polarity`, `totalize`,
-`luminize`, `sharp`, `maim`, and the ultimate variants.
+`luminize`, `laceration`, `maim`, and the ultimate variants.
 
 The ultimate keys are load-bearing:
 
@@ -318,15 +342,15 @@ The ultimate keys are load-bearing:
   how Pyrois's conditional works: his ultimate becomes a real burst when a wind-anomaly unit is
   present, lifting the weak-ultimate penalty.
 
-`sharp` and `maim` are role-inherent to armorers — only list them to override the role default.
+`laceration` and `maim` are role-inherent to armorers — only list them to override the role default.
 
 Conditional `damage` values are resolved once per team into `unit._resolvedDamage` (damage is
 always team-scoped — it's the unit's own output — so no consumer context is needed).
 
 #### `buffs` / `debuffs`
 
-Buff keys: `atk`, `anomaly`, `aftershock`, `abloom`, `chain`, `chains`, `sheer`, `pen`, `def`,
-`stun-multiplier`, `cr`, `cd`, `dmg`, `disorders`, `vortex`, element names.
+Buff keys: `atk`, `anomaly`, `aftershock`, `abloom`, `chain`, `chains`, `sheer`, `laceration`,
+`pen`, `def`, `stun-multiplier`, `cr`, `cd`, `dmg`, `disorders`, `vortex`, element names.
 Debuff keys: `defense`, `recovery`, `dmg`, element names.
 
 Two keys behave unlike the rest and are excluded from cohesion (`COHESION_EXCLUDED_BUFFS`):
@@ -351,10 +375,7 @@ always relevant to anomaly-role units, and to others only if they have matching 
 #### `utility`
 
 `disorders`, `quick-assists`, `chains`, `ultimates`, `veils`, `heal:team`, `heal:self`, `shields`,
-`interrupt-resistance`, `kaleidoscope`, `daze`, `stunless`, `rotations`, `gash-build`.
-
-`gash-build` grants Gash buildup to a non-stun/non-armorer teammate — they add to the shared Maim
-pool's builder count but still cannot detonate it. *(Engine support exists; no unit uses it yet.)*
+`interrupt-resistance`, `kaleidoscope`, `daze`, `stunless`, `rotations`.
 
 #### `scaling`
 
@@ -377,7 +398,7 @@ Role baselines:
 | Attack | `cr`, `cd` |
 | Anomaly | `am`, `ap` |
 | Rupture | `sheer`, `hp`, `cr`, `cd` |
-| Armorer | `def`, `cr` (no `cd` — fixed crit damage) |
+| Armorer | `def`, `cr` (no `cd` — fixed crit damage; Claret overrides with `cd: 1`, a token conversion into Laceration) |
 | Stun | `daze` |
 
 (IMPORTANT HUMAN FEEDBACK FOR LATER ASSESSMENT: Attack and Anomaly should theoretically have `atk`=2 in their baseline scaling, and Rupture should theoretically have `atk`=1. This may be directly modeled in the code rather than through scaling definitions. Needs review.)
@@ -419,6 +440,7 @@ Two `scaling` keys are meta-flags rather than game mechanics:
     "shill": "anomaly", "anti": ["rupture"], "assists": 2,
     "weak": ["veils"], "anomaly:state": "wind",
     "freezable": true, "chainParry": false, "shillIntensity": 2,
+    "control": 2,
     "debuffs": { "cd": 2, "daze": 2 }
   },
   "variations": { "raging": { "enabled": false, "mechanics": { "anti": null } } }
@@ -441,6 +463,13 @@ Two `scaling` keys are meta-flags rather than game mechanics:
 * `debuffs.daze` — slows daze accumulation, penalizing attack/rupture/armorer DPS proportionally to
   the shortfall. Anomaly DPS are exempt (less window-dependent). Unlike anti-shill this is
   **fully mitigable** by bringing a high-daze stunner.
+* `control` — how many **control skills** the boss uses over the fight. A control skill locks the
+  player out of everything except dodging, parrying and assisting, and lands without the telegraph
+  players normally react to, so timing it correctly is a large part of a good clear. Armorers
+  intercept a control skill and reduce it to a simple quicktime event, so an armorer's value rises
+  with this count: `control × BOSS_WEAK.CONTROL_QUICKTIME` per armorer, with a steep per-armorer
+  falloff (`ARMORER_CONTROL_FALLOFF` — second armorer 25%, third nothing), since one interceptor
+  already covers the fight. **Bonus only** — a team without an armorer is never penalized for it.
 * `shillIntensity` — amplifies `favored` bonuses; superseded in practice by mechanics-driven scoring
 * `variations` — named alternate configurations, shallow-merged onto the base. An explicit `null`
   erases a base property. `enabled: false` hides a variation from the **UI only** — CLI tools ignore
@@ -459,7 +488,7 @@ resolution stays transparent.
 | **Typhon Slugger** | `assists: 3` — every unit must have `assist:defensive`. |
 | **Girtablullu** | `chainParry: true` — the assist requirement cannot be reduced by limited-rotation units. |
 | **Sacrifice Bringer** | `freezable` — ice anomaly agents get a large bonus. |
-| **Discordant Solo** | `weak: veils` — built around Sunna's ether veil stacking. |
+| **Discordant Solo** | `weak: veils` — built around Sunna's ether veil stacking. Also `control: 2`, the highest in the roster, so it is the current best showcase for the armorer quicktime bonus. |
 | **Primordial Nightmare / Wandering Hunter / Stagnant Aberrant** | Multiple `anti` entries narrow the field to a single viable archetype. |
 
 Everything else — full weakness/resistance lists, current anti sets — belongs in `bosses.json`, not here.
@@ -543,6 +572,11 @@ multiplicative. The engine recognizes two diametric pairs:
 * an ATK-or-CD buff from one supplier + a defense debuff from another
 * a same-element buff + a same-element debuff (Soukaku's `buffs.ice` + Lycaon's `debuffs.ice`)
 
+**Armorer exception on the first pair only.** ATK is worth zero to an armorer and CD nearly zero, so
+pairing off them would grant a cohesion floor for buffs the consumer cannot use. For armorer
+consumers the buff half becomes PEN/CR/Laceration instead. The element pair is unchanged —
+elemental damage is a full-value armorer lever.
+
 A sufficiently strong pair establishes a **cohesion floor** the team cannot drop below, scaling with
 the weights of both halves. Defense-debuff diametrics are **suppressed on anti-rupture bosses**,
 where the debuff can't be fully exploited.
@@ -571,7 +605,10 @@ What feeds utilization (`computeBuffUtilization`):
 * **Whiffed directional buffs** (`sheer` with no rupture consumer, `cd` on an all-armorer team) take
   a direct cohesion hit beyond the ratio effect, because the absolute-supply path would otherwise
   mask a wasted specialist buff.
-* **Armorer CR dependency** — an armorer with no CR supplier takes a dedicated hit.
+* **Armorer damage-lever dependency** — graded by total supply of the levers an armorer can
+  actually use (CR and Laceration primary; PEN and defense shred secondary, and shred stacks across
+  suppliers). A team supplying none of them takes a dedicated hit. Applies to every armorer, whether
+  or not they carry buffs of their own.
 * **DPS reception** — a DPS with no buff contributions of its own is instead checked on what fraction
   of its scaling needs the team meets. This is what penalizes "duo + deadweight" teams.
 * **Wasted vortex** — a wind anomaly subdps whose vortex generation has no beneficiary (no native
@@ -798,12 +835,18 @@ Kept deliberately — these are things that look wrong when you read the code, a
   to armorers. `mechanicsFitScore` in the pull engine still applies a partial multiplier, so pull
   recommendations credit ATK supports for armorers that the scorer would not.
 * `converts` is implemented but unused. No unit in `units.json` declares it. It was built for Norma (quick-assists → chain attacks) but her unit was changed last minute to upgrade a teammate rather than herself. It is retained for potential future agents that may need it.
-* `utility["gash-build"]` is implemented but unused. Built for Claret, whose kit is currently `mechanics: {}`. Her kit is still in early beta and armorer mechanics are still undergoing many changes.
 * `shillIntensity` is effectively retired, superseded by mechanics-driven scoring. Still read by
   `getBossShillIntensity` and still amplifies `favored` bonuses where set. Retained for potential future use as a lever that can be activated if necessary.
 * **The** `"shared"` field-time model is dead code, retained for possible future use. Remielle used it
   before moving to `onfield: false`.
 * **No armorer subdps exists yet.** `pull-engine.js` carries a TODO for the bucket and detector that
   will be needed when one ships.
+* `scaling.er` (energy regen) is **inert**. Roxy (4), Orphie (3) and Velina (3) declare it, but no
+  engine path reads it and no unit in the roster buffs energy regen — there is no supplier to model
+  it against, so an ER subsystem would score nothing. Retained as data-side documentation of the
+  kits; revisit if an ER-buffing support ever ships.
+* **The element diametric pair is unreachable for armorers.** Claret is electric, and Cissia's
+  `debuffs.electric` is the roster's only electric-element supplier, so there is no electric buff to
+  pair it against. The code path is correct and armorer-safe; it simply cannot fire today.
 
 

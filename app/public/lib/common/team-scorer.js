@@ -26,6 +26,12 @@ const MULT = {
     ELEMENT_DEBUFF: 2,
     ANOMALY_BUFF: 1.6,
     SHEER_BUFF: 9,
+    // Laceration buff -> armorers. The armorer analogue of SHEER_BUFF: a direct
+    // amplifier on the class's own damage type. Priced above DEF_BUFF because the
+    // buff is rare (only Claret/Koleda/Roxy supply it) and armorers have few other
+    // levers, but below SHEER_BUFF because an armorer still has CR, PEN and shred.
+    // Primary calibration dial for the armorer rework.
+    LACERATION_BUFF: 6,
     PEN_BUFF: 2,
     ATK_BUFF: 0.7,
     CR_BUFF: 0.7,
@@ -46,7 +52,7 @@ const MULT = {
     // key lever for making DEF-buffers (e.g. Rina) best-in-slot for armorers.
     DEF_BUFF: 2.5,
     // Generic damage buff/debuff (`dmg`): a universal multiplier on ALL damage — the
-    // last term in the formula, so it lifts attack/anomaly/vortex/totalize/Sharp/etc.
+    // last term in the formula, so it lifts attack/anomaly/vortex/totalize/Laceration/etc.
     // Never misses (every DPS benefits). A debuff is worth slightly less than a buff:
     // a buff helps the team against every enemy/wave, a debuff only marks one enemy —
     // irrelevant on single-target Deadly Assault, but real on multi-enemy Shiyu Defense.
@@ -60,11 +66,10 @@ const RUPTURE_ATK_EFFICIENCY = 0.33;
 // stat levers are crit rate and defense.
 const ARMORER_ATK_EFFICIENCY = 0;
 
-// Maim: only armorers open Gash meters; all meters share one pool of marks (max 3). Only
-// stun/armorer agents build that pool (+ units Claret grants gash-build to via
-// utility["gash-build"]), and only stun/armorer agents detonate it into a Maim burst
-// (parallel to a disorder). More gash builders → the shared pool fills faster → more/bigger
-// maims — which is why armorers favour dual-DPS (Stun/Armorer/Armorer, Armorer/Armorer/Support).
+// Maim: only armorers OPEN Gash meters; all meters share one pool of marks (max 3). Stun and
+// armorer agents BUILD that pool, but only armorers DETONATE it into a Maim burst (parallel to
+// a disorder). More gash builders → the shared pool fills faster → more/bigger maims — which is
+// why armorers favour dual-DPS (Stun/Armorer/Armorer, Armorer/Armorer/Support).
 const MAIM_BASE = 8;
 const MAIM_ENABLER_BONUS = 6;
 // Element-scoped anomaly scaling (e.g. Roxy/Pyrois `scaling["anomaly:wind"]`): bonus per
@@ -80,7 +85,15 @@ const BOSS_WEAK = {
     FREEZE_BONUS: 15,
     CD_DEBUFF_PER_UNIT: 16,
     DAZE_DEBUFF_PER_UNIT: 10,
+    // Armorer quicktime bonus, per control skill the boss uses. A control skill locks the
+    // player out of everything but dodge/parry/assist and arrives without the usual telegraph,
+    // so timing it is a large part of a good clear. Armorers intercept it and reduce it to a
+    // simple quicktime event. Bonus only — a team with no armorer is never penalized for it.
+    CONTROL_QUICKTIME: 10,
 };
+
+// Second armorer adds much less (one interceptor already covers the fight); third adds nothing.
+const ARMORER_CONTROL_FALLOFF = [1, 0.25, 0];
 
 const BURST_DAMAGE_TYPES = ['enhanced', 'ultimate:strong', 'ultimate:double', 'chain', 'totalize', 'maim'];
 const NEED_FULFILLMENT_KEYS = [
@@ -306,6 +319,7 @@ export function getBossAnti(boss) { return boss.mechanics?.anti ?? []; }
 export function getBossAssists(boss) { return boss.mechanics?.assists ?? 0; }
 export function getBossChainParry(boss) { return boss.mechanics?.chainParry === true; }
 export function getBossShillIntensity(boss) { return boss.mechanics?.shillIntensity ?? 1; }
+export function getBossControl(boss) { return boss.mechanics?.control ?? 0; }
 
 // ============================================================================
 // MECHANICS HELPERS
@@ -680,8 +694,15 @@ function resolveBaselineWeight(consumer, category) {
         case 'sheer':
             if (scaling?.sheer) return w(scaling.sheer);
             return roles.includes('rupture') ? 3 : 0;
+        case 'laceration':
+            if (scaling?.laceration) return w(scaling.laceration);
+            return roles.includes('armorer') ? 3 : 0;
         case 'pen':
             if (scaling?.pen) return w(scaling.pen);
+            // Armorer premium: Laceration lands against normal enemy defense (unlike
+            // rupture's Sheer), and with ATK and CD dead, PEN is one of the few levers
+            // an armorer has left — so it is worth more to them than to an attacker.
+            if (roles.includes('armorer')) return 2;
             return (isDPSByRoles(roles) && !roles.includes('rupture')) ? 1 : 0;
         case 'cr':
             if (scaling?.cr) return w(scaling.cr);
@@ -710,6 +731,10 @@ function resolveBaselineWeight(consumer, category) {
             }
             return 0;
         case 'defense':
+            // Armorer premium, same reasoning as 'pen'. Defense shred is doubly valuable
+            // to them because it stacks across suppliers (Trigger + Nicole ~= 60% shred)
+            // and raises their damage without the armorer receiving a buff at all.
+            if (roles.includes('armorer')) return 2;
             return ((isDPSByRoles(roles) || isStunnerByRoles(roles)) && !roles.includes('rupture')) ? 1 : 0;
         case 'element':
             return (isDPSByRoles(roles) || isStunnerByRoles(roles)) ? 1 : 0;
@@ -750,10 +775,35 @@ const BUFF_UTIL_FLOOR = 0;
 // armorer class, CD always landed, so the engine never treated it as missable.
 const WHIFF_COHESION_PENALTY = 0.8;
 const WHIFF_PENALTY_BUFFS = ['sheer', 'cd'];
-// Armorer crit-rate dependency: an armorer with no CR-supplying teammate takes this cohesion
-// hit (weighted like a hard need). Strong, because CR is an armorer's defining stat.
-const ARMORER_CR_MISS_UTIL = 0.55;
-const ARMORER_CR_WEIGHT = 0.6;
+// Armorer damage-lever dependency. Armorers have two crit checks (0-100% for 150% Laceration,
+// 100-200% for 300%) but fixed crit damage and zero ATK scaling, so their whole lever set is
+// CR, Laceration, PEN and defense shred. A team that supplies none of them leaves the armorer
+// with no way to reach its damage ceiling, and takes this cohesion hit (weighted like a hard
+// need). CR and Laceration are primary (they drive the crit checks directly); PEN and shred
+// are secondary but real, and shred STACKS across suppliers — Trigger + Nicole together shred
+// ~60%, which is a full-strength lever without the armorer receiving a buff at all.
+const ARMORER_LEVER_MISS_UTIL = 0.55;
+const ARMORER_LEVER_WEIGHT = 0.6;
+const ARMORER_SECONDARY_LEVER_FACTOR = 0.75;
+// Total lever supply at which the dependency is fully satisfied.
+const ARMORER_LEVER_FULL = 3;
+
+// Summed lever supply available to `armorer` from the rest of the team. Conditional values are
+// resolved against this armorer as recipient, so Koleda/Roxy's armorer-only Laceration counts.
+function getArmorerLeverSupply(armorer, team) {
+    let primary = 0, secondary = 0;
+    for (const s of team) {
+        if (s === armorer) continue;
+        const ctx = { team, self: s, consumer: armorer };
+        const buffs = s.mechanics?.buffs;
+        primary += Math.max(
+            resolveConditionalValue(buffs?.cr, ctx),
+            resolveConditionalValue(buffs?.laceration, ctx));
+        secondary += resolveConditionalValue(buffs?.pen, ctx)
+            + resolveConditionalValue(s.mechanics?.debuffs?.defense, ctx);
+    }
+    return primary + secondary * ARMORER_SECONDARY_LEVER_FACTOR;
+}
 // Undersupply is worse than linear: when a provider supplies less of a need than the
 // consumer scales for, the partial credit is further discounted (0.6 → ~30% at half).
 const UNDERSUPPLY_FACTOR = 0.6;
@@ -774,6 +824,9 @@ function getBuffRelevance(key, consumer) {
         case 'sheer':
             if (consumer.mechanics?.scaling?.sheer) return 1;
             return roles.includes('rupture') ? 1 : 0;
+        case 'laceration':
+            if (consumer.mechanics?.scaling?.laceration) return 1;
+            return roles.includes('armorer') ? 1 : 0;
         case 'pen':
             return (dps && !roles.includes('rupture')) ? 1 : 0;
         case 'cr':
@@ -783,8 +836,11 @@ function getBuffRelevance(key, consumer) {
             if (roles.includes('anomaly')) return 0.3;
             return 0;
         case 'cd':
-            if (consumer.mechanics?.scaling?.cd) return 1;
-            // Armorer: no cd relevance (fixed crit damage) — CD-buffing supports earn no credit.
+            // Graded by declared scaling: an attacker-tier cd:2 is fully relevant, while a
+            // token converter like Claret (cd:1 — she turns a sliver of CD into Laceration)
+            // only half-lands, so CD-buffing supports earn proportionally little credit.
+            if (consumer.mechanics?.scaling?.cd) return Math.min(1, w(consumer.mechanics.scaling.cd) / 2);
+            // Armorers otherwise have FIXED crit damage — CD-buffing supports earn nothing.
             if (roles.includes('attack') || roles.includes('rupture')) return 1;
             if (roles.includes('anomaly')) return 0.3;
             return 0;
@@ -830,7 +886,7 @@ function getDebuffRelevance(key, consumer) {
     }
 }
 
-const STAT_BUFF_KEYS = new Set(['atk', 'anomaly', 'sheer', 'pen', 'cr', 'cd', 'stun-multiplier', ...ELEMENTS]);
+const STAT_BUFF_KEYS = new Set(['atk', 'anomaly', 'sheer', 'laceration', 'pen', 'cr', 'cd', 'stun-multiplier', ...ELEMENTS]);
 
 const BUFF_IMPACT = {
     atk: MULT.ATK_BUFF, cr: MULT.CR_BUFF, cd: MULT.CD_BUFF,
@@ -1616,6 +1672,22 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
         }
     }
 
+    // Control skills (e.g. Discordant Solo): armorers intercept a control skill and turn it
+    // into a simple quicktime event, so their value rises with how many the boss uses. Scales
+    // per armorer with a steep falloff — a second interceptor helps a little, a third not at
+    // all. Pure bonus: teams without an armorer are unaffected.
+    const controlCount = getBossControl(boss);
+    if (controlCount > 0) {
+        const armorers = team.filter(u => getEffectiveRoles(u).includes('armorer'));
+        armorers.forEach((unit, i) => {
+            const falloff = ARMORER_CONTROL_FALLOFF[i] ?? 0;
+            if (falloff === 0) return;
+            const bonus = Math.round(controlCount * BOSS_WEAK.CONTROL_QUICKTIME * falloff);
+            score += bonus;
+            if (debug) console.log(`    Boss control skills (${controlCount}): ${unit.name} quicktime intercept → +${bonus}${i > 0 ? ` (×${falloff})` : ''}`);
+        });
+    }
+
     // --- DPS element weakness/resistance ---
     const l3Reactions = computeAnomalyReactions(team, boss);
     let onElementDPSCount = 0;
@@ -1815,6 +1887,16 @@ function scoreBaselineAffinity(supplier, consumer, debug, options = {}) {
             const val = w(supplierBuffs.sheer) * cw * MULT.SHEER_BUFF;
             score += val;
             dbg('sheer', val);
+        }
+    }
+
+    // Laceration buffs → armorers. The armorer analogue of the sheer block above.
+    if (supplierBuffs.laceration) {
+        const cw = resolveBaselineWeight(consumer, 'laceration');
+        if (cw > 0) {
+            const val = w(supplierBuffs.laceration) * cw * MULT.LACERATION_BUFF;
+            score += val;
+            dbg('laceration', val);
         }
     }
 
@@ -2127,10 +2209,23 @@ function countDiametricPairs(consumer, team, { antiRupture = false } = {}) {
     const elemBuffSuppliers = new Map();
     const elemDebuffSuppliers = new Map();
 
+    // The buff half of the buff x defense-shred pair. For most DPS that is ATK/CD, but an
+    // armorer gets nothing from ATK and usually nothing from CD, so pairing off those would
+    // hand out a cohesion floor for buffs the consumer cannot use. Swap in the levers an
+    // armorer actually has: PEN, CR and Laceration. (The element buff x element debuff pair
+    // below is left alone — elemental damage is a full-value lever for armorers too.)
+    const isArmorerConsumer = consumerRoles.includes('armorer');
+    const pairBuffWeight = (s, buffs) => isArmorerConsumer
+        ? Math.max(
+            getEffectiveBuffValue(s, team, 'atk') * ARMORER_ATK_EFFICIENCY,
+            w(buffs.cd) * getBuffRelevance('cd', consumer),
+            w(buffs.pen), w(buffs.cr), w(buffs.laceration))
+        : Math.max(getEffectiveBuffValue(s, team, 'atk'), w(buffs.cd));
+
     for (const s of suppliers) {
         const buffs = resolveValueMap(s.mechanics?.buffs, { team, self: s, consumer: null });
         const debuffs = resolveValueMap(s.mechanics?.debuffs, { team, self: s, consumer: null });
-        const atkCdWeight = Math.max(getEffectiveBuffValue(s, team, 'atk'), w(buffs.cd));
+        const atkCdWeight = pairBuffWeight(s, buffs);
         if (atkCdWeight > 0) atkCdSuppliers.set(s.name, atkCdWeight);
         const defWeight = w(debuffs.defense);
         if (defWeight > 0) defDebuffSuppliers.set(s.name, defWeight);
@@ -2286,16 +2381,14 @@ function scoreMechanicalSynergy(team, debug, options = {}) {
     }
 
     // Maim reaction bonus. Only armorers open Gash meters; all meters share one pool of marks
-    // (max 3), and only stun/armorer agents build that pool (+ non-stun/non-armorer units that
-    // Claret has granted gash-build to, via utility["gash-build"]). More gash builders → the
-    // shared pool fills faster → more/bigger Maims (only stun/armorer detonate). This is why
-    // armorers favour stun/armorer-dense comps (Stun/Armorer/Armorer, Armorer/Armorer/Support).
-    // The shared-pool cap is modelled by capping the builder count.
+    // (max 3). Stun and armorer agents build that pool, and only armorers detonate it into a
+    // Maim — which is why the bonus below is awarded to armorers alone. More gash builders →
+    // the shared pool fills faster → more/bigger Maims, so armorers favour stun/armorer-dense
+    // comps (Stun/Armorer/Armorer, Armorer/Armorer/Support). The shared-pool cap is modelled by
+    // capping the builder count.
     const armorerUnits = team.filter(u => getEffectiveRoles(u).includes('armorer'));
     if (armorerUnits.length > 0) {
-        const grantsGashBuild = team.some(u => w(u.mechanics?.utility?.['gash-build']) > 0);
-        const buildsGash = (u) => isStun(u) || isArmorer(u)
-            || (grantsGashBuild && !isStun(u) && !isArmorer(u));
+        const buildsGash = (u) => isStun(u) || isArmorer(u);
         for (const unit of armorerUnits) {
             const builderCount = Math.min(2, team.filter(u => u !== unit && buildsGash(u)).length);
             const maimBonus = MAIM_BASE + MAIM_ENABLER_BONUS * builderCount;
@@ -2452,6 +2545,18 @@ function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs =
     let totalWeight = 0;
 
     for (const unit of team) {
+        // Armorer damage-lever dependency (dedicated, strong) — see ARMORER_LEVER_MISS_UTIL.
+        // Graded by total lever supply rather than a yes/no CR check, so stacked defense shred
+        // counts for what it is. Applied to every armorer, buff-carrying or not: Claret has a
+        // buff of her own now, and must not fall out of this check because of it.
+        if (isArmorer(unit)) {
+            const supply = getArmorerLeverSupply(unit, team);
+            const leverUtil = ARMORER_LEVER_MISS_UTIL + (1 - ARMORER_LEVER_MISS_UTIL)
+                * Math.min(1, supply / ARMORER_LEVER_FULL);
+            logSum += ARMORER_LEVER_WEIGHT * Math.log(Math.max(leverUtil * leverUtil, 0.01));
+            totalWeight += ARMORER_LEVER_WEIGHT;
+            if (debug) console.log(`    Armorer levers: ${unit.name} supply=${supply.toFixed(2)} util=${leverUtil.toFixed(2)}`);
+        }
         const buffs = unit.mechanics?.buffs || {};
         const debuffs = unit.mechanics?.debuffs || {};
         const utility = unit.mechanics?.utility || {};
@@ -2522,18 +2627,6 @@ function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs =
                 const weight = Math.min(0.5, needsTotal * 0.25);
                 logSum += weight * Math.log(Math.max(receptionUtil * receptionUtil, 0.01));
                 totalWeight += weight;
-            }
-            // Armorer crit-rate dependency (dedicated, strong). Armorers scale almost entirely
-            // off CR (overcritical, useful to 200%) and DEF; ATK is nearly dead (15%) and CD is
-            // fixed. Unlike other DPS — for whom CR is a generic equipment stat — an armorer with
-            // NO CR-supplying teammate is badly under-powered. Koleda's P6 narrow CR and
-            // Nicole/Cissia satisfy it; a plain stunner like Trigger does not.
-            if (isArmorer(unit)) {
-                const hasCrSupplier = team.some(s => s !== unit &&
-                    resolveConditionalValue(s.mechanics?.buffs?.cr, { team, self: s, consumer: unit }) > 0);
-                const crUtil = hasCrSupplier ? 1.0 : ARMORER_CR_MISS_UTIL;
-                logSum += ARMORER_CR_WEIGHT * Math.log(Math.max(crUtil * crUtil, 0.01));
-                totalWeight += ARMORER_CR_WEIGHT;
             }
             continue;
         }

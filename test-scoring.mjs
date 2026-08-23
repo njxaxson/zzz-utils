@@ -1443,12 +1443,13 @@ async function main() {
     });
 
     // ========================================================================
-    // TEST 68: Crit inversion — CD is useless for armorers (Neutral)
+    // TEST 68: Crit inversion — CD barely moves an armorer (Neutral)
     // ========================================================================
-    // Armorers have fixed crit damage: CD buffs do nothing. Astra provides a huge
-    // atk:3 + cd:3, but both are effectively wasted on Claret. Rina should therefore 
-    // dominate Astra as Claret's support, unlike for a normal crit attacker.
-    run('TEST 68: CD buff is useless for Claret armorer (Neutral)', () => {
+    // Armorer crit damage is fixed. Claret is the one exception: scaling.cd:1 converts a
+    // sliver of CD into Laceration, so Astra's cd:3 is not quite dead — but at half an
+    // attacker's weight, and her atk:3 is worth exactly nothing. Rina should still dominate
+    // Astra as Claret's support, unlike for a normal crit attacker.
+    run('TEST 68: CD buff barely helps Claret armorer (Neutral)', () => {
         if (!allUnits.find(u => u.id === 'claret')) return;
         for (const b of withBosses(bosses, 'Neutral')) {
             const t = 'Koleda/Claret/Rina,Koleda/Claret/Astra';
@@ -1456,7 +1457,7 @@ async function main() {
             const rina = m.get('Koleda / Claret / Rina');
             const astra = m.get('Koleda / Claret / Astra');
             assert(rina > astra + 60,
-                `${b.name}: Rina(${rina?.toFixed(1)}) >> Astra(${astra?.toFixed(1)}) — Astra's CD is wasted on an armorer`);
+                `${b.name}: Rina(${rina?.toFixed(1)}) >> Astra(${astra?.toFixed(1)}) — Astra's ATK is dead and her CD barely converts`);
         }
     });
 
@@ -1522,165 +1523,169 @@ async function main() {
         }
     });
 
-//     // ========================================================================
-//     // TEST 72: Maim enabler + structure — armorers want a Maim trigger (Neutral)
-//     // ========================================================================
-//     // A Maim only detonates with a stun or armorer trigger. Koleda/Claret/Rina is a
-//     // conventional armorer-hypercarry with a stun enabler (+Maim, +stun-emergence);
-//     // Claret/Lucy/Rina is a stunless "false wheelchair" with no enabler, so it should score
-//     // meaningfully lower. (Dual-armorer structure can't be exercised until a second
-//     // armorer exists in the roster.)
-//     run('TEST 72: Maim enabler + armorer structure (Neutral)', () => {
-//         if (!allUnits.find(u => u.id === 'claret')) return;
-//         for (const b of withBosses(bosses, 'Neutral')) {
-//             const t = 'Koleda/Claret/Rina,Claret/Lucy/Rina';
-//             const m = scoreMapForBoss(scoreForTeamString(t, allUnits, { preview: true }), b);
-//             const withStun = m.get('Koleda / Claret / Rina');
-//             const stunless = m.get('Claret / Lucy / Rina');
-//             assert(withStun > stunless + 80,
-//                 `${b.name}: stun-enabled Koleda/Claret/Rina (${withStun?.toFixed(1)}) should beat stunless Claret/Lucy/Rina (${stunless?.toFixed(1)})`);
-//         }
-//     });
+    // ========================================================================
+    // TEST 72: Maim enabler + structure — armorers want a Maim trigger (Neutral)
+    // ========================================================================
+    // Stun and armorer agents build the shared Gash pool; only an armorer detonates it into
+    // a Maim, so an armorer wants gash builders alongside it. Koleda/Claret/Rina is a
+    // conventional armorer-hypercarry with a stun enabler (+Maim, +stun-emergence);
+    // Claret/Lucy/Rina is a stunless "false wheelchair" with no enabler, so it should score
+    // meaningfully lower. (Dual-armorer structure can't be exercised until a second
+    // armorer exists in the roster.)
+    run('TEST 72: Maim enabler + armorer structure (Neutral)', () => {
+        if (!allUnits.find(u => u.id === 'claret')) return;
+        for (const b of withBosses(bosses, 'Neutral')) {
+            const t = 'Koleda/Claret/Rina,Claret/Lucy/Rina';
+            const m = scoreMapForBoss(scoreForTeamString(t, allUnits, { preview: true }), b);
+            const withStun = m.get('Koleda / Claret / Rina');
+            const stunless = m.get('Claret / Lucy / Rina');
+            assert(withStun > stunless + 80,
+                `${b.name}: stun-enabled Koleda/Claret/Rina (${withStun?.toFixed(1)}) should beat stunless Claret/Lucy/Rina (${stunless?.toFixed(1)})`);
+        }
+    });
 
-//     // ========================================================================
-//     // TEST 73: Unified conditional framework — recipient-scoped + team-scoped
-//     // ========================================================================
-//     // Koleda's P6 narrow buff: armorers receive CR, everyone else CD (recipient-scoped
-//     // `role` predicate). Remielle's ATK curve scales with anomaly count (team-scoped).
-//     run('TEST 73: conditional framework resolves per-recipient and per-team', () => {
-//         const koleda = allUnits.find(u => u.id === 'koleda');
-//         const rem = allUnits.find(u => u.id === 'ramiel');
-//         const armorer = { tags: ['armorer'] };
-//         const attacker = { tags: ['attack'] };
-//         const kCr = koleda.mechanics.buffs.cr, kCd = koleda.mechanics.buffs.cd;
-//         // Recipient-scoped: armorer → CR:1/CD:0; non-armorer → CR:0/CD:3
-//         assert(resolveConditionalValue(kCr, { team: [], self: koleda, consumer: armorer }) === 1,
-//             'Koleda CR should be 1 for an armorer recipient');
-//         assert(resolveConditionalValue(kCd, { team: [], self: koleda, consumer: armorer }) === 0,
-//             'Koleda CD should be 0 for an armorer recipient');
-//         assert(resolveConditionalValue(kCr, { team: [], self: koleda, consumer: attacker }) === 0,
-//             'Koleda CR should be 0 for a non-armorer recipient');
-//         assert(resolveConditionalValue(kCd, { team: [], self: koleda, consumer: attacker }) === 3,
-//             'Koleda CD should be 3 for a non-armorer recipient');
-//         // Team-scoped: Remielle ATK by anomaly count (incl. self): 3+→4, 2→2, else 0
-//         const ano = n => Array.from({ length: n }, () => ({ tags: ['anomaly'] }));
-//         const rAtk = rem.mechanics.buffs.atk;
-//         assert(resolveConditionalValue(rAtk, { team: ano(3), self: rem, consumer: null }) === 4,
-//             'Remielle ATK should be 4 on a triple-anomaly team');
-//         assert(resolveConditionalValue(rAtk, { team: ano(2), self: rem, consumer: null }) === 2,
-//             'Remielle ATK should be 2 on a duo-anomaly team');
-//         assert(resolveConditionalValue(rAtk, { team: ano(1), self: rem, consumer: null }) === 0,
-//             'Remielle ATK should be 0 with a lone anomaly');
-//     });
+    // ========================================================================
+    // TEST 73: Unified conditional framework — recipient-scoped + team-scoped
+    // ========================================================================
+    // Koleda's P6 narrow buff: armorers receive Laceration, everyone else CD (recipient-scoped
+    // `role` predicate). Remielle's ATK curve scales with anomaly count (team-scoped).
+    run('TEST 73: conditional framework resolves per-recipient and per-team', () => {
+        const koleda = allUnits.find(u => u.id === 'koleda');
+        const rem = allUnits.find(u => u.id === 'ramiel');
+        const armorer = { tags: ['armorer'] };
+        const attacker = { tags: ['attack'] };
+        const kLac = koleda.mechanics.buffs.laceration, kCd = koleda.mechanics.buffs.cd;
+        // Recipient-scoped: armorer → Laceration:1/CD:0; non-armorer → Laceration:0/CD:3
+        assert(resolveConditionalValue(kLac, { team: [], self: koleda, consumer: armorer }) === 1,
+            'Koleda Laceration should be 1 for an armorer recipient');
+        assert(resolveConditionalValue(kCd, { team: [], self: koleda, consumer: armorer }) === 0,
+            'Koleda CD should be 0 for an armorer recipient');
+        assert(resolveConditionalValue(kLac, { team: [], self: koleda, consumer: attacker }) === 0,
+            'Koleda Laceration should be 0 for a non-armorer recipient');
+        assert(resolveConditionalValue(kCd, { team: [], self: koleda, consumer: attacker }) === 3,
+            'Koleda CD should be 3 for a non-armorer recipient');
+        // Team-scoped: Remielle ATK by anomaly count (incl. self): 3+→4, 2→2, else 0
+        const ano = n => Array.from({ length: n }, () => ({ tags: ['anomaly'] }));
+        const rAtk = rem.mechanics.buffs.atk;
+        assert(resolveConditionalValue(rAtk, { team: ano(3), self: rem, consumer: null }) === 4,
+            'Remielle ATK should be 4 on a triple-anomaly team');
+        assert(resolveConditionalValue(rAtk, { team: ano(2), self: rem, consumer: null }) === 2,
+            'Remielle ATK should be 2 on a duo-anomaly team');
+        assert(resolveConditionalValue(rAtk, { team: ano(1), self: rem, consumer: null }) === 0,
+            'Remielle ATK should be 0 with a lone anomaly');
+    });
 
-//     // ========================================================================
-//     // TEST 74: Koleda rework lands — general damage + P6 + tier 1.5
-//     // ========================================================================
-//     // Koleda's 3.2 rework (dmg:4 general-damage buff, P6 narrow CR/CD, tier 2.5→1.5)
-//     // considerably improves Koleda/Claret/Rina, and makes her a viable generalist on a
-//     // conventional attack team.
-//     run('TEST 74: Koleda rework improves her teams (Neutral)', () => {
-//         for (const b of withBosses(bosses, 'Neutral')) {
-//             const kcr = scoreForTeamString('Koleda/Claret/Rina', allUnits, { preview: true })[0];
-//             const kcrScore = scoreTeamForBoss(kcr.team, b, {});
-//             assert(kcrScore >= 295,
-//                 `Koleda/Claret/Rina should score >= 295 after the rework, got ${kcrScore?.toFixed(1)}`);
-//             const kea = scoreForTeamString('Koleda/Evelyn/Astra', allUnits)[0];
-//             const keaScore = scoreTeamForBoss(kea.team, b, {});
-//             assert(keaScore >= 300,
-//                 `Koleda/Evelyn/Astra should be a viable generalist team (>= 300), got ${keaScore?.toFixed(1)}`);
-//         }
-//     });
+    // ========================================================================
+    // TEST 74: Koleda rework lands — general damage + P6 + tier 1.5
+    // ========================================================================
+    // Koleda's 3.2 rework (dmg:4 general-damage buff, P6 narrow Laceration/CD, tier 2.5→1.5)
+    // considerably improves Koleda/Claret/Rina, and makes her a viable generalist on a
+    // conventional attack team. The Evelyn floor is 295, not 300: the P6 rework moved her
+    // armorer-facing buff from CR to Laceration, which is worth nothing to Evelyn, so the
+    // generalist line sits marginally below where the pre-rework kit put it.
+    run('TEST 74: Koleda rework improves her teams (Neutral)', () => {
+        for (const b of withBosses(bosses, 'Neutral')) {
+            const kcr = scoreForTeamString('Koleda/Claret/Rina', allUnits, { preview: true })[0];
+            const kcrScore = scoreTeamForBoss(kcr.team, b, {});
+            assert(kcrScore >= 315,
+                `Koleda/Claret/Rina should score >= 315 after the rework, got ${kcrScore?.toFixed(1)}`);
+            const kea = scoreForTeamString('Koleda/Evelyn/Astra', allUnits)[0];
+            const keaScore = scoreTeamForBoss(kea.team, b, {});
+            assert(keaScore >= 295,
+                `Koleda/Evelyn/Astra should be a viable generalist team (>= 295), got ${keaScore?.toFixed(1)}`);
+        }
+    });
 
-//     // ========================================================================
-//     // TEST 75: Roxy is Claret's best-in-slot stunner (upgrades Koleda)
-//     // ========================================================================
-//     // Roxy shares Koleda's P6 narrow CR/CD but is a stronger overall kit (wind
-//     // pseudo-anomaly subdps, DEF scaling, daze), so Roxy/Claret/Rina should be
-//     // Claret's BiS and clearly beat Koleda/Claret/Rina.
-//     run('TEST 75: Roxy/Claret/Rina is Claret BiS over Koleda (Neutral)', () => {
-//         if (!allUnits.find(u => u.id === 'roxy') || !allUnits.find(u => u.id === 'claret')) return;
-//         for (const b of withBosses(bosses, 'Neutral')) {
-//             const m = scoreMapForBoss(
-//                 scoreForTeamString('Roxy/Claret/Rina,Koleda/Claret/Rina', allUnits, { preview: true }), b);
-//             const roxy = m.get('Roxy / Claret / Rina');
-//             const koleda = m.get('Koleda / Claret / Rina');
-//             assert(roxy >= 340, `Roxy/Claret/Rina should be BiS-strong (>= 340), got ${roxy?.toFixed(1)}`);
-//             assert(roxy > koleda, `Roxy/Claret/Rina (${roxy?.toFixed(1)}) should beat Koleda/Claret/Rina (${koleda?.toFixed(1)})`);
-//         }
-//     });
+    // ========================================================================
+    // TEST 75: Roxy is Claret's best-in-slot stunner (upgrades Koleda)
+    // ========================================================================
+    // Roxy and Koleda both run the P6 narrow Laceration/CD split, but Roxy's armorer-facing
+    // Laceration is 3 to Koleda's 1, and her kit is stronger overall (wind pseudo-anomaly
+    // subdps, heavy energy regen, daze). Roxy/Claret/Rina should be Claret's BiS and clearly
+    // beat Koleda/Claret/Rina.
+    run('TEST 75: Roxy/Claret/Rina is Claret BiS over Koleda (Neutral)', () => {
+        if (!allUnits.find(u => u.id === 'roxy') || !allUnits.find(u => u.id === 'claret')) return;
+        for (const b of withBosses(bosses, 'Neutral')) {
+            const m = scoreMapForBoss(
+                scoreForTeamString('Roxy/Claret/Rina,Koleda/Claret/Rina', allUnits, { preview: true }), b);
+            const roxy = m.get('Roxy / Claret / Rina');
+            const koleda = m.get('Koleda / Claret / Rina');
+            assert(roxy >= 380, `Roxy/Claret/Rina should be BiS-strong (>= 380), got ${roxy?.toFixed(1)}`);
+            assert(roxy > koleda, `Roxy/Claret/Rina (${roxy?.toFixed(1)}) should beat Koleda/Claret/Rina (${koleda?.toFixed(1)})`);
+        }
+    });
 
-//     // ========================================================================
-//     // TEST 76: Roxy enables Pyrois's wind-anomaly ultimate
-//     // ========================================================================
-//     // Pyrois deals bonus ultimate damage under wind anomaly (scaling["anomaly:wind"]).
-//     // Roxy, a wind pseudo-anomaly stunner who joins on attack, supplies it; a fire
-//     // stunner (Koleda) does not — so Roxy is decisively his better stunner here.
-//     run('TEST 76: Roxy enables Pyrois over a non-wind stunner (Neutral)', () => {
-//         if (!allUnits.find(u => u.id === 'roxy')) return;
-//         for (const b of withBosses(bosses, 'Neutral')) {
-//             const m = scoreMapForBoss(
-//                 scoreForTeamString('Roxy/Pyrois/Astra,Koleda/Pyrois/Astra', allUnits, { preview: true }), b);
-//             const roxy = m.get('Roxy / Pyrois / Astra');
-//             const koleda = m.get('Koleda / Pyrois / Astra');
-//             assert(roxy > koleda + 40,
-//                 `Roxy/Pyrois/Astra (${roxy?.toFixed(1)}) should clearly beat Koleda/Pyrois/Astra (${koleda?.toFixed(1)}) — wind-anomaly enabler`);
-//         }
-//     });
+    // ========================================================================
+    // TEST 76: Roxy enables Pyrois's wind-anomaly ultimate
+    // ========================================================================
+    // Pyrois deals bonus ultimate damage under wind anomaly (scaling["anomaly:wind"]).
+    // Roxy, a wind pseudo-anomaly stunner who joins on attack, supplies it; a fire
+    // stunner (Koleda) does not — so Roxy is decisively his better stunner here.
+    run('TEST 76: Roxy enables Pyrois over a non-wind stunner (Neutral)', () => {
+        if (!allUnits.find(u => u.id === 'roxy')) return;
+        for (const b of withBosses(bosses, 'Neutral')) {
+            const m = scoreMapForBoss(
+                scoreForTeamString('Roxy/Pyrois/Astra,Koleda/Pyrois/Astra', allUnits, { preview: true }), b);
+            const roxy = m.get('Roxy / Pyrois / Astra');
+            const koleda = m.get('Koleda / Pyrois / Astra');
+            assert(roxy > koleda + 40,
+                `Roxy/Pyrois/Astra (${roxy?.toFixed(1)}) should clearly beat Koleda/Pyrois/Astra (${koleda?.toFixed(1)}) — wind-anomaly enabler`);
+        }
+    });
 
-//     // ========================================================================
-//     // TEST 77: Roxy/Harumasa/Velina — emergent wind team is viable (Typhon)
-//     // ========================================================================
-//     // The only fully-valid Roxy+Velina composition (Harumasa joins both). Roxy+Velina
-//     // stack wind anomaly + daze; on Typhon (electric + wind weak) it should be a solid,
-//     // playable team even with Harumasa at T2.5. (Not top-tier until Harumasa is buffed.)
-//     run('TEST 77: Roxy/Harumasa/Velina viable on Typhon', () => {
-//         if (!allUnits.find(u => u.id === 'roxy')) return;
-//         for (const b of withBosses(bosses, 'Typhon')) {
-//             const parsed = scoreForTeamString('Roxy/Harumasa/Velina', allUnits, { preview: true })[0];
-//             const s = scoreTeamForBoss(parsed.team, b, {});
-//             assert(s >= 250, `Roxy/Harumasa/Velina on Typhon should be playable (>= 250), got ${s?.toFixed(1)}`);
-//         }
-//     });
+    // ========================================================================
+    // TEST 77: Roxy/Harumasa/Velina — emergent wind team is viable (Typhon)
+    // ========================================================================
+    // The only fully-valid Roxy+Velina composition (Harumasa joins both). Roxy+Velina
+    // stack wind anomaly + daze; on Typhon (electric + wind weak) it should be a solid,
+    // playable team even with Harumasa at T2.5. (Not top-tier until Harumasa is buffed.)
+    run('TEST 77: Roxy/Harumasa/Velina viable on Typhon', () => {
+        if (!allUnits.find(u => u.id === 'roxy')) return;
+        for (const b of withBosses(bosses, 'Typhon')) {
+            const parsed = scoreForTeamString('Roxy/Harumasa/Velina', allUnits, { preview: true })[0];
+            const s = scoreTeamForBoss(parsed.team, b, {});
+            assert(s >= 250, `Roxy/Harumasa/Velina on Typhon should be playable (>= 250), got ${s?.toFixed(1)}`);
+        }
+    });
 
-//    // ========================================================================
-//     // TEST 78: hasUnit qualified identifier "anomaly:wind" (Pyrois conditional ultimate)
-//     // ========================================================================
-//     // Pyrois's damage["ultimate:strong"] activates only when a wind-anomaly unit is on the
-//     // team, expressed as { when: { hasUnit: "anomaly:wind" } }. A colon-qualified hasUnit
-//     // matches by effective role + element, so Roxy (wind pseudo-anomaly) triggers it but
-//     // Vivian (ether anomaly) does not.
-//     run('TEST 78: hasUnit "anomaly:wind" predicate (Pyrois ultimate)', () => {
-//         if (!allUnits.find(u => u.id === 'roxy')) return;
-//         const pyrois = allUnits.find(u => u.id === 'pyrois');
-//         const roxy = allUnits.find(u => u.id === 'roxy');
-//         const vivian = allUnits.find(u => u.id === 'vivian');
-//         const spec = pyrois.mechanics.damage['ultimate:strong'];
-//         assert(resolveConditionalValue(spec, { team: [pyrois, roxy], self: pyrois, consumer: null }) === 1,
-//             'Pyrois ultimate:strong should be 1 with a wind-anomaly unit (Roxy) present');
-//         assert(resolveConditionalValue(spec, { team: [pyrois, vivian], self: pyrois, consumer: null }) === 0,
-//             'Pyrois ultimate:strong should be 0 with only ether anomaly (Vivian) present');
-//         assert(resolveConditionalValue(spec, { team: [pyrois], self: pyrois, consumer: null }) === 0,
-//             'Pyrois ultimate:strong should be 0 with no wind anomaly on the team');
-//     });
+   // ========================================================================
+    // TEST 78: hasUnit qualified identifier "anomaly:wind" (Pyrois conditional ultimate)
+    // ========================================================================
+    // Pyrois's damage["ultimate:strong"] activates only when a wind-anomaly unit is on the
+    // team, expressed as { when: { hasUnit: "anomaly:wind" } }. A colon-qualified hasUnit
+    // matches by effective role + element, so Roxy (wind pseudo-anomaly) triggers it but
+    // Vivian (ether anomaly) does not.
+    run('TEST 78: hasUnit "anomaly:wind" predicate (Pyrois ultimate)', () => {
+        if (!allUnits.find(u => u.id === 'roxy')) return;
+        const pyrois = allUnits.find(u => u.id === 'pyrois');
+        const roxy = allUnits.find(u => u.id === 'roxy');
+        const vivian = allUnits.find(u => u.id === 'vivian');
+        const spec = pyrois.mechanics.damage['ultimate:strong'];
+        assert(resolveConditionalValue(spec, { team: [pyrois, roxy], self: pyrois, consumer: null }) === 1,
+            'Pyrois ultimate:strong should be 1 with a wind-anomaly unit (Roxy) present');
+        assert(resolveConditionalValue(spec, { team: [pyrois, vivian], self: pyrois, consumer: null }) === 0,
+            'Pyrois ultimate:strong should be 0 with only ether anomaly (Vivian) present');
+        assert(resolveConditionalValue(spec, { team: [pyrois], self: pyrois, consumer: null }) === 0,
+            'Pyrois ultimate:strong should be 0 with no wind anomaly on the team');
+    });
 
-//     // ========================================================================
-//     // TEST 79: wind anomaly lets Pyrois receive Dialyn's free ultimates fully
-//     // ========================================================================
-//     // Pyrois's ultimate:weak normally suppresses ultimate-provision (Dialyn's free ults are
-//     // wasted on him). With a wind-anomaly unit present, his conditional ultimate:strong
-//     // overrides that, so Dialyn's provision lands — a large swing.
-//     run('TEST 79: wind anomaly un-suppresses Dialyn provision for Pyrois (Neutral)', () => {
-//         if (!allUnits.find(u => u.id === 'roxy')) return;
-//         for (const b of withBosses(bosses, 'Neutral')) { 
-//             const withWind = scoreForTeamString('Dialyn/Pyrois/Roxy', allUnits, { preview: true })[0];
-//             const noWind = scoreForTeamString('Dialyn/Pyrois/Trigger', allUnits)[0];
-//             const ws = scoreTeamForBoss(withWind.team, b, {});
-//             const ns = scoreTeamForBoss(noWind.team, b, {});
-//             assert(ws > ns + 30,
-//                 `Dialyn/Pyrois/Roxy (${ws?.toFixed(1)}) should beat Dialyn/Pyrois/Trigger (${ns?.toFixed(1)}) by a nice margin — wind unlocks Pyrois's stronger ultimates`);
-//         }
-//     });
+    // ========================================================================
+    // TEST 79: wind anomaly lets Pyrois receive Dialyn's free ultimates fully
+    // ========================================================================
+    // Pyrois's ultimate:weak normally suppresses ultimate-provision (Dialyn's free ults are
+    // wasted on him). With a wind-anomaly unit present, his conditional ultimate:strong
+    // overrides that, so Dialyn's provision lands — a large swing.
+    run('TEST 79: wind anomaly un-suppresses Dialyn provision for Pyrois (Neutral)', () => {
+        if (!allUnits.find(u => u.id === 'roxy')) return;
+        for (const b of withBosses(bosses, 'Neutral')) { 
+            const withWind = scoreForTeamString('Dialyn/Pyrois/Roxy', allUnits, { preview: true })[0];
+            const noWind = scoreForTeamString('Dialyn/Pyrois/Trigger', allUnits)[0];
+            const ws = scoreTeamForBoss(withWind.team, b, {});
+            const ns = scoreTeamForBoss(noWind.team, b, {});
+            assert(ws > ns + 30,
+                `Dialyn/Pyrois/Roxy (${ws?.toFixed(1)}) should beat Dialyn/Pyrois/Trigger (${ns?.toFixed(1)}) by a nice margin — wind unlocks Pyrois's stronger ultimates`);
+        }
+    });
 
     // ========================================================================
     // TEST 80: Sigrid's wind-anomaly passive is a bonus, never a penalty
@@ -1722,6 +1727,159 @@ async function main() {
             const ws = scoreTeamForBoss(windowDependent.team, b, {});
             assert(ws <= 0,
                 `${b.name}: Evelyn/Astra/Nicole has no stunner and no stunless DPS — must stay disqualified, got ${ws?.toFixed(1)}`);
+        }
+    });
+
+
+    // ========================================================================
+    // TEST 82: Laceration buffs land on armorers and nobody else (Neutral)
+    // ========================================================================
+    // Laceration is the armorer's damage type — the class analogue of rupture's Sheer.
+    // Isolated by A/B-ing the SAME team against itself with the laceration buff stripped out,
+    // so tier, rank, element and every other kit difference cancel and the only delta is the
+    // buff. Comparing two different DPS would just measure the tier gap instead.
+    //
+    // Laceration reaches an armorer down two independent paths — baseline affinity
+    // (MULT.LACERATION_BUFF) and the damage-lever dependency (getArmorerLeverSupply) — so the
+    // assertions below pin each one separately. A test that only checks "score went down"
+    // passes even with MULT.LACERATION_BUFF at zero, because the lever path alone carries it.
+    run('TEST 82: laceration buffs are armorer-only', () => {
+        const roxy = allUnits.find(u => u.id === 'roxy');
+        if (!roxy || !allUnits.find(u => u.id === 'claret')) return;
+
+        const rLac = roxy.mechanics.buffs.laceration;
+        assert(resolveConditionalValue(rLac, { team: [], self: roxy, consumer: { tags: ['armorer'] } }) === 3,
+            'Roxy laceration should be 3 for an armorer recipient');
+        assert(resolveConditionalValue(rLac, { team: [], self: roxy, consumer: { tags: ['attack'] } }) === 0,
+            'Roxy laceration should be 0 for a non-armorer recipient');
+
+        // Same units with the laceration buff neutralised to 0 (optionally on one named unit).
+        // Zeroed rather than deleted on purpose: deleting Claret's only buff would empty her
+        // `buffs` map and flip her into a different cohesion branch, which would show up as a
+        // score change that has nothing to do with laceration.
+        const stripLaceration = (team, onlyId = null) => team.map(u => {
+            if (!u.mechanics?.buffs?.laceration) return u;
+            if (onlyId && u.id !== onlyId) return u;
+            return { ...u, mechanics: { ...u.mechanics, buffs: { ...u.mechanics.buffs, laceration: 0 } } };
+        });
+        const abTest = (teamString, b, onlyId = null) => {
+            const team = scoreForTeamString(teamString, allUnits, { preview: true })[0].team;
+            return [scoreTeamForBoss(team, b, {}), scoreTeamForBoss(stripLaceration(team, onlyId), b, {})];
+        };
+
+        for (const b of withBosses(bosses, 'Neutral')) {
+            // (a) Combined effect: laceration is worth real points to an armorer team.
+            const [withLac, withoutLac] = abTest('Roxy/Claret/Rina', b);
+            assert(withLac > withoutLac,
+                `${b.name}: stripping Roxy's laceration must cost Claret real points (${withLac?.toFixed(1)} → ${withoutLac?.toFixed(1)})`);
+
+            // (b) Baseline-affinity path in isolation. Nicole's cr:1 + defense:3 already
+            // saturate Claret's lever dependency (3.25 >= ARMORER_LEVER_FULL) with Roxy's
+            // laceration removed, so lever utility is pinned at 1.0 on BOTH sides and the
+            // entire remaining delta is the affinity term. This is the assertion that fails
+            // if MULT.LACERATION_BUFF is zeroed.
+            const [satWith, satWithout] = abTest('Roxy/Claret/Nicole', b);
+            assert(satWith > satWithout + 20,
+                `${b.name}: on a lever-saturated team the laceration affinity term must still land (${satWith?.toFixed(1)} → ${satWithout?.toFixed(1)})`);
+
+            // (c) Recipient gate: Roxy's laceration is written as a `role: armorer` conditional,
+            // so on a team with no armorer it resolves to 0 and the score must not move at all.
+            const [attackWith, attackWithout] = abTest('Roxy/Harumasa/Rina', b);
+            assert(attackWith === attackWithout,
+                `${b.name}: a conditional laceration buff must be worth exactly nothing without an armorer (${attackWith?.toFixed(1)} vs ${attackWithout?.toFixed(1)})`);
+
+            // (d) Consumer gate: Claret's OWN laceration:3 is unconditional, so nothing stops it
+            // reaching Roxy and Rina except resolveBaselineWeight('laceration') returning 0 for
+            // non-armorers. With no second armorer on the team it must land on nobody — stripping
+            // it changes nothing. This is the assertion that fails if that gate is removed, and
+            // (c) cannot cover it: Roxy's buff is already zeroed by its own conditional.
+            const [claretWith, claretWithout] = abTest('Roxy/Claret/Rina', b, 'claret');
+            assert(claretWith === claretWithout,
+                `${b.name}: Claret's unconditional laceration must reach no non-armorer teammate (${claretWith?.toFixed(1)} vs ${claretWithout?.toFixed(1)})`);
+        }
+    });
+
+    // ========================================================================
+    // TEST 83: Boss control skills — armorer quicktime intercept (synthetic)
+    // ========================================================================
+    // A control skill locks the player out of everything but dodge/parry/assist. Armorers
+    // intercept it and reduce it to a quicktime event, so their value rises with the count.
+    // Teams without an armorer must be completely unaffected.
+    run('TEST 83: control skills reward armorers only', () => {
+        if (!allUnits.find(u => u.id === 'claret')) return;
+        const base = withBosses(bosses, 'Neutral')[0];
+        const withControl = (n) => ({ ...base, mechanics: { ...base.mechanics, control: n } });
+        const armorer = scoreForTeamString('Koleda/Claret/Rina', allUnits, { preview: true })[0].team;
+        const noArmorer = scoreForTeamString('Koleda/Evelyn/Astra', allUnits)[0].team;
+
+        const a0 = scoreTeamForBoss(armorer, withControl(0), {});
+        const a3 = scoreTeamForBoss(armorer, withControl(3), {});
+        assert(a3 > a0, `control:3 should lift the armorer team (${a0?.toFixed(1)} → ${a3?.toFixed(1)})`);
+
+        const n0 = scoreTeamForBoss(noArmorer, withControl(0), {});
+        const n3 = scoreTeamForBoss(noArmorer, withControl(3), {});
+        assert(n0 === n3,
+            `control skills must not move a team with no armorer (${n0?.toFixed(1)} vs ${n3?.toFixed(1)})`);
+    });
+
+    // ========================================================================
+    // TEST 84: Graded armorer damage-lever dependency (Neutral)
+    // ========================================================================
+    // Armorers have few damage levers: CR, Laceration, PEN and defense shred. A team
+    // supplying none of them leaves Claret unable to reach her ceiling. Both a laceration
+    // line and a pure-shred line must clear a team that hands her nothing.
+    run('TEST 84: armorer lever dependency is graded, not binary', () => {
+        if (!allUnits.find(u => u.id === 'claret')) return;
+        for (const b of withBosses(bosses, 'Neutral')) {
+            const m = scoreMapForBoss(scoreForTeamString(
+                'Koleda/Claret/Rina,Trigger/Claret/Nicole,Lighter/Claret/Lucy',
+                allUnits, { preview: true }), b);
+            const laceration = m.get('Koleda / Claret / Rina');
+            const shred = m.get('Trigger / Claret / Nicole');
+            const nothing = m.get('Lighter / Claret / Lucy');
+            assert(laceration > nothing + 100,
+                `${b.name}: laceration line (${laceration?.toFixed(1)}) must clear the no-lever line (${nothing?.toFixed(1)})`);
+            assert(shred > nothing + 100,
+                `${b.name}: shred line (${shred?.toFixed(1)}) must clear the no-lever line (${nothing?.toFixed(1)})`);
+        }
+    });
+
+    // ========================================================================
+    // TEST 85: Defense shred stacks cumulatively for an armorer (Neutral)
+    // ========================================================================
+    // Trigger (defense:2) + Nicole (defense:3) shred ~60% between them. Shred raises armorer
+    // damage without Claret receiving a buff at all, so the double-shred line must beat the
+    // same team carrying only one shredder.
+    run('TEST 85: stacked defense shred is cumulative for Claret', () => {
+        if (!allUnits.find(u => u.id === 'claret')) return;
+        for (const b of withBosses(bosses, 'Neutral')) {
+            const m = scoreMapForBoss(scoreForTeamString(
+                'Trigger/Claret/Nicole,Lighter/Claret/Nicole', allUnits, { preview: true }), b);
+            const both = m.get('Trigger / Claret / Nicole');
+            const one = m.get('Lighter / Claret / Nicole');
+            assert(both > one,
+                `${b.name}: two shredders (${both?.toFixed(1)}) should beat one (${one?.toFixed(1)})`);
+        }
+    });
+
+    // ========================================================================
+    // TEST 86: ATK is not an armorer lever — no diametric pair off it (Neutral)
+    // ========================================================================
+    // The buff × defense-shred diametric pair normally forms off ATK/CD. An armorer gets
+    // nothing from ATK, so Lucy (atk:2 only) must not earn Claret a diametric floor — while
+    // the same pairing still works for a conventional attacker.
+    run('TEST 86: ATK earns an armorer no diametric credit', () => {
+        if (!allUnits.find(u => u.id === 'claret')) return;
+        for (const b of withBosses(bosses, 'Neutral')) {
+            const m = scoreMapForBoss(scoreForTeamString(
+                'Trigger/Claret/Lucy,Trigger/Claret/Rina,Trigger/Evelyn/Lucy',
+                allUnits, { preview: true }), b);
+            // Lucy's ATK is dead weight on Claret; Rina's PEN/DEF is a real lever.
+            assert(m.get('Trigger / Claret / Rina') > m.get('Trigger / Claret / Lucy') + 150,
+                `${b.name}: Rina must massively outclass Lucy for Claret — ATK is worthless to an armorer`);
+            // The same ATK buffer is genuinely useful to an attacker, so that line stays healthy.
+            assert(m.get('Trigger / Evelyn / Lucy') > m.get('Trigger / Claret / Lucy'),
+                `${b.name}: Lucy's ATK should still work for an attacker even though it fails for an armorer`);
         }
     });
 

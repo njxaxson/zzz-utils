@@ -205,15 +205,24 @@ function mechanicsFitScore(supplier, consumer) {
     }
     if (w(sBuf.anomaly) > 0 && isAnoDPS) score += w(sBuf.anomaly) * 3;
     if (w(sBuf.sheer) > 0 && isRupDPS) score += w(sBuf.sheer) * 5;
+    // Laceration is to armorers what sheer is to rupture: a direct buff on the class's own
+    // damage type, supplied by almost nobody (Claret, Koleda, Roxy).
+    if (w(sBuf.laceration) > 0 && isArmDPS) score += w(sBuf.laceration) * 5;
     const crW = w(sBuf.cr), cdW = w(sBuf.cd);
-    // Armorers (overcritical) value CR highly; CD is worthless to them (fixed crit damage).
+    // Armorers (overcritical) value CR highly. CD is fixed for them, so it is worthless unless
+    // the unit declares explicit cd scaling (Claret converts a sliver of CD into Laceration).
     if (crW > 0) score += crW * (isAnoDPS ? 0.3 : isArmDPS ? 3 : 2);
-    if (cdW > 0 && !isArmDPS) score += cdW * (isAnoDPS ? 0.3 : 2);
-    if (w(sBuf.pen) > 0 && isDPS && !isRupDPS) score += w(sBuf.pen) * 2;
+    const cScalingCd = w(cScaling.cd);
+    if (cdW > 0 && (!isArmDPS || cScalingCd > 0)) {
+        score += cdW * (isArmDPS ? Math.min(1, cScalingCd / 2) : isAnoDPS ? 0.3 : 2);
+    }
+    // Armorer premium on PEN and defense shred: with ATK and CD dead, these are among the few
+    // levers they have left. Mirrors the scorer's armorer weights in resolveBaselineWeight.
+    if (w(sBuf.pen) > 0 && isDPS && !isRupDPS) score += w(sBuf.pen) * (isArmDPS ? 4 : 2);
     // Generic damage (dmg) is intentionally NOT scored here: it's a broad baseline that
     // benefits every DPS equally, so it carries no signal for ranking WHICH support best
     // fits a given DPS, and crediting it drowns out specialist synergies (aftershock, veils).
-    if (w(sDebuf.defense) > 0 && isDPS && !isRupDPS) score += w(sDebuf.defense) * 3;
+    if (w(sDebuf.defense) > 0 && isDPS && !isRupDPS) score += w(sDebuf.defense) * (isArmDPS ? 6 : 3);
     if (w(sDebuf.recovery) > 0 && isDPS) {
         const burst = Math.max(1, ...Object.values(cDamage).map(v => typeof v === 'number' ? v : 1));
         score += w(sDebuf.recovery) * burst;

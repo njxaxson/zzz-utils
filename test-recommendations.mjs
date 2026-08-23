@@ -758,9 +758,10 @@ await runTest(42, 'Remielle is High priority for anomaly-loaded roster', () => {
 // ===========================================================================
 // TESTS 43-45: Claret — Electric Armorer (new DPS role)
 // ===========================================================================
-// Claret has tags=["armorer","electric",...] and a vanilla armorer kit
-// (mechanics:{}). The pull engine must classify her as a primary armorer DPS,
-// not as a supporting defense unit, and credit electric-DPS coverage.
+// Claret has tags=["armorer","electric",...] and a light kit: a Laceration buff for
+// fellow armorers plus scaling.cd:1 (her sliver of CD-to-Laceration conversion). The
+// pull engine must classify her as a primary armorer DPS, not as a supporting defense
+// unit, and credit electric-DPS coverage.
 
 await runTest(43, 'Claret classifies as armorer DPS', () => {
     const claret = unitByName(allUnits, 'Claret');
