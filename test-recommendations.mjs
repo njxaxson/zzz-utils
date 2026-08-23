@@ -367,16 +367,16 @@ await runTest(18, 'Same-element sub-DPS', () => {
         `expected element or tier reason, got: ${gap.reason}`);
 });
 
-// TEST 19
-await runTest(19, 'Weak sub-DPS still fires anomaly-partner gap', () => {
-    const { unitStates, ownedUnits } = buildSyntheticRoster(
-        allUnits, ['Miyabi', 'Grace', 'Nicole', 'Anby', 'Billy']
-    );
-    const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 20 });
-    const gap = findGap(result, 'anomaly-partner');
-    assert(gap, 'expected anomaly-partner gap when only weak Grace as partner');
-    assert(gap.reason.includes('low-tier'), `expected low-tier reason, got: ${gap.reason}`);
-});
+// // TEST 19 - Test disabled as Grace is no longer considered weak with recent buffs, Remielle, Velina, etc. 
+// await runTest(19, 'Weak sub-DPS still fires anomaly-partner gap', () => {
+//     const { unitStates, ownedUnits } = buildSyntheticRoster(
+//         allUnits, ['Miyabi', 'Grace', 'Nicole', 'Anby', 'Billy']
+//     );
+//     const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 20 });
+//     const gap = findGap(result, 'anomaly-partner');
+//     assert(gap, 'expected anomaly-partner gap when only weak Grace as partner');
+//     assert(gap.reason.includes('low-tier'), `expected low-tier reason, got: ${gap.reason}`);
+// });
 
 // TEST 20
 await runTest(20, 'Pseudo-anomaly mitigates gap', () => {

@@ -1,18 +1,17 @@
 {
     "active" : [
         "ramiel",
-        "aria",
+        "sigrid",
         "jane-doe",
         "sanby",
         "hugo",
         "trigger",
-        "lucia"
-    ],
-    "upcoming": [
-        "sigrid",
+        "lucia",
         "dialyn",
         "yuzuha",
-        "harumasa",
+        "harumasa"
+    ],
+    "upcoming": [
         "claret",
         "roxy"
     ]
