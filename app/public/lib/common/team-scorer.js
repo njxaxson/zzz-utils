@@ -95,6 +95,18 @@ const BOSS_WEAK = {
 // Second armorer adds much less (one interceptor already covers the fight); third adds nothing.
 const ARMORER_CONTROL_FALLOFF = [1, 0.25, 0];
 
+// Boss shill credit: the boss's mechanics reward a specific role or archetype.
+const SHILL_MATCH_BONUS = 8;
+// A stun shill satisfied by a stunless carry rather than by a stunner. Worth far more than
+// the plain match because the requirement is met WITHOUT spending a team slot on a stunner —
+// the freed slot takes a second support instead. Sized at roughly what that replacement
+// support contributes end-to-end: for YSG/Zhao/Sunna on Thrall, Zhao is worth ~27 after the
+// L4 element modifier and soft cap, plus ~21 of L2 tier/rank. Reachable only by a
+// stunner-free team holding a stunless unit on a stun-shill boss — today that is
+// Ye Shunguong on Thrall and butcher:raging. Primary calibration dial for the stunless
+// archetype; raising it makes stunless carries compete with stunner lines.
+const STUNLESS_SHILL_CREDIT = 48;
+
 const BURST_DAMAGE_TYPES = ['enhanced', 'ultimate:strong', 'ultimate:double', 'chain', 'totalize', 'maim'];
 const NEED_FULFILLMENT_KEYS = [
     'disorders', 'ablooms', 'chains', 'ultimates', 'veils',
@@ -1572,8 +1584,8 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
                 (u.tags.includes(bossShill) || (u._activatedRoles?.includes('dps') && u._activatedRoles?.includes(bossShill)))
                 && !isEffectiveSupport(u) && !isEffectiveDefense(u));
             if (hasShilledDPS) {
-                score += 8;
-                if (debug) console.log(`    Shill match (${bossShill}): +8`);
+                score += SHILL_MATCH_BONUS;
+                if (debug) console.log(`    Shill match (${bossShill}): +${SHILL_MATCH_BONUS}`);
             }
         } else {
             // A stun shill is a hard requirement because the boss only takes real damage
@@ -1587,8 +1599,11 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
                 if (debug) console.log(`    DISQUALIFIED: Missing required role ${bossShill}`);
                 return { score: -1, disqualified: true };
             }
-            score += 8;
-            if (debug) console.log(`    Non-DPS shill match (${bossShill})${stunlessException ? ' via stunless DPS' : ''}: +8`);
+            // Meeting the requirement intrinsically is not the same as meeting it with a
+            // stunner: the stunless carry satisfies it AND keeps the slot for a second support.
+            const shillCredit = stunlessException ? STUNLESS_SHILL_CREDIT : SHILL_MATCH_BONUS;
+            score += shillCredit;
+            if (debug) console.log(`    Non-DPS shill match (${bossShill})${stunlessException ? ' via stunless DPS — stunner slot not spent' : ''}: +${shillCredit}`);
         }
     }
     

@@ -146,6 +146,45 @@ export function extendTeamsWithUniversalUnits(twoCharTeams, threeCharTeams, univ
     return extendedCount;
 }
 
+// Rank band tolerance. Two teams whose scores differ by less than this are treated as
+// equally good for allocation purposes. The engine is calibrated to roughly a point, not
+// to a tenth of one, so a sub-band gap is noise rather than a real preference — and
+// because `priority` below weights maxRank by 100, letting noise open a rank step can
+// evict a strictly better allocation from the results entirely. Ratio-based so it keeps
+// its meaning as scores drift upward across patches; the floor keeps it from collapsing
+// to nothing on low-scoring matchups.
+export const RANK_BAND_RATIO = 0.02;
+export const RANK_BAND_FLOOR = 5;
+
+export function rankBandEpsilon(score) {
+    return Math.max(Math.abs(score) * RANK_BAND_RATIO, RANK_BAND_FLOOR);
+}
+
+/**
+ * Assigns equivalence-class ranks (1 = best band) to a list already sorted by score
+ * descending. Rank increments only when a score falls more than epsilon below the band
+ * LEADER — the score that opened the current band. Comparing against the leader rather
+ * than the previous team is what stops a long shallow gradient of near-equal scores from
+ * chaining into one enormous band.
+ *
+ * Mutates `rank` on each entry (same contract as the index-based assignment it replaces)
+ * and returns the list.
+ *
+ * @param {Array} teams - Array of {score, ...}, sorted by score descending
+ */
+export function assignBandedRanks(teams) {
+    let rank = 0;
+    let bandLeader = null;
+    for (const t of teams) {
+        if (bandLeader === null || t.score < bandLeader - rankBandEpsilon(bandLeader)) {
+            rank++;
+            bandLeader = t.score;
+        }
+        t.rank = rank;
+    }
+    return teams;
+}
+
 /**
  * Finds valid combinations of 3 teams (one per boss) with no shared units.
  * Uses a priority-based approach where teams are ranked per boss.
@@ -161,10 +200,12 @@ export function findExclusiveCombinations(viableTeamsByBoss, bossNames) {
     const teams1 = viableTeamsByBoss[bossNames[1]] || [];
     const teams2 = viableTeamsByBoss[bossNames[2]] || [];
     
-    // Assign ranks (1 = best, 2 = second best, etc.)
-    teams0.forEach((t, i) => t.rank = i + 1);
-    teams1.forEach((t, i) => t.rank = i + 1);
-    teams2.forEach((t, i) => t.rank = i + 1);
+    // Assign ranks as epsilon-banded equivalence classes (1 = best band), not raw list
+    // indices. Teams that score within noise of each other share a rank, so a fractional
+    // score difference can no longer inflate maxRank and evict a better allocation.
+    assignBandedRanks(teams0);
+    assignBandedRanks(teams1);
+    assignBandedRanks(teams2);
     
     // Limit to top N teams per boss for efficiency
     const TOP_N = 20;

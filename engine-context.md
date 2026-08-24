@@ -205,7 +205,13 @@ output looks like.
   her constantly, unlike everyone else). Dialyn is the exception worth bringing: her free ultimates
   feed YSG's double-ultimate, the highest burst in the game. This is also why a stunless DPS clears
   a stun-shill boss's hard stunner requirement (see `shill` under Boss Mechanics) — the boss's
-  damage gate *is* the stun window, and YSG doesn't need one.
+  damage gate *is* the stun window, and YSG doesn't need one. Clearing that requirement without
+  a stunner is worth substantially more than clearing it with one, because the stunless carry
+  satisfies the gate *and keeps the slot* for a second support. The engine prices that freed
+  slot: on a stun-shill boss a stunless team earns a much larger shill credit than the flat
+  match bonus. The size of the gap is a calibration dial, and it is what makes YSG double-support
+  lines competitive with the Dialyn line rather than a distant second — which matters most in
+  Deadly Assault, where hoarding Dialyn for Thrall starves another team who needs her far more.
 * **"Monoshock"** — hybrid anomaly + attacker. Named for the old triple-electric Grace/Harumasa/Rina
   team, but the name now just means any hybrid anomaly/attack comp; it need not be electric or triple.
   Niche but legal — Harumasa's `scaling.anomaly` is what makes it score.
@@ -850,3 +856,35 @@ Kept deliberately — these are things that look wrong when you read the code, a
   pair it against. The code path is correct and armorer-safe; it simply cannot fire today.
 
 
+
+## Deadly Assault allocation: marginal value and rank bands
+
+`scoreTeamForBoss` is a pure function of one team and one boss, so it cannot see that a unit is
+scarce. Allocation across three bosses is where scarcity actually bites, and the property that
+matters there is not a team's absolute score but a unit's **marginal** value — how much better
+the best team containing it is than the best team without it, *for that boss*. A unit belongs to
+the boss where its marginal value is highest, which is generally not the boss where its team
+scores highest. Maximising the sum of the three team scores gets this right automatically; the
+failure mode is anything that lets a per-boss preference override the total.
+
+Two mechanics guard this:
+
+* **Rank bands.** `findExclusiveCombinations` ranks each boss's teams as epsilon-banded
+  equivalence classes, not raw list indices. Teams scoring within a band of each other share a
+  rank. This exists because `priority = maxRank * 100 + rankSum` weights `maxRank` so heavily
+  that a single extra rank step outranks *any* total-score advantage — so without banding, a
+  fractional score difference (well inside the engine's calibration precision) could bury a
+  strictly better allocation below a worse one. The band is ratio-based with an absolute floor,
+  so it keeps its meaning as scores drift upward across patches and stays meaningful on
+  low-scoring matchups. Constants live in `team-builder.js`.
+* **Scorer parity for genuinely-equal archetypes.** Banding only absorbs *noise*. If two teams
+  the game treats as equivalent score tens of points apart, that is a scoring error and no
+  allocation tolerance can paper over it — the fix belongs in the scorer. The stunless
+  stun-shill credit above is exactly this case.
+
+A trap worth recording: discounting a *shared* need does not help reallocate the unit that
+supplies it. Dialyn's ultimates feed both YSG and Yixuan, so cheapening `need(ultimates)` lowers
+her value on both bosses at once. Worse, the L4 soft cap damps reductions harder on the team that
+sits deeper into the cap, so the discount can shrink the *wrong* marginal faster and move the
+allocation the wrong way. Reallocation comes from raising the alternative, not from cheapening
+the contended resource.

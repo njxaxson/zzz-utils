@@ -13,17 +13,16 @@ import { buildAvailableUnits } from './lib/roster-builder.js';
 import { filterBosses } from './lib/boss-filter.js';
 import { buildTeams } from './lib/team-pipeline.js';
 import { parseTeams } from './lib/team-parser.js';
-import { scoreTeamForBoss, getBossWeaknesses, getBossResistances, getBossShill, getBossAnti, getBossAssists } from './app/public/lib/common/team-scorer.js';
+import { scoreTeamForBoss, getBossWeaknesses, getBossResistances, getBossShill, getBossAssists } from './app/public/lib/common/team-scorer.js';
 import { teamsOverlap } from './app/public/lib/common/team-builder.js';
 import { isPrimaryDps, unitFingerprint, getTeamDpsBuckets } from './app/public/lib/common/dps-buckets.js';
 import { solveDeadlyAssault } from './app/public/lib/common/deadly-assault-solver.js';
 import { rawScorePassesFilter } from './lib/score-filter.js';
-import { ELEMENTS, DPS_ROLES } from './app/public/lib/common/constants.js';
 
 const DISPLAY_LIMIT = 5;
 
-// Debug-only: DPS-archetype bucket breakdown per boss, plus key-DPS-missing checks.
-function printDpsBucketDiagnostics(boss, viableTeams, disqualified, keyDpsNames) {
+// Debug-only: DPS-archetype bucket breakdown per boss.
+function printDpsBucketDiagnostics(boss, viableTeams) {
     const buckets = new Map();
     for (const entry of viableTeams) {
         const fps = getTeamDpsBuckets(entry.team);
@@ -40,23 +39,6 @@ function printDpsBucketDiagnostics(boss, viableTeams, disqualified, keyDpsNames)
         const dpsUnit = best.team.find(u => isPrimaryDps(u, best.team) && unitFingerprint(u) === fp);
         const name = dpsUnit ? dpsUnit.name : '?';
         console.log(`    [${fp}] ${name} — best: ${best.score.toFixed(0)}, ${entries.length} teams`);
-    }
-
-    const missingDps = keyDpsNames.filter(name =>
-        !viableTeams.some(entry => entry.team.some(u => u.name === name && isPrimaryDps(u, entry.team)))
-    );
-    if (missingDps.length > 0) {
-        console.log(`  Missing key DPS: ${missingDps.join(', ')}`);
-        for (const name of missingDps) {
-            const teamsWithUnit = disqualified.filter(e => e.team.some(u => u.name === name));
-            if (teamsWithUnit.length === 0) {
-                console.log(`    ${name}: NO teams formed at all`);
-            } else {
-                const best = teamsWithUnit.sort((a, b) => b.score - a.score)[0];
-                console.log(`    ${name}: ${teamsWithUnit.length} teams, all scored <= 0. Best: ${best.label} = ${best.score.toFixed(0)}`);
-                scoreTeamForBoss(best.team, boss, { debug: true });
-            }
-        }
     }
 }
 
@@ -249,84 +231,6 @@ async function main() {
         console.log(`Using ${availableUnits.length} units${modeNote}\n`);
     }
 
-    // Tier 0 units are this roster's best-in-class DPS — used as the "key DPS" watch
-    // list for the missing-DPS debug check, instead of a hardcoded name list.
-    const keyDpsNames = availableUnits
-        .filter(u => u.tier === 0 && DPS_ROLES.some(role => u.tags.includes(role)))
-        .map(u => u.name);
-
-    // ============================================================================
-    // TIER 0 SANITY CHECK
-    // ============================================================================
-
-    function checkTier0Utilization(combination, availableUnits, selectedBosses, bosses) {
-        const warnings = [];
-        const notes = [];
-
-        const usedUnits = new Set();
-        for (const assignment of combination.assignments) {
-            for (const unit of assignment.team) {
-                usedUnits.add(unit.name);
-            }
-        }
-
-        const dpsTypesInCombo = new Set();
-        for (const assignment of combination.assignments) {
-            for (const unit of assignment.team) {
-                for (const role of DPS_ROLES) {
-                    if (unit.tags.includes(role)) dpsTypesInCombo.add(role);
-                }
-            }
-        }
-
-        const tier0Units = availableUnits.filter(u => u.tier === 0);
-        const tier0Supports = tier0Units.filter(u => u.tags.includes("support"));
-        const tier0DPS = tier0Units.filter(u => DPS_ROLES.some(role => u.tags.includes(role)));
-
-        for (const support of tier0Supports) {
-            if (usedUnits.has(support.name)) continue;
-            const avoidTags = support.synergy?.avoid || [];
-
-            if (avoidTags.length === 0) {
-                warnings.push(`⚠️  ${support.name} (Tier 0 support, no restrictions) is not used`);
-            } else {
-                const canFitSomewhere = [...dpsTypesInCombo].some(dpsType => !avoidTags.includes(dpsType));
-                if (canFitSomewhere) {
-                    const compatibleTypes = [...dpsTypesInCombo].filter(t => !avoidTags.includes(t));
-                    warnings.push(`⚠️  ${support.name} (Tier 0 support) not used despite compatible teams (${compatibleTypes.join("/")})`);
-                }
-            }
-        }
-
-        const bossData = selectedBosses.map(name => bosses.find(b => b.name === name));
-        for (const dps of tier0DPS) {
-            if (usedUnits.has(dps.name)) continue;
-            const dpsElement = dps.tags.find(t => ELEMENTS.includes(t));
-            const dpsType = dps.tags.find(t => DPS_ROLES.includes(t));
-
-            const matchingBosses = bossData.filter(boss => {
-                const weaknessMatch = getBossWeaknesses(boss).includes(dpsElement);
-                const notAnti = !getBossAnti(boss).includes(dpsType);
-                return weaknessMatch && notAnti;
-            });
-
-            if (matchingBosses.length > 0) {
-                const bossNames = matchingBosses.map(b =>
-                    b.name.replace("Notorious ", "").substring(0, 15)
-                ).join(", ");
-                notes.push(`ℹ️  ${dps.name} (Tier 0 ${dpsType}) not used but matches weakness for: ${bossNames}`);
-            }
-        }
-
-        const tier0Used = [...usedUnits].filter(name => {
-            const unit = availableUnits.find(u => u.name === name);
-            return unit && unit.tier === 0;
-        }).length;
-        const tier0Available = tier0Units.length;
-
-        return { warnings, notes, tier0Used, tier0Available, usedUnits: [...usedUnits] };
-    }
-
     // ============================================================================
     // MAIN EXECUTION
     // ============================================================================
@@ -361,15 +265,12 @@ async function main() {
 
     for (const boss of selectedBossObjects) {
         viableTeamsByBoss[boss.name] = [];
-        const disqualified = DEBUG ? [] : null;
 
         for (const label of teamLabels) {
             const team = threeCharTeams[label];
             const score = scoreTeamForBoss(team, boss, { debug: options.debug });
             if (score > 0 && rawScorePassesFilter(score, options)) {
                 viableTeamsByBoss[boss.name].push({ label, team, score });
-            } else if (DEBUG) {
-                disqualified.push({ label, team, score });
             }
         }
 
@@ -388,7 +289,7 @@ async function main() {
         if (DEBUG) {
             const lenientNote = lenientBosses.includes(boss.name) ? " (LENIENT)" : "";
             console.log(`${boss.name}: ${viableTeamsByBoss[boss.name].length} viable teams${lenientNote}`);
-            printDpsBucketDiagnostics(boss, viableTeamsByBoss[boss.name], disqualified, keyDpsNames);
+            printDpsBucketDiagnostics(boss, viableTeamsByBoss[boss.name]);
         }
     }
 
@@ -441,10 +342,6 @@ async function main() {
         }
     }
 
-    for (const combo of combinations) {
-        combo.sanityCheck = checkTier0Utilization(combo, availableUnits, selectedBossNames, bosses);
-    }
-
     if (DEBUG) {
         console.log(`Found ${combinations.length} valid team allocations\n`);
     }
@@ -466,15 +363,6 @@ async function main() {
         for (const assignment of combo.assignments) {
             const shortBoss = assignment.boss.replace("Notorious ", "").substring(0, 20).padEnd(20);
             console.log(`  ${shortBoss}: [#${assignment.rank}] ${assignment.label} (${assignment.score})`);
-        }
-
-        const check = combo.sanityCheck;
-        if (check.warnings.length > 0 || check.notes.length > 0) {
-            console.log(`  --- Tier 0 Check (${check.tier0Used}/${check.tier0Available} used) ---`);
-            for (const warning of check.warnings) console.log(`  ${warning}`);
-            for (const note of check.notes) console.log(`  ${note}`);
-        } else {
-            console.log(`  ✓ Tier 0 utilization: ${check.tier0Used}/${check.tier0Available}`);
         }
 
         console.log();
