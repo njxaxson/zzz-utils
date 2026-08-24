@@ -107,6 +107,10 @@ const SHILL_MATCH_BONUS = 8;
 // archetype; raising it makes stunless carries compete with stunner lines.
 const STUNLESS_SHILL_CREDIT = 48;
 
+// Burst throughput candidates, combined by MAX in getMaxBurstWeight. `enhanced` is listed
+// because an enhanced attack can carry ultimate-tier multipliers: Miyabi has no
+// `ultimate:double`, and this is how her effective double-ultimate enters throughput. Do NOT
+// give her `ultimate:double` to "fix" that - it is already accounted for here.
 const BURST_DAMAGE_TYPES = ['enhanced', 'ultimate:strong', 'ultimate:double', 'chain', 'totalize', 'maim'];
 const NEED_FULFILLMENT_KEYS = [
     'disorders', 'ablooms', 'chains', 'ultimates', 'veils',
@@ -141,6 +145,14 @@ const REFRINGE_VORTEX_CASCADE = 3;
 const CONDITIONAL_BUFF_PENALTY_MULT = 35;
 const L4_SOFT_CAP = 250;
 const POLARITY_VORTEX_DISCOUNT = 0.35;
+// Needs exempt from L5 cohesion penalties. INTENTIONAL, and NOT an L4/L5 inconsistency -
+// this has been misread as an oversight before. L4 pays for ultimate provision (two channels:
+// ULTIMATES_PROVISION for throughput, need(ultimates) for units that ultimates actually FUEL),
+// while L5 declines to penalise its absence. Both halves are deliberate: ultimates and chains
+// arrive naturally anyway, AND the ability to provision them is vanishingly rare (essentially
+// Dialyn and Ju Fufu), so charging a YSG or Yixuan team for lacking a provisioner would punish
+// it for something almost no teammate could supply. Reward the upside, do not bill the absence.
+// See engine-context.md, "The ultimates two-channel model", before changing this.
 const NATURALLY_AVAILABLE_NEEDS = new Set(['ultimates', 'chains']);
 const STAT_SCALING_KEYS = ['am', 'ap', 'cr', 'cd', 'hp', 'def', 'pen', 'sheer'];
 
@@ -670,12 +682,33 @@ export function getEffectiveScaling(unit) {
     if (roles.includes('stun'))    Object.assign(baseline, { daze: 1 });
     if (isDPSByRoles(roles)) {
         const damage = unit._resolvedDamage || unit.mechanics?.damage || {};
+        // ULTIMATE APPETITE. Three INDEPENDENT axes exist in the data (see engine-context.md
+        // under `damage`): magnitude (`ultimate:strong`/`weak`, the raw in-game modifier),
+        // frequency (`ultimate:double`, ultimates per window), and unique benefit
+        // (`scaling.ultimates`, whether the unit gets something BEYOND the ultimate's damage).
+        // Neither magnitude nor frequency implies appetite for provisioning: Pyrois has a
+        // double ultimate yet benefits LESS than most from Dialyn, while Seed has neither a
+        // double ultimate nor any ultimate scaling yet benefits enormously.
+        //
+        // KNOWN DEFECT: this block manufactures appetite from magnitude and frequency, and the
+        // `{ ...baseline, ...explicit }` merge below then lets `scaling.ultimates` OVERWRITE it
+        // rather than combine. So annotating a genuine unique benefit can LOWER a unit: adding
+        // Miyabi's warranted `scaling.ultimates: 1` overrides the magnitude-derived 2 and halves
+        // her need(ultimates) from 42.0 to 21.0, so that correct data edit is blocked on this
+        // being fixed. The frequency bump below is also conceptually
+        // wrong and currently inert (every unit tripping it is subdps or carries an explicit
+        // override). Not fixed here: Seed's appetite of 2 comes solely from magnitude and is
+        // the only thing holding the intended Yixuan-vs-Seed balance, so removing the leak
+        // requires rebalancing ULTIMATES_PROVISION. See scoring-engine-open-issues.md.
         if (!hasSubDPSRole(unit)) {
             let implicitUlt = 1;
             if (w(damage['ultimate:strong']) >= 2) implicitUlt = Math.max(implicitUlt, 2);
             if (w(damage['ultimate:double']) >= 2) implicitUlt = Math.max(implicitUlt, 3);
             // A (possibly conditional) ultimate:strong OVERRIDES ultimate:weak — e.g. Pyrois's
             // ultimate becomes a real burst under wind anomaly, lifting the weak-ultimate penalty.
+            // LOAD-BEARING: this zeroing is what excludes Sigrid, and what implements the
+            // intentional design that Pyrois under-benefits from Dialyn (two weak ultimates sum
+            // to a normal one, but Dialyn supplies only a single ultimate). Must survive any fix.
             if (w(damage['ultimate:weak']) > 0 && w(damage['ultimate:strong']) === 0) implicitUlt = 0;
             baseline.ultimates = implicitUlt;
         }

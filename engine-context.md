@@ -338,15 +338,58 @@ exactly when her anomaly role fires.
 Distinctive damage types: `enhanced`, `chain`, `aftershock`, `abloom`, `polarity`, `totalize`,
 `luminize`, `laceration`, `maim`, and the ultimate variants.
 
-The ultimate keys are load-bearing:
+The ultimate keys encode **three mutually independent axes.** Do not treat any one as a derived
+or stronger form of another — collapsing them is a known engine defect, recorded in
+`scoring-engine-open-issues.md`.
 
-* `ultimate:strong` / `ultimate:double` raise the unit's implicit ultimate scaling
-* `ultimate:weak` marks a unit whose ultimate is *not* a meaningful burst (Sigrid's ultimate is
-  weaker than her enhanced attacks; Pyrois uses his as a mode switch). Implicit ultimate scaling is
-  zeroed and ultimate-provision bonuses from stunners are suppressed, so ultimate-providing stunners
-  don't earn unearned credit. **A** `ultimate:strong` overrides `ultimate:weak` — which is exactly
-  how Pyrois's conditional works: his ultimate becomes a real burst when a wind-anomaly unit is
-  present, lifting the weak-ultimate penalty.
+| Axis | Where it lives | What it means |
+|----|----|----|
+| **Magnitude** | `damage['ultimate:strong' \| 'ultimate:weak']` | Raw in-game modifier size |
+| **Frequency** | `damage['ultimate:double']` | How many ultimates the unit gets per window |
+| **Unique benefit** | `scaling.ultimates` — *not* a `damage` key | Whether the unit gets something *beyond* the ultimate's own damage |
+
+**Magnitude.** The `ultimate:strong` tiers track the actual in-game multiplier: `3` is 6000%+
+(Seed, YSG), `2` is 4500%+ (Rina, Miyabi), `1` is 4200%+ (Evelyn, Yixuan). Most DPS agents sit
+at 3000–3600%. `ultimate:weak` is ~1600% — about the strength of Evelyn's chain attack, where
+most chain attacks are ~1200%.
+
+**Frequency.** Normal DPS agents get a single ultimate within a given window; a double-ultimate
+unit gets two. Pyrois builds ultimate twice as fast. Ramiel and Yixuan each have their own
+unique meter that, when full, grants an extra ultimate on top of the standard one — in a stun
+window they can unleash the extra and then immediately the regular. YSG's enlightened state,
+when *opened with an ultimate*, ends with an extra large bonus ultimate (opening the state by
+other means does not grant it). This is why titled units — void hunters and grandmasters — have
+such high damage ceilings: large magnitude meeting doubled frequency. Magnitude × frequency is
+**throughput**, and throughput belongs in burst-damage calculations, not in ultimate appetite.
+
+**Neither magnitude nor frequency says anything about appetite for ultimate provisioning.** The
+two clearest cases point in opposite directions:
+
+* **Pyrois** has a double ultimate yet benefits *less* than most from Dialyn. Two weak ultimates
+  (2 × 1600% ≈ 3200%) put his throughput in line with a standard DPS like Ellen — so there is no
+  cause to complain his output is below average — but Dialyn's free ultimate is a *single*
+  ultimate, only half of his desired ultimate damage. This is deliberate design with intended
+  ramifications: he is fine without a provisioner and cannot fully exploit one.
+* **Seed** has no double ultimate and no ultimate scaling whatsoever, yet benefits tremendously
+  from extra ultimates — purely on magnitude.
+
+`ultimate:weak` additionally marks a unit whose ultimate is *not* a meaningful burst (Sigrid's
+ultimate is weaker than her enhanced attacks; Pyrois uses his as a mode switch). Implicit
+ultimate scaling is zeroed and ultimate-provision bonuses from stunners are suppressed, so
+ultimate-providing stunners don't earn unearned credit. An `ultimate:strong` overrides
+`ultimate:weak` — which is exactly how Pyrois's conditional works: his ultimate becomes a real
+burst when a wind-anomaly unit is present, lifting the weak-ultimate penalty. This zeroing is
+load-bearing: it implements both Sigrid's exclusion and the Pyrois design above.
+
+**`ultimate:double` is not the only route to an effective double ultimate.** Miyabi carries no
+`ultimate:double` — her enhanced attack has the same multipliers as an ultimate, so she
+effectively double-ultimates via `damage.enhanced: 3` feeding burst weight through
+`BURST_DAMAGE_TYPES`. That is the correct modelling and the engine accounts for it there; do
+**not** "fix" it by adding `ultimate:double` to her.
+
+**Yixuan's two ultimate keys are not double-encoding one thing.** Her `scaling.ultimates: 2`
+models enablement of her annihilation attack; her `ultimate:double: 3` models her literal extra
+ultimate. Genuinely distinct things.
 
 `laceration` and `maim` are role-inherent to armorers — only list them to override the role default.
 
@@ -559,8 +602,9 @@ Principles that govern L4 scoring:
   assists are *not* limited and benefit everyone including subdps. Ultimate provision is also scaled
   by the consumer's burst potential: a free ultimate is worth far more to Evelyn than to a unit with
   a basic one.
-* **Ultimates and chains are naturally available.** A dedicated provider makes them arrive *faster*,
-  which is correctly rewarded — but lacking one is not a cohesion failure.
+* **Ultimates and chains are naturally available.** A dedicated provider makes them arrive
+  *faster*, which is correctly rewarded — but lacking one is not a cohesion failure. This
+  produces a deliberate L4/L5 asymmetry — see "The ultimates two-channel model" below.
 * **Self-provision excludes a need from cohesion.** Banyue both scales with and provides
   interrupt-resistance, so it never counts as unmet. This differs from damage mechanics like
   aftershock or abloom, where a large part of the ceiling is damage dealt *by buffed teammates*.
@@ -569,6 +613,46 @@ Principles that govern L4 scoring:
   scaling feeds a conversion into something else, and missing it leaves the unit far below its ceiling
   (Miyabi: disorders → enhanced attacks). *Constant* — steady passive amplification, where a buff
   pays twice (Alice/Vivian convert AM into AP, making AM buffs doubly valuable).
+
+### The ultimates two-channel model
+
+Ultimate provision is scored through **two distinct channels**, and ultimates are **exempt from
+L5 cohesion penalties**. That combination looks like an L4/L5 inconsistency at first glance. It
+is not — it is deliberate, and it has been mistaken for a bug at least once. Read this before
+"fixing" it.
+
+| | Code | Fires on | Models |
+|----|----|----|----|
+| **Tier 1** | `ULTIMATES_PROVISION` (`MULT` 1.5), x `getMaxBurstWeight` | any primary DPS with a non-weak ultimate | Throughput. Big damage x big frequency = good. Seed's case, where the benefit stops at the ultimate itself. |
+| **Tier 2** | `need(ultimates)` in `scoreNeedFulfillment` (`MULT.NEED_FULFILLMENT` 7), x effective appetite | consumers with ultimate scaling | Ultimates *fuel* the unit. YSG's enlightened state, Yixuan's annihilation attack, Miyabi. |
+| **Exemption** | `NATURALLY_AVAILABLE_NEEDS`, applied in the L5 cohesion loop | L5 only | Ultimates and chains arrive naturally, *and* almost nothing can provision them. Lacking a provider is not a *fit* failure. |
+
+**Why Tier 2 pays the full `NEED_FULFILLMENT` rate.** It looks like a scarcity violation —
+`ultimates` is billed at the same rate as a genuinely rare mechanic like `veils`, while 27 of 60
+units want ultimates and only 2 want veils. It isn't, because for ultimates the scarcity is
+expressed on the **consumer** side: only units that get a material extra benefit carry a
+meaningful `scaling.ultimates`. The rarity being priced is "this carry can do something unique
+with an ultimate", not "ultimates are hard to come by".
+
+**Why L5 exempts them.** The ability to provision ultimates is itself extremely rare —
+essentially Dialyn and Ju Fufu. Charging a YSG or Yixuan team a cohesion penalty for lacking a
+provisioner would punish it for something almost no teammate could supply, and the resource
+arrives naturally regardless. A YSG team without Dialyn is not *incohesive*; it is simply
+missing an accelerant. So the upside is rewarded in L4 and the absence is not penalised in L5.
+
+**Do not try to use the exemption as an L4 discount to reallocate a contended provider.** See
+the trap recorded at the end of the allocation section: cheapening a *shared* provision lowers
+its value to every consumer simultaneously, and the L4 soft cap damps the reduction unevenly, so
+it can move an allocation the wrong way.
+
+**Terminology — keep these two straight.** *Annotated* ultimate scaling is the literal
+`mechanics.scaling.ultimates` value in `units.json`; only YSG (3) and Yixuan (2) carry one
+today (Miyabi warrants 1, pending a merge fix — see `scoring-engine-open-issues.md`).
+*Effective appetite* is `getEffectiveScaling(unit).ultimates`, the number Tier 2 actually
+multiplies by — which the engine manufactures from magnitude, from frequency, or from the
+annotated value overriding both. For most units these are different numbers: Seed has no
+annotated value at all yet an effective appetite of 2. Conflating the two is an active engine
+defect; see `scoring-engine-open-issues.md`.
 
 ### Diametric synergy
 

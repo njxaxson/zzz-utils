@@ -1,0 +1,7 @@
+Scoring engine issues; documented in detail in scoring-engine-open-issues.md
+
+Consider revisiting anomaly score ceiling calibration by post-facto reducing bottom baseline bonus for top-scoring anomaly DPS teams
+
+Alice really scales on disorders and produces polarity assaults, not disorders
+
+Consider availability accepting true/false/date
