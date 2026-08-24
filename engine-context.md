@@ -339,19 +339,36 @@ Distinctive damage types: `enhanced`, `chain`, `aftershock`, `abloom`, `polarity
 `luminize`, `laceration`, `maim`, and the ultimate variants.
 
 The ultimate keys encode **three mutually independent axes.** Do not treat any one as a derived
-or stronger form of another — collapsing them is a known engine defect, recorded in
-`scoring-engine-open-issues.md`.
+or stronger form of another, and do not let any of them leak into another's channel — that was a
+long-standing engine defect, now fixed and recorded under Resolved in
+`scoring-engine-open-issues.md`. Each axis has exactly one home:
 
-| Axis | Where it lives | What it means |
-|----|----|----|
-| **Magnitude** | `damage['ultimate:strong' \| 'ultimate:weak']` | Raw in-game modifier size |
-| **Frequency** | `damage['ultimate:double']` | How many ultimates the unit gets per window |
-| **Unique benefit** | `scaling.ultimates` — *not* a `damage` key | Whether the unit gets something *beyond* the ultimate's own damage |
+| Axis | Where it lives | What it means | Scored by |
+|----|----|----|----|
+| **Magnitude** | `damage['ultimate:strong' \| 'ultimate:weak']` | Raw in-game modifier size | `ULTIMATE_MAGNITUDE` → the **provision** channel |
+| **Frequency** | `damage['ultimate:double']` | How many ultimates the unit gets per window | `BURST_DAMAGE_TYPES` → burst throughput, and nothing else |
+| **Unique benefit** | `scaling.ultimates` — *not* a `damage` key | Whether the unit gets something *beyond* the ultimate's own damage | the **need** channel, annotated values only |
 
 **Magnitude.** The `ultimate:strong` tiers track the actual in-game multiplier: `3` is 6000%+
 (Seed, YSG), `2` is 4500%+ (Rina, Miyabi), `1` is 4200%+ (Evelyn, Yixuan). Most DPS agents sit
 at 3000–3600%. `ultimate:weak` is ~1600% — about the strength of Evelyn's chain attack, where
 most chain attacks are ~1200%.
+
+This is what a *free* ultimate is worth to a unit, and `ULTIMATE_MAGNITUDE` grades it with
+deliberately uneven steps, because the underlying percentages are uneven — 4200 → 4500 is a small
+jump and 4500 → 6000 is a large one:
+
+| `ultimate:strong` | value | |
+|----|----|----|
+| weak, or no strong | **0** | Sigrid, Pyrois-without-wind — not a real burst |
+| *(unannotated)* | **1.0** | ~3000–3600%, most DPS |
+| `1` | **1.1** | ~4200% — Evelyn, Yixuan |
+| `2` | **1.25** | ~4500% — Miyabi |
+| `3` | **2.0** | 6000%+ — Seed, YSG |
+
+The 1.0 → 1.1 step is small on purpose but must not be collapsed: it is the only thing that makes
+annotating `ultimate:strong: 1` mean anything, and it is what makes Evelyn a slightly better
+recipient of a free ultimate than Ellen. TEST 89 pins it.
 
 **Frequency.** Normal DPS agents get a single ultimate within a given window; a double-ultimate
 unit gets two. Pyrois builds ultimate twice as fast. Ramiel and Yixuan each have their own
@@ -360,26 +377,34 @@ window they can unleash the extra and then immediately the regular. YSG's enligh
 when *opened with an ultimate*, ends with an extra large bonus ultimate (opening the state by
 other means does not grant it). This is why titled units — void hunters and grandmasters — have
 such high damage ceilings: large magnitude meeting doubled frequency. Magnitude × frequency is
-**throughput**, and throughput belongs in burst-damage calculations, not in ultimate appetite.
+**throughput**, and throughput belongs in burst-damage calculations. Frequency in particular must
+stay out of both ultimate channels — see below.
 
-**Neither magnitude nor frequency says anything about appetite for ultimate provisioning.** The
-two clearest cases point in opposite directions:
+**Neither axis implies a `scaling.ultimates` need**, and frequency does not even imply provision
+value. The two clearest cases point in opposite directions:
 
 * **Pyrois** has a double ultimate yet benefits *less* than most from Dialyn. Two weak ultimates
   (2 × 1600% ≈ 3200%) put his throughput in line with a standard DPS like Ellen — so there is no
   cause to complain his output is below average — but Dialyn's free ultimate is a *single*
   ultimate, only half of his desired ultimate damage. This is deliberate design with intended
-  ramifications: he is fine without a provisioner and cannot fully exploit one.
+  ramifications: he is fine without a provisioner and cannot fully exploit one. **Frequency is
+  therefore worthless as a predictor of provision value**, which is why it feeds only throughput.
 * **Seed** has no double ultimate and no ultimate scaling whatsoever, yet benefits tremendously
-  from extra ultimates — purely on magnitude.
+  from extra ultimates — purely on magnitude. **Magnitude is therefore exactly the right predictor
+  of provision value**, which is why it feeds that channel and nothing else.
+
+Neither of them declares a `scaling.ultimates`, and neither should: a free ultimate is worth
+something to both, but neither gets anything *beyond* the ultimate's own damage. That distinction
+is the whole reason the need channel exists separately.
 
 `ultimate:weak` additionally marks a unit whose ultimate is *not* a meaningful burst (Sigrid's
-ultimate is weaker than her enhanced attacks; Pyrois uses his as a mode switch). Implicit
-ultimate scaling is zeroed and ultimate-provision bonuses from stunners are suppressed, so
+ultimate is weaker than her enhanced attacks; Pyrois uses his as a mode switch). Such a unit gets
+magnitude **0**, so ultimate-provision bonuses from stunners are suppressed entirely and
 ultimate-providing stunners don't earn unearned credit. An `ultimate:strong` overrides
 `ultimate:weak` — which is exactly how Pyrois's conditional works: his ultimate becomes a real
 burst when a wind-anomaly unit is present, lifting the weak-ultimate penalty. This zeroing is
-load-bearing: it implements both Sigrid's exclusion and the Pyrois design above.
+load-bearing: it implements both Sigrid's exclusion and the Pyrois design above. It lives in
+`getUltimateMagnitude` and is pinned by TEST 90.
 
 **`ultimate:double` is not the only route to an effective double ultimate.** Miyabi carries no
 `ultimate:double` — her enhanced attack has the same multipliers as an ultimate, so she
@@ -437,8 +462,12 @@ wind pseudo-anomaly like Roxy self-fulfils.
 **How** `scaling` interacts with role baselines — read this carefully, it is easy to get wrong:
 
 `getEffectiveScaling` returns `{ ...roleBaseline, ...explicitScaling }` — a **per-key merge, not a
-wholesale replacement**. An attacker with `scaling: { ultimates: 3 }` still has `cr: 2, cd: 2` from
-the attack baseline *and* gains `ultimates: 3`. Only keys the unit names explicitly are overridden.
+wholesale replacement**. An attacker with `scaling: { sheer: 3 }` still has `cr: 2, cd: 2` from the
+attack baseline *and* gains `sheer: 3`. Only keys the unit names explicitly are overridden.
+
+There is **no baseline for `ultimates`**, deliberately. It is authored data and nothing else, so a
+unit that does not annotate one has no ultimate need at all and never enters the need channel.
+See "the ultimates two-channel model" below.
 
 Role baselines:
 
@@ -453,8 +482,8 @@ Role baselines:
 (IMPORTANT HUMAN FEEDBACK FOR LATER ASSESSMENT: Attack and Anomaly should theoretically have `atk`=2 in their baseline scaling, and Rupture should theoretically have `atk`=1. This may be directly modeled in the code rather than through scaling definitions. Needs review.)
 
 
-Plus, for any DPS: implicit `ultimates` (skipped for subdps — see below), a small implicit
-`quick-assists`, and implicit `recovery` scaled off `damage.totalize` if present.
+Plus, for any DPS: a small implicit `quick-assists`, and implicit `recovery` scaled off
+`damage.totalize` if present. **Not** `ultimates` — see the note above.
 
 Note that Baseline *Affinity* uses a separate resolver (`resolveBaselineWeight`) with its own
 defaults — e.g. armorers get elevated CR weight there. Don't conflate the two paths.
@@ -598,10 +627,10 @@ Principles that govern L4 scoring:
 * **Supply gates fulfillment,** and **undersupply is worse than linear.** Partially meeting a need
   (Lucia's `veils:1` against YSG's `veils:2`) helps, but disproportionately less than half.
 * **Ultimates are a limited primary-DPS resource.** Only one unit gets the free ultimate per window,
-  so it goes to the best damage dealer — subdps units get **no** implicit ultimate scaling. Quick
-  assists are *not* limited and benefit everyone including subdps. Ultimate provision is also scaled
-  by the consumer's burst potential: a free ultimate is worth far more to Evelyn than to a unit with
-  a basic one.
+  so it goes to the best damage dealer — subdps units receive **no** ultimate provision at all. Quick
+  assists are *not* limited and benefit everyone including subdps. Provision is scaled by the
+  consumer's ultimate **magnitude**: a free ultimate is worth far more to Seed than to a unit with a
+  basic one, and nothing at all to a unit whose ultimate is not a real burst.
 * **Ultimates and chains are naturally available.** A dedicated provider makes them arrive
   *faster*, which is correctly rewarded — but lacking one is not a cohesion failure. This
   produces a deliberate L4/L5 asymmetry — see "The ultimates two-channel model" below.
@@ -623,16 +652,46 @@ is not — it is deliberate, and it has been mistaken for a bug at least once. R
 
 | | Code | Fires on | Models |
 |----|----|----|----|
-| **Tier 1** | `ULTIMATES_PROVISION` (`MULT` 1.5), x `getMaxBurstWeight` | any primary DPS with a non-weak ultimate | Throughput. Big damage x big frequency = good. Seed's case, where the benefit stops at the ultimate itself. |
-| **Tier 2** | `need(ultimates)` in `scoreNeedFulfillment` (`MULT.NEED_FULFILLMENT` 7), x effective appetite | consumers with ultimate scaling | Ultimates *fuel* the unit. YSG's enlightened state, Yixuan's annihilation attack, Miyabi. |
+| **Provision** | `ULTIMATES_PROVISION` (`MULT` 7.8), x the consumer's `ULTIMATE_MAGNITUDE` | any primary DPS whose ultimate is a real burst | A free ultimate arrives sooner, and is worth more the harder that ultimate hits. Seed's case, where the benefit stops at the ultimate itself. |
+| **Need** | `need(ultimates)` in `scoreNeedFulfillment` (`NEED_KEY_MULT.ultimates` 3.2), x the annotated `scaling.ultimates` | **only** units that annotate `scaling.ultimates` | Ultimates *fuel* the unit — something beyond the ultimate's own damage. YSG's enlightened state, Yixuan's annihilation attack, Miyabi's enhanced-attack gauge. |
 | **Exemption** | `NATURALLY_AVAILABLE_NEEDS`, applied in the L5 cohesion loop | L5 only | Ultimates and chains arrive naturally, *and* almost nothing can provision them. Lacking a provider is not a *fit* failure. |
 
-**Why Tier 2 pays the full `NEED_FULFILLMENT` rate.** It looks like a scarcity violation —
-`ultimates` is billed at the same rate as a genuinely rare mechanic like `veils`, while 27 of 60
-units want ultimates and only 2 want veils. It isn't, because for ultimates the scarcity is
-expressed on the **consumer** side: only units that get a material extra benefit carry a
-meaningful `scaling.ultimates`. The rarity being priced is "this carry can do something unique
-with an ultimate", not "ultimates are hard to come by".
+**The channels do not overlap, and that is the whole point.** Magnitude is priced once, in
+provision. A declared benefit is priced once, in need. A unit with a big ultimate and no
+annotation (Seed) collects only the first; a unit with both (YSG) collects both, which is why she
+sits clearly at the top. Worked totals from Dialyn (`utility.ultimates: 3`), for calibration
+reference:
+
+| | magnitude | scaling | provision | need | total |
+|----|----|----|----|----|----|
+| YSG | 2.0 | 3 | 46.8 | 28.8 | **75.6** |
+| Seed | 2.0 | — | 46.8 | 0 | **46.8** |
+| Yixuan | 1.1 | 2 | 25.7 | 19.2 | **44.9** |
+| Miyabi | 1.25 | 1 | 29.3 | 9.6 | **38.9** |
+| Evelyn | 1.1 | — | 25.7 | 0 | **25.7** |
+| Ellen | 1.0 | — | 23.4 | 0 | **23.4** |
+| Sigrid | 0 | — | 0 | 0 | **0** |
+
+`ULTIMATES_PROVISION` and `NEED_KEY_MULT.ultimates` are the two calibration dials. Raising the
+first lifts every carry and is what separates Evelyn from Ellen; raising the second lifts only
+the three units that declare a need, and pulls YSG further clear. They trade off against each
+other if you want to hold YSG's total fixed — `6K + 9M` is her whole ultimate value.
+
+**Never fabricate a need.** The rule this section exists to protect, and it generalises well
+beyond ultimates: *a unit must never be given a need it did not declare.* The old model
+manufactured an `ultimates` need for every primary DPS — a floor of 1, plus bumps from magnitude
+and frequency — which the annotated value then overwrote. Three things went wrong at once. Units
+like Evelyn and Seed, who declare nothing, got a need anyway. The same free ultimate was paid for
+twice, once per channel, with the fabricated half the larger of the two. And the fabricated need
+was then exposed to the undersupply gate, so Evelyn was discounted for being "undersupplied" on
+something she never asked for — while collecting full ungated credit from Ju Fufu purely because
+the fabricated floor of 1 happened to match their `utility.ultimates: 1` exactly. TEST 87 pins the
+rule directly.
+
+**Why the need channel is cheaper than `NEED_FULFILLMENT`.** It carries its own multiplier (3.2
+against the shared 7) because ultimates are the one need also paid through a second channel.
+Charging the full rate on top of provision would let the need side dominate. Every other key
+falls through to `MULT.NEED_FULFILLMENT` unchanged.
 
 **Why L5 exempts them.** The ability to provision ultimates is itself extremely rare —
 essentially Dialyn and Ju Fufu. Charging a YSG or Yixuan team a cohesion penalty for lacking a
@@ -640,19 +699,36 @@ provisioner would punish it for something almost no teammate could supply, and t
 arrives naturally regardless. A YSG team without Dialyn is not *incohesive*; it is simply
 missing an accelerant. So the upside is rewarded in L4 and the absence is not penalised in L5.
 
+**Cohesion relevance uses magnitude, not need.** `computeBuffUtilization` asks whether a
+supplier's utility key lands on anybody. For `ultimates` that question is answered by the
+*provision* channel — does any carry have a real ultimate — not by whether someone declares a
+need. Judging it by declared need would read Dialyn's provision as landing on nobody whenever the
+carry is a Seed or an Evelyn, which is wrong: they use the free ultimate, they just get nothing
+extra from it.
+
 **Do not try to use the exemption as an L4 discount to reallocate a contended provider.** See
 the trap recorded at the end of the allocation section: cheapening a *shared* provision lowers
 its value to every consumer simultaneously, and the L4 soft cap damps the reduction unevenly, so
 it can move an allocation the wrong way.
 
-**Terminology — keep these two straight.** *Annotated* ultimate scaling is the literal
-`mechanics.scaling.ultimates` value in `units.json`; only YSG (3) and Yixuan (2) carry one
-today (Miyabi warrants 1, pending a merge fix — see `scoring-engine-open-issues.md`).
-*Effective appetite* is `getEffectiveScaling(unit).ultimates`, the number Tier 2 actually
-multiplies by — which the engine manufactures from magnitude, from frequency, or from the
-annotated value overriding both. For most units these are different numbers: Seed has no
-annotated value at all yet an effective appetite of 2. Conflating the two is an active engine
-defect; see `scoring-engine-open-issues.md`.
+**Terminology.** *Annotated* ultimate scaling is the literal `mechanics.scaling.ultimates` value
+in `units.json` — YSG (3), Yixuan (2), Miyabi (1), and nobody else. `getEffectiveScaling(unit).ultimates`
+now returns exactly that value, or `undefined`. The two used to differ, and conflating them was an
+active defect; they are the same number now, and TEST 87 keeps them that way.
+
+### Deliberately unmodeled
+
+Things a reader may notice are missing. They are absent by choice, not oversight — if you spot
+one and think it is a bug, it has already been considered and declined.
+
+**Relayed provision.** A provision that reaches a consumer *through* an intermediary teammate is
+not traced. `Dialyn/Sigrid/Sunna` and `Dialyn/Sigrid/Astra` take the identical cohesion hit,
+because Sigrid's weak ultimate makes Dialyn's free ultimate land on nobody. In principle the
+Astra line deserves a smaller hit: Dialyn can gift the ultimate to Astra, Astra's ultimate
+provisions a chain attack to every teammate, and Sigrid (`scaling.chains: 3`) wants a free chain
+attack badly — so the value does reach her, just indirectly. Modelling that means tracing
+provisions through an intermediary, which is a lot of machinery for a difference this small.
+Revisit only if this hair genuinely needs splitting.
 
 ### Diametric synergy
 

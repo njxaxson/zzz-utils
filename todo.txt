@@ -5,3 +5,7 @@ Consider revisiting anomaly score ceiling calibration by post-facto reducing bot
 Alice really scales on disorders and produces polarity assaults, not disorders
 
 Consider availability accepting true/false/date
+
+Some test cases in test-scoring and test-bucketing (and maybe test-recommendations) are UNIT tests, not real scoring or bucketing or recommendation tests. They should be moved into a test-fundamentals.mjs script instead. 
+
+consider assigning gender and species to the unit metadata, maybe just for the character summary display

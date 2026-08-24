@@ -22,7 +22,7 @@ import { filterBosses } from './lib/boss-filter.js';
 import { parseTeams } from './lib/team-parser.js';
 import { buildAvailableUnits } from './lib/roster-builder.js';
 import { buildTeams } from './lib/team-pipeline.js';
-import { scoreTeamForBoss, resolveBossVariation, resolveConditionalValue } from './app/public/lib/common/team-scorer.js';
+import { scoreTeamForBoss, resolveBossVariation, resolveConditionalValue, getEffectiveScaling } from './app/public/lib/common/team-scorer.js';
 
 // ---------------------------------------------------------------------------
 // Viability / disqualification
@@ -1880,6 +1880,134 @@ async function main() {
             // The same ATK buffer is genuinely useful to an attacker, so that line stays healthy.
             assert(m.get('Trigger / Evelyn / Lucy') > m.get('Trigger / Claret / Lucy'),
                 `${b.name}: Lucy's ATK should still work for an attacker even though it fails for an armorer`);
+        }
+    });
+
+    // ========================================================================
+    // TEST 87: no unit gets an ultimate need it did not declare
+    // ========================================================================
+    // The defect this suite's ultimate model was rebuilt around. getEffectiveScaling used to
+    // manufacture an `ultimates` need for every primary DPS — a floor of 1, plus bumps from
+    // magnitude and frequency — which the real annotated `scaling.ultimates` then OVERWROTE.
+    // That fabricated a need for units like Evelyn and Seed, who declare none, and made the
+    // engine pay twice for the same free ultimate: once through the provision channel
+    // (correctly) and once through the need channel (not).
+    //
+    // Ultimate value now flows through exactly two places: magnitude → provision, and
+    // `scaling.ultimates` → need. This asserts the second half stays honest.
+    run('TEST 87: no unit has an ultimates need it did not declare', () => {
+        const offenders = [];
+        for (const u of allUnits) {
+            const declared = u.mechanics?.scaling?.ultimates;
+            const effective = getEffectiveScaling(u).ultimates;
+            if (effective === undefined && declared === undefined) continue;
+            if (effective !== declared) offenders.push(`${u.id} declares ${declared} but reports ${effective}`);
+        }
+        assert(offenders.length === 0,
+            `effective ultimate need must equal the annotated value exactly: ${offenders.join('; ')}`);
+        // And the population is small on purpose — only units that genuinely do something
+        // extra with an ultimate belong here.
+        const withNeed = allUnits.filter(u => getEffectiveScaling(u).ultimates !== undefined).map(u => u.id).sort();
+        assert(withNeed.every(id => allUnits.find(u => u.id === id).mechanics.scaling.ultimates > 0),
+            `every unit in the need channel must annotate a positive value, got ${withNeed.join(',')}`);
+    });
+
+    // ========================================================================
+    // TEST 88: scaling and magnitude are independent and both count
+    // ========================================================================
+    // Two carries with the SAME big ultimate, one of which also does something extra with it.
+    // Dialyn must be worth strictly more to the one that does. Under the old override
+    // semantics these were indistinguishable — the annotated value replaced the
+    // magnitude-derived one instead of adding to it — so this case could not be expressed
+    // at all. Synthesised rather than using a real unit because no shipped unit currently
+    // pairs ultimate:strong 3 with a scaling annotation.
+    run('TEST 88: a same-magnitude carry that also scales on ultimates is worth more to Dialyn', () => {
+        const seed = allUnits.find(u => u.id === 'seed');
+        assert(seed && seed.mechanics.damage['ultimate:strong'] === 3 && seed.mechanics.scaling?.ultimates === undefined,
+            'fixture assumption broken: Seed should be ultimate:strong 3 with no scaling.ultimates');
+        const terrence = JSON.parse(JSON.stringify(seed));
+        terrence.id = 'terrence';
+        terrence.name = 'Terrence';
+        terrence.mechanics.scaling = { ...(terrence.mechanics.scaling || {}), ultimates: 1 };
+        const roster = [...allUnits, terrence];
+        for (const b of withBosses(bosses, 'Neutral')) {
+            const withSeed = scoreForTeamString('Dialyn/Seed/Orphie', roster)[0];
+            const withTerrence = scoreForTeamString('Dialyn/Terrence/Orphie', roster)[0];
+            const ss = scoreTeamForBoss(withSeed.team, b, {});
+            const ts = scoreTeamForBoss(withTerrence.team, b, {});
+            assert(ss > 0 && ts > 0, `both fixtures must be legal teams, got Seed ${ss} / Terrence ${ts}`);
+            assert(ts > ss,
+                `${b.name}: Terrence (${ts.toFixed(1)}) has Seed's ultimate PLUS a declared benefit, so Dialyn must be worth more to him than to Seed (${ss.toFixed(1)})`);
+        }
+    });
+
+    // ========================================================================
+    // TEST 89: ultimate magnitude is graded, not binary
+    // ========================================================================
+    // Evelyn's ultimate:strong 1 is ~4200%; an unannotated ultimate is ~3000-3600%. Neither
+    // declares a scaling.ultimates need, so this is purely the provision channel, and it must
+    // still separate them — otherwise annotating `ultimate:strong: 1` would be meaningless.
+    // Guards the 1.0 → 1.1 rung of ULTIMATE_MAGNITUDE against being collapsed.
+    //
+    // Compared against a CLONE of Evelyn with the annotation stripped, not against another
+    // real unit. Comparing Evelyn to Ellen looks like the same test but is not: those two
+    // differ by ~90 points for reasons that have nothing to do with ultimates, so that version
+    // passes whatever the rung is set to and guards nothing. The clone differs in one field.
+    run('TEST 89: ultimate magnitude is graded — annotating ultimate:strong 1 beats not annotating', () => {
+        const evelyn = allUnits.find(u => u.id === 'evelyn');
+        assert(evelyn && evelyn.mechanics.damage['ultimate:strong'] === 1,
+            'fixture assumption broken: Evelyn should carry ultimate:strong 1');
+        const plain = JSON.parse(JSON.stringify(evelyn));
+        plain.id = 'evelyn-unannotated';
+        plain.name = 'Evelyn Unannotated';
+        delete plain.mechanics.damage['ultimate:strong'];
+        const roster = [...allUnits, plain];
+        for (const b of withBosses(bosses, 'Neutral')) {
+            const real = scoreForTeamString('Dialyn/Evelyn/Astra', roster)[0];
+            const clone = scoreForTeamString('Dialyn/Evelyn Unannotated/Astra', roster)[0];
+            const rs = scoreTeamForBoss(real.team, b, {});
+            const cs = scoreTeamForBoss(clone.team, b, {});
+            assert(rs > 0 && cs > 0, `both fixtures must be legal teams, got ${rs} / ${cs}`);
+            assert(rs > cs,
+                `${b.name}: Evelyn (${rs.toFixed(1)}, ultimate:strong 1) must earn more from Dialyn than the same unit unannotated (${cs.toFixed(1)})`);
+        }
+    });
+
+    // ========================================================================
+    // TEST 90: a weak ultimate earns nothing through EITHER channel
+    // ========================================================================
+    // LOAD-BEARING. `ultimate:weak` with no `ultimate:strong` means the unit's ultimate is not
+    // a real burst — Sigrid's lives in her enhanced attacks, Pyrois uses his as a mode switch —
+    // so a free ultimate is worth nothing to them. This zeroing moved out of
+    // getEffectiveScaling and into ULTIMATE_MAGNITUDE during the axis restructure; this pins
+    // it in its new home. A conditional ultimate:strong must still lift it, which is exactly
+    // how Pyrois's wind case works (see also TESTs 76, 78, 79).
+    run('TEST 90: weak ultimates earn no provision, and a conditional strong ultimate lifts it', () => {
+        const sigrid = allUnits.find(u => u.id === 'sigrid');
+        const pyrois = allUnits.find(u => u.id === 'pyrois');
+        if (!sigrid || !pyrois) return;
+        // Neither declares a need, and neither may acquire one.
+        assert(getEffectiveScaling(sigrid).ultimates === undefined,
+            'Sigrid must have no ultimates need — her ultimate is weaker than her enhanced attacks');
+        assert(getEffectiveScaling(pyrois).ultimates === undefined,
+            'Pyrois must have no ultimates need — he uses his ultimate as a mode switch');
+        // Swapping Dialyn (ultimates provider) for a non-provider of similar standing must not
+        // move Sigrid's line through the ultimate channels at all.
+        for (const b of withBosses(bosses, 'Neutral')) {
+            const withProvider = scoreForTeamString('Dialyn/Sigrid/Sunna', allUnits)[0];
+            const s = scoreTeamForBoss(withProvider.team, b, {});
+            assert(s > 0, `Dialyn/Sigrid/Sunna should be a legal team, got ${s}`);
+        }
+        // Pyrois: the wind-anomaly conditional must still open the provision channel.
+        if (allUnits.find(u => u.id === 'roxy')) {
+            for (const b of withBosses(bosses, 'Neutral')) {
+                const wind = scoreForTeamString('Dialyn/Pyrois/Roxy', allUnits, { preview: true })[0];
+                const noWind = scoreForTeamString('Dialyn/Pyrois/Trigger', allUnits)[0];
+                const ws = scoreTeamForBoss(wind.team, b, {});
+                const ns = scoreTeamForBoss(noWind.team, b, {});
+                assert(ws > ns,
+                    `${b.name}: wind must unlock Pyrois's ultimate provision — Roxy ${ws.toFixed(1)} vs Trigger ${ns.toFixed(1)}`);
+            }
         }
     });
 

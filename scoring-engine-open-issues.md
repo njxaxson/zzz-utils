@@ -1,148 +1,60 @@
 # Scoring engine — open issues
 
 Live register of what is actually open in the scorer. All suites are green
-(`86/86` scoring, `43/43` recommendations, `6/6` bucketing) — everything below is a *modelling*
+(`90/90` scoring, `43/43` recommendations, `6/6` bucketing) — everything below is a *modelling*
 problem, not a failing test. Historical post-mortems are demoted to the end.
 
 Last reviewed 2026-08-24.
 
 | # | Issue | Status | Size |
 |----|----|----|----|
-| 1 | Ultimate appetite is derived from the wrong axes | **Open** — decision needed | Medium; needs a multiplier rebalance |
-| 2 | Undersupply gating inverts supplier credit | **Open** — blocked on #1 | Small change, real calibration risk |
+| 1 | Ultimate credit is derived from the wrong axes | **Resolved** — see the post-mortem below | Done |
+| 2 | Undersupply gating inverts supplier credit | **Open** — much smaller than it was, unblocked | Small change, contained calibration risk |
 | 3 | Partial relevance is never priced | **Open, parked** by owner | Large; broad retune |
-
----
-
-## 1. Ultimate appetite is derived from the wrong axes
-
-### Terminology — keep these straight
-
-The confusion this issue is about is easy to reproduce in conversation, so name things precisely:
-
-* **Annotated** ultimate scaling = the literal `mechanics.scaling.ultimates` in `units.json`.
-  Only YSG (`3`) and Yixuan (`2`) carry one today. Miyabi warrants `1`, and it is **not yet
-  applied** — see Consequence A for why applying it is currently unsafe.
-* **Effective appetite** = `getEffectiveScaling(unit).ultimates`, the number `need(ultimates)`
-  actually multiplies by. The engine *manufactures* it — from magnitude, from frequency, or from
-  the annotated value overriding both.
-
-These differ for most units. Never write "Seed's ultimate scaling" without saying which one.
-
-### The three axes
-
-`units.json` encodes three **mutually independent** facts about a unit's ultimate. Full
-definitions, including the in-game modifier tiers, are in `engine-context.md` under `damage`.
-
-| Axis | Where | Means |
-|----|----|----|
-| Magnitude | `damage['ultimate:strong' \| 'ultimate:weak']` | Raw modifier size |
-| Frequency | `damage['ultimate:double']` | Ultimates per window |
-| Unique benefit | `scaling.ultimates` | Gets something *beyond* the ultimate's own damage |
-
-Crucially, **neither magnitude nor frequency implies appetite for provisioning.** Pyrois has a
-double ultimate yet benefits *less* than most from Dialyn (deliberately — two weak ultimates sum
-to a normal one, but Dialyn supplies only a single ultimate). Seed has no double ultimate and no
-ultimate scaling at all, yet benefits enormously, purely on magnitude.
-
-### The defect
-
-`getEffectiveScaling` manufactures `baseline.ultimates` from magnitude and frequency, then
-`{ ...baseline, ...explicit }` lets the annotated value **overwrite** it rather than combine.
-
-**Consequence A — annotating a real unique benefit *lowers* a unit.** Miyabi warrants
-`scaling.ultimates: 1`; she genuinely gets a material extra benefit from ultimates. Adding it
-**halves** her credit, because the annotated `1` overrides the magnitude-derived `2`:
-
-```
-as shipped        annotated=none  appetite=2  need(ultimates) from Dialyn=42.0
-with ultimates:1  annotated=1     appetite=1  need(ultimates) from Dialyn=21.0
-```
-
-So the correct data change is currently a regression. **Do not apply it until the merge is
-fixed** — that edit is pending on this issue. The data is right; the merge is wrong. Overriding
-must become combining (`max`, or explicit-only). Reproduce without touching the file by
-deep-cloning the unit and setting `mechanics.scaling.ultimates = 1`.
-
-**Consequence B — the frequency bump is conceptually wrong and currently inert.** Every unit
-that trips `ultimate:double >= 2` is either subdps (Ramiel — the whole block is skipped) or
-carries an annotated value that overwrites it (YSG `3`→`3`, Yixuan `3`→`2`). Pyrois's `1` is
-below the bar. So **no unit's live appetite comes from that line.** Deleting it should be
-score-neutral across all three suites — verify that, because a surprise there would mean the axis
-model is wrong somewhere else.
-
-### Measured baseline
-
-Dialyn (`utility.ultimates: 3`) on Butcher:
-
-```
-                  need(ultimates)   effective appetite   annotated   appetite came from
-Dialyn -> YSG          63.0                3                3        annotated (implicit also 3)
-Dialyn -> Yixuan       42.0                2                2        annotated, overriding implicit 3
-Dialyn -> Seed         42.0                2                -        MAGNITUDE (ult:strong 3 -> 2)
-Dialyn -> Miyabi       42.0                2                -        MAGNITUDE (ult:strong 2 -> 2)
-Dialyn -> Evelyn       21.0                1                -        flat baseline for primary DPS
-Dialyn -> Sigrid        0.0                0                -        ultimate:weak zeroing
-```
-
-Miyabi drops to `21.0` the moment her pending `scaling.ultimates: 1` is applied — Consequence A.
-
-### The decision this turns on
-
-Magnitude belongs in burst throughput, not appetite. But Seed carries **no annotated value at
-all** — her effective appetite of `2` is manufactured wholly from `damage['ultimate:strong']: 3`.
-So the intended Yixuan ≈ Seed balance currently rests *entirely* on magnitude leaking into
-appetite:
-
-| | annotated | effective appetite | source | need(ultimates) |
-|----|----|----|----|----|
-| Yixuan | `2` | `2` | annotated (unique benefit) | 42.0 |
-| Seed | *none* | `2` | magnitude leak (`ult:strong 3`) | 42.0 |
-
-Remove the leak and Seed collapses to the flat baseline `1` (21.0) or to `0`, while Yixuan holds
-at 42.0 — **breaking the intended balance.** So moving magnitude out of appetite is only viable
-if `ULTIMATES_PROVISION` (`MULT` 1.5, × burst weight) is scaled up to carry the throughput
-difference that `need(ultimates)` (`MULT` 7) currently carries by accident. **That rebalance is
-the fix, not a side effect of it.**
-
-### Constraints any fix must respect
-
-* **The `ultimate:weak` zeroing is load-bearing.** It is what makes Sigrid appetite `0`, and what
-  implements the intentional Pyrois-under-benefits-from-Dialyn design via his conditional
-  `ultimate:strong`. Must survive.
-* **Acceptance criterion: YSG clearly top, Yixuan ≈ Seed.** Yixuan's lower magnitude is
-  deliberately offset by her unique benefit — her extra non-ultimate attacks rival or exceed what
-  Seed puts out in her ultimate alone.
-* **The flat baseline `1` for every primary DPS is a separate concept** from the ladder bumps and
-  is probably correct — everyone wants ultimates a bit.
-* Do **not** give Miyabi `ultimate:double`. Her enhanced attack already carries ultimate-tier
-  multipliers and enters throughput via `damage.enhanced` in `BURST_DAMAGE_TYPES`.
+| 4 | `getMaxBurstWeight` saturates at 3 for every carry | **Open** — new, low priority | Small; unknown blast radius |
 
 ---
 
 ## 2. Undersupply gating inverts supplier credit
 
-Ju Fufu's `utility.ultimates: 1`:
+**Much smaller than it used to be, and no longer blocked.** Fixing issue 1 removed every
+fabricated ultimate need, so the gate can now only reach units that actually declare one. For
+`ultimates` that is three units — YSG, Yixuan, Miyabi — instead of every primary DPS.
+
+The mechanism. When undersupplied,
+`val = supply × scaling × keyMult × (supply/scaling) × UNDERSUPPLY_FACTOR` —
+so **`scaling` cancels out entirely**, leaving `keyMult × supply²`. Every undersupplied consumer
+receives the same flat number regardless of how much they wanted, and a consumer whose need
+exactly *matches* supply slips under the gate to collect full credit. There is a discontinuity
+at `supply == scaling`.
+
+The surviving instance, with Ju Fufu's `utility.ultimates: 1`:
 
 ```
-Ju Fufu -> YSG      need(ultimates) 4.2  (gated 20%)
-Ju Fufu -> Yixuan   need(ultimates) 4.2  (gated 30%)
-Ju Fufu -> Seed     need(ultimates) 4.2  (gated 30%)
-Ju Fufu -> Evelyn   need(ultimates) 7.0  (ungated)   <-- least ultimate-hungry carry gets the MOST
+Ju Fufu -> YSG      need(ultimates) 1.9  (gated 20%)   scaling 3
+Ju Fufu -> Yixuan   need(ultimates) 1.9  (gated 30%)   scaling 2
+Ju Fufu -> Miyabi   need(ultimates) 3.2  (ungated)     scaling 1  <-- least hungry gets the MOST
 ```
 
-When undersupplied,
-`val = supply × scaling × NEED_FULFILLMENT × (supply/scaling) × UNDERSUPPLY_FACTOR` —
-so **`scaling` cancels out entirely**, leaving `4.2 × supply²`. Every undersupplied consumer
-receives the same flat number regardless of appetite, and a low-appetite consumer slips under the
-gate to collect full credit. Ju Fufu is worth 67% more to Evelyn than to YSG.
+Miyabi's `scaling: 1` exactly matches Ju Fufu's `utility.ultimates: 1`, so she alone escapes the
+discount and collects 67% more than YSG, who wants ultimates three times as much.
 
 `UNDERSUPPLY_FACTOR` models something real — a carry needing 3 who receives 1 stays below their
 ceiling — but it is charged against the **supplier's** credit, which is where the inversion comes
 from.
 
-**Sequencing:** this interacts with issue 1. If appetite values change, every gating ratio here
-changes with them. Settle #1 first, or fix both together — never #2 alone.
+**The old worked example is dead.** This section used to lead with `Ju Fufu -> Evelyn 7.0
+(ungated)` as the headline case. That number came entirely from the fabricated need floor of 1
+matching Ju Fufu's supply of 1. Evelyn declares no ultimate need at all, so she no longer enters
+this channel and the example cannot recur. Do not reintroduce it.
+
+**A hard ceiling on `scaling.ultimates`, until this is fixed.** Dialyn's `utility.ultimates: 3`
+is the largest provision weight in the data, so a consumer annotated above `3` would tip into
+this gate and *lose* credit for wanting ultimates more. YSG sits at exactly `3` — right on the
+cliff edge, collecting full credit; `4` would drop her from 28.8 to roughly 17. Nothing in the
+code enforces this, so **do not annotate `scaling.ultimates` above 3** while this issue is open.
+Fixing it removes the ceiling. TEST 88's synthetic fixture is the natural place to extend
+coverage once it does.
 
 ---
 
@@ -214,6 +126,33 @@ retune rather than a patch. All measured against the full 86-test suite:
 
 ---
 
+## 4. `getMaxBurstWeight` saturates at 3 for every carry
+
+Found while restructuring the ultimate axes, and the reason that restructure had to move
+magnitude into the provision channel by a different route.
+
+`getMaxBurstWeight` MAXes across `BURST_DAMAGE_TYPES` and returns **3 for every relevant carry**:
+
+```
+ysg 3   yixuan 3   seed 3   miyabi 3   evelyn 3   sigrid 3   pyrois 3
+```
+
+Because it is a MAX over six keys and most carries max out at least one of them, it cannot
+distinguish Seed's 6000% ultimate from Evelyn's chain-driven kit. Anything scaled by it is
+effectively a flat rate.
+
+Ultimate provision used to be sized this way, which is *why* magnitude was originally smuggled
+into the need channel — that channel had a per-unit multiplier and this one did not. Issue 1
+moved provision onto `ULTIMATE_MAGNITUDE` and no longer depends on it.
+
+Still live on two paths: the recovery-debuff term in `scoreBaselineAffinity` (line ~2159) and
+`scoreStunEmergence` (line ~2313). Both silently treat every carry as equally bursty — stun
+emergence in particular pays `burst=3` for Seed, Evelyn and Sigrid alike. Low priority, since no
+wrong output is known, but a measurement that reports the same number for everything means
+anything downstream of it is uncalibrated rather than deliberately calibrated flat.
+
+---
+
 ## Design note: stunners and supports already differ
 
 Worth knowing before anyone adds a role-split penalty constant, because the split exists. The
@@ -234,6 +173,81 @@ So the 2:3 split is already in the engine. If more separation is wanted, lowerin
 in `getScalingBuffs` from `2` is a smaller and more principled lever than a second penalty
 constant — it is already the single source of truth for "how much does this unit's kit landing
 matter", and it applies consistently to every penalty.
+
+---
+
+## Resolved — the ultimate axis restructure
+
+`units.json` describes a unit's ultimate along three independent axes: **frequency**
+(`damage['ultimate:double']`), **magnitude** (`damage['ultimate:strong'|'weak']`), and **scaling**
+(`mechanics.scaling.ultimates`, a benefit *beyond* the ultimate's own damage). None of the three
+was in the right place, and two scoring channels overlapped.
+
+### The diagnosis
+
+`Ju Fufu / Evelyn / Astra`, real debug output from the old engine:
+
+```
+Ju Fufu → Evelyn:
+  ultimates: 4.5          ← provision credit  — correct
+  need(ultimates): 7.0    ← need credit       — fabricated
+```
+
+Evelyn annotates no `scaling.ultimates`. Neither does Ellen, Harumasa, or Seed. But
+`getEffectiveScaling` manufactured a floor of `1` for every primary DPS, plus bumps from
+magnitude and frequency, and then `{ ...baseline, ...explicit }` let the real annotated value
+**overwrite** the manufactured one. **26 of 60 units reported an ultimate need they never
+declared.** The same free ultimate was paid for twice, and the fabricated half was the larger.
+
+Three consequences, all of which had been observed separately without the common cause being
+identified:
+
+* Annotating a genuine benefit *lowered* a unit. Miyabi's warranted `scaling.ultimates: 1` would
+  have overridden her magnitude-derived `2` and halved her credit, so the correct data edit sat
+  unapplied.
+* Yixuan was already paying the same cost silently — manufactured `3`, annotated `2`, overwritten
+  down.
+* The fabricated need was exposed to the undersupply gate, producing issue 2's headline
+  inversion: Evelyn collected Ju Fufu's full ungated 7.0 purely because the floor of `1` matched
+  his `utility.ultimates: 1` exactly.
+
+### The fix
+
+One home per axis. Frequency stays in `BURST_DAMAGE_TYPES` and nowhere else. Magnitude moved to
+the provision channel via a new `ULTIMATE_MAGNITUDE` table. Scaling is read verbatim from
+`units.json` with no baseline, so only YSG, Yixuan and Miyabi enter the need channel at all.
+
+The central code change was a **deletion**: removing the manufactured `baseline.ultimates` left
+the existing per-key merge with nothing to collide with, so the override bug disappeared without
+any special-casing. Calibration settled at `ULTIMATES_PROVISION` 7.8 and
+`NEED_KEY_MULT.ultimates` 3.2, anchored on holding YSG's total flat.
+
+Verification: 8,723 of 127,836 whole-roster scores moved (6.8%), and **every moved team contained
+Dialyn or Ju Fufu** — no leakage outside the ultimate channels. Max delta 14.5.
+
+### Why the anticipated rebalance was rejected
+
+The original writeup proposed moving magnitude out of the need channel and scaling up
+`ULTIMATES_PROVISION` to compensate. That cannot work as stated: provision was sized by
+`getMaxBurstWeight`, which returns 3 for every carry (issue 4), so there was no throughput
+*difference* there to scale up — raising it would have lifted Evelyn exactly as much as Seed.
+The restructure works because it gave provision a per-unit multiplier of its own.
+
+### One calibration tension, recorded
+
+TEST 7 (Evelyn stunner ordering on fire-weak Pompey) asserts `Dialyn > Lighter`. Before the fix
+Dialyn led by 9.3 points — but a large part of that lead was Evelyn's fabricated need. Removing it
+drops the margin to roughly a point, and the two constants trade off:
+
+| | `ULTIMATES_PROVISION` up | `NEED_KEY_MULT.ultimates` up |
+|----|----|----|
+| TEST 7 margin | improves | no effect (Evelyn has no need) |
+| Yixuan ≈ Seed | drifts, Seed pulls ahead | drifts, Yixuan pulls ahead |
+| YSG total / Thrall band | rises, squeezes bucketing TEST 5 | rises, squeezes bucketing TEST 5 |
+
+7.8 / 3.2 is the point where all three suites pass with YSG's total exactly on its old value.
+Seed ends ~1.9 ahead of Yixuan (4%) rather than dead level; that is the price of keeping the
+Thrall band clear, and it is the knob to revisit first if the balance ever feels wrong.
 
 ---
 
@@ -291,6 +305,31 @@ single constant cannot open both. This is the one place a genuinely narrow windo
 
 ## Lessons learned
 
+**Never give a unit a need it did not declare.** The single most useful rule to come out of the
+ultimate restructure, and it generalises past ultimates. A manufactured baseline looks harmless —
+"everyone wants ultimates a bit" is even true — but it puts units into machinery built for units
+that opted in. Once Evelyn had a fabricated need of 1, she was eligible for need-fulfillment
+credit she should never have received, *and* eligible for the undersupply discount on a need she
+never had. If a value is worth giving to everyone, price it in a channel that applies to
+everyone; do not fake a per-unit declaration to get at a per-unit multiplier. That is precisely
+how magnitude ended up in the wrong channel.
+
+**Score-neutrality is not evidence that a fix is right — it can be evidence it is empty.** An
+earlier attempt at issue 1 kept both axes but combined them with `max` instead of letting the
+annotation override. It was provably score-neutral across all three suites, which felt like a
+clean landing. It was worthless: `max(magnitude 2, annotated 1) = 2` means Miyabi's annotation
+can never change anything, so "the data edit is now safe" was true only because the edit did
+nothing. It also still could not distinguish a big-ultimate carry from a big-ultimate carry that
+*also* scales, and left the double payment untouched. When a structural fix moves no scores, ask
+whether it changed any behaviour at all.
+
+**A test that cannot fail proves nothing.** TEST 89 was first written as "Dialyn is worth more to
+Evelyn than to Ellen". True, and it passed — but Evelyn and Ellen differ by ~90 points for
+reasons unrelated to ultimates, so it passed just as happily with the magnitude rung collapsed.
+It now compares Evelyn against a *clone of Evelyn* with the annotation stripped, which differs in
+exactly one field. Mutation-check new tests: break the mechanism deliberately and confirm the
+right test goes red.
+
 **Before adding a penalty keyed on "no consumer scales for X", check how many units scale for X
 at all.** The provision whiff was first written over *all* `NEED_FULFILLMENT_KEYS`, which caught
 Sunna's `veils:3` and was doing all the work holding up TEST 15 — wrongly, because veils don't
@@ -340,13 +379,15 @@ abstraction.
 node test-scoring.mjs && node test-recommendations.mjs && node test-bucketing.mjs
 ```
 
-**Effective appetite per unit** (issue 1):
+**Who is in the ultimate need channel** — must print exactly three lines, matching the annotated
+values in `units.json` and nothing else. A fourth unit means a fabricated need has crept back
+(TEST 87 asserts the same thing):
 
 ```bash
-node --input-type=module -e "import { getEffectiveScaling } from './app/public/lib/common/team-scorer.js'; import { readFileSync } from 'fs'; const raw=JSON.parse(readFileSync('./app/public/data/units.json','utf8')); const list=Array.isArray(raw)?raw:raw.units; for (const id of ['ysg','yixuan','seed','miyabi','evelyn','sigrid']) console.log(id.padEnd(8), 'appetite=' + getEffectiveScaling(list.find(y=>y.id===id)).ultimates);"
+node --input-type=module -e "import { getEffectiveScaling } from './app/public/lib/common/team-scorer.js'; import { readFileSync } from 'fs'; const raw=JSON.parse(readFileSync('./app/public/data/units.json','utf8')); const list=Array.isArray(raw)?raw:raw.units; for (const u of list) { const s=getEffectiveScaling(u).ultimates; if (s!==undefined) console.log(u.id.padEnd(12), s); }"
 ```
 
-Expect `ysg 3`, `yixuan 2`, `seed 2`, `miyabi 2`, `evelyn 1`, `sigrid 0`.
+Expect `miyabi 1`, `ysg 3`, `yixuan 2`.
 
 **Per-pair ultimate credit** (issues 1 and 2) — score a team with `{ debug: true }` and grep the
 output for `need(ultimates)` and `ultimates:`.
@@ -357,7 +398,9 @@ Two harness traps, both of which produced misleading numbers during this investi
   `[dialyn, ju-fufu, yixuan]`, silently adding a second ultimate provider. Always print
   `team.map(u => u.id)`.
 * **Disqualified teams score `-1` and never reach L4**, so they emit no debug lines at all.
-  `Dialyn/Seed/Astra` is DQ'd on Butcher; measure Seed on a legal team instead.
+  Measure Seed on `Dialyn/Seed/Orphie`, not `Dialyn/Seed/Astra` — Seed needs a second attacker,
+  so the Astra line is DQ'd, while Orphie is nominally an attacker acting as a pseudo-support and
+  satisfies the requirement.
 
 **Issue 3** — the second number should be lower than the first once fixed, and currently is not:
 
@@ -377,6 +420,9 @@ for (const drop of [false, true]) {
 }"
 ```
 
-A whole-roster diff harness (7,339 teams × 18 bosses = 132,102 scores) was used to check blast
-radius during the 3.2 remodel. Rebuilding it is ~20 lines: enumerate `buildTeams(...)` against
-`[...bosses, syntheticNeutral]`, write `boss\tteam\tscore` rows, diff two runs.
+**Whole-roster blast radius.** A diff harness (7,102 teams × 18 bosses = 127,836 scores) is the
+sharpest check available and is worth rebuilding for any structural change — ~20 lines: enumerate
+`buildTeams(...)` against `[...bosses, syntheticNeutral]`, write `boss\tteam\tscore` rows, diff
+two runs. Its value is that it supports a *falsifiable prediction*: the ultimate restructure
+should have moved only teams containing Dialyn or Ju Fufu, and that is exactly what it moved
+(8,723 rows, 6.8%, zero exceptions). "The suites are green" cannot tell you that.

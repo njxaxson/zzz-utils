@@ -39,7 +39,10 @@ const MULT = {
     DEFENSE_DEBUFF: 1.5,
     RECOVERY_DEBUFF: 2,
     STUN_INFRA: 1,
-    ULTIMATES_PROVISION: 1.5,
+    // Ultimate provision, multiplied by the consumer's ULTIMATE_MAGNITUDE (0 - 2.0). Was 1.5
+    // against getMaxBurstWeight, which saturated at 3 for every carry and so paid a flat rate;
+    // the magnitude table is a smaller number, hence the larger multiplier here.
+    ULTIMATES_PROVISION: 7.8,
     STUN_MULT_BUFF: 2,
     TOTALIZE_PENALTY: 38,
     DISORDER_BONUS: 6,
@@ -111,11 +114,35 @@ const STUNLESS_SHILL_CREDIT = 48;
 // because an enhanced attack can carry ultimate-tier multipliers: Miyabi has no
 // `ultimate:double`, and this is how her effective double-ultimate enters throughput. Do NOT
 // give her `ultimate:double` to "fix" that - it is already accounted for here.
+// This is the ONLY consumer of `ultimate:double`: frequency is throughput and lives here
+// alone. It must never be reintroduced into ultimate provision or the need channel.
 const BURST_DAMAGE_TYPES = ['enhanced', 'ultimate:strong', 'ultimate:double', 'chain', 'totalize', 'maim'];
+
+// ULTIMATE MAGNITUDE. How big this unit's own ultimate is, and therefore what a FREE
+// ultimate is worth to them. One of three INDEPENDENT axes in the data (see
+// engine-context.md under `damage`), and each axis has exactly one home:
+//   frequency  `damage['ultimate:double']`       -> throughput, via BURST_DAMAGE_TYPES above
+//   magnitude  `damage['ultimate:strong'|'weak']` -> the PROVISION channel, via this table
+//   scaling    `mechanics.scaling.ultimates`     -> the NEED channel, annotated values only
+// Do not collapse them. Magnitude and frequency used to be manufactured into the need
+// channel, which fabricated an ultimate need for every primary DPS and paid twice for the
+// same free ultimate; see scoring-engine-open-issues.md.
+//
+// Values track the in-game modifier tiers: 3 is 6000%+ (Seed, YSG), 2 is 4500%+ (Miyabi),
+// 1 is 4200%+ (Evelyn, Yixuan), and an unannotated ultimate is ~3000-3600%. The 1.0 -> 1.1
+// step at the bottom is what makes Evelyn worth slightly more than Ellen from a free
+// ultimate; collapsing those two rungs would make `ultimate:strong: 1` meaningless.
+const ULTIMATE_MAGNITUDE = { 0: 1.0, 1: 1.1, 2: 1.25, 3: 2.0 };
 const NEED_FULFILLMENT_KEYS = [
     'disorders', 'ablooms', 'chains', 'ultimates', 'veils',
     'quick-assists', 'interrupt-resistance', 'vortex'
 ];
+// Per-key override of MULT.NEED_FULFILLMENT. Ultimates are paid through TWO channels -
+// provision (ULTIMATE_MAGNITUDE, for any carry who can use a free ultimate) and need
+// (`scaling.ultimates`, for the few who get something beyond its damage). Charging the need
+// side at the shared rate would let it dominate the provision side, so it carries its own,
+// lower weight. Every other key falls through to MULT.NEED_FULFILLMENT unchanged.
+const NEED_KEY_MULT = { ultimates: 3.2 };
 
 const VORTEX_TIERS = { 
     //Base elements
@@ -682,36 +709,17 @@ export function getEffectiveScaling(unit) {
     if (roles.includes('stun'))    Object.assign(baseline, { daze: 1 });
     if (isDPSByRoles(roles)) {
         const damage = unit._resolvedDamage || unit.mechanics?.damage || {};
-        // ULTIMATE APPETITE. Three INDEPENDENT axes exist in the data (see engine-context.md
-        // under `damage`): magnitude (`ultimate:strong`/`weak`, the raw in-game modifier),
-        // frequency (`ultimate:double`, ultimates per window), and unique benefit
-        // (`scaling.ultimates`, whether the unit gets something BEYOND the ultimate's damage).
-        // Neither magnitude nor frequency implies appetite for provisioning: Pyrois has a
-        // double ultimate yet benefits LESS than most from Dialyn, while Seed has neither a
-        // double ultimate nor any ultimate scaling yet benefits enormously.
+        // NO IMPLICIT `ultimates` HERE, DELIBERATELY. A unit must never be given a need it
+        // did not declare. `scaling.ultimates` is authored data and nothing else: it flows
+        // through the `explicit` merge below untouched, so only the units that annotate one
+        // ever enter the need channel. Everyone else gets ultimate value through the
+        // PROVISION channel instead, priced by ULTIMATE_MAGNITUDE.
         //
-        // KNOWN DEFECT: this block manufactures appetite from magnitude and frequency, and the
-        // `{ ...baseline, ...explicit }` merge below then lets `scaling.ultimates` OVERWRITE it
-        // rather than combine. So annotating a genuine unique benefit can LOWER a unit: adding
-        // Miyabi's warranted `scaling.ultimates: 1` overrides the magnitude-derived 2 and halves
-        // her need(ultimates) from 42.0 to 21.0, so that correct data edit is blocked on this
-        // being fixed. The frequency bump below is also conceptually
-        // wrong and currently inert (every unit tripping it is subdps or carries an explicit
-        // override). Not fixed here: Seed's appetite of 2 comes solely from magnitude and is
-        // the only thing holding the intended Yixuan-vs-Seed balance, so removing the leak
-        // requires rebalancing ULTIMATES_PROVISION. See scoring-engine-open-issues.md.
-        if (!hasSubDPSRole(unit)) {
-            let implicitUlt = 1;
-            if (w(damage['ultimate:strong']) >= 2) implicitUlt = Math.max(implicitUlt, 2);
-            if (w(damage['ultimate:double']) >= 2) implicitUlt = Math.max(implicitUlt, 3);
-            // A (possibly conditional) ultimate:strong OVERRIDES ultimate:weak — e.g. Pyrois's
-            // ultimate becomes a real burst under wind anomaly, lifting the weak-ultimate penalty.
-            // LOAD-BEARING: this zeroing is what excludes Sigrid, and what implements the
-            // intentional design that Pyrois under-benefits from Dialyn (two weak ultimates sum
-            // to a normal one, but Dialyn supplies only a single ultimate). Must survive any fix.
-            if (w(damage['ultimate:weak']) > 0 && w(damage['ultimate:strong']) === 0) implicitUlt = 0;
-            baseline.ultimates = implicitUlt;
-        }
+        // This block used to manufacture a floor of 1 for every primary DPS plus bumps from
+        // magnitude and frequency, which the annotated value then OVERWROTE. That fabricated
+        // a need for units like Evelyn and Seed (neither annotates one), paid twice for the
+        // same free ultimate, and exposed the fabricated need to the undersupply gate. See
+        // scoring-engine-open-issues.md.
         baseline['quick-assists'] = 0.25;
         const totalizeWeight = w(damage.totalize);
         if (totalizeWeight > 0) {
@@ -811,6 +819,25 @@ function getMaxBurstWeight(unit) {
     // role-default burst weight without needing an explicit damage.maim in their kit.
     if (roles.includes('armorer')) return 2;
     return isDPSByRoles(roles) ? 1 : 0;
+}
+
+/**
+ * Value of a free ultimate to this unit, from ultimate MAGNITUDE alone. Feeds the provision
+ * channel; the need channel reads `scaling.ultimates` and nothing else.
+ *
+ * Returns 0 when the unit's ultimate is not a real burst (`ultimate:weak` with no
+ * `ultimate:strong`) - Sigrid, whose burst lives in her enhanced attacks, and Pyrois without
+ * a wind-anomaly teammate. LOAD-BEARING: this zeroing is what excludes Sigrid from ultimate
+ * provision entirely, and what implements the intentional design that Pyrois under-benefits
+ * from Dialyn (two weak ultimates sum to one normal one, but Dialyn supplies a single
+ * ultimate). A possibly-conditional `ultimate:strong` overrides `ultimate:weak`, which is
+ * exactly how Pyrois's wind condition lifts the penalty.
+ */
+function getUltimateMagnitude(unit) {
+    const damage = unit._resolvedDamage || unit.mechanics?.damage || {};
+    const strong = w(damage['ultimate:strong']);
+    if (strong === 0 && w(damage['ultimate:weak']) > 0) return 0;
+    return ULTIMATE_MAGNITUDE[Math.min(3, strong)] ?? 1.0;
 }
 
 const BUFF_UTIL_FLOOR = 0;
@@ -1069,8 +1096,25 @@ function computeBuffUtilization(supplier, team) {
             totalWeight += uv;
             let maxRelevance = 0;
             for (const consumer of consumers) {
-                const scaling = getEffectiveScaling(consumer);
-                maxRelevance = Math.max(maxRelevance, Math.min(1, w(scaling[key])));
+                // `ultimates` is the one key paid through the PROVISION channel, which lands on
+                // any carry who can use an ultimate at all - not only on the few units that
+                // declare a `scaling.ultimates` need. Judging it by declared need would read
+                // Dialyn's provision as landing on nobody whenever the carry is a Seed or an
+                // Evelyn, which is wrong: they use the free ultimate, they just don't get
+                // anything extra from it.
+                //
+                // DELIBERATELY UNMODELED - relayed provision. Dialyn/Sigrid/Sunna and
+                // Dialyn/Sigrid/Astra take the identical hit here. The Astra line could in
+                // principle take a smaller one: Dialyn can gift the free ultimate to Astra,
+                // whose ultimate provisions a chain attack to every teammate, and Sigrid
+                // (`scaling.chains: 3`) wants a free chain attack badly - so the provision
+                // reaches her by relay. Tracing provisions through an intermediary is a lot of
+                // machinery for a difference this small. Not modelled on purpose; revisit only
+                // if this hair genuinely needs splitting.
+                const rel = key === 'ultimates'
+                    ? (isDPS(consumer) && !hasSubDPSRole(consumer) && getUltimateMagnitude(consumer) > 0 ? 1 : 0)
+                    : Math.min(1, w(getEffectiveScaling(consumer)[key]));
+                maxRelevance = Math.max(maxRelevance, rel);
             }
             effectiveWeight += uv * maxRelevance;
         }
@@ -2123,20 +2167,22 @@ function scoreBaselineAffinity(supplier, consumer, debug, options = {}) {
         }
     }
 
-    // Ultimates provision → primary DPS only (subdps don't consume the burst window)
-    // Skipped when consumer has a weak ultimate (their ultimate isn't stronger than their chain)
-    const supplierUtility = supplier.mechanics?.utility || {};
+    // Ultimates provision → primary DPS only (subdps don't consume the burst window).
+    // Priced by the consumer's ultimate MAGNITUDE: a free ultimate is worth more to a carry
+    // whose own ultimate hits harder. This used to be sized by getMaxBurstWeight, which MAXes
+    // across BURST_DAMAGE_TYPES and returns 3 for every relevant carry alike - so it paid a
+    // flat rate and differentiated nobody. That saturation is why magnitude was originally
+    // smuggled into the need channel; it lives here now.
+    //
+    // A weak ultimate (not a real burst) yields magnitude 0 and zeroes this out on its own,
+    // so no separate guard is needed. A conditional `ultimate:strong` resolves through
+    // _resolvedDamage and lifts the zeroing - which is exactly how Pyrois's wind case works.
+    const supplierUtility = resolveValueMap(supplier.mechanics?.utility, _ctx);
     const ultimatesWeight = w(supplierUtility.ultimates);
     if (ultimatesWeight > 0 && isDPSByRoles(consumerRoles) && !hasSubDPSRole(consumer)) {
-        // ultimate:strong (possibly conditional) overrides ultimate:weak — provision counts again.
-        const cDmg = consumer._resolvedDamage || consumer.mechanics?.damage || {};
-        const weakUltActive = w(cDmg['ultimate:weak']) > 0 && w(cDmg['ultimate:strong']) === 0;
-        if (!weakUltActive) {
-            const burstWeight = getMaxBurstWeight(consumer);
-            const val = ultimatesWeight * burstWeight * MULT.ULTIMATES_PROVISION;
-            score += val;
-            dbg('ultimates', val);
-        }
+        const val = ultimatesWeight * getUltimateMagnitude(consumer) * MULT.ULTIMATES_PROVISION;
+        score += val;
+        dbg('ultimates', val);
     }
 
     return { score, firedCategories };
@@ -2191,7 +2237,8 @@ function scoreNeedFulfillment(supplier, consumer, debug, options = {}) {
             // veils:1 for YSG's veils:2) helps, but not enough to do the job.
             let fulfillment = Math.min(1, supplyWeight / scalingWeight);
             if (supplyWeight < scalingWeight) fulfillment *= UNDERSUPPLY_FACTOR;
-            const val = supplyWeight * scalingWeight * MULT.NEED_FULFILLMENT * fulfillment;
+            const keyMult = NEED_KEY_MULT[key] ?? MULT.NEED_FULFILLMENT;
+            const val = supplyWeight * scalingWeight * keyMult * fulfillment;
             score += val;
             if (debug) console.log(`        need(${key}): ${val.toFixed(1)}${fulfillment < 1 ? ` (gated ${Math.round(fulfillment * 100)}%)` : ''}`);
         }

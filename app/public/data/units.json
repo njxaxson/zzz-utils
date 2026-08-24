@@ -501,7 +501,7 @@
         "mechanics": {
             "elementalVariant": "frost",
             "damage": { "enhanced": 3, "ultimate:strong": 2 },
-            "scaling": { "disorders": 3, "cr": 3, "cd": 3 }
+            "scaling": { "ultimates": 1, "disorders": 3, "cr": 3, "cd": 3 }
         },
         "faction": "Section 6",
         "displayText": "Void Hunter Hoshimi Miyabi reporting for duty. An anomaly agent built like an attacker, Miyabi has a low skill floor but a very high skill ceiling and can produce some of the highest damage output in the game with precise technical play."
