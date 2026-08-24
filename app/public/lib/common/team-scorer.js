@@ -775,6 +775,10 @@ const BUFF_UTIL_FLOOR = 0;
 // armorer class, CD always landed, so the engine never treated it as missable.
 const WHIFF_COHESION_PENALTY = 0.8;
 const WHIFF_PENALTY_BUFFS = ['sheer', 'cd'];
+// Cohesion multiplier when a DEFINING (weight-3) need-fulfillment provision lands on nobody.
+// Softer than WHIFF_COHESION_PENALTY: Dialyn handing free ultimates to a weak-ultimate carry
+// has wasted her headline perk, but she is still a fully functional stunner underneath.
+const PROVISION_WHIFF_PENALTY = 0.963;
 // Armorer damage-lever dependency. Armorers have two crit checks (0-100% for 150% Laceration,
 // 100-200% for 300%) but fixed crit damage and zero ATK scaling, so their whole lever set is
 // CR, Laceration, PEN and defense shred. A team that supplies none of them leaves the armorer
@@ -1044,15 +1048,57 @@ function computeBuffUtilization(supplier, team) {
     const coreActivation = Math.min(1.0, coreImpact / CORE_IMPACT_BASELINE);
     const coreRatio = rawCoreRatio * coreActivation;
     let baseUtil = Math.min(1.0, Math.max(adjustedRatio, threshold, coreRatio));
-    // A whiffed directional stat buff (no consumer can use it) is a strong signal the support
-    // is on the wrong team — it wastes a defining buff. Apply a direct cohesion hit beyond the
-    // ratio effect (which the absolute-supply threshold masks). Covers sheer (no rupture
-    // consumer) and cd (all-armorer / crit-damage-agnostic teams).
-    for (const wk of WHIFF_PENALTY_BUFFS) {
-        if (w(buffs[wk]) >= 2 && !consumers.some(c => getBuffRelevance(wk, c) > 0)) {
+    // A defining stat buff that reaches NO consumer is wasted, and the `ratio` that should have
+    // caught it is masked by the absolute-supply `threshold` above — so charge it directly.
+    // This was historically restricted to sheer and cd; it applies to any stat buff, because a
+    // whiffed `anomaly` buff (Nangong on a team with no anomaly unit) is wasted for exactly the
+    // same reason as sheer with no rupture consumer.
+    //
+    // Element buffs are a MENU, not separate offerings: Lighter carries fire AND ice so that one
+    // of them matches the carry. They are judged together on their best element — charging him
+    // for the arm that missed would penalise the very thing that makes him flexible.
+    // Only DEFINING buffs (weight 3) generalise. A weight-2 buff is a secondary perk, and a team
+    // that cannot use it has not wasted the supplier — Rina's atk:2 is worthless to an armorer
+    // (ARMORER_ATK_EFFICIENCY is 0) but her pen:3 and def:2 are exactly what Claret wants, and
+    // she is not on the wrong team. sheer and cd keep the older weight-2 bar via
+    // WHIFF_PENALTY_BUFFS, since those were calibrated against it.
+    let elemWeight = 0, elemLands = false;
+    for (const [key, value] of Object.entries(buffs)) {
+        if (!STAT_BUFF_KEYS.has(key)) continue;
+        const bw = w(value);
+        const bar = WHIFF_PENALTY_BUFFS.includes(key) ? 2 : 3;
+        if (bw < bar) continue;
+        const lands = consumers.some(c => getBuffRelevance(key, c) > 0);
+        if (ELEMENTS.includes(key)) {
+            elemWeight = Math.max(elemWeight, bw);
+            if (lands) elemLands = true;
+        } else if (!lands) {
             baseUtil *= WHIFF_COHESION_PENALTY;
         }
     }
+    if (elemWeight >= 3 && !elemLands) baseUtil *= WHIFF_COHESION_PENALTY;
+    // Provision side. A provision is only "wasted" when the consumer is ACTIVELY barred from
+    // using something they would otherwise want — not merely when nobody happens to scale for
+    // it. Most need-fulfillment keys are niche (only 2 of 60 units scale off veils, 1 off
+    // disorders, 0 off vortex), so "no consumer scales for this" is the normal case and says
+    // nothing about fit. Ultimates are the opposite: 27 of 60 units want them, and
+    // `ultimate:weak` is an explicit statement that this carry cannot. That is a real mismatch,
+    // and it is the one this charge exists for — Dialyn handing free ultimates to Sigrid, whose
+    // burst lives in her enhanced attacks and whose chains they would consume.
+    if (w(utility.ultimates) >= 3) {
+        const anyUsableUltimate = consumers.some(c => {
+            if (!isDPS(c) || hasSubDPSRole(c)) return false;
+            const cDmg = c._resolvedDamage || c.mechanics?.damage || {};
+            return !(w(cDmg['ultimate:weak']) > 0 && w(cDmg['ultimate:strong']) === 0);
+        });
+        if (!anyUsableUltimate) baseUtil *= PROVISION_WHIFF_PENALTY;
+    }
+    // KNOWN GAP: a *partially* landing stat buff is still not charged. Sunna's atk:3 reaches a
+    // rupture carry at relevance 0.33, and because utilization is a ratio, carrying that buff
+    // lowers it even though the buff adds real absolute damage — so she can score better by not
+    // having it at all. Charging the shortfall in proportion was tried and breaks the calibrated
+    // support ordering in TEST 9. The real fix is making the fit ratio authoritative over the
+    // absolute-supply `threshold` above, which needs a full retune of the suite.
     return 1 - (1 - baseUtil) * (scalingBuffs / 3);
 }
 
@@ -2563,7 +2609,13 @@ function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs =
         const hasBuffContributions = Object.keys(buffs).length > 0 || Object.keys(debuffs).length > 0
             || (!isDPS(unit) && NEED_FULFILLMENT_KEYS.some(k => w(utility[k]) > 0))
             || isStun(unit);
-        if (!hasBuffContributions && isDPS(unit)) {
+        // Needs are evaluated for EVERY unit, whether or not it also supplies buffs. A unit
+        // that provides something still consumes something: a support can depend on disorders
+        // exactly the way a hypercarry does. Gating this on "supplies nothing" used to mean a
+        // single token weight-1 buff silently switched off the whole consumer-side evaluation
+        // — including the wasted-vortex check below — and was worth ~90-105 points.
+        let chargedForNeeds = false;
+        {
             const scaling = getEffectiveScaling(unit);
             let needsMet = 0;
             let needsTotal = 0;
@@ -2600,7 +2652,11 @@ function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs =
                     if (supplyWeight > 0) { needsMet++; break; }
                 }
             }
-            if (hasSubDPSRole(unit) && isAnomaly(unit)) {
+            // Native anomaly tag, not the effective role: this charges a unit for its own
+            // anomaly output going nowhere, which only makes sense when anomaly IS its job.
+            // A stunner who picks anomaly up as a pseudo-role (Roxy) is valued as a wind
+            // ENABLER for teammates who scale off it, not as a reaction generator herself.
+            if (hasSubDPSRole(unit) && unit.tags.includes('anomaly')) {
                 const unitReaction = twReactions.get(unit);
                 const hasReaction = unitReaction?.bestVortexTier > 0 || unitReaction?.hasDisorder;
                 if (!hasReaction) {
@@ -2627,13 +2683,33 @@ function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs =
                 const weight = Math.min(0.5, needsTotal * 0.25);
                 logSum += weight * Math.log(Math.max(receptionUtil * receptionUtil, 0.01));
                 totalWeight += weight;
+                chargedForNeeds = true;
+            }
+        }
+        // A unit that is EXPECTED to supply something (scaling.buffs > 0 — supports and
+        // defense by default, stunners at 2, or an explicit override like SAnby's 3) but
+        // supplies nothing at all is on the wrong team entirely. Keyed off scaling.buffs
+        // rather than role so the data stays the single source of truth.
+        if (!hasBuffContributions) {
+            if (getScalingBuffs(unit) > 0) {
+                const weight = 1.0;
+                logSum += weight * Math.log(0.01);
+                totalWeight += weight;
             }
             continue;
         }
-        if (!hasBuffContributions && !isDPS(unit)) {
-            const weight = 1.0;
-            logSum += weight * Math.log(0.01);
-            totalWeight += weight;
+        // scaling.buffs === 0 means "whether this unit's buffs land is not part of its job"
+        // (Lycaon's ice debuff, Claret's own buff). computeBuffUtilization returns a flat 1.0
+        // for these, and that neutral term is load-bearing: it is how a clean unit vouches for
+        // the team in the weighted average. Keep it — but never let it wash out the SAME unit's
+        // needs penalty above, which is how a token weight-1 buff on Velina or Vivian used to
+        // cancel the wasted-vortex charge.
+        if (getScalingBuffs(unit) === 0) {
+            if (!chargedForNeeds) {
+                const neutralWeight = isDPS(unit) ? 0.5 : 1.0;
+                logSum += neutralWeight * Math.log(1.0);
+                totalWeight += neutralWeight;
+            }
             continue;
         }
 
@@ -2664,6 +2740,15 @@ function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs =
                 }
             }
         }
+        // How much a whiff matters is a property of the unit's kit, not its role tag.
+        // scaling.buffs already carries that (support/defense 3, stun 2, DPS 0, explicit
+        // overrides win), so a DPS who genuinely depends on landing her buffs — SAnby, who
+        // cannot reach her ceiling without an aftershock consumer — is charged like the
+        // supplier she is instead of getting the DPS discount.
+        // Only units with scaling.buffs > 0 reach here. A DPS that opted in via an explicit
+        // override (SAnby) still takes the lighter DPS weighting — the severity of her whiff
+        // is already applied inside computeBuffUtilization, which damps by scaling.buffs/3;
+        // charging it again here would double-count it.
         const weight = isDPS(unit) ? 0.5 : 1.0;
         const utilValue = isDPS(unit) ? util : util * util;
 

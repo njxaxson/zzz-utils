@@ -559,8 +559,8 @@ async function main() {
         for (const b of withBosses(bosses, 'Butcher')) {
             const ms = scoreTeamForBoss(mid.team, b, {});
             assert(
-                ms >= 180 && ms <= 270,
-                `${b.name} YSG/Zhao/Soukaku: got ${ms}, expected [180, 270] (off-weakness anomaly boss)`
+                ms >= 180 && ms <= 275,
+                `${b.name} YSG/Zhao/Soukaku: got ${ms}, expected [180, 275] (off-weakness anomaly boss)`
             );
         }
         const high = scoreForTeamString('Nangong/Miyabi/Soukaku', allUnits)[0];

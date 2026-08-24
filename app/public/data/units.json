@@ -212,7 +212,7 @@
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "pseudoRole": [{ "role": "subdps", "when":{"countTag":"attack","minCount":2} }],
-            "buffs": { "cr": 1 },
+            "buffs": { "cr": 1, "cd": 3 },
             "debuffs": { "electric": 2 },
             "utility": { "daze": 1, "veils": 1 },
             "scaling": { "buffs": 2 }
@@ -229,7 +229,9 @@
         "tags": ["attack", "physical", "assist:defensive"],
         "join": ["physical", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
-        "mechanics": {},
+        "mechanics": {
+            "debuffs": { "physical": 1 }
+        },
         "faction": "Victoria Housekeeping",
         "displayText": "Basic physical attack agent. Can put up some good numbers with skilled play and good supporting teammates."
     },
@@ -244,7 +246,7 @@
         "join": ["attack", "rupture"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
-            "buffs": { "stun-multiplier": 2 },
+            "buffs": { "stun-multiplier": 2, "dmg": 4 },
             "debuffs": { "recovery": 2 },
             "utility": { "ultimates": 3 },
             "replaces": { "chains": "ultimates" },
@@ -298,7 +300,8 @@
         "mechanics": {
             "pseudoRole": [{ "role": "subdps", "when": { "notPresent": "velina" } }],
             "damage": { "abloom": 1 },
-            "scaling": { "pen": true }
+            "buffs": { "anomaly:electric" : 1 },
+            "scaling": { "pen": true, "anomaly:electric" : 1 }
         },
         "faction": "Belobog Heavy Industries",
         "displayText": "Gearhead who throws electric grenades, Grace is typically used as an anomaly sub-DPS when you don't have a better alternative - but at P6, she can actually be quite good when paired with a wind anomaly like Velina."
@@ -382,7 +385,7 @@
         "image": "./assets/characters/koleda.webp",
         "rank": "S",
         "limited": false,
-        "tier": 2,
+        "tier": 1.5,
         "tags": ["stun", "fire", "assist:defensive"],
         "join": ["fire", "faction", "rupture", "armorer"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
@@ -404,7 +407,7 @@
         "aliases": ["Manato"],
         "image": "./assets/characters/komano.webp",
         "rank": "A",
-        "tier": 1.5,
+        "tier": 2,
         "tags": ["rupture", "fire", "assist:defensive"],
         "join": ["support", "stun"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
@@ -461,7 +464,7 @@
         "join": ["fire", "faction", "rupture"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
-            "buffs": { "atk": 2 },
+            "buffs": { "atk": 2, "cd" : 1 },
             "utility": { "quick-assists": true }
         },
         "faction": "Sons of Calydon",
@@ -517,9 +520,9 @@
         "mechanics": {
             "pseudoRole": [{"role":"anomaly","when":{"countTag":"anomaly","minCount":1}}],
             "damage": { "polarity": true, "abloom": true },
-            "buffs": { "anomaly": 3 },
+            "buffs": { "anomaly": 3, "dmg": 2, "stun-multiplier": 2 },
             "debuffs": { "recovery": 3 },
-            "utility": { "disorders": 2, "daze": true },
+            "utility": { "disorders": 2, "daze": true, "veils": 1 },
             "scaling": { "am": 3 }
         },
         "faction": "Angels of Delusion",
@@ -570,7 +573,7 @@
             "onfield": false,
             "pseudoRole": ["subdps"],
             "damage": { "chain": 3 },
-            "buffs": { "stun-multiplier": 2, "atk": 1 },
+            "buffs": { "stun-multiplier": 2, "dmg": 2 },
             "debuffs": { "recovery": 2 },
             "utility": { "quick-assists": true, "chains": 2 },
             "scaling": { "sheer": 1, "atk": 3 }
@@ -593,7 +596,7 @@
             "pseudoRole": ["support", "subdps"],
             "onfield": false,
             "damage": { "aftershock": 3 },
-            "buffs": { "atk": 2 },
+            "buffs": { "atk": 2, "aftershock" : 2 },
             "scaling": { "er": 3, "buffs": 2 }
         },
         "faction": "Obol Squad",
@@ -612,7 +615,7 @@
         "mechanics": {
             "buffs": { "sheer": 2 },
             "debuffs": { "dmg": 3 },
-            "utility": { "quick-assists": true }
+            "utility": { "quick-assists": true, "heal:team": true }
         },
         "faction": "Yunkui Summit",
         "displayText": "Standard rupture support agent if you don't have Lucia. Not useful outside of rupture teams."
@@ -622,7 +625,7 @@
         "name": "Piper",
         "image": "./assets/characters/piper.webp",
         "rank": "A",
-        "tier": 1.5,
+        "tier": 2,
         "tags": ["anomaly", "physical", "assist:defensive"],
         "join": ["physical", "faction", "anomaly"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
@@ -644,7 +647,7 @@
         "mechanics": {
             "damage": { "abloom": 3, "enhanced": 2 },
             "buffs": { "abloom": 3 },
-            "scaling": { "buffs": 1 }
+            "scaling": { "buffs": 1, "am" : 3 }
         },
         "faction": "Krampus",
         "displayText": "She's not Batman, but she's got that vibe. Very strong ice anomaly agent that goes a different route from Miyabi. In certain scenarios, she can be even better than Miyabi."
@@ -661,6 +664,7 @@
         "mechanics": {
             "onfield": false,
             "damage": { "aftershock": 2 },
+            "buffs": { "dmg": 2 },
             "utility": { "quick-assists": true }
         },
         "faction": "Sons of Calydon",
@@ -747,7 +751,7 @@
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "damage": { "ultimate:strong": 2 },
-            "buffs": { "pen": 3, "atk": 2, "def": 2 },
+            "buffs": { "pen": 3, "atk": 2, "def": 2, "anomaly:electric": 1 },
             "scaling": { "ap": true },
             "utility": { "quick-assists": true }
         },
@@ -762,7 +766,7 @@
         "limited": true,
         "tier": 0.5,
         "tags": ["stun", "wind", "assist:defensive"],
-        "join": ["attack", "armorer"],
+        "join": ["attack", "armorer", "rupture"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "pseudoRole": ["anomaly", "subdps"],
@@ -809,7 +813,7 @@
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "damage": { "ultimate:strong": 3 },
-            "scaling": { "attacker": 3 }
+            "buffs": { "atk": 3, "cd": 3, "dmg": 2 }
         },
         "faction": "Obol Squad",
         "displayText": "Electric attack agent that demands a second attack agent on the team. Can also work well on relatively low-investment teams."
@@ -893,7 +897,7 @@
         "synergy": { "units": ["Aria"], "tags": [], "avoid": [] },
         "mechanics": {
             "buffs": { "atk": 3, "stun-multiplier": 2 },
-            "utility": { "veils": 3, "daze": 2, "quick-assists" : true }
+            "utility": { "veils": 3, "daze": 2, "quick-assists" : true, "heal:team": true }
         },
         "faction": "Angels of Delusion",
         "displayText": "Ether veil spammer that is a best-in-slot teammate for both Angels of Delusion faction mates Nangong and Aria, as well as Ye Shunguang. Although Astra has stronger buffs, Sunna provides more personal damage and significant daze buildup for a support agent, letting her edge out Astra in modern endgame for attack teams."
@@ -933,6 +937,7 @@
         "mechanics": {
             "pseudoRole": ["subdps"],
             "damage": { "abloom": 2 },
+            "buffs": { "anomaly": 1, "vortex" : 1 },
             "utility": { "daze": 2 ,"quick-assists": true },
             "scaling": { "er": 3 }
         },
@@ -954,6 +959,7 @@
             "pseudoRole": ["subdps"],
             "onfield": false,
             "damage": { "abloom": 3 },
+            "buffs" : { "disorders": 1 },
             "scaling": { "am": 2 }
         },
         "faction": "Mockingbird",
@@ -973,6 +979,7 @@
         "mechanics": {
             "pseudoRole": [{ "role": "subdps", "when": { "hasUnit": "miyabi" } }],
             "damage": { "polarity": 2 },
+            "buffs": { "disorders": 2 },
             "utility": { "disorders": 2 },
             "scaling": { "pen": true }
         },
@@ -1047,7 +1054,7 @@
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "damage": { "aftershock": true },
-            "buffs": { "atk": 3, "anomaly": 3, "disorders": 3 },
+            "buffs": { "atk": 3, "anomaly": 3, "disorders": 3, "dmg": 1 },
             "utility": { "kaleidoscope": true, "quick-assists": 2, "daze": true },
             "scaling": { "ap": 2 }
         },
@@ -1065,7 +1072,7 @@
         "join": ["attack", "anomaly", "support"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
-            "buffs": { "atk": 3 },
+            "buffs": { "atk": 3, "dmg" : 4 },
             "utility": { "heal:team": 2, "veils": 2 },
             "scaling": { "hp": 2 }
         },
