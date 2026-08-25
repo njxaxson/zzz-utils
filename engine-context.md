@@ -626,6 +626,11 @@ Principles that govern L4 scoring:
   high. A rare mechanic matching a consumer's scaling always beats a common stat buff, all else equal.
 * **Supply gates fulfillment,** and **undersupply is worse than linear.** Partially meeting a need
   (Lucia's `veils:1` against YSG's `veils:2`) helps, but disproportionately less than half.
+  **`ultimates` is the exception** (`FRACTIONAL_COVERAGE_KEYS`): there, partial supply is priced as
+  a straight *fraction of the need met* rather than flat-discounted, so Ju Fufu's single ultimate
+  earns `6 / 3 / 2` from Miyabi / Yixuan / YSG as it covers all, half and a third of what each
+  wants. Same reason as the L5 exemption below — ultimates arrive naturally and almost nothing
+  supplies them, so covering a need only partly is a smaller bonus, never a penalty.
 * **Ultimates are a limited primary-DPS resource.** Only one unit gets the free ultimate per window,
   so it goes to the best damage dealer — subdps units receive **no** ultimate provision at all. Quick
   assists are *not* limited and benefit everyone including subdps. Provision is scaled by the
@@ -655,6 +660,7 @@ is not — it is deliberate, and it has been mistaken for a bug at least once. R
 | **Provision** | `ULTIMATES_PROVISION` (`MULT` 7.8), x the consumer's `ULTIMATE_MAGNITUDE` | any primary DPS whose ultimate is a real burst | A free ultimate arrives sooner, and is worth more the harder that ultimate hits. Seed's case, where the benefit stops at the ultimate itself. |
 | **Need** | `need(ultimates)` in `scoreNeedFulfillment` (`NEED_KEY_MULT.ultimates` 3.2), x the annotated `scaling.ultimates` | **only** units that annotate `scaling.ultimates` | Ultimates *fuel* the unit — something beyond the ultimate's own damage. YSG's enlightened state, Yixuan's annihilation attack, Miyabi's enhanced-attack gauge. |
 | **Exemption** | `NATURALLY_AVAILABLE_NEEDS`, applied in the L5 cohesion loop | L5 only | Ultimates and chains arrive naturally, *and* almost nothing can provision them. Lacking a provider is not a *fit* failure. |
+| **Partial coverage** | `FRACTIONAL_COVERAGE_KEYS`, inside the need branch | a supplier who covers only part of a declared need | Fraction of the need met, not a flat discount. Ju Fufu's `1` earns 3.2 / 1.6 / 1.1 from Miyabi / Yixuan / YSG; Dialyn's `3` covers all three fully and is unaffected. Continuous at full coverage, so there is no cliff. |
 
 **The channels do not overlap, and that is the whole point.** Magnitude is priced once, in
 provision. A declared benefit is priced once, in need. A unit with a big ultimate and no
@@ -671,6 +677,12 @@ reference:
 | Evelyn | 1.1 | — | 25.7 | 0 | **25.7** |
 | Ellen | 1.0 | — | 23.4 | 0 | **23.4** |
 | Sigrid | 0 | — | 0 | 0 | **0** |
+
+**Annotating `scaling.ultimates` above 3 is allowed but self-limiting.** Dialyn's `utility.ultimates:
+3` is the largest provision in the data, so a need above `3` is covered by nobody and every
+supplier's bonus scales down proportionally — Dialyn earns `21.6` from a hypothetical `4` against
+`28.8` from a `3`. That is fraction-of-need semantics working as designed, not the old cliff, and it
+stays a bonus in every case. TEST 92 pins it.
 
 `ULTIMATES_PROVISION` and `NEED_KEY_MULT.ultimates` are the two calibration dials. Raising the
 first lifts every carry and is what separates Evelyn from Ellen; raising the second lifts only

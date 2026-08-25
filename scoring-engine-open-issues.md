@@ -1,60 +1,17 @@
 # Scoring engine — open issues
 
 Live register of what is actually open in the scorer. All suites are green
-(`90/90` scoring, `43/43` recommendations, `6/6` bucketing) — everything below is a *modelling*
+(`92/92` scoring, `43/43` recommendations, `6/6` bucketing) — everything below is a *modelling*
 problem, not a failing test. Historical post-mortems are demoted to the end.
 
-Last reviewed 2026-08-24.
+Last reviewed 2026-08-25.
 
 | # | Issue | Status | Size |
 |----|----|----|----|
 | 1 | Ultimate credit is derived from the wrong axes | **Resolved** — see the post-mortem below | Done |
-| 2 | Undersupply gating inverts supplier credit | **Open** — much smaller than it was, unblocked | Small change, contained calibration risk |
+| 2 | Undersupply gating prices partial coverage flat | **Resolved** — see the post-mortem below | Done |
 | 3 | Partial relevance is never priced | **Open, parked** by owner | Large; broad retune |
 | 4 | `getMaxBurstWeight` saturates at 3 for every carry | **Open** — new, low priority | Small; unknown blast radius |
-
----
-
-## 2. Undersupply gating inverts supplier credit
-
-**Much smaller than it used to be, and no longer blocked.** Fixing issue 1 removed every
-fabricated ultimate need, so the gate can now only reach units that actually declare one. For
-`ultimates` that is three units — YSG, Yixuan, Miyabi — instead of every primary DPS.
-
-The mechanism. When undersupplied,
-`val = supply × scaling × keyMult × (supply/scaling) × UNDERSUPPLY_FACTOR` —
-so **`scaling` cancels out entirely**, leaving `keyMult × supply²`. Every undersupplied consumer
-receives the same flat number regardless of how much they wanted, and a consumer whose need
-exactly *matches* supply slips under the gate to collect full credit. There is a discontinuity
-at `supply == scaling`.
-
-The surviving instance, with Ju Fufu's `utility.ultimates: 1`:
-
-```
-Ju Fufu -> YSG      need(ultimates) 1.9  (gated 20%)   scaling 3
-Ju Fufu -> Yixuan   need(ultimates) 1.9  (gated 30%)   scaling 2
-Ju Fufu -> Miyabi   need(ultimates) 3.2  (ungated)     scaling 1  <-- least hungry gets the MOST
-```
-
-Miyabi's `scaling: 1` exactly matches Ju Fufu's `utility.ultimates: 1`, so she alone escapes the
-discount and collects 67% more than YSG, who wants ultimates three times as much.
-
-`UNDERSUPPLY_FACTOR` models something real — a carry needing 3 who receives 1 stays below their
-ceiling — but it is charged against the **supplier's** credit, which is where the inversion comes
-from.
-
-**The old worked example is dead.** This section used to lead with `Ju Fufu -> Evelyn 7.0
-(ungated)` as the headline case. That number came entirely from the fabricated need floor of 1
-matching Ju Fufu's supply of 1. Evelyn declares no ultimate need at all, so she no longer enters
-this channel and the example cannot recur. Do not reintroduce it.
-
-**A hard ceiling on `scaling.ultimates`, until this is fixed.** Dialyn's `utility.ultimates: 3`
-is the largest provision weight in the data, so a consumer annotated above `3` would tip into
-this gate and *lose* credit for wanting ultimates more. YSG sits at exactly `3` — right on the
-cliff edge, collecting full credit; `4` would drop her from 28.8 to roughly 17. Nothing in the
-code enforces this, so **do not annotate `scaling.ultimates` above 3** while this issue is open.
-Fixing it removes the ceiling. TEST 88's synthetic fixture is the natural place to extend
-coverage once it does.
 
 ---
 
@@ -176,6 +133,70 @@ matter", and it applies consistently to every penalty.
 
 ---
 
+## Resolved — partial ultimate coverage
+
+Issue 2 used to be titled *"undersupply gating inverts supplier credit"*, on the grounds that Ju
+Fufu earned more from Miyabi (who wants ultimates least) than from YSG (who wants them most).
+**The owner rejected that framing, and it was the framing that was wrong, not the ordering.** The
+intended semantics are *fraction of the need met*:
+
+> Ju Fufu fully covers Miyabi's `scaling.ultimates: 1`, half of Yixuan's `2` and a third of YSG's
+> `3`, and should earn credit in roughly a **6 / 3 / 2** shape. Every case is a bonus; the bonus is
+> smaller when the need is under-met. Unmet ultimate scaling is never penalised — ultimates occur
+> naturally, and only two units in the roster provision them at all.
+
+So "least hungry pays the most" is correct. What was actually broken was the arithmetic meant to
+express it. `fulfillment` carried `1/scalingWeight`, which cancelled the `scalingWeight` already in
+the need product, collapsing the undersupplied case to `keyMult × supply²`:
+
+* **Coverage was unpriced.** Ju Fufu collected the *same* `1.9` from Yixuan (half covered) and YSG
+  (a third covered) — flat, not `3 : 2`.
+* **There was a cliff at `supply == scaling`,** because `UNDERSUPPLY_FACTOR` was a step, not a ramp.
+
+### The fix
+
+`FRACTIONAL_COVERAGE_KEYS = new Set(['ultimates'])`, and for keys in it the coverage ratio is
+**squared** rather than flat-discounted. Squaring is what makes the term a fraction of the need met:
+one power is consumed cancelling the `scalingWeight` in the product, and the second is the fraction.
+It is continuous at coverage `1`, so the cliff disappears, and it introduces **no new constant** —
+`NEED_KEY_MULT.ultimates` stays `3.2`, `ULTIMATES_PROVISION` stays `7.8`, nothing was recalibrated.
+
+| supplier | → Miyabi `k=1` | → Yixuan `k=2` | → YSG `k=3` |
+|----|----|----|----|
+| Ju Fufu `utility.ultimates: 1` | 3.2 | 1.9 → **1.6** | 1.9 → **1.1** |
+| Dialyn `utility.ultimates: 3` | 9.6 | 19.2 | 28.8 |
+
+Ju Fufu's row is now exactly `6 : 3 : 2`. Dialyn is fully covering in all three cases, so her row —
+and every team total containing her — is byte-identical.
+
+**Scope: `ultimates` only,** by decision. The other seven need keys keep the flat `0.6` discount.
+There are 18 other undersupplied pairs in the roster — `chains` (Astra/Norma `2`, Koleda `1` →
+Evelyn/Sigrid `3`), `disorders` (Alice/Nangong/Yanagi `2`, Vivian `1` → Miyabi `3`), `veils`
+(Cissia/Lucia/Nangong/Yidhari `1` → Aria/YSG `2`) — and generalising the shape would move every one
+of them by 10–20 points, with direct TEST 62 exposure. The owner's rationale is ultimates-specific
+anyway: they arrive naturally and almost nothing supplies them.
+
+Verification: **426 of 127,836 whole-roster scores moved (0.33%), max delta 1.0, and every moved
+team contained Ju Fufu *and* (Yixuan or YSG)** — zero exceptions to the prediction. TESTs 91 and 92
+are new; both go red under either mutation (dropping the squaring, or reinstating the flat gate).
+
+### The `scaling.ultimates > 3` ceiling did NOT go away — it changed character
+
+The old writeup promised that fixing this "removes the ceiling." It does not, and *cannot*: under
+fraction-of-need semantics credit peaks where supply meets need, so a consumer annotated above the
+largest provision in the data (Dialyn's `3`) is under-covered by everyone and every supplier's bonus
+scales down. Dialyn into a hypothetical `k=4` earns `21.6` against `k=3`'s `28.8`.
+
+What the fix removed is the **cliff**: that same step used to be `28.8 → 17.3` (−40%, discontinuous)
+and is now `28.8 → 21.6` (−25%, smooth and proportional). So the hard rule is replaced by a
+statement of intent:
+
+> Annotating `scaling.ultimates` above the maximum available provision (`3`) means nobody fully
+> covers the need, and every supplier's bonus scales down proportionally. **That is intended, not a
+> bug.** It stays a bonus in every case — TEST 92 pins exactly that.
+
+---
+
 ## Resolved — the ultimate axis restructure
 
 `units.json` describes a unit's ultimate along three independent axes: **frequency**
@@ -207,9 +228,10 @@ identified:
   unapplied.
 * Yixuan was already paying the same cost silently — manufactured `3`, annotated `2`, overwritten
   down.
-* The fabricated need was exposed to the undersupply gate, producing issue 2's headline
-  inversion: Evelyn collected Ju Fufu's full ungated 7.0 purely because the floor of `1` matched
-  his `utility.ultimates: 1` exactly.
+* The fabricated need was exposed to the undersupply gate, producing issue 2's headline example:
+  Evelyn collected Ju Fufu's full ungated 7.0 purely because the floor of `1` matched his
+  `utility.ultimates: 1` exactly. (That example was later understood to be about the *fabricated
+  need*, not about undersupply ordering — see "Resolved — partial ultimate coverage".)
 
 ### The fix
 
@@ -389,8 +411,10 @@ node --input-type=module -e "import { getEffectiveScaling } from './app/public/l
 
 Expect `miyabi 1`, `ysg 3`, `yixuan 2`.
 
-**Per-pair ultimate credit** (issues 1 and 2) — score a team with `{ debug: true }` and grep the
-output for `need(ultimates)` and `ultimates:`.
+**Per-pair ultimate credit** — score a team with `{ debug: true }` and grep the output for
+`need(ultimates)` and `ultimates:`. The need line annotates `(covers NN%)` with the raw coverage
+ratio; it used to print `(gated NN%)` with the post-discount factor, so old transcripts do not
+compare directly.
 
 Two harness traps, both of which produced misleading numbers during this investigation:
 

@@ -883,6 +883,14 @@ function getArmorerLeverSupply(armorer, team) {
 // Undersupply is worse than linear: when a provider supplies less of a need than the
 // consumer scales for, the partial credit is further discounted (0.6 → ~30% at half).
 const UNDERSUPPLY_FACTOR = 0.6;
+// Ultimates price partial supply as a straight FRACTION OF THE NEED MET, not as a flat discount.
+// Ju Fufu's `utility.ultimates: 1` fully covers Miyabi's `scaling.ultimates: 1`, half of Yixuan's
+// 2 and a third of YSG's 3, and should earn 6 / 3 / 2 in that shape. The ratio is SQUARED below
+// because `scalingWeight` already appears once in the need product, so a single power of it
+// cancels out and pays every undersupplied consumer the same flat number regardless of appetite -
+// which is the bug this replaces. Unmet ultimate scaling is never a penalty, only a smaller
+// bonus: ultimates arrive naturally and only Dialyn and Ju Fufu provision them at all.
+const FRACTIONAL_COVERAGE_KEYS = new Set(['ultimates']);
 
 function getBuffRelevance(key, consumer) {
     const roles = getEffectiveRoles(consumer);
@@ -2233,14 +2241,21 @@ function scoreNeedFulfillment(supplier, consumer, debug, options = {}) {
         }
 
         if (supplyWeight > 0) {
-            // Undersupply is worse than linear: partially meeting a need (e.g. Lucia's
-            // veils:1 for YSG's veils:2) helps, but not enough to do the job.
-            let fulfillment = Math.min(1, supplyWeight / scalingWeight);
-            if (supplyWeight < scalingWeight) fulfillment *= UNDERSUPPLY_FACTOR;
+            const coverage = Math.min(1, supplyWeight / scalingWeight);
+            let fulfillment = coverage;
+            if (FRACTIONAL_COVERAGE_KEYS.has(key)) {
+                // Fraction of the need met; see FRACTIONAL_COVERAGE_KEYS. Continuous at coverage
+                // 1, so there is no cliff where supply happens to match scaling exactly.
+                fulfillment *= coverage;
+            } else if (supplyWeight < scalingWeight) {
+                // Undersupply is worse than linear: partially meeting a need (e.g. Lucia's
+                // veils:1 for YSG's veils:2) helps, but not enough to do the job.
+                fulfillment *= UNDERSUPPLY_FACTOR;
+            }
             const keyMult = NEED_KEY_MULT[key] ?? MULT.NEED_FULFILLMENT;
             const val = supplyWeight * scalingWeight * keyMult * fulfillment;
             score += val;
-            if (debug) console.log(`        need(${key}): ${val.toFixed(1)}${fulfillment < 1 ? ` (gated ${Math.round(fulfillment * 100)}%)` : ''}`);
+            if (debug) console.log(`        need(${key}): ${val.toFixed(1)}${coverage < 1 ? ` (covers ${Math.round(coverage * 100)}%)` : ''}`);
         }
 
         // Supplier-side replacement: if supplier provides X which replaces consumer's Y,

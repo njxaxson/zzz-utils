@@ -2011,6 +2011,87 @@ async function main() {
         }
     });
 
+    // ========================================================================
+    // TEST 91: partial ultimate coverage is priced by the FRACTION of the need met
+    // ========================================================================
+    // Ju Fufu's `utility.ultimates: 1` covers half of Yixuan's `scaling.ultimates: 2` and a
+    // third of a hypothetical 3, and must earn strictly less in the second case. This used to
+    // be impossible to express: the undersupply gate multiplied by `supply/scaling`, which
+    // cancelled the `scaling` already in the need product, so EVERY undersupplied consumer
+    // collected the same flat `keyMult x supply^2` regardless of appetite — Yixuan and YSG both
+    // paid Ju Fufu exactly 1.9. The ratio is squared now; see FRACTIONAL_COVERAGE_KEYS.
+    //
+    // Two clones of ONE unit differing in exactly that field, per the TEST 89 lesson: comparing
+    // two real units would pass on unrelated point differences and guard nothing.
+    run('TEST 91: partial ultimate coverage is priced by fraction of need met', () => {
+        const yixuan = allUnits.find(u => u.id === 'yixuan');
+        const juFufu = allUnits.find(u => u.id === 'ju-fufu');
+        assert(yixuan && yixuan.mechanics.scaling?.ultimates === 2,
+            'fixture assumption broken: Yixuan should annotate scaling.ultimates 2');
+        assert(juFufu && juFufu.mechanics.utility?.ultimates === 1,
+            'fixture assumption broken: Ju Fufu should supply utility.ultimates 1');
+        const clone = (k, id, name) => {
+            const c = JSON.parse(JSON.stringify(yixuan));
+            c.id = id;
+            c.name = name;
+            c.mechanics.scaling.ultimates = k;
+            return c;
+        };
+        const half = clone(2, 'yixuan-half', 'Yixuan Halfcovered');
+        const third = clone(3, 'yixuan-third', 'Yixuan Thirdcovered');
+        const roster = [...allUnits, half, third];
+        for (const b of withBosses(bosses, 'Neutral')) {
+            const hs = scoreTeamForBoss(scoreForTeamString('Ju Fufu/Yixuan Halfcovered/Lucia', roster)[0].team, b, {});
+            const ts = scoreTeamForBoss(scoreForTeamString('Ju Fufu/Yixuan Thirdcovered/Lucia', roster)[0].team, b, {});
+            assert(hs > 0 && ts > 0, `both fixtures must be legal teams, got ${hs} / ${ts}`);
+            assert(hs > ts,
+                `${b.name}: Ju Fufu covers half of a scaling.ultimates 2 need (${hs.toFixed(1)}) and only a third of a 3 need (${ts.toFixed(1)}), so the first must score higher — equal scores mean the coverage ratio has stopped being priced`);
+        }
+    });
+
+    // ========================================================================
+    // TEST 92: under-met ultimate scaling is a smaller bonus, never a penalty
+    // ========================================================================
+    // The principle the fraction-of-need shape exists to protect: ultimates arrive naturally
+    // and only two units in the roster provision them, so a carry who wants more of them than
+    // any teammate can supply must never end up WORSE off than a carry who never asked. Both
+    // an under-covered need and a wildly under-covered one must still beat no annotation at all.
+    //
+    // The second assertion pins the intended trailing-off past full coverage: with only 3 in
+    // the roster to supply, a need of 4 is covered by nobody and every supplier's bonus scales
+    // down proportionally. That is fraction-of-need semantics working, not the old cliff — the
+    // guard here is that it stays a bonus.
+    run('TEST 92: under-met ultimate scaling is a smaller bonus, never a penalty', () => {
+        const yixuan = allUnits.find(u => u.id === 'yixuan');
+        assert(yixuan && yixuan.mechanics.scaling?.ultimates === 2,
+            'fixture assumption broken: Yixuan should annotate scaling.ultimates 2');
+        const clone = (k, id, name) => {
+            const c = JSON.parse(JSON.stringify(yixuan));
+            c.id = id;
+            c.name = name;
+            if (k === null) delete c.mechanics.scaling.ultimates;
+            else c.mechanics.scaling.ultimates = k;
+            return c;
+        };
+        const none = clone(null, 'yixuan-noneed', 'Yixuan Noneed');
+        const k3 = clone(3, 'yixuan-k3', 'Yixuan Wants Three');
+        const k4 = clone(4, 'yixuan-k4', 'Yixuan Wants Four');
+        const roster = [...allUnits, none, k3, k4];
+        assert(getEffectiveScaling(none).ultimates === undefined,
+            'the no-annotation clone must acquire no ultimates need (see TEST 87)');
+        for (const b of withBosses(bosses, 'Neutral')) {
+            const sc = name => scoreTeamForBoss(scoreForTeamString(`Ju Fufu/${name}/Lucia`, roster)[0].team, b, {});
+            const ns = sc('Yixuan Noneed'), s3 = sc('Yixuan Wants Three'), s4 = sc('Yixuan Wants Four');
+            assert(ns > 0 && s3 > 0 && s4 > 0, `all fixtures must be legal teams, got ${ns} / ${s3} / ${s4}`);
+            assert(s3 > ns,
+                `${b.name}: a need Ju Fufu covers a third of (${s3.toFixed(1)}) must still beat declaring no need at all (${ns.toFixed(1)})`);
+            assert(s4 > ns,
+                `${b.name}: a need beyond what any unit in the roster supplies (${s4.toFixed(1)}) must still be a bonus over no need (${ns.toFixed(1)}) — unmet ultimate scaling is never charged`);
+            assert(s3 > s4,
+                `${b.name}: coverage falls as the need grows, so a 3 need (${s3.toFixed(1)}) must earn Ju Fufu more than a 4 need (${s4.toFixed(1)})`);
+        }
+    });
+
     // ------------------------------------------------------------------------
     // Summary
     // ------------------------------------------------------------------------
