@@ -92,6 +92,14 @@ Occurrence still feeds `scaling.disorders` at full weight (so Miyabi's transform
 keeps working), but polarity *damage* is heavily discounted on wind-anomaly bosses
 (`POLARITY_VORTEX_DISCOUNT`).
 
+**Polarity *assaults* are a different mechanic, and the two are easy to confuse.** An assault is an extra physical anomaly proc — i.e. Alice's polarity assaults are extra *physical*
+anomaly procs. A polarity-based anomaly proc is not a disorder: it generates none, satisfies no `scaling.disorders`, and is not what `utility.disorders` means. Only **Nangong** and **Yanagi** generate polarity
+disorders solo. Alice does not; annotating her as though she did produced a phantom "Alice
+exception" that cost a round of scoring work — see issue 5 in `scoring-engine-open-issues.md`.
+
+What assaults *do* affect is the team's anomaly proc count, which anomaly-quantity scalers cash
+in. That is modelled as `utility["anomaly:<element>"]` — see the `utility` vocabulary below.
+
 ### Lumen (Remielle)
 
 Lumen has three mechanics that make it unlike any other element:
@@ -107,7 +115,9 @@ Lumen has three mechanics that make it unlike any other element:
   same-element ones: Alice/Vivian/Remielle (disorders to cascade into) > Alice/Jane/Remielle.
 * **Luminize** — a lumen-only damage type. For Remielle it takes the form of *anomaly rebound*:
   she tracks the last three mutations, combines their Refringe-boosted damage, multiplies by her
-  Anomaly Proficiency, and delivers it as one enormous hit. Modeled as `damage.luminize`.
+  Anomaly Proficiency, and delivers it as one enormous hit. Modeled on two axes: `damage.luminize`
+  for the hit, and `scaling.anomaly: 3` for its dependence on **teammate** proc volume — she supplies
+  none of it herself, which is why the anomaly-quantity supply count excludes lumen entirely.
 
 ### Armorer / Laceration / Gash / Maim
 
@@ -525,15 +535,39 @@ always relevant to anomaly-role units, and to others only if they have matching 
 #### `utility`
 
 `disorders`, `quick-assists`, `chains`, `ultimates`, `veils`, `heal:team`, `heal:self`, `shields`,
-`interrupt-resistance`, `kaleidoscope`, `daze`, `stunless`, `rotations`.
+`interrupt-resistance`, `kaleidoscope`, `daze`, `stunless`, `rotations`,
+`anomaly:<element>`.
+
+`anomaly:<element>` is the odd one out — it is not consumed by a matching `scaling` key of the same
+name, but feeds the **anomaly-quantity supply count** described under `scaling` below. It declares
+*extra anomaly procs of that element*, beyond the buildup the unit's own rotation already implies:
+Alice's polarity assaults are `utility["anomaly:physical"]: 2`. A hypothetical fire unit with the
+same mechanic would annotate `utility["anomaly:fire"]`.
+
+It is element-scoped, not a generic flag, so it composes with the head-count it augments exactly
+the way a real agent would: a **generic** `scaling.anomaly` consumer (Harumasa, Remielle) absorbs
+procs of any element; an **element-scoped** one (Grace's `anomaly:electric`, Roxy/Sigrid's
+`anomaly:wind`) absorbs only matching procs and is blind to Alice's physical ones.
 
 #### `scaling`
 
 What the unit benefits from. Non-stat keys go through Need Fulfillment; stat keys feed Baseline
 Affinity. Includes element-scoped anomaly quantity scaling: `scaling.anomaly` is fed by *any*
 effective anomaly agent, `scaling["anomaly:wind"]` only by wind ones — and since wind anomaly is
-still anomaly, a wind source satisfies both. Supply counts anomaly agents *including self*, so a
-wind pseudo-anomaly like Roxy self-fulfils.
+still anomaly, a wind source satisfies both.
+
+Supply is a **weighted count, not a head-count**: each matching anomaly agent is one body
+*including self* (so a wind pseudo-anomaly like Roxy self-fulfils), plus any teammate's
+`utility["anomaly:<element>"]` proc surplus at `ANOMALY_PROC_SUPPLY` per weight. A `2` annotation
+is deliberately worth *one* extra agent's presence rather than two — procs are a surplus on top of
+a body, not a second body.
+
+**Lumen agents supply nothing here, not even to themselves.** Attribute Mutation morphs damage but
+fills no anomaly gauge, so a lumen unit procs no anomalies. This is what makes Remielle's
+`scaling.anomaly: 3` — her Luminize rebound, which combines Refringe-boosted teammate procs — fed
+by teammates alone: solo-anomaly Remielle scores zero from this channel, and a triple-anomaly team
+pays her for two bodies. The check reads `tags`, not `getElement()`, because during morph scoring
+`getElement()` reports the morph target rather than `lumen`.
 
 **How** `scaling` interacts with role baselines — read this carefully, it is easy to get wrong:
 

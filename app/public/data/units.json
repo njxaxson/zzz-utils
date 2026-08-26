@@ -10,8 +10,8 @@
         "join": ["anomaly", "support"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
-            "damage": { "enhanced": 2, "polarity": true },
-            "utility": { "disorders": 2 },
+            "damage": { "enhanced": 2 },
+            "utility": { "anomaly:physical": 2 },
             "scaling": { "disorders": 2, "am": 3 }
         },
         "faction": "Spook Shack",
@@ -732,7 +732,7 @@
                     { "value": 0 }
                 ] }
             },
-            "scaling": { "ap": 3, "atk": 3, "codependent" : true, "buffs": 3 },
+            "scaling": { "ap": 3, "atk": 3, "anomaly": 3, "codependent" : true, "buffs": 3 },
             "utility": { "daze": 2,  "rotations": "limited" },
             "onfield": false
         },

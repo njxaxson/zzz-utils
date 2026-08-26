@@ -83,6 +83,15 @@ const MAIM_ENABLER_BONUS = 6;
 // same-element anomaly source on the team. Linear — oversupply always helps. A wind
 // pseudo-anomaly (Roxy) counts herself; a non-anomaly consumer (Pyrois) needs teammates.
 const ANOMALY_ELEMENT_MULT = 4;
+// Extra anomaly procs, declared as `utility["anomaly:<element>"]`: this unit generates additional
+// anomaly procs of that element beyond the buildup its own rotation already implies. Alice's
+// polarity assaults are extra *physical* procs; a future unit's would name its own element.
+// Element-scoped rather than a generic flag on purpose, so it composes with the head-count it
+// augments: a generic `scaling.anomaly` consumer (Harumasa, Remielle) absorbs procs of any
+// element, while an element-scoped one (Grace `anomaly:electric`, Roxy/Sigrid `anomaly:wind`)
+// absorbs only matching ones. Weighted below 1 because procs are a surplus on top of a body,
+// not a second body — a `2` annotation is worth one extra agent's presence, not two.
+const ANOMALY_PROC_SUPPLY = 0.5;
 
 const BOSS_WEAK = {
     DISORDER_PER_UNIT: 4,
@@ -2715,9 +2724,11 @@ function scoreMechanicalSynergy(team, debug, options = {}) {
     //   `scaling.anomaly`         — generic: fed by ANY effective anomaly agent (any element).
     //   `scaling["anomaly:wind"]` — element-scoped: fed ONLY by wind anomaly agents.
     // A wind-anomaly source is still anomaly, so it satisfies BOTH the generic and the wind need.
-    // Supply counts effective anomaly agents on the team INCLUDING self (a wind pseudo-anomaly
-    // self-fulfils its own wind need). Linear in supply — oversupply always helps (two anomaly
-    // agents feed Harumasa's generic anomaly scaling a lot; Vivian's ether gives a wind-scaler nothing).
+    // Supply is a WEIGHTED count, not a head-count. Each effective anomaly agent on the team is
+    // one body INCLUDING self (a wind pseudo-anomaly self-fulfils its own wind need), plus any
+    // `utility["anomaly:<element>"]` proc surplus at ANOMALY_PROC_SUPPLY per weight (Alice's
+    // polarity assaults). Linear in supply — oversupply always helps (two anomaly agents feed
+    // Harumasa's generic anomaly scaling a lot; Vivian's ether gives a wind-scaler nothing).
     for (const consumer of team) {
         const cScaling = getEffectiveScaling(consumer);
         for (const [skey, sval] of Object.entries(cScaling)) {
@@ -2727,12 +2738,26 @@ function scoreMechanicalSynergy(team, debug, options = {}) {
             else continue;
             const scalingWeight = w(sval);
             if (scalingWeight <= 0) continue;
-            const supply = team.filter(u =>
-                getEffectiveRoles(u).includes('anomaly') && (element === null || getElement(u) === element)).length;
+            let supply = 0;
+            for (const u of team) {
+                // Lumen fills no anomaly gauge (Attribute Mutation morphs damage, not buildup),
+                // so a lumen agent supplies no anomaly quantity — not even to itself. This is why
+                // Remielle's `scaling.anomaly` is fed by teammates alone, matching the Luminize
+                // rebound it models. Read off `tags`, not getElement(): during morph scoring
+                // getElement() reports the morph target, which would defeat the check.
+                if (!u.tags.includes('lumen')
+                    && getEffectiveRoles(u).includes('anomaly')
+                    && (element === null || getElement(u) === element)) supply += 1;
+                for (const [ukey, uval] of Object.entries(u.mechanics?.utility || {})) {
+                    if (!ukey.startsWith('anomaly:')) continue;
+                    if (element !== null && ukey.slice('anomaly:'.length) !== element) continue;
+                    supply += ANOMALY_PROC_SUPPLY * w(uval);
+                }
+            }
             if (supply <= 0) continue;
             const bonus = ANOMALY_ELEMENT_MULT * scalingWeight * supply;
             consumerScores.set(consumer.name, (consumerScores.get(consumer.name) || 0) + bonus);
-            if (debug) console.log(`    Anomaly(${element ?? 'any'}): ${consumer.name} +${bonus} (${supply} anomaly source(s))`);
+            if (debug) console.log(`    Anomaly(${element ?? 'any'}): ${consumer.name} +${bonus.toFixed(1)} (${supply} anomaly source(s))`);
         }
     }
 

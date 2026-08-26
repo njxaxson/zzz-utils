@@ -2,7 +2,8 @@
 
 Live register of what is actually open in the scorer. All suites are green (`92/92` scoring, `43/43` recommendations, `6/6` bucketing) — everything
 below is a *modelling* problem, not a failing test. **Issue 5 is the one to read first if you are
-touching disorders**; it records two confident diagnoses that were both wrong. Historical post-mortems are demoted to the end.
+touching disorders**; it records three confident diagnoses that were all wrong. Issue 6 was
+found underneath it and is a live correctness bug, not a modelling gap. Historical post-mortems are demoted to the end.
 
 Last reviewed 2026-08-26.
 
@@ -12,7 +13,8 @@ Last reviewed 2026-08-26.
 | 2 | Undersupply gating prices partial coverage flat | **Resolved** — see the post-mortem below | Done |
 | 3 | Partial relevance is never priced | **Open, parked** by owner | Large; broad retune |
 | 4 | Burst throughput measured by the wrong aggregate | **Resolved** — see the post-mortem below | Done |
-| 5 | Disorder model misses solo polarity generation | **Open** — needs a vocabulary decision first | Medium; Alice-adjacent |
+| 5 | Disorder model misses solo polarity generation | **Open** — unblocked; the "Alice exception" was a game-mechanics error, now retired | Small; latent — never fires on the current roster |
+| 6 | `isLumenUnit()` is false during morph scoring, so the lumen no-reactions guard never fires | **Open** — found 2026-08-26, reproduced by instrumentation | Small fix, wide blast radius; needs its own measured pass |
 
 ---
 
@@ -86,8 +88,8 @@ retune rather than a patch. All measured against the full 86-test suite:
 
 ## 5. The disorder model only sees element cycling, not solo polarity generation
 
-**Open.** Found while scoping Alice, and it invalidated two confident-sounding diagnoses before it
-was understood. Read this before touching anything disorder-related.
+**Open.** Found while scoping Alice, and it invalidated three confident-sounding diagnoses before
+it was understood. Read this before touching anything disorder-related.
 
 **Disorders arise two independent ways.** Element cycling — two anomaly agents of different
 non-wind elements, e.g. Nangong's ether over Miyabi's frost. *And* solo polarity generation:
@@ -109,17 +111,22 @@ generates disorders alone, so Yuzuha's `buffs.disorders: 3` is properly credited
 `unitReaction?.hasDisorder` alone, so a `scaling.disorders` consumer on a team whose disorders come
 from solo polarity generation would be marked unmet. **The suites pass today by happy accident,
 not by correct modelling:** the only units that scale on disorders are Miyabi and Alice, both
-anomaly agents; Miyabi generates no polarity, and Alice cannot benefit from her own. Every
-realistic pairing therefore also satisfies element cycling, and the gap never fires.
+anomaly agents, and **neither generates polarity** — Miyabi is frost-cycling only, and Alice's
+polarity is assaults, not disorders (see below). The only two solo-polarity units are Nangong
+(ether) and Yanagi (electric), both anomaly agents themselves, and neither shares a base element
+with Miyabi or Alice. So every pairing that would exercise the gap also satisfies element cycling,
+and it never fires. This is structural luck about the current roster, not a rule — a future
+non-anomaly or same-element `scaling.disorders` consumer would expose it immediately.
 
 Fix direction: the needs side should consult the same `teamHasDisorderGenerationFromReactions`
-gate the buff side already uses. **But not naively** — see the Alice exception below, which is the
-one case where a team generating disorders still does not satisfy the consumer.
+gate the buff side already uses. With the Alice exception retired (below) there is no longer a
+known counter-case blocking that, but the wrong diagnoses recorded next are the reason to
+measure rather than assume.
 
-### Two wrong diagnoses this produced, recorded so they are not repeated
+### Three wrong diagnoses this produced, recorded so they are not repeated
 
 **"The disorder need is paid twice."** It is not. `need(disorders)` in the L4 pair loop prices a
-teammate's `utility.disorders` provision; the implicit block at ~line 2651 prices natural element
+teammate's `utility.disorders` provision; the implicit block at ~line 2660 prices natural element
 cycling. **Two genuinely different supplies.** Nangong + Miyabi produces ether/frost cycling
 disorders *and* Nangong's polarity disorders on top; a consumer should be paid for both. A
 prototype that subtracted teammate provision from the implicit supply passed all three suites and
@@ -128,44 +135,123 @@ which is backwards. Another instance of the standing lesson that green suites ar
 
 **"A disorder is a team reaction, so no unit can disorder alone."** False, per Yanagi and Nangong
 above. It was offered as the principled justification for excluding `disorders` from the L5
-self-provision shortcut. The exclusion happens to produce the right answer for Alice, but the
-stated reason was wrong, and a false principle applied anywhere else does damage — it would treat
+self-provision shortcut. A false principle applied anywhere else does damage — it would treat
 Yanagi's solo disorders as non-existent and penalise Yuzuha's buff as unutilised.
 
-### The Alice exception is genuinely unit-specific
+**"Alice generates polarity disorders she cannot consume."** False, and it was a *game-mechanics*
+error rather than a modelling one — see the next section.
 
-Alice gains a stack from any disorder **except her own polarity disorders**. Teammates' polarity
-disorders count; regular cycling disorders count; her own do not. She is therefore the only unit
-in the roster whose own generation does not satisfy her own need — which is why this cannot be
-expressed as a rule about the `disorders` key.
+### Resolved: the "Alice exception" never existed
 
-Half of it is already correct by structure: the L4 pair loop skips `supplier === consumer`, so her
-`utility.disorders: 2` can never fulfil her own `scaling.disorders` through the provision channel.
-The other half is not: the **L5 self-provision shortcut** (~line 2888) reads `utility[key]` and
-skips the key entirely, so on `Lycaon / Alice / Astra` — where she has no usable disorder source
-at all — cohesion reads **1.00** and she is charged nothing. Contrast Banyue, the documented
-self-provision case, whose interrupt resistance genuinely is a personal buff.
+This section used to record a unit-specific exception — that Alice generates polarity disorders,
+gains a stack from any disorder *except her own*, and is therefore the only unit in the roster
+whose own generation does not satisfy her own need. A per-unit mechanic that could not be
+expressed as a rule about the `disorders` key, and the thing blocking the fix direction above.
 
-Measured, with `scaling.disorders: 2` annotated and the shortcut bypassed for that key:
+**The premise was wrong.** Alice does not generate polarity *disorders*. She generates polarity
+**assaults** — extra anomaly procs of her own element, i.e. physical. An assault is not a disorder, so
+there is nothing for her to fail to consume, and no exception to model.
 
-| team | phase-1 | with the bypass | |
+`units.json` has been corrected: `damage.polarity` and `utility.disorders` are gone from Alice's
+entry, leaving `damage.enhanced: 2` and `scaling: { disorders: 2, am: 3 }`. Everything the
+exception was going to need code for now falls out of ordinary structure:
+
+* The **L5 self-provision shortcut** reads `utility[key]`. She has no `utility.disorders`, so the
+  shortcut does not fire and her `scaling.disorders` is audited like anyone else's.
+* On `Lycaon / Alice / Astra` — no usable disorder source — she is charged: cohesion **0.92**,
+  Butcher **251.9**. That is the number the proposed per-key bypass was built to produce, now
+  arrived at with no code change at all.
+* `Nangong / Alice / Astra` (**407.2**) and `Alice / Yanagi / Astra` (**287.2**) on Butcher are
+  paid for cycling and the teammate's polarity, as intended.
+
+No engine change was required *for disorders*, and none is owed. The only casualty is the measured
+table that used to sit here, which priced a bypass for a mechanic that does not exist. What her
+assaults genuinely do affect — anomaly quantity — is a separate channel, now modelled below.
+
+`mechanics.scaling.disorders` on Alice at either **1 or 2 passes all three suites**. The breakage
+the owner originally hit was a pre-3.3 artifact; the burst remodel and the two threshold retunes
+absorbed it.
+
+### Resolved: anomaly-quantity supply is now a weighted count
+
+Alice's assaults are extra anomaly procs, so an anomaly-quantity scaler gets more from her than
+from a plain anomaly agent. The block at ~line 2723 counted supply as
+`team.filter(isAnomaly).length` — a flat head-count that read Alice as exactly one source and paid
+nothing for the surplus. **Fixed**, and the fix pulled in a second unmodelled mechanic.
+
+**Vocabulary: `utility["anomaly:<element>"]`.** Element-scoped rather than a generic
+`anomaly-procs` flag, so it composes with the head-count it augments exactly as a real agent would
+— a generic `scaling.anomaly` consumer absorbs procs of any element, an element-scoped one only
+matching procs. Alice is `utility["anomaly:physical"]: 2`; a future fire unit with the same
+mechanic annotates `utility["anomaly:fire"]` and is absorbed by the same consumers with no code
+change. A generic flag would have had to choose between paying Grace's `anomaly:electric` for
+Alice's physical procs (wrong) or never paying element-scoped consumers at all (also wrong).
+
+Supply became `1 per matching agent + ANOMALY_PROC_SUPPLY × w(procs)`, with
+`ANOMALY_PROC_SUPPLY = 0.5` so a `2` annotation is worth **one** extra agent's presence, not two —
+procs are a surplus on top of a body, not a second body. Verified:
+
+| team | consumer | supply | bonus |
 |----|----|----|----|
-| `lycaon/alice/astra` | 276.3 | **259.4** | starved of usable disorders — now charged |
-| `nangong/alice/astra` | 373.9 | **415.1** | cycling *and* Nangong's polarity |
-| `alice/yanagi/astra` | 262.3 | **298.4** | cycling *and* Yanagi's polarity |
+| `harumasa/alice/astra` | Harumasa `anomaly: 2` | 1 (Alice) + 1.0 (procs) = 2.0 | 16.0, was 8.0 |
+| `grace/alice/astra` | Grace `anomaly:electric: 1` | 1 (self) + 0 | 4.0, unchanged — physical procs correctly invisible |
+| `grace/yanagi/astra` | Grace `anomaly:electric: 1` | 2 | 8.0, unchanged |
 
-All three suites pass, and 1,836 of 126,514 scores move (1.45%) with **every moved team
-containing Alice**. But a per-key rule is the wrong shape for a per-unit mechanic, and it collides
-with the fix direction above — so the vocabulary question comes first.
+**Remielle's missing channel.** Her Luminize rebound combines the Refringe-boosted damage of
+*teammate* anomaly procs, and nothing priced that — she had `damage.luminize` for the hit but no
+dependency on proc volume. Now `scaling.anomaly: 3`.
 
-### What is settled
+**Lumen supplies no anomaly quantity, not even to itself.** Attribute Mutation morphs damage but
+fills no gauge, so a lumen agent procs no anomalies — the same rule `computeAnomalyReactions`
+*intends* for disorders and vortex, though its version of the check is broken (issue 6).
+Without this, self-counting would have handed every
+Remielle team a floor of +12 raw including solo-anomaly ones, which is precisely the composition
+her kit is designed to punish. With it, `Lycaon / Remielle / Astra` scores **zero** from this
+channel and `Nangong / Alice / Remielle` scores **+36** (Nangong 1 + Alice 1 + assaults 1.0).
 
-`mechanics.scaling.disorders` on Alice at either **1 or 2 passes all three suites on the current
-engine with no code change at all.** The breakage the owner hit was a pre-3.3 artifact; the burst
-remodel and the two threshold retunes absorbed it. What remains open is not whether to annotate
-her, but how to express that her own generation does not feed her.
+The check reads `u.tags.includes('lumen')`, not `isLumenUnit()`, deliberately — see issue 6 below.
 
-### Also noted
+Measured over the whole roster: **1,838 of ~127k scores move, +1.9 to +41.4 points, and every
+moved team contains Remielle or Alice.** All three suites stay green. Top-of-table is stable —
+on Fiend the top six are unchanged and Remielle enters at #7, which for a tier-0 unit previously
+outside the top ten reads as a correction rather than a distortion.
+
+### Issue 6 (found underneath this one): `isLumenUnit()` is false during morph scoring
+
+`getElement()` returns `unit._morphedElement` when set, and morph combinations are tried by setting
+that field and **re-entering `scoreTeamForBoss`**. So inside a morph pass, a lumen unit reports its
+morph target and `isLumenUnit()` is `false`.
+
+This is not hypothetical. Instrumenting `computeAnomalyReactions` on `Alice / Remielle / Astra`
+shows it seeing Remielle as `physical` and `ether` — never `lumen`. Its guard
+
+```js
+if (element === 'lumen') { reactions.set(unit, { bestVortexTier: 0, hasDisorder: false }); continue; }
+```
+
+therefore **never fires on the scoring path** (only under `--debug`, which skips the morph loop).
+Remielle can currently cycle disorders and vortex against a teammate she morphed off, which the
+lumen model says is impossible.
+
+**Not fixed here** — it is unrelated to anomaly quantity, and correcting it would move every
+Remielle team a second time on top of the 1,838 above, so it deserves its own measured pass. Any
+code that means *natively lumen* must test `tags`, not `getElement()`.
+
+### Also noted: `scaling.anomaly` and `buffs.anomaly` are different mechanics sharing a key
+
+`scaling.anomaly` is anomaly *quantity* (how much anomaly is on the enemy). `buffs.anomaly` is
+Anomaly Mastery, a stat. The pull engine's specialist-provider check keys off the scaling name and
+looks up `buffs[key]`/`utility[key]`, so a `scaling.anomaly` consumer is judged to depend on an
+**AM buffer**. Pre-existing — Harumasa already routes through it — and Remielle's new
+`scaling.anomaly: 3` makes it one unit more reachable.
+
+It does not misfire on any tested roster: Nangong and Yuzuha both carry `buffs.anomaly: 3`, so the
+dependency reads as met and Remielle surfaces clean (verified with both removed). But a roster
+holding neither would produce a "Needs Nangong or Yuzuha to reach full potential" note whose
+reasoning is a name collision, not a mechanic. The fix is either a rename or adding `anomaly` to
+`CODEPENDENT_SKIP_KEYS`; neither is urgent.
+
+### Also noted: `implicitSupply` makes `scaling.disorders` 2 and 3 identical
 
 The implicit block hardcodes `implicitSupply = 2` and gates on `min(1, 2 / scaling)`, so
 `scaling.disorders` of **2 and 3 pay identically** from that channel — Miyabi's `3` buys nothing
@@ -336,8 +422,8 @@ Ju Fufu's row is now exactly `6 : 3 : 2`. Dialyn is fully covering in all three 
 and every team total containing her — is byte-identical.
 
 **Scope: `ultimates` only,** by decision. The other seven need keys keep the flat `0.6` discount.
-There are 18 other undersupplied pairs in the roster — `chains` (Astra/Norma `2`, Koleda `1` →
-Evelyn/Sigrid `3`), `disorders` (Alice/Nangong/Yanagi `2`, Vivian `1` → Miyabi `3`), `veils`
+There were 18 other undersupplied pairs in the roster when this was measured (17 after Alice's `utility.disorders` was removed — see issue 5) — `chains` (Astra/Norma `2`, Koleda `1` →
+Evelyn/Sigrid `3`), `disorders` (Nangong/Yanagi `2`, Vivian `1` → Miyabi `3`), `veils`
 (Cissia/Lucia/Nangong/Yidhari `1` → Aria/YSG `2`) — and generalising the shape would move every one
 of them by 10–20 points, with direct TEST 62 exposure. The owner's rationale is ultimates-specific
 anyway: they arrive naturally and almost nothing supplies them.
