@@ -15,7 +15,9 @@
             "scaling": { "disorders": 2, "am": 3 }
         },
         "faction": "Spook Shack",
-        "displayText": "Literal bunny girl is a strong physical anomaly unit."
+        "displayText": "Literal bunny girl is a strong physical anomaly unit.",
+        "gender": "female",
+        "species": "thiren:bunny:half"
     },
     {
         "id": "anby",
@@ -28,7 +30,9 @@
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {},
         "faction": "Cunning Hares",
-        "displayText": "As your first unit, Anby is a basic electric stunner."
+        "displayText": "As your first unit, Anby is a basic electric stunner.",
+        "gender": "female",
+        "species": "human:clone"
     },
     {
         "id": "anton",
@@ -43,7 +47,9 @@
             "scaling": { "quick-assists": true }
         },
         "faction": "Belobog Heavy Industries",
-        "displayText": "Basic electric attacker if you have no one else. Has some quirky synergy with Astra."
+        "displayText": "Basic electric attacker if you have no one else. Has some quirky synergy with Astra.",
+        "gender": "male",
+        "species": "human"
     },
     {
         "id": "aria",
@@ -60,7 +66,9 @@
             "scaling": { "veils": 2 }
         },
         "faction": "Angels of Delusion",
-        "displayText": "Intelligent construct masquerading as a human, Aria is top-tier primary ether anomaly DPS."
+        "displayText": "Intelligent construct masquerading as a human, Aria is top-tier primary ether anomaly DPS.",
+        "gender": "female",
+        "species": "robot"
     },
     {
         "id": "astra",
@@ -78,7 +86,9 @@
             "utility": { "quick-assists": 3, "chains": 2, "heal:team": true, "rotations": "limited" }
         },
         "faction": "Stars of Lyra",
-        "displayText": "The best generalist support in the game, Astra can round out any team."
+        "displayText": "The best generalist support in the game, Astra can round out any team.",
+        "gender": "female",
+        "species": "human"
     },
     {
         "id": "banyue",
@@ -95,7 +105,9 @@
             "scaling": { "interrupt-resistance": 2 }
         },
         "faction": "Krampus",
-        "displayText": "Combo-heavy unit that operates best when you play with a high level of technical skill."
+        "displayText": "Combo-heavy unit that operates best when you play with a high level of technical skill.",
+        "gender": "male",
+        "species": "robot"
     },
     {
         "id": "ben",
@@ -112,7 +124,9 @@
             "onfield": true
         },
         "faction": "Belobog Heavy Industries",
-        "displayText": "Oddly enough, Ben is best used when built as a crit DPS rather than defense agent."
+        "displayText": "Oddly enough, Ben is best used when built as a crit DPS rather than defense agent.",
+        "gender": "male",
+        "species": "thiren:bear:full"
     },
     {
         "id": "billy",
@@ -125,7 +139,9 @@
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {},
         "faction": "Cunning Hares",
-        "displayText": "One of your starting characters, Billy actually has a very high skill ceiling."
+        "displayText": "One of your starting characters, Billy actually has a very high skill ceiling.",
+        "gender": "male",
+        "species": "robot"
     },
     {
         "id": "sbilly",
@@ -142,7 +158,9 @@
             "utility": { "heal:self": true }
         },
         "faction": "Cunning Hares",
-        "displayText": "Starlight Knight supreme."
+        "displayText": "Starlight Knight supreme.",
+        "gender": "male",
+        "species": "robot"
     },
     {
         "id": "burnice",
@@ -160,7 +178,9 @@
             "damage": { "abloom": 1 }
         },
         "faction": "Sons of Calydon",
-        "displayText": "This ditzy Calydon bartender is an off-field fire anomaly sub-DPS. At P6, she pairs particularly well with Velina."
+        "displayText": "This ditzy Calydon bartender is an off-field fire anomaly sub-DPS. At P6, she pairs particularly well with Velina.",
+        "gender": "female",
+        "species": "human"
     },
     {
         "id": "claret",
@@ -178,7 +198,9 @@
         },
         "faction": "Flint Workshop",
         "available": false,
-        "displayText": "Goth Barbie is the first armorer unit and craves crit rate and defense. Her favorite support is Rina P6."
+        "displayText": "Goth Barbie is the first armorer unit and craves crit rate and defense. Her favorite support is Rina P6.",
+        "gender": "female",
+        "species": "human"
     },
     {
         "id": "caesar",
@@ -198,7 +220,9 @@
             "scaling": { "buffs": 2 }
         },
         "faction": "Sons of Calydon",
-        "displayText": "For those who struggle with the combat, Caesar's shielding and attack interrupts can make it easier to power through fights."
+        "displayText": "For those who struggle with the combat, Caesar's shielding and attack interrupts can make it easier to power through fights.",
+        "gender": "female",
+        "species": "human"
     },
     {
         "id": "cissia",
@@ -218,7 +242,9 @@
             "scaling": { "buffs": 2 }
         },
         "faction": "PubSec",
-        "displayText": "Snake girl is an electric sub-DPS primarily designed to work with Seed."
+        "displayText": "Snake girl is an electric sub-DPS primarily designed to work with Seed.",
+        "gender": "female",
+        "species": "thiren:snake:half"
     },
     {
         "id": "corin",
@@ -233,7 +259,9 @@
             "debuffs": { "physical": 1 }
         },
         "faction": "Victoria Housekeeping",
-        "displayText": "Basic physical attack agent. Can put up some good numbers with skilled play and good supporting teammates."
+        "displayText": "Basic physical attack agent. Can put up some good numbers with skilled play and good supporting teammates.",
+        "gender": "female",
+        "species": "human"
     },
     {
         "id": "dialyn",
@@ -253,7 +281,9 @@
             "scaling": { "cr": 3 }
         },
         "faction": "Krampus",
-        "displayText": "Hands-down the best stun agent in the game; she can provide free ultimates for teammates."
+        "displayText": "Hands-down the best stun agent in the game; she can provide free ultimates for teammates.",
+        "gender": "female",
+        "species": "human"
     },
     {
         "id": "ellen",
@@ -267,7 +297,9 @@
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {},
         "faction": "Victoria Housekeeping",
-        "displayText": "Shark girl is a fan-favorite ice attacker. She's a bit outdated, but hey, ZZZ is all about style."
+        "displayText": "Shark girl is a fan-favorite ice attacker. She's a bit outdated, but hey, ZZZ is all about style.",
+        "gender": "female",
+        "species": "thiren:shark:half"
     },
     {
         "id": "evelyn",
@@ -285,7 +317,9 @@
             "scaling": { "chains": 3, "recovery": 1 }
         },
         "faction": "Stars of Lyra",
-        "displayText": "This fire attacker specializes in chain attacks and does well when paired with her faction member Astra."
+        "displayText": "This fire attacker specializes in chain attacks and does well when paired with her faction member Astra.",
+        "gender": "female",
+        "species": "human"
     },
     {
         "id": "grace",
@@ -304,7 +338,9 @@
             "scaling": { "pen": true, "anomaly:electric" : 1 }
         },
         "faction": "Belobog Heavy Industries",
-        "displayText": "Gearhead who throws electric grenades, Grace is typically used as an anomaly sub-DPS when you don't have a better alternative - but at P6, she can actually be quite good when paired with a wind anomaly like Velina."
+        "displayText": "Gearhead who throws electric grenades, Grace is typically used as an anomaly sub-DPS when you don't have a better alternative - but at P6, she can actually be quite good when paired with a wind anomaly like Velina.",
+        "gender": "female",
+        "species": "human"
     },
     {
         "id": "harumasa",
@@ -322,7 +358,9 @@
             "scaling": { "anomaly": 2 }
         },
         "faction": "Section 6",
-        "displayText": "One of the most difficult characters to master, Harumasa struggles to keep up with endgame content without high levels of investment."
+        "displayText": "One of the most difficult characters to master, Harumasa struggles to keep up with endgame content without high levels of investment.",
+        "gender": "male",
+        "species": "human"
     },
     {
         "id": "hugo",
@@ -339,7 +377,9 @@
             "onfield": false
         },
         "faction": "Mockingbird",
-        "displayText": "This ice attacker lives for stuns, when he can do very large amounts of burst damage. Give him two stunners."
+        "displayText": "This ice attacker lives for stuns, when he can do very large amounts of burst damage. Give him two stunners.",
+        "gender": "male",
+        "species": "elf"
     },
     {
         "id": "jane-doe",
@@ -356,7 +396,9 @@
             "buffs": { "vortex": 3 }
         },
         "faction": "PubSec",
-        "displayText": "Sensuous rat lady is an older physical anomaly unit that remains a fan favorite. She has unique synergy with the vortex mechanic."
+        "displayText": "Sensuous rat lady is an older physical anomaly unit that remains a fan favorite. She has unique synergy with the vortex mechanic.",
+        "gender": "female",
+        "species": "thiren:rat:half"
     },
     {
         "id": "ju-fufu",
@@ -377,7 +419,9 @@
             "scaling": { "buffs": 2 }
         },
         "faction": "Yunkui Summit",
-        "displayText": "Smol tiger lady will remind you that she is your senior. An off-field stun agent that refunds decibels and boosts crit damage."
+        "displayText": "Smol tiger lady will remind you that she is your senior. An off-field stun agent that refunds decibels and boosts crit damage.",
+        "gender": "female",
+        "species": "thiren:tiger:half"
     },
     {
         "id": "koleda",
@@ -399,7 +443,9 @@
             "utility": { "daze": 1 }
         },
         "faction": "Belobog Heavy Industries",
-        "displayText": "CEO of Belobog, this maniac likes to smash things. Has the fastest stun rate of any agent. Her upgraded kit delivers a large general-damage buff, plus a P6 that buffs armorers laceration and everyone else a nice crit damage buff."
+        "displayText": "CEO of Belobog, this maniac likes to smash things. Has the fastest stun rate of any agent. Her upgraded kit delivers a large general-damage buff, plus a P6 that buffs armorers laceration and everyone else a nice crit damage buff.",
+        "gender": "female",
+        "species": "human"
     },
     {
         "id": "komano",
@@ -415,7 +461,9 @@
             "utility": { "heal:self": true }
         },
         "faction": "Spook Shack",
-        "displayText": "Beefy dog with big fire sword. Big damage from his repeated counterattacks after defensive assists. One of the best A-rank DPS agents."
+        "displayText": "Beefy dog with big fire sword. Big damage from his repeated counterattacks after defensive assists. One of the best A-rank DPS agents.",
+        "gender": "male",
+        "species": "thiren:dog:half"
     },
     {
         "id": "lighter",
@@ -433,7 +481,9 @@
             "scaling": { "buffs": 1 }
         },
         "faction": "Sons of Calydon",
-        "displayText": "The original coolest man alive. Excellent stun unit that buffs fire and ice damage."
+        "displayText": "The original coolest man alive. Excellent stun unit that buffs fire and ice damage.",
+        "gender": "male",
+        "species": "human"
     },
     {
         "id": "lucia",
@@ -452,7 +502,9 @@
             "scaling": { "hp": 3 }
         },
         "faction": "Spook Shack",
-        "displayText": "Goat lady is GOAT support for rupture teams. Not so useful for attackers or anomaly, though."
+        "displayText": "Goat lady is GOAT support for rupture teams. Not so useful for attackers or anomaly, though.",
+        "gender": "female",
+        "species": "thiren:goat:half"
     },
     {
         "id": "lucy",
@@ -468,7 +520,9 @@
             "utility": { "quick-assists": true }
         },
         "faction": "Sons of Calydon",
-        "displayText": "Basic generalist support unit. Her W-engine is one of the best A-rank engines for S-rank support units."
+        "displayText": "Basic generalist support unit. Her W-engine is one of the best A-rank engines for S-rank support units.",
+        "gender": "female",
+        "species": "human"
     },
     {
         "id": "lycaon",
@@ -486,7 +540,9 @@
             "scaling": { "buffs": 0 }
         },
         "faction": "Victoria Housekeeping",
-        "displayText": "Unlocking his potential vision opens Lycaon up as an anomaly-compatible stunner."
+        "displayText": "Unlocking his potential vision opens Lycaon up as an anomaly-compatible stunner.",
+        "gender": "male",
+        "species": "thiren:wolf:full"
     },
     {
         "id": "miyabi",
@@ -504,7 +560,9 @@
             "scaling": { "ultimates": 1, "disorders": 3, "cr": 3, "cd": 3 }
         },
         "faction": "Section 6",
-        "displayText": "Void Hunter Hoshimi Miyabi reporting for duty. An anomaly agent built like an attacker, Miyabi has a low skill floor but a very high skill ceiling and can produce some of the highest damage output in the game with precise technical play."
+        "displayText": "Void Hunter Hoshimi Miyabi reporting for duty. An anomaly agent built like an attacker, Miyabi has a low skill floor but a very high skill ceiling and can produce some of the highest damage output in the game with precise technical play.",
+        "gender": "female",
+        "species": "thiren:fox:half"
     },
     {
         "id": "nangong",
@@ -526,7 +584,9 @@
             "scaling": { "am": 3 }
         },
         "faction": "Angels of Delusion",
-        "displayText": "Top-tier stunner for anomaly teams that practically serves as an anomaly agent herself."
+        "displayText": "Top-tier stunner for anomaly teams that practically serves as an anomaly agent herself.",
+        "gender": "female",
+        "species": "thiren:angel:half"
     },
     {
         "id": "nekomata",
@@ -540,7 +600,9 @@
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {},
         "faction": "Cunning Hares",
-        "displayText": "Cat girl was the bane of 50/50s everywhere, but with her potential vision buffs, she gains a join on support and becomes considerably more useful."
+        "displayText": "Cat girl was the bane of 50/50s everywhere, but with her potential vision buffs, she gains a join on support and becomes considerably more useful.",
+        "gender": "female",
+        "species": "thiren:cat:half"
     },
     {
         "id": "nicole",
@@ -557,7 +619,9 @@
             "utility": { "quick-assists": true }
         },
         "faction": "Cunning Hares",
-        "displayText": "Everyone loves Nicole. Great support agent that specializes in shredding enemy defense, even for an A-rank."
+        "displayText": "Everyone loves Nicole. Great support agent that specializes in shredding enemy defense, even for an A-rank.",
+        "gender": "female",
+        "species": "human"
     },
     {
         "id": "norma",
@@ -579,7 +643,9 @@
             "scaling": { "sheer": 1, "atk": 3 }
         },
         "faction": "External Strategy Department",
-        "displayText": "Whacky bangboo engineer fires missiles at enemies. She can convert some quick assists into chain attacks and converts sheer damage buffs back into attack damage."
+        "displayText": "Whacky bangboo engineer fires missiles at enemies. She can convert some quick assists into chain attacks and converts sheer damage buffs back into attack damage.",
+        "gender": "female",
+        "species": "human"
     },
     {
         "id": "orphie",
@@ -600,7 +666,9 @@
             "scaling": { "er": 3, "buffs": 2 }
         },
         "faction": "Obol Squad",
-        "displayText": "Clumsy off-field attack agent that does aftershock damage and buffs teammates. Not recommended as an on-field DPS."
+        "displayText": "Clumsy off-field attack agent that does aftershock damage and buffs teammates. Not recommended as an on-field DPS.",
+        "gender": "female",
+        "species": "thiren:ram:half:clone"
     },
     {
         "id": "pan",
@@ -618,7 +686,9 @@
             "utility": { "quick-assists": true, "heal:team": true }
         },
         "faction": "Yunkui Summit",
-        "displayText": "Standard rupture support agent if you don't have Lucia. Not useful outside of rupture teams."
+        "displayText": "Standard rupture support agent if you don't have Lucia. Not useful outside of rupture teams.",
+        "gender": "female",
+        "species": "thiren:panda:full"
     },
     {
         "id": "piper",
@@ -631,7 +701,9 @@
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {},
         "faction": "Sons of Calydon",
-        "displayText": "Spin-to-win. A physical anomaly agent that is one of the best A-rank DPS agents and great at applying physical anomalies quickly."
+        "displayText": "Spin-to-win. A physical anomaly agent that is one of the best A-rank DPS agents and great at applying physical anomalies quickly.",
+        "gender": "female",
+        "species": "human"
     },
     {
         "id": "promeia",
@@ -650,7 +722,9 @@
             "scaling": { "buffs": 1, "am" : 3 }
         },
         "faction": "Krampus",
-        "displayText": "She's not Batman, but she's got that vibe. Very strong ice anomaly agent that goes a different route from Miyabi. In certain scenarios, she can be even better than Miyabi."
+        "displayText": "She's not Batman, but she's got that vibe. Very strong ice anomaly agent that goes a different route from Miyabi. In certain scenarios, she can be even better than Miyabi.",
+        "gender": "female",
+        "species": "human"
     },
     {
         "id": "pulchra",
@@ -668,7 +742,9 @@
             "utility": { "quick-assists": true }
         },
         "faction": "Sons of Calydon",
-        "displayText": "Specializes in off-field aftershock daze and damage; not well-suited for on-field play."
+        "displayText": "Specializes in off-field aftershock daze and damage; not well-suited for on-field play.",
+        "gender": "female",
+        "species": "thiren:dog:full"
     },
     {
         "id": "pyrois",
@@ -691,7 +767,9 @@
             }
         },
         "faction": "Phaethon",
-        "displayText" : "Proxy made manifest? We shall see! This unit is received as part of the story."
+        "displayText" : "Proxy made manifest? We shall see! This unit is received as part of the story.",
+        "gender": "androgynous",
+        "species": "etheric-other"
     },
     {
         "id": "qingyi",
@@ -707,7 +785,9 @@
             "buffs": { "stun-multiplier": 2 }
         },
         "faction": "PubSec",
-        "displayText": "On-field electric stun agent is surprisingly good for Yixuan, even though they have no natural team alliance."
+        "displayText": "On-field electric stun agent is surprisingly good for Yixuan, even though they have no natural team alliance.",
+        "gender": "female",
+        "species": "robot"
     },
     {
         "id": "ramiel",
@@ -737,7 +817,9 @@
             "onfield": false
         },
         "faction": "Covenant of Dayat",
-        "displayText": "First-generation void hunter is an off-field support rather than an on-field hypercarry DPS. Requires a triple-anomaly team composition to be effective."
+        "displayText": "First-generation void hunter is an off-field support rather than an on-field hypercarry DPS. Requires a triple-anomaly team composition to be effective.",
+        "gender": "female",
+        "species": "thiren:angel:half"
     },
     {
         "id": "rina",
@@ -756,7 +838,9 @@
             "utility": { "quick-assists": true }
         },
         "faction": "Victoria Housekeeping",
-        "displayText": "Electric support agent that specializes in buffing PEN. Her potential vision upgrades her to buff attack and defense and makes her considerably better than without it."
+        "displayText": "Electric support agent that specializes in buffing PEN. Her potential vision upgrades her to buff attack and defense and makes her considerably better than without it.",
+        "gender": "female",
+        "species": "human"
     },
     {
         "id": "roxy",
@@ -780,7 +864,9 @@
         },
         "faction": "Flint Workshop",
         "available": false,
-        "displayText": "Generalized wind stun agent designed to work best with Claret, but also has interesting synergy with Pyrois and Harumasa."
+        "displayText": "Generalized wind stun agent designed to work best with Claret, but also has interesting synergy with Pyrois and Harumasa.",
+        "gender": "female",
+        "species": "human"
     },
     {
         "id": "sanby",
@@ -798,7 +884,9 @@
             "scaling": { "codependent": true, "buffs": 3 }
         },
         "faction": "Silver Squad",
-        "displayText": "Premier electric DPS, Silver Soldier Anby wants aftershock teammates like Trigger and Orphie to maximize her damage potential."
+        "displayText": "Premier electric DPS, Silver Soldier Anby wants aftershock teammates like Trigger and Orphie to maximize her damage potential.",
+        "gender": "female",
+        "species": "human:clone"
     },
     {
         "id": "seed",
@@ -816,7 +904,9 @@
             "buffs": { "atk": 3, "cd": 3, "dmg": 2 }
         },
         "faction": "Obol Squad",
-        "displayText": "Electric attack agent that demands a second attack agent on the team. Can also work well on relatively low-investment teams."
+        "displayText": "Electric attack agent that demands a second attack agent on the team. Can also work well on relatively low-investment teams.",
+        "gender": "female",
+        "species": "human"
     },
     {
         "id": "seth",
@@ -833,7 +923,9 @@
             "onfield": true
         },
         "faction": "PubSec",
-        "displayText": "A defense agent that boosts anomaly teams; although underpowered for modern endgame."
+        "displayText": "A defense agent that boosts anomaly teams; although underpowered for modern endgame.",
+        "gender": "male",
+        "species": "thiren:dog:half"
     },
     {
         "id": "sigrid",
@@ -850,7 +942,9 @@
             "scaling": { "chains" : 3, "anomaly:wind": 1 }
         },
         "faction": "Airspace Patrol Department",
-        "displayText": "Horse lady with spear."
+        "displayText": "Horse lady with spear.",
+        "gender": "female",
+        "species": "thiren:horse:half"
     },
     {
         "id": "soldier-11",
@@ -865,7 +959,9 @@
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {},
         "faction": "Obol Squad",
-        "displayText": "This fire attacker can make a suitable DPS when you don't have alternatives. Her damage ceiling is highly dependent on your attack timing; it is worthwhile to practice with her to get it right. Norma is her favorite stunner, and her strength increases dramatically with more mindscapes."
+        "displayText": "This fire attacker can make a suitable DPS when you don't have alternatives. Her damage ceiling is highly dependent on your attack timing; it is worthwhile to practice with her to get it right. Norma is her favorite stunner, and her strength increases dramatically with more mindscapes.",
+        "gender": "female",
+        "species": "human:clone"
     },
     {
         "id": "soukaku",
@@ -883,7 +979,9 @@
             "utility": { "quick-assists": true }
         },
         "faction": "Section 6",
-        "displayText": "An ice support that is best built like an anomaly agent. She can also generate disorders with Miyabi even though they are both ice, because Miyabi is technically 'frost' instead of ice."
+        "displayText": "An ice support that is best built like an anomaly agent. She can also generate disorders with Miyabi even though they are both ice, because Miyabi is technically 'frost' instead of ice.",
+        "gender": "female",
+        "species": "oni"
     },
     {
         "id": "sunna",
@@ -900,7 +998,9 @@
             "utility": { "veils": 3, "daze": 2, "quick-assists" : true, "heal:team": true }
         },
         "faction": "Angels of Delusion",
-        "displayText": "Ether veil spammer that is a best-in-slot teammate for both Angels of Delusion faction mates Nangong and Aria, as well as Ye Shunguang. Although Astra has stronger buffs, Sunna provides more personal damage and significant daze buildup for a support agent, letting her edge out Astra in modern endgame for attack teams."
+        "displayText": "Ether veil spammer that is a best-in-slot teammate for both Angels of Delusion faction mates Nangong and Aria, as well as Ye Shunguang. Although Astra has stronger buffs, Sunna provides more personal damage and significant daze buildup for a support agent, letting her edge out Astra in modern endgame for attack teams.",
+        "gender": "female",
+        "species": "human"
     },
     {
         "id": "trigger",
@@ -921,7 +1021,9 @@
             "utility": { "quick-assists": true }
         },
         "faction": "Obol Squad",
-        "displayText": "Off-field electric aftershock stun agent that can shred defense with her W-engine."
+        "displayText": "Off-field electric aftershock stun agent that can shred defense with her W-engine.",
+        "gender": "female",
+        "species": "human"
     },
     {
         "id": "velina",
@@ -942,7 +1044,9 @@
             "scaling": { "er": 3 }
         },
         "faction": "External Strategy Department",
-        "displayText" : "Tall anomaly gentlelady sub-DPS with oversized fan creates on-field tornado traps. Pairs well with Jane, Burnice, Aria and Promeia."
+        "displayText" : "Tall anomaly gentlelady sub-DPS with oversized fan creates on-field tornado traps. Pairs well with Jane, Burnice, Aria and Promeia.",
+        "gender": "female",
+        "species": "elf"
     },
     {
         "id": "vivian",
@@ -963,7 +1067,9 @@
             "scaling": { "am": 2 }
         },
         "faction": "Mockingbird",
-        "displayText": "Great ether anomaly sub-DPS that can help generate disorders in dual-anomaly teams. Simps for Phaethon. Although previously a staple of anomaly teams, Nangong and Velina have shifted modern teams away from her; but she is still excellent."
+        "displayText": "Great ether anomaly sub-DPS that can help generate disorders in dual-anomaly teams. Simps for Phaethon. Although previously a staple of anomaly teams, Nangong and Velina have shifted modern teams away from her; but she is still excellent.",
+        "gender": "female",
+        "species": "elf"
     },
     {
         "id": "yanagi",
@@ -984,7 +1090,9 @@
             "scaling": { "pen": true }
         },
         "faction": "Section 6",
-        "displayText": "Premier electric anomaly agent, this disorder-generation queen is great teammate for Miyabi. Suitable both as a primary or secondary DPS."
+        "displayText": "Premier electric anomaly agent, this disorder-generation queen is great teammate for Miyabi. Suitable both as a primary or secondary DPS.",
+        "gender": "female",
+        "species": "human"
     },
     {
         "id": "ysg",
@@ -1004,7 +1112,9 @@
             "scaling": { "ultimates": 3, "veils": 2, "codependent": true }
         },
         "faction": "Yunkui Summit",
-        "displayText": "Void Hunter Ye Shunguang is currently the strongest DPS agent in the game. Wants lots of ether veils to help push her into her enlightened state, though - you will need either Sunna or Zhao to fully leverage her damage output."
+        "displayText": "Void Hunter Ye Shunguang is currently the strongest DPS agent in the game. Wants lots of ether veils to help push her into her enlightened state, though - you will need either Sunna or Zhao to fully leverage her damage output.",
+        "gender": "female",
+        "species": "thiren:horse:half"
     },
     {
         "id": "yidhari",
@@ -1020,7 +1130,9 @@
             "utility": { "veils": true, "heal:self": true }
         },
         "faction": "Spook Shack",
-        "displayText": "Octomommy with big hammer, this ice rupture agent is effective against a wide range of endgame content."
+        "displayText": "Octomommy with big hammer, this ice rupture agent is effective against a wide range of endgame content.",
+        "gender": "female",
+        "species": "thiren:octopus:half"
     },
     {
         "id": "yixuan",
@@ -1039,7 +1151,9 @@
             "scaling": { "ultimates": 2 }
         },
         "faction": "Yunkui Summit",
-        "displayText": "Grandmaster Yixuan is one of the strongest DPS agents in the game and can even brute force nearly every boss in endgame content."
+        "displayText": "Grandmaster Yixuan is one of the strongest DPS agents in the game and can even brute force nearly every boss in endgame content.",
+        "gender": "female",
+        "species": "human"
     },
     {
         "id": "yuzuha",
@@ -1059,7 +1173,9 @@
             "scaling": { "ap": 2 }
         },
         "faction": "Spook Shack",
-        "displayText": "Hands-down the best support agent for anomaly teams. Her smug face can even change her element to match a teammate."
+        "displayText": "Hands-down the best support agent for anomaly teams. Her smug face can even change her element to match a teammate.",
+        "gender": "female",
+        "species": "human"
     },
     {
         "id": "zhao",
@@ -1077,7 +1193,9 @@
             "scaling": { "hp": 2 }
         },
         "faction": "Krampus",
-        "displayText": "Bunny boss has big sword, big buffs, and ether veil generation. Ice defense that can also provide teamwide healing."
+        "displayText": "Bunny boss has big sword, big buffs, and ether veil generation. Ice defense that can also provide teamwide healing.",
+        "gender": "female",
+        "species": "thiren:bunny:full"
     },
     {
         "id": "zhu-yuan",
@@ -1092,6 +1210,8 @@
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {},
         "faction": "PubSec",
-        "displayText": "Best cop out there. A bit outdated for endgame content, she is one of the few DPS agents without a defensive assist."
+        "displayText": "Best cop out there. A bit outdated for endgame content, she is one of the few DPS agents without a defensive assist.",
+        "gender": "female",
+        "species": "human"
     }
 ]

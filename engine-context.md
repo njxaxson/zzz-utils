@@ -113,6 +113,14 @@ Lumen has three mechanics that make it unlike any other element:
   Lumiflux is up, that proc deals a large extra hit. Because disorder/vortex damage derives from
   proc damage, Refringe **cascades** into reactions. This is why multi-element partners beat
   same-element ones: Alice/Vivian/Remielle (disorders to cascade into) > Alice/Jane/Remielle.
+* **`tags`, never `getElement()`.** Morph scoring assigns `unit._morphedElement` and re-enters
+  `scoreTeamForBoss`, so inside a scoring pass `getElement()` reports the **morph target** — a lumen
+  unit does not read as lumen. Anything meaning *natively lumen* must therefore test tags, via
+  **`isNativeLumen()`**. The one exception is the morph search itself, which uses
+  `isUnmorphedLumen()` and terminates precisely because that goes false once a target is assigned.
+  Getting this backwards silently disabled both reaction guards, the element-diversity filter and
+  the entire Refringe bonus (issue 6); the two helpers exist so the choice cannot be made by
+  accident.
 * **Luminize** — a lumen-only damage type. For Remielle it takes the form of *anomaly rebound*:
   she tracks the last three mutations, combines their Refringe-boosted damage, multiplies by her
   Anomaly Proficiency, and delivers it as one enormous hit. Modeled on two axes: `damage.luminize`
@@ -512,6 +520,13 @@ ultimate.
 Buff keys: `atk`, `anomaly`, `aftershock`, `abloom`, `chain`, `chains`, `sheer`, `laceration`,
 `pen`, `def`, `stun-multiplier`, `cr`, `cd`, `dmg`, `disorders`, `vortex`, element names.
 Debuff keys: `defense`, `recovery`, `dmg`, element names.
+
+`buffs.anomaly` is **anomaly buildup** — the rate at which procs accrue — and is distinct from
+`buffs.am` (Anomaly Mastery) and `buffs.ap` (Anomaly Proficiency), which are the stats. Buildup is
+derived from Mastery without being identical to it, the same way damage is derived from ATK. All
+three differ again from `utility["anomaly:<element>"]` (extra procs *produced*) and `scaling.anomaly`
+(procs *needed*) — four senses of one stem, listed here because the overlap has been misread before.
+Buildup and quantity are causally connected, though: more buildup means more procs.
 
 Two keys behave unlike the rest and are excluded from cohesion (`COHESION_EXCLUDED_BUFFS`):
 
@@ -1101,9 +1116,10 @@ node matchups -i Miyabi -b Butcher -10
 node test-scoring.mjs && node test-recommendations.mjs
 ```
 
-> **Debug-mode caveat:** lumen morph search is **skipped when** `--debug` is set. Normal scoring tries
-> every Attribute Mutation target and keeps the best; the debug path scores one un-morphed pass so the
-> trace stays readable. A debug score for a lumen team will therefore not match its real score.
+> **Lumen debug traces:** the morph search runs under `--debug` too. It scores every Attribute
+> Mutation target silently, then re-scores the **winning** combination with the trace on, so a debug
+> score for a lumen team matches its real score and the `Lumen morph:` line names the target that
+> won. (Before issue 6 the debug path skipped morphing entirely and the two scores disagreed.)
 
 For a full-landscape review, dump scores to a file and diff against a previous dump with
 `scoring-diff.js`. (There is no committed baseline file — generate one before a change and compare after.)

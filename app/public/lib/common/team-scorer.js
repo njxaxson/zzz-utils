@@ -355,20 +355,30 @@ function getEffectiveAssists(boss, team) {
     return Math.max(0, bossAssists - limitedCount);
 }
 
-function isLumenUnit(unit) {
-    return getElement(unit) === 'lumen';
+// Natively lumen. Reads `tags`, so it stays TRUE inside a morph pass. Every rule about what lumen
+// *is* — fills no anomaly gauge (so no disorder, no vortex, no element diversity, no anomaly
+// quantity), supplies Lumiflux for Refringe — must use this. getElement() reports the MORPH TARGET
+// during morph scoring, so an element-based test silently inverts on the real scoring path; that
+// was issue 6, and it disabled the reaction guards and the Refringe bonus alike.
+function isNativeLumen(unit) {
+    return unit.tags.includes('lumen');
+}
+
+// Lumen with no morph target assigned yet. ONLY the morph search may use this: its recursion
+// terminates precisely because this goes false once `_morphedElement` is set (including to null).
+function isUnmorphedLumen(unit) {
+    return isNativeLumen(unit) && unit._morphedElement === undefined;
 }
 
 // Returns the list of teammate elements that a lumen unit could morph to via Attribute Mutation.
 // Lumen agents deal damage as the next agent's element in team order — effectively any teammate
 // element. The caller should score with each option and take the best result.
 function getPossibleMorphElements(unit, team) {
-    if (!isLumenUnit(unit)) return null;
+    if (!isUnmorphedLumen(unit)) return null;
     return [...new Set(
         team
-            .filter(u => u.id !== unit.id)
+            .filter(u => u.id !== unit.id && !isNativeLumen(u))
             .map(u => getElement(u))
-            .filter(e => e !== 'lumen')
     )];
 }
 
@@ -640,8 +650,10 @@ function teamHasImplicitDisorders(team) {
     const anomalyAgents = team.filter(u => getEffectiveRoles(u).includes('anomaly'));
     if (anomalyAgents.length < 2) return false;
     // Lumen doesn't open its own anomaly gauge, so it doesn't contribute to elemental
-    // diversity for disorder purposes. Only count non-lumen anomaly elements.
-    const elements = anomalyAgents.map(u => getElementVariant(u)).filter(e => e !== 'lumen');
+    // diversity for disorder purposes. Only count non-lumen anomaly elements. Filtered on the
+    // UNIT rather than the resolved variant string: a variant would read "lumen:x" and slip past
+    // an element comparison, and during morph scoring the string is the morph target anyway.
+    const elements = anomalyAgents.filter(u => !isNativeLumen(u)).map(u => getElementVariant(u));
     return new Set(elements).size >= 2;
 }
 
@@ -684,7 +696,7 @@ function computeAnomalyReactions(team, boss) {
         // Lumen agents don't build anomaly gauges via Attribute Mutation — their damage
         // morphs to a teammate's element but does not fill the corresponding anomaly gauge.
         // Therefore lumen units produce no anomaly reactions (no disorder, no vortex).
-        if (element === 'lumen') {
+        if (isNativeLumen(unit)) {
             reactions.set(unit, { bestVortexTier: 0, hasDisorder: false });
             continue;
         }
@@ -703,7 +715,7 @@ function computeAnomalyReactions(team, boss) {
                 const partnerEl = getElement(partner);
                 if (element === partnerEl) continue;
                 // Skip lumen pairings — lumen doesn't open its own gauge
-                if (partnerEl === 'lumen') continue;
+                if (isNativeLumen(partner)) continue;
 
                 if (element === 'wind' || partnerEl === 'wind') {
                     const nonWindUnit = (element === 'wind') ? partner : unit;
@@ -1398,6 +1410,10 @@ function checkDisqualifications(team, boss, debug) {
         if (morphOptions !== null) {
             // Lumen unit: DQ only if ALL morph targets are resisted — if any target is
             // unresisted the player will morph to it instead.
+            // Unreachable in practice: L1 runs inside a morph pass, where the morph sentinel is
+            // already false. Kept because it is redundant rather than wrong — the search takes the
+            // max over every target, so an all-resisted lumen unit yields -1 from the `else` branch
+            // on every combination and an any-unresisted one yields a real score.
             const hasValidMorph = morphOptions.length === 0 ||
                 morphOptions.some(e => !bossResistances.includes(e));
             if (!hasValidMorph) {
@@ -1659,7 +1675,10 @@ function scoreInherentQuality(team, { lenient = false, debug = false, boss = nul
         let tierMult = (isSecondaryAttacker || isSecondaryAnomaly || forcedSecondary) ? 0.5 : 1.0;
         const unitReaction = reactions.get(unit);
         const onElementWeakness = getBossWeaknesses(boss).includes(getElement(unit));
-        const reactionDisabled = isSubDPS && isAnomaly(unit) &&
+        // Native lumen is exempt: it CANNOT produce a reaction (Attribute Mutation fills no
+        // gauge), so the absence is what lumen is rather than a defect of the team. Same
+        // reasoning as the L5 carve-out below.
+        const reactionDisabled = isSubDPS && isAnomaly(unit) && !isNativeLumen(unit) &&
             !(unitReaction?.bestVortexTier > 0 || unitReaction?.hasDisorder) &&
             !onElementWeakness;
         if (reactionDisabled) {
@@ -2685,9 +2704,9 @@ function scoreMechanicalSynergy(team, debug, options = {}) {
     // when a non-lumen anomaly teammate procs an anomaly, dealing a large additional hit.
     // Cascade: Attribute Mutation boosts anomaly proc damage, so disorder/vortex damage (which
     // derives from anomaly procs) is also amplified. Partners with active reactions get extra credit.
-    const lumenAnomalyAgents = anomalyDPS.filter(isLumenUnit);
+    const lumenAnomalyAgents = anomalyDPS.filter(isNativeLumen);
     if (lumenAnomalyAgents.length > 0) {
-        const nonLumenAnomalyPartners = anomalyDPS.filter(u => !isLumenUnit(u));
+        const nonLumenAnomalyPartners = anomalyDPS.filter(u => !isNativeLumen(u));
         for (const partner of nonLumenAnomalyPartners) {
             const reaction = reactions.get(partner);
             let bonus = REFRINGE_BONUS;
@@ -2743,9 +2762,8 @@ function scoreMechanicalSynergy(team, debug, options = {}) {
                 // Lumen fills no anomaly gauge (Attribute Mutation morphs damage, not buildup),
                 // so a lumen agent supplies no anomaly quantity — not even to itself. This is why
                 // Remielle's `scaling.anomaly` is fed by teammates alone, matching the Luminize
-                // rebound it models. Read off `tags`, not getElement(): during morph scoring
-                // getElement() reports the morph target, which would defeat the check.
-                if (!u.tags.includes('lumen')
+                // rebound it models.
+                if (!isNativeLumen(u)
                     && getEffectiveRoles(u).includes('anomaly')
                     && (element === null || getElement(u) === element)) supply += 1;
                 for (const [ukey, uval] of Object.entries(u.mechanics?.utility || {})) {
@@ -2949,7 +2967,12 @@ function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs =
             // anomaly output going nowhere, which only makes sense when anomaly IS its job.
             // A stunner who picks anomaly up as a pseudo-role (Roxy) is valued as a wind
             // ENABLER for teammates who scale off it, not as a reaction generator herself.
-            if (hasSubDPSRole(unit) && unit.tags.includes('anomaly')) {
+            // Native lumen is exempt for a stronger version of the same reason: it cannot
+            // react at all, so there is no output going nowhere to charge for. Remielle's
+            // value is the Luminize rebound off TEAMMATE procs, priced in the anomaly-quantity
+            // channel by `scaling.anomaly`. Without this every lumen team pays a cohesion
+            // penalty for a mechanical impossibility.
+            if (hasSubDPSRole(unit) && unit.tags.includes('anomaly') && !isNativeLumen(unit)) {
                 const unitReaction = twReactions.get(unit);
                 const hasReaction = unitReaction?.bestVortexTier > 0 || unitReaction?.hasDisorder;
                 if (!hasReaction) {
@@ -3090,31 +3113,44 @@ export function scoreTeamForBoss(team, boss, options = {}) {
 
     // Lumen units morph their damage to a teammate's element via Attribute Mutation.
     // Try each possible morph combination and return the highest score — the player will
-    // naturally order their team for the optimal outcome.
-    const lumenUnits = team.filter(isLumenUnit);
-    if (lumenUnits.length > 0 && !debug) {
+    // naturally order their team for the optimal outcome. The search runs silently and, under
+    // debug, the WINNING combination is then re-scored with the trace on, so a debug score for a
+    // lumen team matches its real score. `isUnmorphedLumen` is what terminates the recursion:
+    // once `_morphedElement` is assigned (a real element, or null when there is nothing to morph
+    // to) the sentinel goes false while `isNativeLumen` stays true, so every lumen RULE still
+    // applies on the inner pass — which is the whole of issue 6.
+    const lumenUnits = team.filter(isUnmorphedLumen);
+    if (lumenUnits.length > 0) {
         const morphOptions = lumenUnits.map(u => getPossibleMorphElements(u, team) ?? [null]);
         let bestScore = -Infinity;
+        let bestCombo = null;
         const tryMorphCombinations = (idx) => {
             if (idx === lumenUnits.length) {
-                const s = scoreTeamForBoss(team, boss, options);
-                if (s > bestScore) bestScore = s;
+                const s = scoreTeamForBoss(team, boss, { ...options, debug: false });
+                if (s > bestScore) {
+                    bestScore = s;
+                    bestCombo = lumenUnits.map(u => u._morphedElement ?? null);
+                }
                 return;
             }
             const unit = lumenUnits[idx];
             const targets = morphOptions[idx];
-            if (targets.length === 0) {
+            // A lumen unit with no non-lumen teammate has nothing to morph to. Assigning null
+            // still clears the sentinel (getElement falls back to the native `lumen` tag via
+            // `??`), which is what stops this from recursing forever.
+            for (const el of targets.length > 0 ? targets : [null]) {
+                unit._morphedElement = el;
                 tryMorphCombinations(idx + 1);
-            } else {
-                for (const el of targets) {
-                    unit._morphedElement = el;
-                    tryMorphCombinations(idx + 1);
-                }
-                delete unit._morphedElement;
             }
+            delete unit._morphedElement;
         };
         tryMorphCombinations(0);
-        return bestScore === -Infinity ? -1 : bestScore;
+        if (bestScore === -Infinity) return -1;
+        if (!debug) return bestScore;
+        lumenUnits.forEach((u, i) => { u._morphedElement = bestCombo[i]; });
+        const traced = scoreTeamForBoss(team, boss, options);
+        lumenUnits.forEach(u => { delete u._morphedElement; });
+        return traced;
     }
 
     const baseScore = lenient ? 250 : 175;
@@ -3136,14 +3172,19 @@ export function scoreTeamForBoss(team, boss, options = {}) {
         console.log(`SCORING: ${teamLabel}`);
         console.log(`Boss: ${boss.name}`);
         console.log(`Base score: ${baseScore}`);
-        const lumenLabels = lumenUnits.map(u => `${u.name}→${u._morphedElement ?? '(native)'}`);
+        // isNativeLumen, not the morph sentinel: this line runs on the TRACED pass, where the
+        // sentinel is already false. Reading tags is what makes the winning target visible.
+        const lumenLabels = team.filter(isNativeLumen)
+            .map(u => `${u.name}→${u._morphedElement ?? '(native)'}`);
         if (lumenLabels.length > 0) console.log(`Lumen morph: ${lumenLabels.join(', ')}`);
     }
 
+    // `_morphedElement` is deliberately NOT cleared here — the morph search above owns its whole
+    // lifecycle. Clearing it from the inner pass wiped an outer lumen unit's target mid-search
+    // whenever a team held two of them.
     const cleanupRoles = () => {
         for (const u of team) {
             delete u._activatedRoles;
-            delete u._morphedElement;
             delete u._resolvedDamage;
         }
     };
