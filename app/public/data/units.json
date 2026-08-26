@@ -12,7 +12,7 @@
         "mechanics": {
             "damage": { "enhanced": 2, "polarity": true },
             "utility": { "disorders": 2 },
-            "scaling": { "am": 3 }
+            "scaling": { "disorders": 2, "am": 3 }
         },
         "faction": "Spook Shack",
         "displayText": "Literal bunny girl is a strong physical anomaly unit."
@@ -138,7 +138,7 @@
         "join": ["stun", "support", "defense"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
-            "damage": { "chains": 2 },
+            "damage": { "chain": 2 },
             "utility": { "heal:self": true }
         },
         "faction": "Cunning Hares",
@@ -281,7 +281,7 @@
         "join": ["stun", "support"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
-            "damage": { "chain": 3, "ultimate:strong": 1 },
+            "damage": { "chain": 3, "chain:extra": 2, "ultimate:strong": 1 },
             "scaling": { "chains": 3, "recovery": 1 }
         },
         "faction": "Stars of Lyra",

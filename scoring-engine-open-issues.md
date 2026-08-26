@@ -1,17 +1,18 @@
 # Scoring engine — open issues
 
-Live register of what is actually open in the scorer. All suites are green
-(`92/92` scoring, `43/43` recommendations, `6/6` bucketing) — everything below is a *modelling*
-problem, not a failing test. Historical post-mortems are demoted to the end.
+Live register of what is actually open in the scorer. All suites are green (`92/92` scoring, `43/43` recommendations, `6/6` bucketing) — everything
+below is a *modelling* problem, not a failing test. **Issue 5 is the one to read first if you are
+touching disorders**; it records two confident diagnoses that were both wrong. Historical post-mortems are demoted to the end.
 
-Last reviewed 2026-08-25.
+Last reviewed 2026-08-26.
 
 | # | Issue | Status | Size |
 |----|----|----|----|
 | 1 | Ultimate credit is derived from the wrong axes | **Resolved** — see the post-mortem below | Done |
 | 2 | Undersupply gating prices partial coverage flat | **Resolved** — see the post-mortem below | Done |
 | 3 | Partial relevance is never priced | **Open, parked** by owner | Large; broad retune |
-| 4 | `getMaxBurstWeight` saturates at 3 for every carry | **Open** — new, low priority | Small; unknown blast radius |
+| 4 | Burst throughput measured by the wrong aggregate | **Resolved** — see the post-mortem below | Done |
+| 5 | Disorder model misses solo polarity generation | **Open** — needs a vocabulary decision first | Medium; Alice-adjacent |
 
 ---
 
@@ -83,30 +84,195 @@ retune rather than a patch. All measured against the full 86-test suite:
 
 ---
 
-## 4. `getMaxBurstWeight` saturates at 3 for every carry
+## 5. The disorder model only sees element cycling, not solo polarity generation
 
-Found while restructuring the ultimate axes, and the reason that restructure had to move
-magnitude into the provision channel by a different route.
+**Open.** Found while scoping Alice, and it invalidated two confident-sounding diagnoses before it
+was understood. Read this before touching anything disorder-related.
 
-`getMaxBurstWeight` MAXes across `BURST_DAMAGE_TYPES` and returns **3 for every relevant carry**:
+**Disorders arise two independent ways.** Element cycling — two anomaly agents of different
+non-wind elements, e.g. Nangong's ether over Miyabi's frost. *And* solo polarity generation:
+**Yanagi and Nangong each generate polarity disorders entirely on their own**, with no second
+anomaly agent required.
+
+`computeAnomalyReactions` (~line 665) models **only the first**. `reaction.hasDisorder` is derived
+purely from element pairings between anomaly agents and never reads `utility.disorders` or
+`damage.polarity`. The engine compensates in exactly one place:
+
+```js
+teamHasDisorderGenerationFromReactions = teamHasAnyDisorder(reactions) || teamHasPolarity(team)
+```
+
+That `|| teamHasPolarity` is what makes **Trigger / Yanagi / Yuzuha** score correctly — Yanagi
+generates disorders alone, so Yuzuha's `buffs.disorders: 3` is properly credited as utilised.
+
+**But the needs side has no such compensation.** The L5 needs-met audit tests
+`unitReaction?.hasDisorder` alone, so a `scaling.disorders` consumer on a team whose disorders come
+from solo polarity generation would be marked unmet. **The suites pass today by happy accident,
+not by correct modelling:** the only units that scale on disorders are Miyabi and Alice, both
+anomaly agents; Miyabi generates no polarity, and Alice cannot benefit from her own. Every
+realistic pairing therefore also satisfies element cycling, and the gap never fires.
+
+Fix direction: the needs side should consult the same `teamHasDisorderGenerationFromReactions`
+gate the buff side already uses. **But not naively** — see the Alice exception below, which is the
+one case where a team generating disorders still does not satisfy the consumer.
+
+### Two wrong diagnoses this produced, recorded so they are not repeated
+
+**"The disorder need is paid twice."** It is not. `need(disorders)` in the L4 pair loop prices a
+teammate's `utility.disorders` provision; the implicit block at ~line 2651 prices natural element
+cycling. **Two genuinely different supplies.** Nangong + Miyabi produces ether/frost cycling
+disorders *and* Nangong's polarity disorders on top; a consumer should be paid for both. A
+prototype that subtracted teammate provision from the implicit supply passed all three suites and
+was **still wrong** — it deleted the cycling credit precisely when a polarity unit was present,
+which is backwards. Another instance of the standing lesson that green suites are not evidence.
+
+**"A disorder is a team reaction, so no unit can disorder alone."** False, per Yanagi and Nangong
+above. It was offered as the principled justification for excluding `disorders` from the L5
+self-provision shortcut. The exclusion happens to produce the right answer for Alice, but the
+stated reason was wrong, and a false principle applied anywhere else does damage — it would treat
+Yanagi's solo disorders as non-existent and penalise Yuzuha's buff as unutilised.
+
+### The Alice exception is genuinely unit-specific
+
+Alice gains a stack from any disorder **except her own polarity disorders**. Teammates' polarity
+disorders count; regular cycling disorders count; her own do not. She is therefore the only unit
+in the roster whose own generation does not satisfy her own need — which is why this cannot be
+expressed as a rule about the `disorders` key.
+
+Half of it is already correct by structure: the L4 pair loop skips `supplier === consumer`, so her
+`utility.disorders: 2` can never fulfil her own `scaling.disorders` through the provision channel.
+The other half is not: the **L5 self-provision shortcut** (~line 2888) reads `utility[key]` and
+skips the key entirely, so on `Lycaon / Alice / Astra` — where she has no usable disorder source
+at all — cohesion reads **1.00** and she is charged nothing. Contrast Banyue, the documented
+self-provision case, whose interrupt resistance genuinely is a personal buff.
+
+Measured, with `scaling.disorders: 2` annotated and the shortcut bypassed for that key:
+
+| team | phase-1 | with the bypass | |
+|----|----|----|----|
+| `lycaon/alice/astra` | 276.3 | **259.4** | starved of usable disorders — now charged |
+| `nangong/alice/astra` | 373.9 | **415.1** | cycling *and* Nangong's polarity |
+| `alice/yanagi/astra` | 262.3 | **298.4** | cycling *and* Yanagi's polarity |
+
+All three suites pass, and 1,836 of 126,514 scores move (1.45%) with **every moved team
+containing Alice**. But a per-key rule is the wrong shape for a per-unit mechanic, and it collides
+with the fix direction above — so the vocabulary question comes first.
+
+### What is settled
+
+`mechanics.scaling.disorders` on Alice at either **1 or 2 passes all three suites on the current
+engine with no code change at all.** The breakage the owner hit was a pre-3.3 artifact; the burst
+remodel and the two threshold retunes absorbed it. What remains open is not whether to annotate
+her, but how to express that her own generation does not feed her.
+
+### Also noted
+
+The implicit block hardcodes `implicitSupply = 2` and gates on `min(1, 2 / scaling)`, so
+`scaling.disorders` of **2 and 3 pay identically** from that channel — Miyabi's `3` buys nothing
+over a `2` there. Real, and separate from everything above.
+
+---
+
+## Resolved — burst throughput was measured by the wrong aggregate
+
+Issue 4 used to read *"`getMaxBurstWeight` saturates at 3 for every carry."* **That claim was
+false**, and it was the framing that was wrong rather than the suspicion. Measured across all 60
+units the old function returned 3 for 11, 2 for 5, 1 for 24 and 0 for 20. The issue sampled seven
+units that happened to sit at 3 and generalised from them.
+
+### What was actually broken
+
+**`MAX` picked the biggest ordinal, not the biggest instrument.** The annotation scales are not
+commensurate — `chain: 3` and `ultimate:strong: 3` are roughly four rungs apart — so Evelyn's
+chain attack rated equal to Seed's 6000% ultimate, and a unit with three instruments rated equal
+to a unit with one. YSG (`ultimate:strong: 3` **and** `ultimate:double: 3`, the highest burst in
+the game) scored identically to Seed's single ultimate and to Norma, a subdps stunner.
+
+Two faults compounded it. **Role was ignored** — a support's unannotated ultimate is a fraction
+of a DPS's, but the old code read magnitude alone. And **no field recorded chain frequency**:
+ultimates had `ultimate:double`, chains had nothing, so Evelyn's self-provisioned extra chains
+were unmodelled.
+
+The clearest wrong output, on Butcher:
 
 ```
-ysg 3   yixuan 3   seed 3   miyabi 3   evelyn 3   sigrid 3   pyrois 3
+Lycaon → Ellen   stun-emergence: burst=1 × infra=3 = 3.0
+Lycaon → Rina    stun-emergence: burst=2 × infra=3 = 6.0
 ```
 
-Because it is a MAX over six keys and most carries max out at least one of them, it cannot
-distinguish Seed's 6000% ultimate from Evelyn's chain-driven kit. Anything scaled by it is
-effectively a flat rate.
+A stunner's window rated **twice as valuable to Rina the support as to Ellen, the actual carry**
+— because Rina's `ultimate:strong: 2` was read as throughput while Ellen, annotating nothing, sat
+on the floor. Rina's magnitude annotation had no other live effect anywhere in the engine.
 
-Ultimate provision used to be sized this way, which is *why* magnitude was originally smuggled
-into the need channel — that channel had a per-unit multiplier and this one did not. Issue 1
-moved provision onto `ULTIMATE_MAGNITUDE` and no longer depends on it.
+### The fix
 
-Still live on two paths: the recovery-debuff term in `scoreBaselineAffinity` (line ~2159) and
-`scoreStunEmergence` (line ~2313). Both silently treat every carry as equally bursty — stun
-emergence in particular pays `burst=3` for Seed, Evelyn and Sigrid alike. Low priority, since no
-wrong output is known, but a measurement that reports the same number for everything means
-anything downstream of it is uncalibrated rather than deliberately calibrated flat.
+Burst weight is now *derived*: `roleImpactFactor × Σ(instruments fired in a window)`, over a
+shared rung scale. Full vocabulary in `engine-context.md` under "Burst throughput". Key decisions:
+
+* **Role applies twice** — setting unannotated baselines, then scaling throughput into impact.
+  It stands in for the base-ATK gap between roles, which is deliberately not modelled as a number.
+* **`isBurstDPS` widens `DPS_ROLES` to include `subdps`, locally to the burst model.** Ultimate
+  provision really is limited to one primary carry; throughput is not. Norma is the case.
+* **A non-DPS earns burst only if it annotates an instrument** — otherwise every Astra and Lycaon
+  collects a small unearned bonus on nearly every team. Same rule as the need channel.
+* **`damage['chain:extra']`** is the chain-frequency axis, mirroring `ultimate:double`. Evelyn
+  carries `2`. Deliberately **not** `utility.chains`: provision is scored `supplier !== consumer`,
+  so a `utility` entry can never reach its own owner — it would give Sigrid chains and Evelyn
+  nothing.
+* **`getChainMagnitude` + `CHAINS_PROVISION`** price a gifted chain by the recipient's chain
+  magnitude, returning 0 for a non-DPS. The exact analogue of `getUltimateMagnitude` returning 0
+  for `ultimate:weak`.
+* **A stunless carry gets no chain component.** YSG never opens a window, so her burst is pure
+  ultimate.
+
+Data: `sbilly`'s `damage.chains: 2` was a **typo for `chain`** — the plural is read by nothing in
+the burst path, so his chain damage scored as zero and he sat on the generic DPS floor.
+
+### Resulting burst weights (was 3 for all eleven of the top group)
+
+```
+yixuan 2.79   ysg 2.69   miyabi 2.23   harumasa 1.98   hugo 1.98   evelyn 1.95
+ramiel 1.74   alice/aria/promeia 1.69   seed 1.61   sigrid 1.59   claret 1.49
+pyrois 1.36   sbilly 1.07   norma 1.08   generic DPS 1.00   rina 0.75   astra 0.00
+```
+
+Pyrois landing just above Ellen is the design intent stated in `engine-context.md`: two weak
+ultimates put his throughput "in line with a standard DPS like Ellen." He used to score a flat 3.
+
+Verification: **33,957 of 126,514 scores moved (26.8%), mean −2.14, max +4.1 / −29.3, and every
+moved team contained a stun-infrastructure supplier, a recovery-debuffer or a chain provisioner**
+— zero exceptions, so nothing leaked into a third channel. Recommendations 43/43 and bucketing
+6/6 unchanged.
+
+### Two calibration anchors were retuned, with reasons
+
+`STUN_EMERGENCE` 1.0 and `CHAINS_PROVISION` 0.4. Correcting Sigrid from a flat 3 to 1.59 —
+`ultimate:weak` + chain + `enhanced: 3`, which puts her level with Seed at 1.61 — left two
+absolute thresholds unreachable. In both cases the behaviour the test exists to pin still passed;
+only the magnitude anchor failed. Both were adjusted **by owner decision, on game grounds rather
+than to make the suite green**:
+
+| test | was | now | why |
+|----|----|----|----|
+| **80** Sigrid wind | floor 350 | floor **340** | The assertion's content is that wind is a bonus and never a penalty, which held throughout (windless 344.8 → 372.3 with Roxy). The floor was a proxy calibrated against the inflated burst. |
+| **62** Sigrid stunners | `Dialyn > Koleda + 30` | `+ 20` | Koleda's P6 and general damage buff have closed much of the gap on Dialyn, *and* Sigrid cannot exploit Dialyn's ultimate provisioning at all (weak ultimate → magnitude 0). A 30-point tier gap was never warranted for this carry specifically. |
+
+TEST 62's three ordering assertions — Norma 357.0 > Lycaon 330.0 > Dialyn 305.6, and Lighter
+308.6 > Dialyn — passed unchanged throughout, which is what the test's own comment describes as
+its content.
+
+**`CHAINS_PROVISION` remains capped by TEST 14, not by the model.** At 0.4 the Nice/Nicer/Nicest
+ladder separates Ellen, Starlight Billy and Evelyn by only ~0.2–0.4 points — thinner than the
+ultimates analogue (`ULTIMATES_PROVISION` 7.8) would suggest, since a chain attack is roughly a
+third of an ultimate. The binding constraint is TEST 14's `[350, 485]` band on Banyue teams,
+which had only **1.1 points of headroom at baseline** (Norma/Banyue/Lucia at 483.9 against a 485
+ceiling) — so any new positive term near those teams pushes through it. Raising the dial to 0.8
+breaks it. If that band is ever revisited, `CHAINS_PROVISION` is the first thing to re-scale.
+
+Sweep evidence, for anyone tempted to retune instead: across `STUN_EMERGENCE` 0.9–1.9,
+`CHAINS_PROVISION` 0.2–2.2 and the burst normaliser 2.1–3.05, TEST 80 moved by under a point and
+TEST 62's gap by under two. Neither anchor was reachable by any dial — they were pinning the old
+flat rate, not a tuning error.
 
 ---
 

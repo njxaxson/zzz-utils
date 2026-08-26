@@ -43,6 +43,10 @@ const MULT = {
     // against getMaxBurstWeight, which saturated at 3 for every carry and so paid a flat rate;
     // the magnitude table is a smaller number, hence the larger multiplier here.
     ULTIMATES_PROVISION: 7.8,
+    // Chain provision, multiplied by the consumer's CHAIN_MAGNITUDE (0 - 1.45). Far smaller
+    // than ULTIMATES_PROVISION because a chain attack is a fraction of an ultimate, and
+    // because chains are unlimited rather than one-per-window.
+    CHAINS_PROVISION: 0.4,
     STUN_MULT_BUFF: 2,
     TOTALIZE_PENALTY: 38,
     DISORDER_BONUS: 6,
@@ -110,18 +114,59 @@ const SHILL_MATCH_BONUS = 8;
 // archetype; raising it makes stunless carries compete with stunner lines.
 const STUNLESS_SHILL_CREDIT = 48;
 
-// Burst throughput candidates, combined by MAX in getMaxBurstWeight. `enhanced` is listed
-// because an enhanced attack can carry ultimate-tier multipliers: Miyabi has no
-// `ultimate:double`, and this is how her effective double-ultimate enters throughput. Do NOT
-// give her `ultimate:double` to "fix" that - it is already accounted for here.
-// This is the ONLY consumer of `ultimate:double`: frequency is throughput and lives here
-// alone. It must never be reintroduced into ultimate provision or the need channel.
-const BURST_DAMAGE_TYPES = ['enhanced', 'ultimate:strong', 'ultimate:double', 'chain', 'totalize', 'maim'];
+// BURST THROUGHPUT. What a unit actually dumps into a stun window, as a sum over the
+// instruments it can fire there - because in a stun window it does not matter HOW the big
+// damage lands, only that it does. This replaces an older MAX over a flat list of damage
+// keys, which was wrong in a specific way: the annotation scales are NOT commensurate, so a
+// MAX picked the biggest ORDINAL rather than the biggest instrument. `chain: 3` and
+// `ultimate:strong: 3` both returned 3 despite being roughly four rungs apart, and a unit
+// with three instruments scored the same as a unit with one.
+//
+// The rungs below are relative burst damage, calibrated so an unannotated DPS ultimate is
+// ~2.25 and a chain attack is ~0.8. Two equivalences anchor the scale and are load-bearing:
+// `enhanced: 3` == `ultimate:strong: 2`, and `chain` (at ANY value) sits down with
+// `ultimate:weak`. The whole chain 1/2/3 axis spans less than one rung - which is why chain
+// magnitude earns its keep in the PROVISION channel (getChainMagnitude) rather than here.
+// See engine-context.md under `damage` for the full relative-damage table.
+//
+// Unannotated does NOT mean "no burst": `damage` records what is DISTINCTIVE, and Ellen's
+// `mechanics` is literally `{}` while she still fires a real ultimate and a chain attack.
+// So every instrument has a role-derived baseline. A support's ultimate is a fraction of a
+// DPS's, which is why the baselines split on role and not on annotation.
+const BURST_ULTIMATE = { weak: 1.05, support: 1.0, stun: 2.11, base: 2.25, 1: 2.8, 2: 3.0, 3: 4.1 };
+const BURST_CHAIN = { support: 0.4, stun: 0.74, base: 0.8, 1: 0.9, 2: 1.0, 3: 1.05 };
+const BURST_ENHANCED = { 1: 1.6, 2: 2.1, 3: 3.0 };
+const BURST_TOTALIZE = { 1: 1.0, 2: 2.0, 3: 3.0 };
+// Maim is the armorer's inherent burst (parallel to a disorder), carried by the role rather
+// than by an explicit `damage.maim` - no unit annotates one.
+const BURST_MAIM = 1.5;
+
+// How much of that throughput converts into real impact. Stands in for the base-ATK gap
+// between roles, which is deliberately NOT modelled as a number: role and pseudoRole carry
+// it. Read through getEffectiveRoles, so Norma - tagged `stun` but playing subdps - is
+// correctly treated as a DPS, and Soukaku's conditional anomaly role follows the team.
+const BURST_ROLE_FACTOR = { dps: 1.0, stun: 0.80, support: 0.67 };
+// Normalises the sum so an unannotated DPS (Ellen: 2.25 + 0.8) lands at 1.0, keeping the
+// output on roughly the 0-3 range the two call sites were calibrated against.
+const BURST_NORM = 3.05;
+
+// FREQUENCY keys. `ultimate:double` and `chain:extra` say how MANY times a unit fires an
+// instrument in one window, never how hard. Both are read HERE AND NOWHERE ELSE. They must
+// never reach the provision or need channels - that leak is what fabricated an ultimate need
+// for 26 of 60 units; see scoring-engine-open-issues.md.
+//
+// `chain:extra` is Evelyn's self-provisioned chains. It is deliberately NOT `utility.chains`:
+// provision is scored supplier -> consumer with `supplier !== consumer`, so a `utility` entry
+// can never reach its own owner. Annotating her that way would hand Sigrid free chains and
+// give Evelyn nothing - the unintended effect and none of the intended one.
+//
+// `scaling` is a NEED, never a frequency. `scaling.chains: 3` means Evelyn WANTS chains
+// badly, not that she fires more of them. Same for `scaling.ultimates`. Do not conflate them.
 
 // ULTIMATE MAGNITUDE. How big this unit's own ultimate is, and therefore what a FREE
 // ultimate is worth to them. One of three INDEPENDENT axes in the data (see
 // engine-context.md under `damage`), and each axis has exactly one home:
-//   frequency  `damage['ultimate:double']`       -> throughput, via BURST_DAMAGE_TYPES above
+//   frequency  `damage['ultimate:double']`       -> throughput, via getMaxBurstWeight above
 //   magnitude  `damage['ultimate:strong'|'weak']` -> the PROVISION channel, via this table
 //   scaling    `mechanics.scaling.ultimates`     -> the NEED channel, annotated values only
 // Do not collapse them. Magnitude and frequency used to be manufactured into the need
@@ -133,6 +178,17 @@ const BURST_DAMAGE_TYPES = ['enhanced', 'ultimate:strong', 'ultimate:double', 'c
 // step at the bottom is what makes Evelyn worth slightly more than Ellen from a free
 // ultimate; collapsing those two rungs would make `ultimate:strong: 1` meaningless.
 const ULTIMATE_MAGNITUDE = { 0: 1.0, 1: 1.1, 2: 1.25, 3: 2.0 };
+
+// CHAIN MAGNITUDE. How big this unit's own chain attack is, and therefore what a FREE chain
+// is worth to them. The chain analogue of ULTIMATE_MAGNITUDE, and it exists for the same
+// reason: magnitude predicts provision value, so it lives in the provision channel and
+// nothing else. The steps are deliberately shallow - the underlying chain modifiers span far
+// less ground than the ultimate ones, which is exactly why chain magnitude contributes almost
+// nothing to burst throughput but still separates provision targets.
+//   0 (unannotated) - a standard DPS chain attack
+//   1 / 2 / 3       - progressively harder-hitting, Evelyn at the top
+// A non-DPS returns 0 from getChainMagnitude before this table is consulted.
+const CHAIN_MAGNITUDE = { 0: 1.0, 1: 1.15, 2: 1.3, 3: 1.45 };
 const NEED_FULFILLMENT_KEYS = [
     'disorders', 'ablooms', 'chains', 'ultimates', 'veils',
     'quick-assists', 'interrupt-resistance', 'vortex'
@@ -810,15 +866,99 @@ function getStunInfraWeight(supplier) {
     return isStunRole ? raw : raw * 0.5;
 }
 
-function getMaxBurstWeight(unit) {
+// A subdps deals DPS-tier damage even when their tag says otherwise - Norma is tagged `stun`
+// but hits like a carry, which is exactly what her pseudoRole records. `DPS_ROLES` (and so
+// isDPSByRoles) deliberately excludes `subdps` because ultimate provision IS limited to one
+// primary carry; burst throughput is not. Local to the burst model on purpose - widening
+// DPS_ROLES itself would move every channel in the engine.
+function isBurstDPS(roles) {
+    return isDPSByRoles(roles) || roles.includes('subdps');
+}
+
+function getBurstRoleFactor(roles) {
+    if (isBurstDPS(roles)) return BURST_ROLE_FACTOR.dps;
+    if (roles.includes('stun')) return BURST_ROLE_FACTOR.stun;
+    return BURST_ROLE_FACTOR.support;
+}
+
+/**
+ * Total burst a unit dumps into one stun window, summed across every instrument it fires,
+ * then scaled by how much its role converts that into impact. See the BURST_* tables above.
+ *
+ * NON-DPS UNITS RETURN 0 UNLESS THEY ANNOTATE AN INSTRUMENT. A support technically fires an
+ * ultimate and a chain attack in a window, but crediting every Astra and Lycaon for it would
+ * pay a small unearned bonus on essentially every team. The annotation IS the statement that
+ * this unit's burst is worth noticing - Rina's `ultimate:strong: 2` is exactly that, and it
+ * is what puts her below Ellen (support role factor) but well above Astra (zero). This is
+ * the same "never give a unit something it did not declare" rule that governs the need
+ * channel; see scoring-engine-open-issues.md.
+ */
+export function getMaxBurstWeight(unit) {
     const damage = unit._resolvedDamage || unit.mechanics?.damage || {};
-    const explicit = Math.max(0, ...BURST_DAMAGE_TYPES.map(type => w(damage[type])));
-    if (explicit > 0) return explicit;
     const roles = getEffectiveRoles(unit);
-    // Maim is the armorer's inherent burst (parallel to a disorder), so armorers carry a
-    // role-default burst weight without needing an explicit damage.maim in their kit.
-    if (roles.includes('armorer')) return 2;
-    return isDPSByRoles(roles) ? 1 : 0;
+    const dps = isBurstDPS(roles);
+    // A stunner sits between a DPS and a support: their ultimates run slightly under a DPS's
+    // and their base ATK lower, for ~75% of an undistinguished DPS like Ellen overall. Norma
+    // and Nangong are the exceptions and are correctly excluded here - they reach isBurstDPS
+    // through their subdps / pseudo-anomaly roles.
+    const tier = dps ? 'base' : (roles.includes('stun') ? 'stun' : 'support');
+
+    const strong = w(damage['ultimate:strong']);
+    const weak = w(damage['ultimate:weak']);
+    const enhanced = w(damage.enhanced);
+    const totalize = w(damage.totalize);
+    const chainMag = w(damage.chain);
+    const armorer = roles.includes('armorer');
+
+    // A non-DPS with nothing declared contributes no burst worth pricing.
+    if (!dps && !strong && !weak && !enhanced && !totalize && !chainMag && !w(damage.maim)) return 0;
+
+    // Ultimate: magnitude first, then frequency. `ultimate:strong` overrides `ultimate:weak`,
+    // which is how Pyrois's wind condition lifts his weak-ultimate rung via _resolvedDamage.
+    let ultimate;
+    if (strong > 0) ultimate = BURST_ULTIMATE[Math.min(3, strong)];
+    else if (weak > 0) ultimate = BURST_ULTIMATE.weak;
+    else ultimate = BURST_ULTIMATE[tier];
+    if (w(damage['ultimate:double']) > 0) ultimate *= 2;
+
+    // Chain attacks exist ONLY inside a stun window, so a stunless carry never gets the
+    // opening chain - YSG does not open a window, she only inherits the damage multiplier.
+    let chain = 0;
+    if (!isStunlessUnit(unit)) {
+        const per = chainMag > 0
+            ? BURST_CHAIN[Math.min(3, chainMag)]
+            : BURST_CHAIN[tier];
+        // Teammate chain provision (Astra, Norma) stays OUT of this - it is already priced in
+        // the provision channel, and counting it here would pay for it twice.
+        chain = per * (1 + w(damage['chain:extra']));
+    }
+
+    let sum = ultimate + chain;
+    if (enhanced > 0) sum += BURST_ENHANCED[Math.min(3, enhanced)];
+    if (totalize > 0) sum += BURST_TOTALIZE[Math.min(3, totalize)];
+    if (armorer || w(damage.maim) > 0) sum += BURST_MAIM;
+
+    return (sum * getBurstRoleFactor(roles)) / BURST_NORM;
+}
+
+/**
+ * Value of a free CHAIN ATTACK to this unit, from chain MAGNITUDE alone. The exact analogue
+ * of getUltimateMagnitude: Astra gifting a chain to Ellen is nice, to Starlight Billy nicer,
+ * to Evelyn nicest, and to a support a waste.
+ *
+ * Returns 0 for a non-DPS. That zeroing is the counterpart of getUltimateMagnitude returning
+ * 0 for `ultimate:weak` - it stops a chain provisioner earning credit for gifting a chain to
+ * someone who cannot punish with it.
+ */
+export function getChainMagnitude(unit) {
+    const damage = unit._resolvedDamage || unit.mechanics?.damage || {};
+    const annotated = w(damage.chain);
+    // An ANNOTATION OVERRIDES THE ROLE DEFAULT, exactly as it does for ultimate magnitude:
+    // Rina is a support whose  makes her a real recipient of a free
+    // ultimate, and a future support with a meaningful chain attack must not be zeroed here
+    // either. Only an UNANNOTATED non-DPS is the waste case - gifting Sunna a chain.
+    if (annotated === 0 && !isBurstDPS(getEffectiveRoles(unit))) return 0;
+    return CHAIN_MAGNITUDE[Math.min(3, annotated)] ?? 1.0;
 }
 
 /**
@@ -2177,10 +2317,11 @@ function scoreBaselineAffinity(supplier, consumer, debug, options = {}) {
 
     // Ultimates provision → primary DPS only (subdps don't consume the burst window).
     // Priced by the consumer's ultimate MAGNITUDE: a free ultimate is worth more to a carry
-    // whose own ultimate hits harder. This used to be sized by getMaxBurstWeight, which MAXes
-    // across BURST_DAMAGE_TYPES and returns 3 for every relevant carry alike - so it paid a
-    // flat rate and differentiated nobody. That saturation is why magnitude was originally
-    // smuggled into the need channel; it lives here now.
+    // whose own ultimate hits harder. Magnitude belongs here and only here - it used to be
+    // smuggled into the need channel instead, which fabricated an ultimate need for 26 of 60
+    // units. Note getMaxBurstWeight ALSO reads ultimate magnitude, and that is not a duplicate:
+    // this channel prices what a FREE ultimate is worth to the consumer, while burst throughput
+    // prices what the consumer dumps into a window from its own kit. Different questions.
     //
     // A weak ultimate (not a real burst) yields magnitude 0 and zeroes this out on its own,
     // so no separate guard is needed. A conditional `ultimate:strong` resolves through
@@ -2191,6 +2332,23 @@ function scoreBaselineAffinity(supplier, consumer, debug, options = {}) {
         const val = ultimatesWeight * getUltimateMagnitude(consumer) * MULT.ULTIMATES_PROVISION;
         score += val;
         dbg('ultimates', val);
+    }
+
+    // Chain provision -> any DPS, priced by the consumer's chain MAGNITUDE. Unlike ultimates,
+    // chains are NOT a limited one-per-window resource, so subdps are included. Astra gifting
+    // a chain to Ellen is nice, to Starlight Billy nicer, to Evelyn nicest; to a support it is
+    // a waste, which getChainMagnitude expresses by returning 0.
+    //
+    // This is a separate channel from `need(chains)`, on purpose and for the same reason the
+    // two ultimate channels are separate: this one pays for the chain attack's own damage,
+    // while the need channel pays units that get something BEYOND it (Evelyn, Sigrid).
+    const chainsWeight = w(supplierUtility.chains);
+    if (chainsWeight > 0) {
+        const val = chainsWeight * getChainMagnitude(consumer) * MULT.CHAINS_PROVISION;
+        if (val > 0) {
+            score += val;
+            dbg('chains', val);
+        }
     }
 
     return { score, firedCategories };

@@ -346,7 +346,7 @@ long-standing engine defect, now fixed and recorded under Resolved in
 | Axis | Where it lives | What it means | Scored by |
 |----|----|----|----|
 | **Magnitude** | `damage['ultimate:strong' \| 'ultimate:weak']` | Raw in-game modifier size | `ULTIMATE_MAGNITUDE` → the **provision** channel |
-| **Frequency** | `damage['ultimate:double']` | How many ultimates the unit gets per window | `BURST_DAMAGE_TYPES` → burst throughput, and nothing else |
+| **Frequency** | `damage['ultimate:double']` | How many ultimates the unit gets per window | `getMaxBurstWeight` → burst throughput, and nothing else |
 | **Unique benefit** | `scaling.ultimates` — *not* a `damage` key | Whether the unit gets something *beyond* the ultimate's own damage | the **need** channel, annotated values only |
 
 **Magnitude.** The `ultimate:strong` tiers track the actual in-game multiplier: `3` is 6000%+
@@ -409,7 +409,7 @@ load-bearing: it implements both Sigrid's exclusion and the Pyrois design above.
 **`ultimate:double` is not the only route to an effective double ultimate.** Miyabi carries no
 `ultimate:double` — her enhanced attack has the same multipliers as an ultimate, so she
 effectively double-ultimates via `damage.enhanced: 3` feeding burst weight through
-`BURST_DAMAGE_TYPES`. That is the correct modelling and the engine accounts for it there; do
+the burst model (see "Burst throughput" below). That is correct, and the engine accounts for it there; do
 **not** "fix" it by adding `ultimate:double` to her.
 
 **Yixuan's two ultimate keys are not double-encoding one thing.** Her `scaling.ultimates: 2`
@@ -420,6 +420,82 @@ ultimate. Genuinely distinct things.
 
 Conditional `damage` values are resolved once per team into `unit._resolvedDamage` (damage is
 always team-scoped — it's the unit's own output — so no consumer context is needed).
+
+#### Burst throughput — the relative-damage scale
+
+The single most important thing to know: **the same ordinal means different things on different
+keys.** `chain: 3` and `ultimate:strong: 3` are roughly four rungs apart. An engine that MAXed
+over the damage keys therefore picked the biggest *number*, not the biggest *instrument*, and
+rated Evelyn's chain attack equal to Seed's 6000% ultimate. That was the real content of issue 4.
+
+Relative burst damage, in rungs (values are relative only — raw game percentages are
+deliberately not encoded anywhere in the engine):
+
+| rung | what lands here |
+|----|----|
+| lowest | `chain` at **any** value, `ultimate:weak`, an unannotated **support** ultimate |
+| ↓ | `enhanced: 1` |
+| ↓ | `enhanced: 2`, an unannotated **DPS or stunner** ultimate |
+| ↓ | **`enhanced: 3` ≡ `ultimate:strong: 1` ≡ `ultimate:strong: 2`** |
+| highest | `ultimate:strong: 3` |
+
+Two consequences that are easy to get wrong:
+
+* **The whole `chain: 1/2/3` axis spans less than one rung.** Annotating a chain attack as `3`
+  rather than `1` is a rounding error against a single step on the ultimate axis. Chain magnitude
+  therefore earns its keep in the **provision** channel (`CHAIN_MAGNITUDE`), not in throughput —
+  the same division of labour as `ULTIMATE_MAGNITUDE`.
+* **An unannotated support ultimate sits down among chain attacks.** That is a *role* effect on
+  the baseline, not a missing annotation, and it is why Astra and Sunna contribute nothing to a
+  burst window while Rina — who annotates `ultimate:strong: 2` — contributes real damage.
+
+**Unannotated does not mean zero.** `damage` records what is *distinctive*; Ellen's `mechanics`
+is literally `{}` and she still fires a real ultimate and a chain attack. Every instrument has a
+role-derived baseline, which is why burst weight is now *derived* rather than read off a MAX.
+
+**Role applies twice, and both times through `getEffectiveRoles`.** It sets those baselines, and
+then scales throughput into impact — DPS fullest, stunner less, support least. This stands in for
+the base-ATK gap between roles, which is deliberately *not* modelled as a number. Reading the
+*effective* role is what makes Norma — tagged `stun`, playing subdps — score as a carry.
+`DPS_ROLES` excludes `subdps` because ultimate provision really is limited to one primary carry;
+burst throughput is not, so the burst model widens it locally via `isBurstDPS`.
+**Three role tiers, not two.** A stunner sits between a DPS and a support: their ultimates run
+slightly under a DPS's *and* their base ATK is lower, for roughly **75% of an undistinguished DPS
+like Ellen** overall. Norma and Nangong are the exceptions and must not be caught by this — they
+reach the DPS tier through their `subdps` and pseudo-anomaly roles, which `isBurstDPS` resolves.
+
+**An annotation always overrides the role default**, in `getChainMagnitude` exactly as in
+`getUltimateMagnitude`. Rina is the precedent: a support whose `ultimate:strong: 2` makes her a
+genuine recipient of a free ultimate. A future support with a meaningful chain attack must not be
+zeroed either — only an *unannotated* non-DPS is the waste case (gifting Sunna a chain).
+
+**A non-DPS earns burst weight only if it annotates an instrument.** A support technically fires
+an ultimate in a window, but paying every Astra and Lycaon for it would hand out a small
+unearned bonus on nearly every team. The annotation *is* the claim that this unit's burst is
+worth pricing — the same "never give a unit something it did not declare" rule that governs the
+need channel.
+
+#### Frequency keys: `ultimate:double` and `chain:extra`
+
+Both say how **many** times a unit fires an instrument in one window, never how hard. Both are
+read by the burst model and **nowhere else** — they must never reach the provision or need
+channels, because that leak is what once fabricated an ultimate need for 26 of 60 units.
+
+`chain:extra` is Evelyn's self-provisioned chains. It is deliberately **not** `utility.chains`,
+and the distinction matters: provision is scored supplier → consumer with `supplier !== consumer`,
+so a `utility` entry can never reach its own owner. Annotating Evelyn with `utility.chains` would
+hand Sigrid free chains on a Lighter/Sigrid/Evelyn team and give Evelyn nothing — the unintended
+effect and none of the intended one. Chains a *teammate* provides (Astra, Norma) stay out of
+burst weight entirely; they are already priced in the provision channel.
+
+Chain attacks exist only inside a stun window, so a **stunless** carry gets no chain component at
+all. YSG does not open a window — she only inherits the damage multiplier — so her burst is pure
+ultimate.
+
+> **`scaling` is a need, never a frequency.** `scaling.chains: 3` means Evelyn *wants* chains
+> badly, so provisioners are worth more to her. It does **not** mean she fires more of them.
+> Identically for `scaling.ultimates`. Conflating the two is the single easiest mistake to make
+> in this part of the model, and it has been made more than once.
 
 #### `buffs` / `debuffs`
 
