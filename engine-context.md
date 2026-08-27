@@ -71,7 +71,23 @@ Two *different-element* anomalies on the same target react:
 * **Disorder** — both non-wind. The standard reaction.
 * **Vortex** — exactly one is wind. Damage scales off the **non-wind** element's tier.
 
-Same-element pairs (including wind+wind) do nothing.
+Same-element pairs (including wind+wind) do nothing — but **an elemental variant is not the same
+element**. A variant fills its own gauge, so Miyabi's `ice:frost` genuinely disorders with plain
+`ice` (Soukaku, Promeia). Reaction detection is therefore **variant-aware**, via
+`getOwnGaugeElement`; only the boss-anomaly-state comparison stays on the base element, because
+`anomaly:state` values are named by base element. The engine got this wrong for a long time —
+`computeAnomalyReactions` compared base elements while `teamHasImplicitDisorders` compared
+variants, so Miyabi/Soukaku collected L3's disorder-weakness credit while L4 paid Miyabi nothing
+(issue 5, D3).
+
+**A reaction partner is anything that lands an element on the target, not anything with a role.**
+A unit contributes its own gauge element when it holds an effective `anomaly` role, **and** every
+element it annotates as `utility["anomaly:<element>"]`, regardless of role — a proc is a proc
+whoever fires it. So a pure enabler with no `anomaly` pseudo-role still completes reactions for its
+teammates while earning no reaction of its own. Both facts come from one enumeration
+(`getProcElements`), and the element a unit *contributes* is the same string it is *excluded from
+reacting with*, which is why `getOwnGaugeElement` exists: split those two and a unit disorders with
+itself.
 
 Vortex tiers, highest to lowest: **ice ≫ fire ≈ physical ≈ ether > electric > elemental variants**
 (frost is effectively zero; auricInk/honedEdge are low). Exact values: `VORTEX_TIERS`.
@@ -91,6 +107,68 @@ agents get nothing.
 Occurrence still feeds `scaling.disorders` at full weight (so Miyabi's transformative scaling
 keeps working), but polarity *damage* is heavily discounted on wind-anomaly bosses
 (`POLARITY_VORTEX_DISCOUNT`).
+
+### Disorder supply
+
+`scaling.disorders` declares a **need**, so it is only meaningful against a measured supply — the
+same unit is worth far more on a disorder-rich team than as a solo hypercarry.
+`getDisorderSupply(unit, team, reactions)` is that measure, in the same units as a
+`utility.disorders` annotation, and it **adds two independent sources**:
+
+* **element cycling** — `DISORDER_CYCLE_SUPPLY` per *distinct* element that disorders with this
+  unit, counted off the `disorderElements` set the reaction detector already built. Two
+  different-element partners genuinely supply more than one.
+* **parallel gauge buildup** — that per-element figure **doubles** (`DISORDER_PARALLEL_MULT`)
+  unless the consumer and the contributor are *both* on-field. An off-field agent fills its gauge
+  *while* the carry is attacking, so procs land simultaneously and disorders arrive roughly twice
+  as fast. This is what makes Vivian a complete disorder engine for Miyabi despite generating no
+  polarity at all, and it is judged per element on the **best** contributor — one parallel source
+  is enough. Two off-field agents are parallel with each other too; the resulting composition
+  (nobody on field) is penalised through field-time economy and structure, which is where that
+  belongs.
+* **solo polarity generation** — teammates' `utility.disorders`. Nangong and Yanagi force
+  disorders with no second anomaly agent required.
+
+A consumer that is not itself an anomaly agent has no reaction of its own, and reads the richest
+stream on the team instead: disorders land on the *target*, so a bystander benefits from teammates
+cycling without it.
+
+The need is then paid **once**, team-wide:
+`effectiveDisorderSupply(supply, need) x need x MULT.NEED_FULFILLMENT x damp`. It is deliberately
+**not** in the per-supplier `scoreNeedFulfillment` loop, which `continue`s on the key. Pricing it
+per pair is what the old engine did, and each channel then computed coverage in ignorance of the
+other — cycling and polarity both read as 67% of Miyabi's need of 3 when together they covered it.
+
+**Two curve shapes, and they must not be unified.** The consumer curve and the boss-weakness curve
+answer different questions:
+
+| | shape | why |
+|----|----|----|
+| `effectiveDisorderSupply` (consumer) | full credit to the need, then **logarithmic** — unbounded but strictly diminishing | A Deadly Assault fight is capped at 180 seconds, so a thousand disorders cannot all be converted and surplus becomes statistically insignificant — yet never exactly zero, because extreme play can always squeeze out more |
+| `effectiveDisorderWeakSupply` (boss `weak: disorders`) | full credit to 3, marginal falling to zero at 5, **hard cap** | The game itself stops paying past 5 sources; a sixth earns nothing |
+
+The consumer log is scaled by the need (`k = DISORDER_SURPLUS_SCALE x need`), so its derivative is
+exactly 1 at the need and it joins the linear part smoothly. **TEST 102 pins both shapes** and goes
+red if they are collapsed together.
+
+**Undersupply still hurts,** via a separate ramp
+(`UNDERSUPPLY_FACTOR + (1 - UNDERSUPPLY_FACTOR) x coverage`) rather than the old flat step. The ramp
+is continuous at full coverage, so there is no cliff. It deliberately does **not** scale as coverage
+itself: `supply x need x (supply/need)` collapses to `supply^2` and deletes the appetite term
+entirely, which is the exact defect issue 5 existed to remove. A corollary worth knowing before
+retuning: no damp that reaches 1.0 at full coverage can make a *larger* unmet need earn *less* than
+a smaller met one at equal supply. That ordering is unreachable by design, not by oversight.
+
+**Do not re-derive disorder supply.** The engine used to have three independent conventions for
+"this team cycles disorders" — a hardcoded `2` in L4, a boolean in L5, and another `+2` in L3's
+`weak: disorders` block — and they disagreed with each other. All three are now gone: L4 and L5
+share `getDisorderSupply`, and L3's boss-weakness block uses `getTeamDisorderSupply`, which asks
+the same question team-wide (richest single stream, plus total forced polarity) because the boss
+does not care who converts the disorders.
+
+`pull-engine.js` keeps its own disorder-partner check for gap gating. It must stay variant-aware for
+the same reason (`getDisorderElement`), or it gates a unit out for lacking a partner the scorer is
+happily scoring.
 
 **Polarity *assaults* are a different mechanic, and the two are easy to confuse.** An assault is an extra physical anomaly proc — i.e. Alice's polarity assaults are extra *physical*
 anomaly procs. A polarity-based anomaly proc is not a disorder: it generates none, satisfies no `scaling.disorders`, and is not what `utility.disorders` means. Only **Nangong** and **Yanagi** generate polarity
@@ -716,7 +794,7 @@ the team, then runs:
 | Layer | What it does |
 |----|----|
 | **L1 Disqualifications** | Hard failures returning −1. Deliberately narrow: illegal `join` arrangement, no DPS, three *pure* DPS, a DPS whose tag matches boss `anti`, a DPS whose element is resisted, too few reliable defensive assists. `synergy.avoid` is checked alongside. |
-| **L1.5 Structure** | Classifies the composition (anomaly hypercarry, double armorer, rupture + stun + support, …) into conventional / unconventional-viable / no-interaction / wildly-unconventional. Feeds the teamwork multiplier — **it is not added to the score**. Also scores field-time economy. |
+| **L1.5 Structure** | Classifies the composition (anomaly hypercarry, double armorer, rupture + stun + support, …) into conventional / unconventional-viable / no-interaction / wildly-unconventional. Feeds the teamwork multiplier — **it is not added to the score**, so a demotion is a pure multiplier effect. Also scores field-time economy. **CONVENTIONAL requires a support** — see below. |
 | **L2 Inherent Quality** | Individual power independent of team context: tier and rank. DPS at full weight; support/defense/stun at reduced weight **gated by buff utilization**. Titled bonus. Totalize stun-demand penalty. Wasted-DPS-buff penalty. |
 | **L3 Boss Matchup** | Shill, favored units, `weak` mechanics, element weakness/resistance, boss debuffs, assist bonus. Also where a **missing non-DPS shill disqualifies** (a stunless DPS exempts a stunnerless team from the stun shill). |
 | **L4 Mechanical Synergy** | The core. Directional pairwise evaluation of every ordered teammate pair, plus team-level reaction bonuses. |
@@ -726,6 +804,18 @@ Final score = `raw × teamworkMultiplier`.
 
 **Field-time economy:** one on-field agent is a bonus (efficient solo carry), two is neutral, three
 or more is a penalty (field competition), zero is a penalty (no primary damage dealer).
+
+**No support or defense means not CONVENTIONAL.** A team with no `isEffectiveSupport` and no
+`isEffectiveDefense` — pseudo-roles included, so Orphie, Remielle and Cissia-alongside-Seed all
+count — is demoted to `UNCONVENTIONAL_VIABLE` regardless of how sound the rest of its shape is.
+Supports exist because buffs matter, and forgoing one is a genuine teambuilding failure rather than
+a stylistic choice; the resulting −15% is meant to be a large number. Before this rule L1.5 rated
+`Nangong/Miyabi/Vivian` and `Nangong/Miyabi/Yuzuha` identically, which is why triple-anomaly lines
+outranked the wheelchairs they should lose to (issue 7).
+
+**One exemption: totalize + double stun.** There the second stunner *is* the support — totalize
+damage *is* stun uptime, so a second stunner feeds the carry the way a support otherwise would.
+`secondStunnerActsAsSupport` encodes it. This is deliberate; `Anby/Qingyi/Hugo` is a real team.
 
 ### L4 components
 
@@ -1045,6 +1135,25 @@ promoted, on the theory that broad usefulness beats a single narrow fit.
 
 
 ## 6. Reading Scores
+
+### Scores are only comparable WITHIN a boss
+
+A score is a team's fit against **one** matchup, not a portable rating. Different bosses contribute
+wildly different amounts of weakness, shill, assist, debuff and anti credit, so the scales are not
+commensurate: a team scoring 583 against Butcher and another scoring 498 against a neutral boss tell
+you nothing whatsoever about each other.
+
+**Never rank teams by their best score across bosses.** `compositions.js` displays a per-agent
+ranking that way for convenience, and it is fine as a browsing aid, but it is not a valid basis for
+a comparison or a test. An earlier version of TESTs 98-101 did exactly that and every conclusion
+drawn from them was unsafe until they were rewritten to evaluate each boss in a silo.
+
+When an ordering needs to be pinned, assert it **per boss**, and choose bosses so the axes vary
+independently. The Miyabi ladder tests use four: **Butcher** (anomaly-shill + ether/ice weakness),
+**Marionettes** (weakness, no shill), **Girtablullu** (shill, effectively neutral to the units
+involved) and the **synthetic neutral** control. An ordering that survives all four is not an
+artifact of shill or of element weakness. Remember that viability differs per boss too — a rung that
+is disqualified on one matchup has to be skipped there, not counted as a failure.
 
 The app's authoritative bands live in `strength-rating.js` (`STRENGTH_TIERS`): **Excellent → Good →
 Fair → Tough → Risky**, descending. A team containing an A-rank DPS is capped at *Good* regardless of score.

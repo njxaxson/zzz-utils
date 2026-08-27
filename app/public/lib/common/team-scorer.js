@@ -93,6 +93,20 @@ const ANOMALY_ELEMENT_MULT = 4;
 // not a second body — a `2` annotation is worth one extra agent's presence, not two.
 const ANOMALY_PROC_SUPPLY = 0.5;
 
+// Disorder supply contributed by ONE distinct cycling element, in the same units as a
+// `utility.disorders` annotation — so cycling and polarity provision are directly additive
+// (see `getDisorderSupply`). Set to 2 because that is the value the old implicit block
+// hardcoded for "this team cycles disorders", which keeps a plain two-agent disorder team
+// on exactly its previous supply and confines all movement to consumers whose need exceeds
+// what one cycling element covers.
+const DISORDER_CYCLE_SUPPLY = 2;
+// An off-field anomaly agent fills its gauge WHILE the carry is on field, so procs land in
+// parallel and disorders arrive roughly twice as fast. Applied per cycling element whenever the
+// consumer and the contributor are not both competing for field time — see
+// `hasParallelGaugeSource`. This is what makes Vivian a complete disorder engine for Miyabi
+// despite generating no polarity disorders at all.
+const DISORDER_PARALLEL_MULT = 2;
+
 const BOSS_WEAK = {
     DISORDER_PER_UNIT: 4,
     VEIL_PER_UNIT: 8,
@@ -639,7 +653,7 @@ function isStunlessUnit(unit) {
     return unit.mechanics?.utility?.stunless === true;
 }
 
-function getElementVariant(unit) {
+export function getElementVariant(unit) {
     const base = getElement(unit);
     return unit.mechanics?.elementalVariant 
         ? base + ':' + unit.mechanics?.elementalVariant 
@@ -657,11 +671,6 @@ function teamHasImplicitDisorders(team) {
     return new Set(elements).size >= 2;
 }
 
-function teamHasDisorderGeneration(team) {
-    if (teamHasImplicitDisorders(team)) return true;
-    return team.some(u => w(u.mechanics?.utility?.disorders) > 0);
-}
-
 // --- Boss Anomaly State helpers ---
 
 function getBossAnomalyState(boss) {
@@ -673,14 +682,51 @@ function isVortexBoss(boss) {
     return state === 'wind';
 }
 
+function getVortexTierForVariant(variant) {
+    return VORTEX_TIERS[variant] ?? VORTEX_DEFAULT_TIER;
+}
+
 function getVortexTierForElement(unit, bossAnomaly) {
     const base = getElement(unit);
     if (base === 'wind' && bossAnomaly && bossAnomaly !== 'wind') {
-        return VORTEX_TIERS[bossAnomaly] ?? VORTEX_DEFAULT_TIER;
+        return getVortexTierForVariant(bossAnomaly);
     }
     //otherwise:
-    const element = getElementVariant(unit)
-    return VORTEX_TIERS[element] ?? VORTEX_DEFAULT_TIER;
+    return getVortexTierForVariant(getElementVariant(unit));
+}
+
+// The gauge a unit fills with its own rotation, or null if it fills none. Returned as an
+// element-VARIANT string, because a variant tracks a separate gauge and therefore reacts with
+// its own base element (Miyabi's frost disorders with plain ice — see Soukaku's displayText).
+//
+// SINGLE SOURCE OF TRUTH: the element a unit contributes to the team pool and the element it
+// is excluded from reacting with must be the same string, or the unit disorders with itself.
+// Deriving both from one function makes that desync unrepresentable.
+function getOwnGaugeElement(unit) {
+    if (isNativeLumen(unit)) return null;
+    return getEffectiveRoles(unit).includes('anomaly') ? getElementVariant(unit) : null;
+}
+
+// Which elements does this unit put on the enemy's anomaly gauges?
+//
+// Its own gauge element, when it fills one, PLUS any `utility["anomaly:<element>"]` element
+// REGARDLESS of role — because a proc is a proc: that annotation says an extra anomaly of that
+// element lands on the target, and it reacts whether or not its owner is an anomaly agent. The
+// anomaly-QUANTITY channel already reads the key role-blind; this brings the reaction path into
+// line. Latent today — Alice is the only holder, and her `anomaly:physical` is an element she
+// already supplies as an agent — but it is the shape a wind enabler needs if it ever loses its
+// `anomaly` pseudo-role while keeping the procs.
+//
+// Lumen contributes nothing at all: Attribute Mutation morphs damage but fills no gauge.
+function getProcElements(unit) {
+    const els = new Set();
+    if (isNativeLumen(unit)) return els;
+    const own = getOwnGaugeElement(unit);
+    if (own) els.add(own);
+    for (const [key, val] of Object.entries(unit.mechanics?.utility || {})) {
+        if (key.startsWith('anomaly:') && w(val) > 0) els.add(key.slice('anomaly:'.length));
+    }
+    return els;
 }
 
 function computeAnomalyReactions(team, boss) {
@@ -688,46 +734,58 @@ function computeAnomalyReactions(team, boss) {
     const anomalyAgents = team.filter(u => getEffectiveRoles(u).includes('anomaly'));
     const reactions = new Map();
 
+    // Every element the team lands on the target, pooled once. Reactions are then read off
+    // this set rather than off a partner-by-partner scan, so "how many distinct elements
+    // disorder with me" becomes answerable — that count is the disorder SUPPLY, and a bare
+    // hasDisorder boolean could not express it.
+    const teamElements = new Set();
+    for (const u of team) for (const el of getProcElements(u)) teamElements.add(el);
+
     for (const unit of anomalyAgents) {
-        const element = getElement(unit);
+        const baseElement = getElement(unit);
         let bestVortexTier = 0;
-        let hasDisorder = false;
+        const disorderElements = new Set();
 
         // Lumen agents don't build anomaly gauges via Attribute Mutation — their damage
         // morphs to a teammate's element but does not fill the corresponding anomaly gauge.
         // Therefore lumen units produce no anomaly reactions (no disorder, no vortex).
         if (isNativeLumen(unit)) {
-            reactions.set(unit, { bestVortexTier: 0, hasDisorder: false });
+            reactions.set(unit, { bestVortexTier: 0, hasDisorder: false, disorderElements });
             continue;
         }
 
         if (bossAnomaly) {
-            if (element !== bossAnomaly && bossAnomaly !== 'lumen') {
-                if (bossAnomaly === 'wind' || element === 'wind') {
+            // Boss anomaly states are named by BASE element, so this comparison stays base.
+            if (baseElement !== bossAnomaly && bossAnomaly !== 'lumen') {
+                if (bossAnomaly === 'wind' || baseElement === 'wind') {
                     bestVortexTier = getVortexTierForElement(unit, bossAnomaly);
                 } else {
-                    hasDisorder = true;
+                    disorderElements.add(bossAnomaly);
                 }
             }
         } else {
-            for (const partner of anomalyAgents) {
-                if (partner === unit) continue;
-                const partnerEl = getElement(partner);
-                if (element === partnerEl) continue;
-                // Skip lumen pairings — lumen doesn't open its own gauge
-                if (isNativeLumen(partner)) continue;
+            const element = getOwnGaugeElement(unit);
+            for (const partnerEl of teamElements) {
+                // A unit cannot react with the gauge it fills itself.
+                if (partnerEl === element) continue;
+                const partnerBase = partnerEl.split(':')[0];
+                // Same-element pairs do nothing, and that includes wind + wind.
+                if (baseElement === 'wind' && partnerBase === 'wind') continue;
 
-                if (element === 'wind' || partnerEl === 'wind') {
-                    const nonWindUnit = (element === 'wind') ? partner : unit;
-                    bestVortexTier = Math.max(bestVortexTier,
-                        getVortexTierForElement(nonWindUnit, null));
+                if (baseElement === 'wind' || partnerBase === 'wind') {
+                    const nonWindEl = (baseElement === 'wind') ? partnerEl : element;
+                    bestVortexTier = Math.max(bestVortexTier, getVortexTierForVariant(nonWindEl));
                 } else {
-                    hasDisorder = true;
+                    disorderElements.add(partnerEl);
                 }
             }
         }
 
-        reactions.set(unit, { bestVortexTier, hasDisorder });
+        reactions.set(unit, {
+            bestVortexTier,
+            hasDisorder: disorderElements.size > 0,
+            disorderElements
+        });
     }
 
     return reactions;
@@ -749,6 +807,143 @@ function teamHasAnyReaction(reactions) {
 
 function teamHasPolarity(team) {
     return team.some(u => w(u.mechanics?.utility?.disorders) > 0);
+}
+
+// How much disorder does the team actually put in front of `unit`?
+//
+// `scaling.disorders` declares a NEED, so it can only be priced against a measured supply.
+// This used to be a hardcoded 2 gated on a boolean, which meant supply never varied with
+// the composition (one cycling partner paid the same as three) and Miyabi's need of 3 was
+// permanently stuck at 67% coverage — unreachable by ANY team. See issue 5.
+//
+// Two independent sources, ADDED, never netted off against each other:
+//
+//   * element cycling — one rung per distinct element that disorders with this unit,
+//     counted off `disorderElements` so it agrees with the reaction detector by
+//     construction rather than by a parallel re-derivation.
+//   * solo polarity generation — a teammate's `utility.disorders` forces disorders on its
+//     own, with no second anomaly agent required (Nangong, Yanagi).
+//
+// A prototype that SUBTRACTED teammate provision from the cycling supply passed all three
+// suites and was still wrong: it deleted the cycling credit exactly when a polarity unit
+// was present, which is backwards. Nangong + Miyabi genuinely produces ether/frost cycling
+// disorders AND Nangong's polarity disorders on top.
+//
+// Self is excluded, matching the `supplier !== consumer` convention used everywhere else;
+// a unit that provides its own need is handled by the L5 self-provision shortcut.
+// Does anyone supply `element` whose gauge fills ALONGSIDE `unit`'s own rotation, rather than
+// competing with it for field time? Vivian builds ether while Miyabi is applying frost, so their
+// procs land simultaneously and disorders arrive roughly twice as fast; Yanagi has to share the
+// field with her, so hers arrive one after the other.
+//
+// This is a question about RATE, not about whether a disorder happens at all — that is already
+// settled by `disorderElements`. Two on-field agents disorder perfectly well, just serially, so a
+// false result here means "no speed-up", never "no disorder".
+//
+// Existential over the whole team, not a property of a pair: one parallel source is enough to
+// speed the element up, even when another teammate also supplies it on-field.
+//
+// Two off-field suppliers are parallel with each other too, which is correct. The resulting
+// composition (nobody actually on field) is penalised through field-time economy and structure,
+// which is where that belongs rather than here.
+function hasParallelGaugeSource(unit, element, team) {
+    for (const u of team) {
+        if (u === unit) continue;
+        if (!getProcElements(u).has(element)) continue;
+        if (!(isOnField(unit) && isOnField(u))) return true;
+    }
+    return false;
+}
+
+function getDisorderSupply(unit, team, reactions) {
+    let elements = reactions.get(unit)?.disorderElements;
+    if (!reactions.has(unit)) {
+        // A consumer that is not itself an anomaly agent has no reaction of its own, but
+        // disorders land on the TARGET, not on whoever caused them — so it still benefits from
+        // teammates cycling without it. Read the richest stream on the team. This is the case
+        // the old code missed entirely (issue 5): it only ever asked whether the consumer's own
+        // reaction fired. Unreachable on the current roster, where both `scaling.disorders`
+        // units are anomaly agents, which is exactly why it went unnoticed.
+        for (const [, r] of reactions) {
+            if ((r.disorderElements?.size ?? 0) > (elements?.size ?? 0)) elements = r.disorderElements;
+        }
+    }
+    let supply = 0;
+    for (const element of (elements ?? [])) {
+        // Per element, the BEST contributor wins: one parallel source is enough to make that
+        // element's cycling parallel, even if another teammate supplies it on-field too.
+        supply += hasParallelGaugeSource(unit, element, team)
+            ? DISORDER_CYCLE_SUPPLY * DISORDER_PARALLEL_MULT
+            : DISORDER_CYCLE_SUPPLY;
+    }
+    for (const u of team) {
+        if (u === unit) continue;
+        supply += w(u.mechanics?.utility?.disorders);
+    }
+    return supply;
+}
+
+// Disorder supply a CONSUMER can actually convert, given how much it needs.
+//
+// Full credit up to the need, then strictly diminishing but never zero. A Deadly Assault fight
+// is capped at 180 seconds: supply a thousand disorders and you run out of time before you can
+// turn them into enhanced attacks, so surplus becomes statistically insignificant — yet never
+// exactly worthless, since extreme play can always squeeze out a little more. Hence
+// logarithmic and unbounded rather than a hard cap.
+//
+// The log's scale is tied to the need, so the shape is the same for a 2-scaler and a 3-scaler,
+// and its derivative is exactly 1 at the need — the curve joins the linear part smoothly, with
+// no cliff of the kind the old `UNDERSUPPLY_FACTOR` step produced.
+//
+//   need=3:  E(3)=3.000  E(4)=3.766  E(5)=4.271  E(6)=4.648  E(8)=5.200  E(1000)=12.75
+//
+// This is DELIBERATELY a different shape from `effectiveDisorderWeakSupply` below. Oversupply
+// keeps helping a consumer; the boss-weakness bonus genuinely hard-caps. Do not unify them.
+const DISORDER_SURPLUS_SCALE = 0.5;
+
+export function effectiveDisorderSupply(supply, need) {
+    if (need <= 0) return 0;
+    if (supply <= need) return supply;
+    const k = DISORDER_SURPLUS_SCALE * need;
+    return need + k * Math.log(1 + (supply - need) / k);
+}
+
+// Disorder supply that counts toward a boss's `weak: disorders` bonus. Unlike the consumer
+// side this really does hard-cap: the game stops paying past 5 sources, so a sixth earns
+// nothing at all. Full credit to the reference weight, then a marginal rate falling linearly
+// to zero at the cap.
+//
+//   E(3)=3.00  E(4)=3.75  E(5)=4.00  E(6)=4.00  E(7)=4.00      max = R + (CAP-R)/2 = 4
+const DISORDER_WEAK_REF = 3;
+const DISORDER_WEAK_CAP = 5;
+
+export function effectiveDisorderWeakSupply(supply) {
+    const s = Math.min(supply, DISORDER_WEAK_CAP);
+    const width = DISORDER_WEAK_CAP - DISORDER_WEAK_REF;
+    if (s <= DISORDER_WEAK_REF || width <= 0) return s;
+    const d = s - DISORDER_WEAK_REF;
+    return DISORDER_WEAK_REF + d - (d * d) / (2 * width);
+}
+
+// Team-wide disorder output, for the boss-weakness channel. Consumer-relative supply is the
+// wrong question there — the boss does not care who converts them — so take the richest single
+// stream and add the team's total forced-polarity provision on top.
+function getTeamDisorderSupply(team, reactions) {
+    let bestCycling = 0;
+    for (const unit of team) {
+        const elements = reactions.get(unit)?.disorderElements;
+        if (!elements) continue;
+        let cycling = 0;
+        for (const element of elements) {
+            cycling += hasParallelGaugeSource(unit, element, team)
+                ? DISORDER_CYCLE_SUPPLY * DISORDER_PARALLEL_MULT
+                : DISORDER_CYCLE_SUPPLY;
+        }
+        bestCycling = Math.max(bestCycling, cycling);
+    }
+    let polarity = 0;
+    for (const u of team) polarity += w(u.mechanics?.utility?.disorders);
+    return bestCycling + polarity;
 }
 
 function teamHasDisorderGenerationFromReactions(team, reactions) {
@@ -1462,7 +1657,39 @@ const FIELD_TIME = {
     ZERO_ONFIELD_PENALTY: -30,
 };
 
+// A composition with NO support or defense agent is a real teambuilding failure, not a stylistic
+// choice — supports exist because buffs matter, and a team that forgoes one is giving up its
+// single largest source of damage amplification. L1.5 could not express this at all: it rated
+// `Nangong/Miyabi/Vivian` and `Nangong/Miyabi/Yuzuha` as identically CONVENTIONAL, which is why
+// triple-anomaly lines outranked the wheelchairs they should lose to (issue 7).
+//
+// Demotion is to the EXISTING `UNCONVENTIONAL_VIABLE` tier, so no new tier or factor is needed.
+// The hit is deliberately large (~-35 raw, then -15% on the total): it is meant to be.
+//
+// `isEffectiveSupport || isEffectiveDefense` reads activated pseudo-roles, which is what makes
+// Orphie, Remielle, and Cissia-alongside-Seed count as the team's support.
 function scoreTeamStructure(team, debug) {
+    const classified = classifyTeamStructure(team, debug);
+    if (classified !== STRUCTURE.CONVENTIONAL_BONUS) return classified;
+    if (team.some(u => isEffectiveSupport(u) || isEffectiveDefense(u))) return classified;
+    // Exemption: in a totalize + double-stun comp the SECOND STUNNER *is* the support. Totalize
+    // damage is stun uptime, so a second stunner is feeding the carry's damage the way a support
+    // otherwise would. Deliberate, not an oversight.
+    if (secondStunnerActsAsSupport(team)) {
+        if (debug) console.log('    Structure: ^ kept — no support, but the second stunner serves as one (totalize)');
+        return classified;
+    }
+    if (debug) console.log('    Structure: ^ DEMOTED to UNCONVENTIONAL viable — no support or defense agent');
+    return STRUCTURE.UNCONVENTIONAL_VIABLE;
+}
+
+function secondStunnerActsAsSupport(team) {
+    const stunners = team.filter(isStun);
+    if (stunners.length < 2) return false;
+    return team.filter(isDPS).some(u => w(u.mechanics?.damage?.totalize) > 0);
+}
+
+function classifyTeamStructure(team, debug) {
     const attackers = team.filter(u => isAttacker(u) && !isEffectiveSupport(u) && !isEffectiveDefense(u) && !isStun(u));
     const anomalyUnits = team.filter(u => isAnomaly(u) && !isEffectiveSupport(u) && !isEffectiveDefense(u) && !isStun(u));
     const ruptureUnits = team.filter(u => isRupture(u) && !isEffectiveSupport(u) && !isEffectiveDefense(u) && !isStun(u));
@@ -1816,6 +2043,10 @@ function scoreInherentQuality(team, { lenient = false, debug = false, boss = nul
 function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
     let score = 0;
 
+    // Hoisted: both the disorders-weakness block and the element weakness/resistance block
+    // below need reactions, and this used to be computed twice in one pass.
+    const l3Reactions = computeAnomalyReactions(team, boss);
+
     const bossWeaknesses = getBossWeaknesses(boss);
     const bossResistances = getBossResistances(boss);
     const bossShill = getBossShill(boss);
@@ -1880,17 +2111,19 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
     // mechanics.weak is an array; support legacy single-string entries gracefully.
     const weakMechanics = [].concat(boss.mechanics?.weak ?? []);
 
-    // Disorders weakness (e.g. Butcher): bonus scales with team disorder generation
+    // Disorders weakness (e.g. Butcher): bonus scales with team disorder generation, and
+    // saturates. This block used to keep its OWN convention — sum of `utility.disorders` plus a
+    // flat +2 for element cycling — which could not tell one cycling element from two, missed a
+    // role-less proc enabler entirely, and scaled without limit so a triple-anomaly team kept
+    // collecting. It now shares `getTeamDisorderSupply` with the rest of the engine and passes
+    // through the game's hard cap of 5 sources.
     if (weakMechanics.includes('disorders')) {
-        let totalDisorderScore = 0;
-        for (const unit of team) {
-            totalDisorderScore += w(unit.mechanics?.utility?.disorders);
-        }
-        if (teamHasImplicitDisorders(team)) totalDisorderScore += 2;
-        if (totalDisorderScore > 0) {
-            const bonus = Math.round(totalDisorderScore * BOSS_WEAK.DISORDER_PER_UNIT);
+        const supply = getTeamDisorderSupply(team, l3Reactions);
+        if (supply > 0) {
+            const effective = effectiveDisorderWeakSupply(supply);
+            const bonus = Math.round(effective * BOSS_WEAK.DISORDER_PER_UNIT);
             score += bonus;
-            if (debug) console.log(`    Boss weak(disorders): total=${totalDisorderScore} → +${bonus}`);
+            if (debug) console.log(`    Boss weak(disorders): supply ${supply} → ${effective.toFixed(2)} effective → +${bonus}`);
         }
     }
 
@@ -2003,7 +2236,6 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
     }
 
     // --- DPS element weakness/resistance ---
-    const l3Reactions = computeAnomalyReactions(team, boss);
     let onElementDPSCount = 0;
     for (const unit of dpsUnits) {
         const element = getElement(unit);
@@ -2399,16 +2631,19 @@ function scoreNeedFulfillment(supplier, consumer, debug, options = {}) {
         const scalingWeight = w(scaling[key]);
         if (scalingWeight === 0) continue;
 
-        let supplyWeight;
-        if (key === 'disorders') {
-            supplyWeight = w(supplierUtility[key]);
-        } else {
-            supplyWeight = Math.max(
-                w(supplierBuffs[key]),
-                w(supplierDebuffs[key]),
-                w(supplierUtility[key])
-            );
-        }
+        // Disorders are priced ONCE, team-wide, in the L4 team-level section rather than
+        // per supplier. A disorder need is fed by two independent sources — element cycling
+        // and a teammate's forced polarity disorders — and pricing them per pair meant each
+        // computed coverage in ignorance of the other, so both read as undersupplied when
+        // together they covered the need. `getDisorderSupply` aggregates them instead.
+        // (No unit `converts` or `replaces` disorders, so those branches lose nothing.)
+        if (key === 'disorders') continue;
+
+        let supplyWeight = Math.max(
+            w(supplierBuffs[key]),
+            w(supplierDebuffs[key]),
+            w(supplierUtility[key])
+        );
 
         // Consumer-side conversion: if consumer converts X→Y, supplier's X provision
         // augments effective Y supply (e.g., Norma converts QA→chain, so QA supply also
@@ -2685,19 +2920,38 @@ function scoreMechanicalSynergy(team, debug, options = {}) {
             if (debug) console.log(`    Vortex bonus: ${unit.name} +${vortexBonus.toFixed(1)} (tier ${reaction.bestVortexTier})`);
         }
 
-        if (reaction.hasDisorder) {
-            const disorderScaling = w(unit.mechanics?.scaling?.disorders);
-            if (disorderScaling > 0) {
-                const implicitSupply = 2;
-                const fulfillment = Math.min(1, implicitSupply / disorderScaling);
-                const val = implicitSupply * disorderScaling * MULT.NEED_FULFILLMENT * fulfillment;
-                consumerScores.set(unit.name, (consumerScores.get(unit.name) || 0) + val);
-                if (debug) console.log(`    Implicit disorder need: ${unit.name} +${val.toFixed(1)} (supply ${implicitSupply}, scaling ${disorderScaling}, gated ${Math.round(fulfillment * 100)}%)`);
-            } else {
-                consumerScores.set(unit.name, (consumerScores.get(unit.name) || 0) + MULT.DISORDER_BONUS);
-                if (debug) console.log(`    Implicit disorder: ${unit.name} +${MULT.DISORDER_BONUS}`);
-            }
+        // Flat "a disorder happened, and this agent's own procs are part of it" bonus. Agents
+        // who additionally SCALE on disorders are paid through the need channel below instead.
+        if (reaction.hasDisorder && w(getEffectiveScaling(unit).disorders) <= 0) {
+            consumerScores.set(unit.name, (consumerScores.get(unit.name) || 0) + MULT.DISORDER_BONUS);
+            if (debug) console.log(`    Implicit disorder: ${unit.name} +${MULT.DISORDER_BONUS}`);
         }
+    }
+
+    // Disorder need, priced ONCE against the team's aggregate disorder supply. Formerly two
+    // half-blind channels — a hardcoded implicit supply here plus a per-supplier
+    // `need(disorders)` in the pair loop — neither of which could see the other's supply, so
+    // a need of 3 read as 67% covered from both even when the two together met it.
+    //
+    // Loops the whole team, not just anomaly agents: a disorder is a team-wide event on the
+    // target, so a consumer benefits from it whether or not it generates any itself. That is
+    // the L4 half of issue 5 — the old code only ever paid an agent for its OWN reaction.
+    for (const unit of team) {
+        const need = w(getEffectiveScaling(unit).disorders);
+        if (need <= 0) continue;
+        const supply = getDisorderSupply(unit, team, reactions);
+        if (supply <= 0) continue;
+        const effective = effectiveDisorderSupply(supply, need);
+        // Undersupply still hurts: a unit that cannot reach its ceiling is worth less than one
+        // that can. A RAMP rather than the old flat step, so it is continuous at full coverage
+        // and there is no cliff — but it must not scale as coverage itself, because
+        // `supply x need x (supply/need)` collapses to `supply^2` and deletes the appetite term
+        // entirely. That collapse is what issue 5 existed to remove; do not reintroduce it.
+        const coverage = Math.min(1, supply / need);
+        const damp = UNDERSUPPLY_FACTOR + (1 - UNDERSUPPLY_FACTOR) * coverage;
+        const val = effective * need * MULT.NEED_FULFILLMENT * damp;
+        consumerScores.set(unit.name, (consumerScores.get(unit.name) || 0) + val);
+        if (debug) console.log(`    Disorder need: ${unit.name} +${val.toFixed(1)} (supply ${supply} → ${effective.toFixed(2)} effective, need ${need}${coverage < 1 ? `, undersupplied x${damp.toFixed(2)}` : ''})`);
     }
 
     // Refringe bonus: when a lumen anomaly agent is present, their Lumiflux Buildup is consumed
@@ -2941,25 +3195,28 @@ function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs =
                 );
                 if (selfProvision > 0) continue;
                 needsTotal++;
+                // A disorder is a team-wide event on the target, so ANY source satisfies ANY
+                // consumer — this unit's own reaction, two OTHER teammates cycling elements
+                // without it, or a teammate generating polarity disorders solo. This used to
+                // test the unit's own `hasDisorder` and then fall through to a teammate's
+                // `utility.disorders`, which missed the middle case entirely: a consumer that
+                // is not itself part of the cycling pair read as unmet on a team swimming in
+                // disorders. Latent on the current roster (both `scaling.disorders` units are
+                // anomaly agents) but wrong, and it is the same supply the L4 need channel
+                // now prices — one measure, consulted in both places.
                 if (key === 'disorders') {
-                    const unitReaction = twReactions.get(unit);
-                    if (unitReaction?.hasDisorder) {
-                        needsMet++;
-                        continue;
-                    }
+                    if (getDisorderSupply(unit, team, twReactions) > 0) needsMet++;
+                    // Skip the generic supplier scan: it can only see annotations, never
+                    // element cycling, so the supply above is the whole answer for this key.
+                    continue;
                 }
                 for (const supplier of team) {
                     if (supplier === unit) continue;
-                    let supplyWeight;
-                    if (key === 'disorders') {
-                        supplyWeight = w(supplier.mechanics?.utility?.[key]);
-                    } else {
-                        supplyWeight = Math.max(
-                            w(supplier.mechanics?.buffs?.[key]),
-                            w(supplier.mechanics?.debuffs?.[key]),
-                            w(supplier.mechanics?.utility?.[key])
-                        );
-                    }
+                    const supplyWeight = Math.max(
+                        w(supplier.mechanics?.buffs?.[key]),
+                        w(supplier.mechanics?.debuffs?.[key]),
+                        w(supplier.mechanics?.utility?.[key])
+                    );
                     if (supplyWeight > 0) { needsMet++; break; }
                 }
             }

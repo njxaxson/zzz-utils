@@ -1,10 +1,14 @@
 # Scoring engine — open issues
 
-Live register of what is actually open in the scorer. All suites are green (`92/92` scoring, `43/43` recommendations, `6/6` bucketing) — everything
-below is a *modelling* problem, not a failing test. **Issue 5 is the one to read first if you are
-touching disorders**; it records three confident diagnoses that were all wrong. Historical post-mortems are demoted to the end.
+Live register of what is actually open in the scorer. **The scoring suite is 99/102 — TESTs 98, 100
+and 101 are RED on purpose**, documented under issue 7; recommendations 43/43 and bucketing 6/6.
+Everything else below is a *modelling* problem rather than a failing test. **Issue 5 is the one to read first if you are
+touching disorders**; it records four confident diagnoses that were all wrong, and a symptom whose
+own wording sent the fix in the wrong direction. Historical post-mortems are demoted to the end.
 
-Last reviewed 2026-08-26.
+Open: issues 3, 5 (reopened) and 7, plus the two notes at the end of issue 5.
+
+Last reviewed 2026-08-27.
 
 | # | Issue | Status | Size |
 |----|----|----|----|
@@ -12,8 +16,9 @@ Last reviewed 2026-08-26.
 | 2 | Undersupply gating prices partial coverage flat | **Resolved** — see the post-mortem below | Done |
 | 3 | Partial relevance is never priced | **Open, parked** by owner | Large; broad retune |
 | 4 | Burst throughput measured by the wrong aggregate | **Resolved** — see the post-mortem below | Done |
-| 5 | Disorder model misses solo polarity generation | **Open** — unblocked; the "Alice exception" was a game-mechanics error, now retired | Small; latent — never fires on the current roster |
+| 5 | Disorder supply was never measured | **Not resolved** — fix landed and is correct in direction, but its oversupply shape caused issue 7. Do not close until 7 is green | Blocked on 7 |
 | 6 | `isLumenUnit()` is false during morph scoring, so every *natively lumen* rule inverts | **Resolved** — see the post-mortem below | Done |
+| 7 | Miyabi's composition ordering is wrong: triple-anomaly over-valued, off-field partners under-valued | **Partly fixed** — five changes landed; TEST 99 green, 98/100/101 red by documented decision | Blocked on 3 |
 
 
 ---
@@ -69,6 +74,32 @@ A real fix means making the fit ratio authoritative over the absolute-supply `th
 letting absolute contribution live in L4 baseline affinity where it belongs rather than being
 smuggled into cohesion. That is a broad retune, not a patch.
 
+### Measured: the cohesion tax falls on one archetype, ~9 points
+
+New evidence from issue 7, and the sharpest quantification of this issue so far. The `0.984`
+teamwork multiplier applies to precisely the four `anomaly hypercarry` teams in Miyabi's comparison
+set, and to **none** of the triple-anomaly or Remielle lines competing with them, which all sit at
+`1.000`:
+
+| team | raw | x teamwork | final | cost |
+|----|----|----|----|----|
+| `Nangong/Miyabi/Yuzuha` | 592.3 | 0.984 | 582.9 | **−9.4** |
+| `Nangong/Miyabi/Astra` | 563.1 | 0.984 | 554.2 | −8.9 |
+| `Nangong/Miyabi/Sunna` | 559.8 | 0.984 | 550.9 | −8.9 |
+| `Nangong/Miyabi/Nicole` | 527.7 | 0.984 | 519.3 | −8.4 |
+| every competing triple-anomaly / Remielle line | — | 1.000 | — | 0 |
+
+The mechanism is Consequence A seen from the other side: adding Yuzuha drops Nangong's utilization
+from 100% to 94%, because his `anomaly` buff lands on two anomaly bodies with Vivian but only one
+with Yuzuha. The team is better and the ratio says worse. **On raw score
+`Nangong/Miyabi/Yuzuha` already beats `Nangong/Miyabi/Vivian` (592.3 vs 588.5)** — it loses only to
+the multiplier.
+
+So this issue systematically taxes *stunner + carry + true support*, one of the game's strongest and
+most common shapes, about 9 points relative to the compositions it competes with. That is a
+concrete, reproducible cost for a decision to weigh, where previously there was only the
+`Nangong/Yixuan/Sunna` illustration.
+
 ### Approaches already tried and rejected
 
 This table is evidence about *this* issue specifically, and is what establishes that the fix is a
@@ -87,42 +118,190 @@ retune rather than a patch. All measured against the full 86-test suite:
 
 ---
 
-## 5. The disorder model only sees element cycling, not solo polarity generation
+## 5. Disorder supply was never measured
 
-**Open.** Found while scoping Alice, and it invalidated three confident-sounding diagnoses before
-it was understood. Read this before touching anything disorder-related.
+**Not resolved — reopened.** The fix below landed, is correct in direction, and is backed by TESTs
+93-97. But it priced oversupply linearly and uncapped, and that is one of the two mechanisms behind
+**issue 7** (Miyabi's composition ordering). Treat this issue as open until issue 7 is green. The
+heading previously read *Resolved*, which was premature: the whole-roster diff and three green
+suites did not surface it, and `compositions.js -10 :Miyabi` did — one more instance of the standing
+lesson that a green suite is not evidence.
 
-**Disorders arise two independent ways.** Element cycling — two anomaly agents of different
-non-wind elements, e.g. Nangong's ether over Miyabi's frost. *And* solo polarity generation:
-**Yanagi and Nangong each generate polarity disorders entirely on their own**, with no second
-anomaly agent required.
+**Originally filed as:** The heading used to read *"the disorder model only sees element cycling, not solo
+polarity generation"*. That was one symptom of a larger defect, and the framing kept the real one
+hidden for two rounds. Found while scoping Alice, and it invalidated three confident-sounding
+diagnoses before it was understood. Read this before touching anything disorder-related.
 
-`computeAnomalyReactions` (\~line 665) models **only the first**. `reaction.hasDisorder` is derived
-purely from element pairings between anomaly agents and never reads `utility.disorders` or
-`damage.polarity`. The engine compensates in exactly one place:
+### The framing that was wrong
 
-```js
-teamHasDisorderGenerationFromReactions = teamHasAnyDisorder(reactions) || teamHasPolarity(team)
+`scaling.disorders` declares a **need**. Miyabi at `3` cannot reach her ceiling unless the team
+actually generates that many disorders, so her score must rise with the team's disorder generation
+and fall without it. The footnote at the bottom of this issue recorded the symptom as *"a
+`scaling.disorders` of 2 and 3 pay identically"* — which invited the wrong repair, comparing two
+consumers with different needs and trying to order them. **That measures the wrong thing.** The
+right measurement is one consumer across a supply gradient, and it showed the actual defect:
+
+```
+                          before      Miyabi's disorder credit
+lighter/miyabi/astra       242.5      0                        no source
+miyabi/astra/yuzuha        340.4      0                        no source
+miyabi/soukaku/yuzuha      285.1      0                        <-- should be cycling (see D3)
+miyabi/vivian/yuzuha       443.2      28.0                     cycling
+nangong/miyabi/yuzuha      496.3      28.0 + 16.8              cycling + polarity
+miyabi/yanagi/yuzuha       434.3      28.0 + 16.8              cycling + polarity
+nangong/miyabi/vivian      494.5      28.0 + 16.8              cycling + polarity
+nangong/miyabi/yanagi      470.3      28.0 + 16.8              cycling x2 + polarity x2
 ```
 
-That `|| teamHasPolarity` is what makes **Trigger / Yanagi / Yuzuha** score correctly — Yanagi
-generates disorders alone, so Yuzuha's `buffs.disorders: 3` is properly credited as utilised.
+**28.0 in every team that generates any disorder at all.** The engine had no notion of *how much*
+disorder a team produces. Four defects, one root cause.
 
-**But the needs side has no such compensation.** The L5 needs-met audit tests
-`unitReaction?.hasDisorder` alone, so a `scaling.disorders` consumer on a team whose disorders come
-from solo polarity generation would be marked unmet. **The suites pass today by happy accident,
-not by correct modelling:** the only units that scale on disorders are Miyabi and Alice, both
-anomaly agents, and **neither generates polarity** — Miyabi is frost-cycling only, and Alice's
-polarity is assaults, not disorders (see below). The only two solo-polarity units are Nangong
-(ether) and Yanagi (electric), both anomaly agents themselves, and neither shares a base element
-with Miyabi or Alice. So every pairing that would exercise the gap also satisfies element cycling,
-and it never fires. This is structural luck about the current roster, not a rule — a future
-non-anomaly or same-element `scaling.disorders` consumer would expose it immediately.
+**D1 — the needs side never read team-wide generation.** The L5 cohesion audit satisfied a
+`disorders` need only from the consumer's *own* `hasDisorder` reaction or a teammate's
+`utility.disorders`. Disorders generated by two *other* teammates cycling never counted, so a
+consumer that is not itself half of the pair read as unmet on a team swimming in disorders.
+Latent: both `scaling.disorders` units are anomaly agents, so they always had a reaction of their
+own. This was the issue's original headline and it was real — just not the largest part.
 
-Fix direction: the needs side should consult the same `teamHasDisorderGenerationFromReactions`
-gate the buff side already uses. With the Alice exception retired (below) there is no longer a
-known counter-case blocking that, but the wrong diagnoses recorded next are the reason to
-measure rather than assume.
+**D2 — supply was a hardcoded constant.** `hasDisorder` was a boolean and the implicit block
+turned it into `implicitSupply = 2`. So one cycling partner paid the same as three; Miyabi's need
+of `3` sat permanently at 67% coverage, **unreachable by any composition**; and cycling supply and
+polarity supply were each measured against the *full* need independently, so on
+`nangong/miyabi/yuzuha` both read 67% when together they were 4 against a need of 3. The recorded
+`2 == 3` symptom is downstream: with supply pinned at 2, `supply x need x min(1, supply/need)`
+collapses to `supply^2` and the need term drops out. Same arithmetic collapse TEST 91 records for
+ultimates — but ultimates deliberately chose fraction-of-need semantics, which is wrong here.
+
+**D3 — two disorder detectors disagreed, and the live one was wrong.**
+`computeAnomalyReactions` compared **base** elements, so `ice` and `ice:frost` read as identical
+and **Miyabi/Soukaku and Miyabi/Promeia generated no disorders at all**.
+`teamHasImplicitDisorders` used `getElementVariant` and said the opposite, so L3's
+`weak: disorders` credit already fired on those teams while L4 paid Miyabi nothing. `units.json`
+documents the intended behaviour in Soukaku's own `displayText`. Unrecorded before this pass, and
+the largest single mover.
+
+**D4 — proc sources were gated on holding an anomaly role.** Reaction partners were enumerated as
+anomaly-*role* agents only. But `utility["anomaly:<element>"]` states that an extra anomaly of that
+element lands on the target, and a proc is a proc whoever fires it — the anomaly-**quantity**
+channel already read the key role-blind while the reaction path did not. Latent (Alice is the only
+holder, and her `anomaly:physical` is an element she already supplies as an agent), but it is the
+shape a wind enabler needs if it ever loses its `anomaly` pseudo-role while keeping the procs.
+
+### The fix
+
+One measured quantity, consulted everywhere it matters.
+
+* **`getProcElements` / `getOwnGaugeElement`** — one enumeration of which element-variants the team
+  lands on the target. A unit contributes its own gauge element when it holds an effective
+  `anomaly` role, plus any `utility["anomaly:<element>"]` element regardless of role (D4). Lumen
+  contributes nothing. Comparison is on the **variant** (D3).
+  `getOwnGaugeElement` exists so the element a unit *contributes* and the element it is *excluded
+  from reacting with* cannot drift apart — a mutation that changed only one side made Miyabi
+  disorder with herself, so the two now come from one function.
+* **`computeAnomalyReactions` returns `disorderElements`**, a Set, with
+  `hasDisorder === disorderElements.size > 0`. Every existing read site is untouched; the count is
+  what a boolean could never express.
+* **`getDisorderSupply(unit, team, reactions)`** — `DISORDER_CYCLE_SUPPLY` (2) per distinct cycling
+  element, **plus** teammates' `utility.disorders`. Added, never netted: a prototype that
+  *subtracted* teammate provision from cycling supply passed all three suites and was still wrong,
+  deleting the cycling credit precisely when a polarity unit was present. A consumer with no
+  reaction of its own reads the richest stream on the team — that is D1.
+* **One payment, not two.** The implicit block's disorder branch and the pair loop's
+  `need(disorders)` are replaced by a single team-level payment over the whole team:
+  `supply x need x MULT.NEED_FULFILLMENT x (covered ? 1 : UNDERSUPPLY_FACTOR)`. No new constant
+  except `DISORDER_CYCLE_SUPPLY`, which only names the literal that was already there.
+* **L5** consults the same `getDisorderSupply`, which retires the disorders-only branch inside the
+  supplier loop.
+* **`pull-engine.js`** disorder-partner checks are now variant-aware via `getDisorderElement`,
+  or it would gate Miyabi out for having no disorder partner on a team the scorer scores happily.
+
+`DISORDER_CYCLE_SUPPLY = 2` is the calibration anchor: one cycling element reproduces the old
+hardcoded supply exactly. Combined with a payment **linear in supply**, that keeps every Alice
+number identical wherever she was already covered — `Nangong / Alice / Velina` is byte-identical at
+525.7, where the old two channels paid `28 + 28` and the new one pays `4 x 2 x 7`. What used to
+look like double payment was payment for two real supplies, and it survives unchanged.
+
+### After
+
+```
+                          before   after      credit
+lighter/miyabi/astra       242.5   242.5      0                              no source
+miyabi/astra/yuzuha        340.4   340.4      0                              no source
+miyabi/soukaku/yuzuha      285.1   347.2      25.2  supply 2, undersupplied  D3
+miyabi/vivian/yuzuha       443.2   440.9      25.2  supply 2, undersupplied
+miyabi/yanagi/yuzuha       434.3   460.3      84.0  supply 4, covered
+nangong/miyabi/yuzuha      496.3   515.2      84.0  supply 4, covered
+nangong/miyabi/vivian      494.5   518.7      84.0  supply 4, covered
+nangong/miyabi/yanagi      470.3   520.6     168.0  supply 8, covered
+nangong/alice/velina       525.7   525.7      56.0  supply 4, need 2         unchanged
+```
+
+> **Superseded by issue 7.** Both warts flagged in the next paragraph — the coverage cliff and the
+> uncapped linear tail — were the mechanisms behind issue 7, and both are now gone: the step became
+> a ramp, and oversupply became logarithmic on the consumer side and hard-capped on the boss side.
+> The numbers below are the state as of issue 5 landing, kept because the reasoning is what issue 7
+> then had to unpick.
+
+Strictly increasing in supply, which is the whole point. Note the **cliff at coverage**: supply 2
+draws `UNDERSUPPLY_FACTOR` and supply 4 does not, so 25.2 jumps to 84.0. Reachable supply is a
+coarse ladder (0, 2, 4, 6, 8) and no team lands between, so nothing is priced *inside* the
+discontinuity — but it is a step, not a ramp, and it is the first thing to revisit if these
+magnitudes ever feel wrong. **Oversupply is linear and uncapped**, which is what preserves Alice;
+the consequence is that a maximally disorder-rich team pays a large absolute term (168 raw on
+`nangong/miyabi/yanagi`, against 75.6 for YSG's entire ultimate value). The L4 soft cap absorbs
+most of it — that team lands at #7 on Fiend, not runaway — but the linear tail is a deliberate
+choice, not an oversight, and `ANOMALY_ELEMENT_MULT`'s channel is the precedent for it.
+
+### Verification
+
+**1,186 of 132,102 whole-roster scores moved (0.90%), and every single moved team contains Miyabi
+or Alice** — the only two `scaling.disorders` units, zero exceptions to the prediction. 639 up, 547
+down, mean +18.1, range +83.8 / −16.3. The down-movers are all Miyabi undersupplied cases (28.0 →
+25.2), where the merged channel now applies the same undersupply discount every other need key
+pays and the old implicit block skipped. Top six on Fiend unchanged; Miyabi's two disorder-rich
+lines enter at #7 and #8, which for the game's signature disorder comps reads as a correction.
+
+Suites: **97/97** scoring (five new), 43/43 recommendations, 6/6 bucketing. No constant retuned and
+no test threshold moved.
+
+TESTs 93-97 are new, and each was mutation-checked one-to-one — every mutation kills exactly its
+own test and no other:
+
+| mutation | dies |
+|----|----|
+| cycling supply re-flattened to a boolean | 93 |
+| polarity dropped from the aggregate | 94 |
+| L5 audit reverted to the consumer's own reaction | 95 |
+| variant awareness removed at `getOwnGaugeElement` | 96 |
+| proc sources re-gated on holding an anomaly role | 97 |
+
+TEST 93 needed two passes and is the cautionary one. Written first as the supply gradient alone, it
+**passed against the unfixed engine** — the old flat model produced that same ordering out of its
+separately-priced polarity channel. Exactly the TEST 89 trap. What the flat model provably cannot
+do is tell ONE cycling element from TWO, so the decisive assertion clones Vivian off ether onto
+fire and asserts Miyabi gains from the second distinct element. TEST 94 is decisive for the same
+reason: it straddles the aggregate supply of 4 (a need of 4 is covered, a need of 5 is not), and
+without aggregation neither is ever covered and the *larger* need wins on the bare need product —
+so splitting the channels apart flips the assertion rather than merely weakening it.
+
+### The game facts this rests on, which have not changed
+
+**Disorders arise two independent ways.** Element cycling — two anomaly sources of different
+non-wind elements, e.g. Nangong's ether over Miyabi's frost. *And* solo polarity generation:
+**Yanagi and Nangong each generate polarity disorders entirely on their own**, with no second
+anomaly agent required. `getDisorderSupply` adds both; before the fix `computeAnomalyReactions`
+modelled only the first, and the engine compensated in exactly one place —
+`teamHasDisorderGenerationFromReactions = teamHasAnyDisorder(reactions) || teamHasPolarity(team)`,
+the `|| teamHasPolarity` being what makes **Trigger / Yanagi / Yuzuha** score correctly, since
+Yanagi disorders alone and Yuzuha's `buffs.disorders: 3` must read as utilised.
+
+**Why the suites stayed green through all of it.** The only units that scale on disorders are
+Miyabi and Alice, both anomaly agents, and neither generates polarity — Miyabi is frost-cycling
+only, and Alice's polarity is *assaults*, not disorders (below). The only two solo-polarity units,
+Nangong (ether) and Yanagi (electric), are anomaly agents themselves and share no base element with
+Miyabi or Alice. So every pairing that would have exercised D1 also satisfied element cycling.
+Structural luck about the current roster, not a rule, and the reason D1 and D4 both needed
+synthetic units to be testable at all.
 
 ### Three wrong diagnoses this produced, recorded so they are not repeated
 
@@ -352,11 +531,347 @@ exist, so a buildup buff on a team with **no anomaly agent at all** produces not
 `detectAnomalyPartnerGap` is the check that covers that case, and it already excludes lumen
 correctly.
 
-### Also noted: `implicitSupply` makes `scaling.disorders` 2 and 3 identical
+### Promoted out of a footnote: `implicitSupply` made `scaling.disorders` 2 and 3 identical
 
-The implicit block hardcodes `implicitSupply = 2` and gates on `min(1, 2 / scaling)`, so
-`scaling.disorders` of **2 and 3 pay identically** from that channel — Miyabi's `3` buys nothing
-over a `2` there. Real, and separate from everything above.  NOTE FROM HUMAN: This is a real issue but doesn’t seem to be recorded as one, please fix documentation!
+This sat here as a one-line aside reading *"the implicit block hardcodes `implicitSupply = 2` and
+gates on `min(1, 2 / scaling)`, so `scaling.disorders` of 2 and 3 pay identically — real, and
+separate from everything above"*, with a note from the owner that it was a real issue and not
+recorded as one. It is now **D2 at the top of this issue**, and it was not separate from anything
+above — it was the same root cause and the largest live part of it.
+
+Two things worth keeping from how it read as a footnote, because both misled:
+
+**"Separate from everything above" was wrong.** It looked like an arithmetic wart in one block. It
+was the visible edge of supply never being measured, which is also what D1 and D3 are. Filing it
+apart from the issue it belonged to is what kept it in a footnote for two review passes.
+
+**The symptom was stated in a way that invited the wrong repair.** *"A 2 and a 3 pay identically"*
+frames the comparison as being between two consumers, and a reader — this one included — will
+reach for making a `3` out-earn a `2`. That is not a defensible target: `scaling.disorders` is a
+NEED, and a need of 3 against a supply of 2 is genuinely undersupplied, so the consumer's score
+*should* suffer. The right comparison is one consumer across a supply gradient. Getting this
+backwards cost a full round of analysis before the owner corrected it. **When a symptom is an
+equality, check which of the two variables should have been varying** — here it was neither of the
+ones named, it was the supply that both sides silently shared.
+
+### Still open: L3's `weak: disorders` block keeps its own supply convention
+
+Deliberately left out of the fix above to hold its blast radius to `scaling.disorders` consumers.
+L4 and L5 now share `getDisorderSupply`; L3's boss-weakness block still sums `utility.disorders`
+and adds a flat `+2` when `teamHasImplicitDisorders`, so it cannot tell one cycling element from
+two and does not see a role-less proc enabler (D4) at all. Small and self-contained — Butcher is
+the only disorder-weak boss, so it is one matchup — but it is the last place the "how much disorder
+does this team make" question is answered by a second, disagreeing convention. Note it would move
+Butcher scores, so it wants its own measured pass rather than being folded in.
+
+### Still open: the same collapse affects every other need key
+
+Not fixed, and recorded here rather than as its own issue because it is the general form of D2.
+In `scoreNeedFulfillment` the undersupplied branch computes
+`supply x scaling x keyMult x (supply/scaling) x UNDERSUPPLY_FACTOR`, and the `scaling` term
+cancels — so for `veils`, `ablooms`, `quick-assists`, `interrupt-resistance` and `vortex`, every
+undersupplied consumer collects a flat `keyMult x supply^2 x 0.6` regardless of appetite. Lucia's
+`veils:1` earns the same 4.2 from a `veils:2` consumer as from a hypothetical `veils:3` one.
+
+`ultimates` escaped via `FRACTIONAL_COVERAGE_KEYS` (issue 2) and `disorders` now escapes by being
+priced team-wide against a measured supply. The rest have neither. Issue 2's post-mortem parked
+generalising the shape on the grounds that it would move all 17 remaining undersupplied pairs by
+10–20 points with direct TEST 62 exposure, and that judgement stands — this note exists so the
+gap is on the register rather than rediscovered from the arithmetic a third time.
+
+---
+
+## 7. Miyabi's composition ordering
+
+**Partly fixed; blocked on issue 3.** Surfaced by the owner immediately after issue 5 landed, from
+`compositions.js -10 :Miyabi`. Issue 5's fix was correct in direction and made this visible rather
+than causing all of it, but issue 5's own linear-uncapped oversupply was one of the mechanisms at
+fault, so **issue 5 cannot be called finished while this stands.**
+
+Five changes landed and are recorded under "What landed" below. TEST 99 is green; TESTs 98, 100 and
+101 remain red by documented decision, and the reason is now measured rather than guessed — see
+"Remaining: three red tests".
+
+`Nangong / Miyabi / Yuzuha` is one of the strongest anomaly teams in the game and should be
+Miyabi's clear best. Before this work it ranked **4th** among her compositions:
+
+```
+compositions.js peak score            expected
+Nangong / Miyabi / Yanagi    599.8    below NMY (triple anomaly)
+Nangong / Burnice / Miyabi   590.8    below NMY (triple anomaly)
+Nangong / Miyabi / Vivian    588.5    ~6th
+Nangong / Miyabi / Yuzuha    582.9    1st
+```
+
+Owner's stated best-in-slot ordering, middle entries acknowledged as arguable:
+
+```
+Nangong/Miyabi/Yuzuha  >  Miyabi/Vivian/Remielle  >  Nangong/Miyabi/Sunna
+  >  Nangong/Miyabi/Astra  >  Miyabi/Vivian/Yuzuha
+  >  Nangong/Miyabi/[Vivian|Nicole]  >  Miyabi/Vivian/Astra  >  Miyabi/Vivian/Nicole
+```
+
+**Nangong is Miyabi's absolute best-in-slot partner**, ahead of every true anomaly agent. Among
+actual anomaly partners the order is **Vivian > Yanagi > Burnice**, with a pronounced cliff below
+those three (Velina aside, the rest are not bad, just clearly worse).
+
+### Mechanism 1 (fixed) — the third anomaly agent was priced like the second
+
+Disorder supply is linear and uncapped (issue 5, recorded there as a deliberate choice). So:
+
+```
+Nangong / Miyabi / Yuzuha    Disorder need: Miyabi +84.0  (supply 4, need 3)
+Nangong / Miyabi / Yanagi    Disorder need: Miyabi +168.0 (supply 8, need 3)
+```
+
+In the game the **second** anomaly agent is what establishes disorder cycling; a third adds far
+less, and costs field time and a support slot. The engine's field-time economy does charge
+`3 on-field agents -> -25`, but +84 of raw disorder credit swamps it. This is the single largest
+contributor to TESTs 98 and 99.
+
+### Mechanism 2 (fixed) — off-field anomaly agents were not recognised as disorder engines
+
+Vivian generates no polarity disorders, so `getDisorderSupply` gives her one cycling element and
+nothing else: Miyabi reads *undersupplied* (`+25.2`, `supply 2, need 3`) on `Miyabi/Vivian/Yuzuha`.
+
+That misses the mechanic. Vivian is **fully off-field**, so her ether gauge fills *while* Miyabi is
+applying frost — procs happen in parallel and disorders land faster than any on-field agent can
+manage, **faster even than Yanagi**, who forces them explicitly. Burnice is off-field too and
+disorders the same way, though more slowly. And Vivian alone among the three also carries
+`buffs.disorders`, which makes her doubly valuable.
+
+`mechanics.onfield: false` already exists in the data and is exactly the discriminator; nothing in
+the disorder path reads it.
+
+### Mechanism 3 (fixed, and it was the biggest) — no-support compositions
+
+This started as a vaguer owner note: Miyabi is a very large damage dealer who "critically thrives
+off support units", so perhaps supports were under-weighted *for her* rather than anomaly partners
+being over-weighted. Measuring it produced a much better rule, and a general one:
+
+**A team with no support or defense agent is a real teambuilding failure, and L1.5 could not say
+so.** It rated `Nangong/Miyabi/Vivian` and `Nangong/Miyabi/Yuzuha` as identically
+`CONVENTIONAL (+35)`. Checked against the owner's stated best-in-slot list, one structural rule
+separates the whole expected ordering from the whole set of interlopers:
+
+| | has a support/defense (or Orphie/Remielle)? |
+|----|----|
+| all eight expected teams | **yes**, every one |
+| every interloper — `Nangong/Miyabi/{Yanagi, Burnice, Vivian, Grace, Aria}` | **no**, not one |
+
+There are exactly 13 true support/defense units, and Orphie and Remielle are the only
+pseudo-supports, so the rule is cheap to check. Scope was measured before committing: of 3,179
+support-less teams only **319 viable ones** reached CONVENTIONAL, and one archetype of those is
+exempt — see change 4.
+
+Note this supersedes the "supports under-weighted for Miyabi" framing entirely. Nothing needed to
+change about how supports are valued; what was missing was any penalty for *not bringing one*.
+
+### The specification
+
+TESTs 98-101 in `test-scoring.mjs`:
+
+| test | asserts | now |
+|----|----|----|
+| **98** | `Nangong/Miyabi/Yuzuha` outscores every other Miyabi team in the whole team space | **red** — 2 exceptions, both Remielle |
+| **99** | it beats `Nangong/Miyabi/{Yanagi, Burnice, Vivian, Grace, Aria}` | **green** |
+| **100** | Vivian > Yanagi > Burnice as Miyabi's anomaly partner, Nangong ahead of all three | **red** — only `Yanagi > Burnice` |
+| **101** | the owner's full best-in-slot ladder | **red** — 4 rungs out of order |
+
+TEST 100's `Nangong > Vivian` assertion is a **guard against overshoot**: raising Vivian for
+off-field buildup must not lift her past Nangong. It holds.
+
+---
+
+### What landed
+
+Five changes. Each was diffed over the whole roster (7,339 teams x 18 bosses = 132,102 scores)
+against a falsifiable prediction; **every prediction held with zero exceptions.**
+
+| change | what | moved | prediction |
+|----|----|----|----|
+| 1 | **Parallel gauge buildup.** Cycling supply per element doubles (2 → 4) unless the consumer and the contributor are *both* on-field. Vivian fills ether while Miyabi applies frost, so procs land in parallel — twice as fast. Reuses the existing `isOnField`. | 361 rows | every moved team contains Miyabi or Alice **and** an off-field anomaly unit |
+| 2 | **Consumer credit: unbounded but diminishing.** `E_need(s) = need + k·ln(1 + (s−need)/k)`, `k = 0.5·need`. Marginal exactly 1 at the need, so no cliff; `E(1000)=12.75` for a need of 3 — a 180-second fight cannot convert a thousand disorders, but extreme play is never worth exactly zero. | 1,570 rows | Miyabi or Alice |
+| 2b | **Undersupply still hurts** — see the correction below. | 677 rows | Miyabi or Alice |
+| 3 | **L3 boss-weak(disorders) hard-caps at 5.** Replaces the block's own convention (`sum of utility.disorders` plus a flat +2) with the shared `getTeamDisorderSupply`, through `E_weak`: full credit to 3, marginal falling to 0 at 5, nothing after. The last duplicate convention is retired. | 475 rows | Butcher rows only |
+| 5 | **Cissia is a pseudo-support alongside Seed** (`{role:'support', when:{hasUnit:'seed'}}`). | 218 rows | teams containing both Cissia and Seed |
+| 4 | **No support or defense is not conventional.** Demoted to the existing `UNCONVENTIONAL_VIABLE`. Totalize + double-stun exempt: there the second stunner *is* the support. | 238 teams | exactly the support-less CONVENTIONAL set, zero totalize teams, zero Seed teams |
+
+Cumulative: **4,057 of 132,102 scores moved (3.07%)** — 1,056 up, 3,001 down, mean −17.5, range
++140.1 / −117.9.
+
+### Correction: change 2 first removed the undersupply penalty entirely
+
+Caught by TEST 94 going red, and worth recording because the plan did not anticipate it. Dropping
+the flat `UNDERSUPPLY_FACTOR` step removed *any* penalty for missing the need, so an **unmet need of
+5 paid more than a met need of 4** (140.0 vs 112.0) and an undersupplied Miyabi rose from 25.2 to
+42.0. That contradicts the semantics this whole issue rests on — a unit that cannot reach its
+ceiling must score less — and it re-opened the "never fabricate a need" hazard.
+
+Fixed with a **ramp**, not the old step:
+`damp = UNDERSUPPLY_FACTOR + (1 − UNDERSUPPLY_FACTOR) · coverage`. Continuous at full coverage, so
+no cliff returns.
+
+The ramp **cannot** restore TEST 94's original assertion, and that is a fact about the arithmetic
+rather than a tuning choice: making a bigger need earn *less* at equal supply requires
+`supply x need x (supply/need)`, which collapses to `supply^2` and deletes the appetite term — the
+exact collapse issue 5 existed to remove. Any damp reaching 1.0 at full coverage also necessarily
+exceeds 0.6 at coverage two-thirds, so the undersupplied case rises above its old value no matter
+what. Only the cliff could hold it down.
+
+TEST 94 was therefore **rewritten, not weakened**: it now gives Miyabi a polarity provider
+re-elemented onto her own ice/frost gauge, so element cycling is impossible and forced polarity is
+the only possible disorder source. Its third slot is **Astra, not Yuzuha** — deliberately, because
+`utility.disorders` also gates the `buffs.disorders` affinity channel via `teamHasPolarity`, and the
+first draft passed through *that* mechanism instead. It was not mutation-sensitive until the fixture
+was isolated. One more instance of the standing lesson that a test which cannot fail proves nothing.
+
+### Also corrected: the structure score is not added to the score
+
+The plan described change 4 as "−35 raw and then −15%". Wrong: L1.5's structure score feeds only the
+teamwork multiplier. `Trigger/Cissia/SAnby` went **391.9 → 333.1**, exactly `x 0.85`. The demotion is
+a clean −15% on the final score.
+
+### Results
+
+`compositions.js -10 :Miyabi`, before and after. Note this view ranks by each team's PEAK score
+across bosses, which is a browsing aid only — peaks on different bosses are not comparable, and
+the tests deliberately do not work this way (see the correction below):
+
+```
+BEFORE                                  AFTER
+ 1  Nangong/Miyabi/Yanagi    599.8       1  Miyabi/Remielle/Vivian   590.5
+ 2  Nangong/Burnice/Miyabi   590.8       2  Burnice/Miyabi/Remielle  585.3
+ 3  Nangong/Miyabi/Vivian    588.5       3  Nangong/Miyabi/Yuzuha    579.6
+ 4  Nangong/Miyabi/Yuzuha    582.9       4  Miyabi/Remielle/Yanagi   578.8
+ 5  Miyabi/Remielle/Yanagi   581.7       5  Miyabi/Vivian/Yuzuha     556.2
+ 6  Nangong/Grace/Miyabi     555.8       6  Nangong/Miyabi/Astra     550.1
+ 7  Nangong/Miyabi/Astra     554.2       7  Nangong/Miyabi/Remielle  548.1
+ 8  Nangong/Miyabi/Remielle  553.2       8  Nangong/Aria/Miyabi      547.1
+ 9  Nangong/Miyabi/Sunna     550.9       9  Nangong/Miyabi/Sunna     546.6
+10  Nangong/Aria/Miyabi      550.5      10  Miyabi/Yanagi/Yuzuha     537.1
+```
+
+Every triple-anomaly line has left the top of the table (`Nangong/Miyabi/Vivian` fell 588.5 →
+506.8), and `Miyabi/Vivian/*` teams rose into it. TEST 99 is green with 30-130 point margins.
+
+### Correction: the tests were comparing different bosses
+
+TESTs 98-101 originally ranked teams by their **best score across all bosses**. That is invalid:
+scores are only comparable within a matchup, because different bosses contribute wildly different
+weakness, shill, assist and anti credit. `Miyabi/Vivian/Remielle` peaking at 590.5 on Sacrifice
+Bringer was being compared against `Nangong/Miyabi/Yuzuha` peaking at 579.6 on Butcher, which
+compares nothing. Every conclusion drawn from those tests was unsafe, **including the attribution
+previously recorded in this section.**
+
+All four now evaluate **per boss, in a silo**, against four matchups chosen so the two relevant axes
+vary independently:
+
+| boss | shill | ether/ice weakness |
+|----|----|----|
+| Butcher | anomaly | yes |
+| Marionettes | — | yes |
+| Girtablullu | anomaly | effectively neutral to the units involved |
+| Synthetic Neutral | — | — |
+
+`bestAcrossBosses` is deleted and the rule is documented in `engine-context.md` §6. Rungs that are
+disqualified on a given boss are skipped for that boss rather than counted as failures — Astra teams
+are DQ'd on Girtablullu, which has `assists: 3` *and* `chainParry: true`, so all three members must
+carry `assist:defensive` and Astra's `assist:evasive` cannot qualify. That is correct, not a bug.
+
+The rewrite immediately paid for itself: TEST 100 went from 1 reported violation to 18, including one
+the old structure could not see — **`Nangong` has been overtaken by `Vivian`** as Miyabi's partner
+when the third slot is Remielle (548.1 vs 583.7 on Butcher). That is the overshoot guard firing.
+
+### Remaining: three red tests, and why
+
+**TEST 98 — attribution, corrected and now per boss.** Against `Miyabi/Vivian/Remielle`:
+
+| boss | NMY raw | MVR raw | NMY teamwork | diagnosis |
+|----|----|----|----|----|
+| Butcher | **588.9** | 583.7 | 0.984 | NMY already wins on RAW; the loss is entirely issue 3 |
+| Marionettes | **565.9** | 560.7 | 0.984 | same |
+| Girtablullu | 462.7 | **466.4** | 0.984 | issue 3 **plus** a 3.7 raw deficit |
+| Neutral | 493.5 | **498.3** | 0.984 | issue 3 **plus** a 4.8 raw deficit |
+
+So **fixing issue 3 wins Butcher and Marionettes outright** — nothing else is needed there, and
+nothing is uncredited: NMY's L4 is 17.2 *higher* than MVR's. The earlier claim in this file that
+issue 3 left "~4 points unattributable" was an artifact of the cross-boss comparison and is
+withdrawn.
+
+On the two neutral-ish bosses there is a genuine additional raw deficit, and its cause is
+**field-time economy**: `Miyabi/Vivian/Remielle` collects `+15` as a sole on-field carry (both Vivian
+and Remielle are off-field) where `Nangong/Miyabi/Yuzuha` gets `+0` for two. On Butcher and
+Marionettes, Nangong's on-element and stun-on-element L3 credit covers that; on a neutral boss there
+is no element credit and the +15 decides it. Open question, not yet acted on: does one-on-field /
+two-off-field deserve +15 over two-on-field, or is MVR beating NMY on a truly neutral boss simply
+correct?
+
+**Tested and rejected: under-credited stun emergence.** The hypothesis was that Miyabi wants stun
+windows unusually badly — high CR/CD, a large ultimate, enhanced-attack damage — and that Nangong is
+therefore worth more to her than the engine pays. It does not hold. Nangong already gives her
+`stun-emergence 6.7` (burst 2.23 x infra 3) plus `stun-multiplier 4.0`, and NMY leads on raw against
+MVR on both weakness bosses, so there is nothing missing there. Sweeping the constant confirms it is
+the wrong lever:
+
+| `MULT.STUN_EMERGENCE` | scoring failures | Girtablullu gap | Neutral gap |
+|----|----|----|----|
+| **1.0** (current) | 3 | −3.7 | −4.8 |
+| 1.5 | 4 (breaks TEST 14) | −2.7 | −3.8 |
+| 1.9 | 6 | −1.9 | −3.0 |
+| 2.5 | 6 | −0.6 | −1.7 |
+
+It never closes the gap even at 2.5x, while breaking TEST 14 at 1.5 and three tests by 1.9. Left at
+1.0.
+
+**TEST 100 — two orderings wrong.** `Yanagi > Burnice` flipped, as predicted before the work started:
+both reach supply 4, so Yanagi's polarity advantage saturates away and she is left with only
+`buffs.disorders: 2` against Burnice's off-field field-time and better tier (1 vs 1.5). Yanagi holds
+only alongside Yuzuha, by 1.8. Separately, `Nangong > Vivian` now fails wherever the third slot is
+Remielle, and narrowly on the neutral boss with Astra or Nicole — the same root cause as TEST 98.
+`Vivian > Yanagi` holds everywhere by 19-28.
+
+**TEST 101 — 15 of 28 rung comparisons out of order** across the four bosses. Committed red by
+decision so the disagreement stays visible rather than being tuned away. The recurring ones are
+`MVRemielle > NMYuzuha` (all four bosses), `NMAstra > NMSunna`, `MVYuzuha > NMAstra` and
+`MVAstra > NMVivian` — the last three are middle-of-ladder entries already flagged as arguable, and
+each needs a correctness call rather than a tuning pass.
+
+### TEST 99 covers both of Miyabi's cores
+
+Extended after the per-boss rewrite. The rule — a third anomaly agent is never an upgrade over a
+strong support — is asserted on the `Nangong/Miyabi` core **and** the `Miyabi/Vivian` core, and
+passes on all four bosses. **Remielle is deliberately excluded from both lists**: she is nominally an
+anomaly unit but functions as the support in these teams, so asserting she must lose to Yuzuha would
+contradict the owner.
+
+One property worth knowing, because it nearly made half the test vacuous: on the `Miyabi/Vivian`
+core **every genuine third anomaly agent is disqualified** by the pre-existing "Triple DPS" L1 rule
+(`pureDpsCount >= 3`, where subdps still counts as a full DPS), so only the pseudo-anomaly units
+Nangong, Soukaku and Roxy produce a live comparison there. A `comparisons >= 3` guard now fails the
+test outright if it ever degrades into asserting nothing — currently 19 live comparisons on the
+Nangong core and 12 on the Vivian core, and the guard is mutation-checked.
+
+That DQ rule also **partitions cleanly against change 4**: anything with no support *and* no stunner
+was already disqualified, so the no-support demotion only ever reached teams that have a stunner.
+431 of 7,339 teams are DQ'd as Triple DPS, 165 of them all-anomaly. Reviewed and left as-is.
+
+### Mutation matrix
+
+Every mechanism is pinned to exactly one test:
+
+| mutation | dies |
+|----|----|
+| cycling supply re-flattened to a boolean | 93 |
+| polarity dropped from the aggregate | 94 |
+| L5 audit reverted to the consumer's own reaction | 95 |
+| variant awareness removed at `getOwnGaugeElement` | 96 |
+| proc sources re-gated on holding an anomaly role | 97 |
+| `DISORDER_PARALLEL_MULT` → 1 | 100 (and 98 starts passing) |
+| no-support demotion removed | 99 |
+| boss-weakness hard cap removed | 102 |
+| the two curves unified | 93, 102 |
+
 
 
 ---

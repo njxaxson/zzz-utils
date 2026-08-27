@@ -22,7 +22,7 @@ import { filterBosses } from './lib/boss-filter.js';
 import { parseTeams } from './lib/team-parser.js';
 import { buildAvailableUnits } from './lib/roster-builder.js';
 import { buildTeams } from './lib/team-pipeline.js';
-import { scoreTeamForBoss, resolveBossVariation, resolveConditionalValue, getEffectiveScaling } from './app/public/lib/common/team-scorer.js';
+import { scoreTeamForBoss, resolveBossVariation, resolveConditionalValue, getEffectiveScaling, effectiveDisorderSupply, effectiveDisorderWeakSupply } from './app/public/lib/common/team-scorer.js';
 
 // ---------------------------------------------------------------------------
 // Viability / disqualification
@@ -833,13 +833,12 @@ async function main() {
     // ========================================================================
     run('TEST 34: Promeia teams dominate Scorched Horizon; outscore Miyabi teams', () => {
         const teams = scoreForTeamString(
-            'Lycaon/Promeia/Soukaku,Nangong/Promeia/Yuzuha,Lighter/Promeia/Burnice,Miyabi/Vivian/Yuzuha,Nangong/Miyabi/Yuzuha',
+            'Lycaon/Promeia/Soukaku,Nangong/Promeia/Yuzuha,Miyabi/Vivian/Yuzuha,Nangong/Miyabi/Yuzuha',
             allUnits);
         for (const b of withBosses(bosses, 'Horizon')) {
             const m = scoreMapForBoss(teams, b);
             const lps = m.get('Lycaon / Promeia / Soukaku');
             const npy = m.get('Nangong / Promeia / Yuzuha');
-            const lpb = m.get('Lighter / Burnice / Promeia');
             const mvy = m.get('Miyabi / Vivian / Yuzuha');
             const nmy = m.get('Nangong / Miyabi / Yuzuha');
             assert(npy > 350, `${b.name}: NPY (${npy}) expected > 350`);
@@ -858,7 +857,7 @@ async function main() {
         for (const b of withBosses(bosses, 'Horizon')) {
             const m = scoreMapForBoss(teams, b);
             const lpb = m.get('Lighter / Burnice / Promeia');
-            assert(lpb > 345, `${b.name}: LPB (${lpb}) expected > 345 (abloom + dual vortex)`);
+            assert(lpb > 345, `${b.name}: LPB (${lpb}) expected > 345 (abloom + dual vortex)`); 
         }
     });
 
@@ -2090,6 +2089,446 @@ async function main() {
             assert(s3 > s4,
                 `${b.name}: coverage falls as the need grows, so a 3 need (${s3.toFixed(1)}) must earn Ju Fufu more than a 4 need (${s4.toFixed(1)})`);
         }
+    });
+
+    // ========================================================================
+    // TEST 93: disorder supply is MEASURED, not a constant
+    // ========================================================================
+    // `scaling.disorders` declares a NEED, so Miyabi's score has to track how much disorder
+    // the team actually generates. It used to be blind to that: the implicit block turned a
+    // boolean `hasDisorder` into a hardcoded supply of 2, so EVERY disorder-generating team
+    // paid her exactly 28.0 and her need of 3 sat permanently at 67% coverage, unreachable by
+    // any composition.
+    //
+    // The load-bearing assertion is the SECOND block. The gradient alone is not decisive — the
+    // old flat model produced that ordering too, out of its separately-priced polarity channel,
+    // so a test built only on it passes against the very code it exists to guard (the TEST 89
+    // lesson). What the flat model provably cannot do is tell ONE cycling element from TWO,
+    // because `hasDisorder` was a boolean. Hence the clone: Vivian moved off Nangong's ether
+    // onto fire, which hands Miyabi a second distinct element and changes nothing else. Vivian
+    // carries no element-keyed mechanics, so on a neutral boss the tag is the only difference.
+    run('TEST 93: Miyabi rises with the team disorder supply', () => {
+        for (const b of withBosses(bosses, 'Fiend')) {
+            const t = 'Miyabi/Astra/Yuzuha,Miyabi/Vivian/Yuzuha,Nangong/Miyabi/Yuzuha';
+            const m = scoreMapForBoss(scoreForTeamString(t, allUnits), b);
+            const none = m.get('Miyabi / Astra / Yuzuha');
+            const cycling = m.get('Miyabi / Vivian / Yuzuha');
+            const both = m.get('Nangong / Miyabi / Yuzuha');
+            assert(none > 0 && cycling > 0 && both > 0,
+                `all three fixtures must be legal teams, got ${none} / ${cycling} / ${both}`);
+            assert(cycling > none,
+                `${b.name}: a cycling partner (${cycling.toFixed(1)}) must beat no disorder source at all (${none.toFixed(1)})`);
+            assert(both > cycling,
+                `${b.name}: cycling PLUS a polarity generator (${both.toFixed(1)}) must beat cycling alone (${cycling.toFixed(1)})`);
+        }
+
+        const vivian = allUnits.find(u => u.id === 'vivian');
+        assert(vivian && vivian.tags.includes('ether'),
+            'fixture assumption broken: Vivian should be an ether unit');
+        const twin = JSON.parse(JSON.stringify(vivian));
+        twin.id = 'vivian-fire'; twin.name = 'Vivian Fire';
+        twin.tags = vivian.tags.map(t => (t === 'ether' ? 'fire' : t));
+        const roster = [...allUnits, twin];
+        for (const b of withBosses(bosses, 'Neutral')) {
+            const sc = name => scoreTeamForBoss(
+                scoreForTeamString(`Nangong/Miyabi/${name}`, roster)[0].team, b, {});
+            const oneElement = sc('Vivian'), twoElements = sc('Vivian Fire');
+            assert(oneElement > 0 && twoElements > 0,
+                `both fixtures must be legal teams, got ${oneElement} / ${twoElements}`);
+            assert(twoElements > oneElement,
+                `${b.name}: Miyabi cycling with TWO distinct elements (${twoElements.toFixed(1)}) must out-supply cycling with one (${oneElement.toFixed(1)}) — equal scores mean disorder supply is a boolean again`);
+        }
+    });
+
+    // ========================================================================
+    // TEST 94: cycling and polarity supply AGGREGATE against one need
+    // ========================================================================
+    // The two sources are independent and both real, so they add. This test used to detect that
+    // via the coverage STEP: it straddled the aggregate supply of 4 with needs of 4 and 5 and
+    // asserted the covered one won. That step is deliberately gone — the credit curve is now
+    // continuous — and the old assertion is unsatisfiable in principle, because making a bigger
+    // need earn LESS at equal supply requires `supply x need x (supply/need)`, which collapses to
+    // `supply^2` and deletes the appetite term. That collapse is precisely what issue 5 removed.
+    //
+    // So aggregation is pinned directly instead: give Miyabi a polarity provider that shares her
+    // exact element, so element cycling is impossible (same variant → no reaction) and the ONLY
+    // possible disorder source is the forced-polarity provision. If polarity did not enter the
+    // aggregate, this team would have no disorder supply at all and Miyabi would be charged for
+    // an unmet need rather than credited.
+    //
+    // Two clones differing in exactly one field, per the TEST 89 lesson.
+    run('TEST 94: forced polarity feeds the disorder need with no element cycling at all', () => {
+        const nangong = allUnits.find(u => u.id === 'nangong');
+        const miyabi = allUnits.find(u => u.id === 'miyabi');
+        assert(nangong && nangong.mechanics.utility?.disorders === 2,
+            'fixture assumption broken: Nangong should supply utility.disorders 2');
+        assert(miyabi?.mechanics?.elementalVariant === 'frost',
+            'fixture assumption broken: Miyabi should carry elementalVariant frost');
+        // Re-elemented onto Miyabi's exact ice/frost gauge, so the pair cannot cycle.
+        const mk = (id, name, withPolarity) => {
+            const c = JSON.parse(JSON.stringify(nangong));
+            c.id = id; c.name = name;
+            c.tags = nangong.tags.map(t => (t === 'ether' ? 'ice' : t));
+            c.mechanics.elementalVariant = 'frost';
+            if (!withPolarity) delete c.mechanics.utility.disorders;
+            return c;
+        };
+        const withPol = mk('nangong-frost', 'Nangong Frost', true);
+        const noPol = mk('nangong-frost-nopol', 'Nangong Frost Nopol', false);
+        const roster = [...allUnits, withPol, noPol];
+        // Astra as the third slot, NOT Yuzuha: `utility.disorders` also gates the
+        // `buffs.disorders` affinity channel via `teamHasPolarity`, so a teammate who buffs
+        // disorders would make this pass through a completely different mechanism. Astra buffs
+        // no disorders, which leaves the aggregate-supply channel as the only difference.
+        for (const b of withBosses(bosses, 'Neutral')) {
+            const sc = name => scoreTeamForBoss(
+                scoreForTeamString(`${name}/Miyabi/Astra`, roster)[0].team, b, {});
+            const polarity = sc('Nangong Frost'), none = sc('Nangong Frost Nopol');
+            assert(polarity > 0 && none > 0,
+                `both fixtures must be legal teams, got ${polarity} / ${none}`);
+            assert(polarity > none,
+                `${b.name}: forced polarity is Miyabi's only possible disorder source here (${polarity.toFixed(1)}) and must beat having none at all (${none.toFixed(1)}) — equal scores mean polarity has stopped feeding the aggregate supply`);
+        }
+    });
+
+    // ========================================================================
+    // TEST 95: a disorder is a TEAM event — any source satisfies any consumer
+    // ========================================================================
+    // MUTATION TEST for issue 5's headline. The engine used to satisfy a `disorders` need only
+    // from the consumer's OWN anomaly reaction or a teammate's `utility.disorders`, so a
+    // consumer that is not itself half of the cycling pair was charged an unmet need on a team
+    // swimming in disorders. Latent on the live roster — both real `scaling.disorders` units
+    // are anomaly agents — which is precisely why it needs a synthetic consumer to be testable.
+    //
+    // Nicole is a plain non-anomaly support, so she never receives a reaction of her own, and
+    // Miyabi + Vivian cycle frost/ether while NEITHER carries `utility.disorders`. Every prior
+    // route to "met" is therefore closed and only a team-wide reading credits her.
+    run('TEST 95: a non-anomaly disorder consumer is credited for teammates cycling without it', () => {
+        const nicole = allUnits.find(u => u.id === 'nicole');
+        assert(nicole && !nicole.tags.includes('anomaly') && !nicole.mechanics?.pseudoRole,
+            'fixture assumption broken: Nicole should be a plain non-anomaly support');
+        for (const id of ['miyabi', 'vivian']) {
+            const u = allUnits.find(x => x.id === id);
+            assert(!u.mechanics?.utility?.disorders,
+                `fixture assumption broken: ${id} must not supply utility.disorders`);
+        }
+        const mk = (id, name, withNeed) => {
+            const c = JSON.parse(JSON.stringify(nicole));
+            c.id = id; c.name = name;
+            c.mechanics.scaling = c.mechanics.scaling || {};
+            if (withNeed) c.mechanics.scaling.disorders = 2;
+            return c;
+        };
+        const needy = mk('nicole-needy', 'Nicole Needy', true);
+        const plain = mk('nicole-plain', 'Nicole Plain', false);
+        const roster = [...allUnits, needy, plain];
+        for (const b of withBosses(bosses, 'Fiend')) {
+            const sc = name => scoreTeamForBoss(
+                scoreForTeamString(`Miyabi/Vivian/${name}`, roster)[0].team, b, {});
+            const needyScore = sc('Nicole Needy'), plainScore = sc('Nicole Plain');
+            assert(needyScore > 0 && plainScore > 0,
+                `both fixtures must be legal teams, got ${needyScore} / ${plainScore}`);
+            // The need is plainly supplied here, so declaring it must be a bonus over
+            // declaring nothing. Before the fix it was a cohesion PENALTY and this went red.
+            assert(needyScore > plainScore,
+                `${b.name}: a disorder need met by two cycling teammates (${needyScore.toFixed(1)}) must beat declaring no need at all (${plainScore.toFixed(1)}) — a lower score means the consumer is charged for a need the team fills`);
+        }
+    });
+
+    // ========================================================================
+    // TEST 96: elemental variants disorder with their own base element
+    // ========================================================================
+    // A variant tracks a SEPARATE anomaly gauge, so Miyabi's frost genuinely reacts with plain
+    // ice — `units.json` documents this on Soukaku's own entry. `computeAnomalyReactions`
+    // compared BASE elements and so read frost and ice as identical, giving Miyabi/Soukaku and
+    // Miyabi/Promeia zero disorders, while `teamHasImplicitDisorders` (variant-aware) said the
+    // opposite. Two detectors of the same thing, and the base-element one was wrong.
+    //
+    // The control differs in exactly one field: a Soukaku clone handed Miyabi's own frost
+    // variant, which genuinely should NOT disorder with her.
+    run('TEST 96: an elemental variant disorders with its base element (Miyabi/Soukaku)', () => {
+        const miyabi = allUnits.find(u => u.id === 'miyabi');
+        const soukaku = allUnits.find(u => u.id === 'soukaku');
+        assert(miyabi?.mechanics?.elementalVariant === 'frost',
+            'fixture assumption broken: Miyabi should carry elementalVariant frost');
+        assert(soukaku && !soukaku.mechanics?.elementalVariant,
+            'fixture assumption broken: Soukaku should carry no elementalVariant');
+        const twin = JSON.parse(JSON.stringify(soukaku));
+        twin.id = 'soukaku-frost'; twin.name = 'Soukaku Frost';
+        twin.mechanics.elementalVariant = 'frost';
+        const roster = [...allUnits, twin];
+        for (const b of withBosses(bosses, 'Fiend')) {
+            const sc = name => scoreTeamForBoss(
+                scoreForTeamString(`Miyabi/${name}/Yuzuha`, roster)[0].team, b, {});
+            const plainIce = sc('Soukaku'), sameVariant = sc('Soukaku Frost');
+            assert(plainIce > 0 && sameVariant > 0,
+                `both fixtures must be legal teams, got ${plainIce} / ${sameVariant}`);
+            assert(plainIce > sameVariant,
+                `${b.name}: plain-ice Soukaku disorders with frost Miyabi (${plainIce.toFixed(1)}) where a frost twin cannot (${sameVariant.toFixed(1)}) — equal scores mean variants are compared on base element again`);
+        }
+    });
+
+    // ========================================================================
+    // TEST 97: an anomaly PROC source reacts even without an anomaly role
+    // ========================================================================
+    // MUTATION TEST. Reaction partners used to be enumerated as anomaly-ROLE agents only. But
+    // `utility["anomaly:<element>"]` states that an extra anomaly of that element lands on the
+    // target, and a proc is a proc whoever fires it — the anomaly-QUANTITY channel already read
+    // the key role-blind while the reaction path did not. Latent today (Alice is the only
+    // holder, and her `anomaly:physical` is an element she already supplies as an agent), hence
+    // the synthetic enabler. This is the guard that keeps a wind-style enabler working if it
+    // ever loses its `anomaly` pseudo-role while keeping the procs.
+    run('TEST 97: a non-anomaly unit with utility[anomaly:<el>] completes a reaction', () => {
+        const nicole = allUnits.find(u => u.id === 'nicole');
+        assert(nicole && !nicole.tags.includes('anomaly') && !nicole.mechanics?.pseudoRole,
+            'fixture assumption broken: Nicole should be a plain non-anomaly support');
+        const mk = (id, name, withProcs) => {
+            const c = JSON.parse(JSON.stringify(nicole));
+            c.id = id; c.name = name;
+            c.mechanics.utility = c.mechanics.utility || {};
+            // Fire: an element nobody else on the fixture team supplies, so this annotation is
+            // the ONLY thing physical Alice could possibly react with.
+            if (withProcs) c.mechanics.utility['anomaly:fire'] = 2;
+            return c;
+        };
+        const enabler = mk('nicole-procs', 'Nicole Enabler', true);
+        const inert = mk('nicole-inert', 'Nicole Inert', false);
+        const roster = [...allUnits, enabler, inert];
+        for (const b of withBosses(bosses, 'Neutral')) {
+            const sc = name => scoreTeamForBoss(
+                scoreForTeamString(`Alice/${name}/Astra`, roster)[0].team, b, {});
+            const withProcs = sc('Nicole Enabler'), without = sc('Nicole Inert');
+            assert(withProcs > 0 && without > 0,
+                `both fixtures must be legal teams, got ${withProcs} / ${without}`);
+            assert(withProcs > without,
+                `${b.name}: physical Alice disorders with a teammate's fire procs (${withProcs.toFixed(1)}) and has nothing to react with otherwise (${without.toFixed(1)}) — equal scores mean proc sources are still gated on holding an anomaly role`);
+        }
+    });
+
+    // ========================================================================
+    // TESTS 98-101: Miyabi's composition ordering — PARTIALLY RED BY DESIGN
+    // ========================================================================
+    // These encode owner-stated, game-grounded expectations. Some are committed red on purpose
+    // as the specification for issue 7; a green suite here would mean the expectations had been
+    // quietly weakened. See issue 7 for which are expected to fail and why.
+    //
+    // SCORES ARE ONLY COMPARABLE WITHIN A BOSS. Different bosses contribute different amounts
+    // of weakness, shill, assist and debuff credit, so one team's 583 against Butcher and
+    // another's 498 against a neutral boss say nothing whatever about each other. An earlier
+    // version of these tests ranked teams by their best score across all bosses, which silently
+    // compared different matchups and made every conclusion drawn from them unsafe.
+    //
+    // The ladder is therefore evaluated per boss, in a silo, against four matchups chosen so the
+    // two axes that matter here vary independently:
+    //
+    //   Butcher      anomaly-shill  +  ether/ice weakness
+    //   Marionettes  no shill       +  ether/ice weakness
+    //   Girtablullu  anomaly-shill  +  effectively neutral to every unit involved
+    //   Neutral      the synthetic true-neutral control
+    //
+    // An ordering that holds on all four is not an artifact of either axis.
+    const LADDER_BOSSES = ['Butcher', 'Marionettes', 'Girtablullu', 'Neutral']
+        .flatMap(f => withBosses(bosses, f));
+    assert(LADDER_BOSSES.length === 4,
+        `ladder fixture broken: expected 4 bosses, resolved ${LADDER_BOSSES.length} (${LADDER_BOSSES.map(b => b.name).join(', ')})`);
+
+    /** Score one parsed spec against one boss. Returns -1 for a disqualified team. */
+    const scoreSpec = (spec, boss, roster = allUnits) => {
+        const parsed = scoreForTeamString(spec, roster)[0];
+        assert(parsed, `fixture must parse to a legal team: ${spec}`);
+        return { label: parsed.label, score: scoreTeamForBoss(parsed.team, boss, {}) };
+    };
+
+    run('TEST 98: Nangong/Miyabi/Yuzuha is Miyabi\'s strongest composition, per boss', () => {
+        const miyabiTeams = filterIncludeOneOf(allTeamEntries, ['Miyabi']);
+        assert(miyabiTeams.length > 100,
+            `expected the full Miyabi team space, got ${miyabiTeams.length} teams`);
+        const failures = [];
+        for (const boss of LADDER_BOSSES) {
+            const viable = miyabiTeams
+                .map(({ label, team }) => ({ label, score: scoreTeamForBoss(team, boss, {}) }))
+                .filter(t => t.score > 0);
+            const target = viable.find(t => t.label === 'Nangong / Miyabi / Yuzuha');
+            assert(target, `Nangong / Miyabi / Yuzuha must be viable on ${boss.name}`);
+            const above = viable.filter(t => t.score > target.score)
+                .sort((a, b) => b.score - a.score);
+            if (above.length > 0) {
+                failures.push(`${boss.name}: ${above.length} team(s) outscore NMY (${target.score.toFixed(1)}) — `
+                    + above.slice(0, 5).map(t => `${t.label} ${t.score.toFixed(1)}`).join('; '));
+            }
+        }
+        assert(failures.length === 0,
+            `Nangong / Miyabi / Yuzuha must be Miyabi's strongest composition on every ladder boss:\n      - `
+            + failures.join('\n      - '));
+    });
+
+    // A third anomaly agent is never an upgrade over a strong support, on either of Miyabi's two
+    // viable cores. The second anomaly agent is what establishes disorder cycling; a third adds
+    // far less than a top support brings, and costs field time and buffs on top.
+    //
+    // **Remielle is deliberately absent from both lists.** She is nominally an anomaly unit but
+    // functions as the support in these teams — she is a pseudo-support, carries no anomaly gauge
+    // of her own, and her value is the Luminize rebound off teammate procs. Including her would
+    // assert something the owner explicitly rejects.
+    //
+    // Vacuity warning, and the reason for the `comparisons` guard below: on the `Miyabi/Vivian`
+    // core every GENUINE third anomaly agent is disqualified outright (three anomaly units with no
+    // support), so only pseudo-anomaly units — Nangong, Soukaku, Roxy — produce a real comparison
+    // there. Those are the non-vacuous cases. Without the guard this test could silently degrade
+    // into asserting nothing at all if DQ rules ever widened.
+    const THIRD_ANOMALY_CASES = [
+        {
+            core: 'Nangong/Miyabi', support: 'Yuzuha',
+            thirds: ['Yanagi', 'Burnice', 'Vivian', 'Grace', 'Aria'],
+        },
+        {
+            core: 'Miyabi/Vivian', support: 'Yuzuha',
+            thirds: ['Yanagi', 'Burnice', 'Grace', 'Aria', 'Alice', 'Nangong', 'Soukaku', 'Roxy'],
+        },
+    ];
+
+    run('TEST 99: a third anomaly agent does not out-value a strong support for Miyabi', () => {
+        const failures = [];
+        for (const { core, support, thirds } of THIRD_ANOMALY_CASES) {
+            let comparisons = 0;
+            for (const boss of LADDER_BOSSES) {
+                const sup = scoreSpec(`${core}/${support}`, boss);
+                if (sup.score <= 0) continue;      // the support line itself is not viable here
+                for (const third of thirds) {
+                    const triple = scoreSpec(`${core}/${third}`, boss);
+                    if (triple.score <= 0) continue;   // disqualified — not a comparable team
+                    comparisons++;
+                    if (!(sup.score > triple.score)) {
+                        failures.push(`${boss.name}: ${core}/${third} (${triple.score.toFixed(1)}) must not beat ${core}/${support} (${sup.score.toFixed(1)})`);
+                    }
+                }
+            }
+            assert(comparisons >= 3,
+                `core ${core} produced only ${comparisons} live comparison(s) — this test has gone vacuous, most likely because disqualification rules widened. Fix the fixtures rather than letting it pass on nothing.`);
+        }
+        assert(failures.length === 0,
+            `${failures.length} case(s) where a third anomaly agent out-valued a top support:\n      - `
+            + failures.join('\n      - '));
+    });
+
+    // Ordering among Miyabi's TRUE anomaly partners only. Nangong is her absolute best-in-slot
+    // partner and sits ahead of all three — the `Nangong > Vivian` assertion is a guard against
+    // the fix overshooting, since raising Vivian for off-field buildup must not lift her past him.
+    run('TEST 100: Vivian is Miyabi\'s best actually-anomaly partner, then Yanagi, then Burnice', () => {
+        const vivian = allUnits.find(u => u.id === 'vivian');
+        assert(vivian && vivian.mechanics?.onfield === false,
+            'fixture assumption broken: Vivian should be an off-field unit');
+        const failures = [];
+        for (const boss of LADDER_BOSSES) {
+            for (const third of ['Yuzuha', 'Astra', 'Nicole', 'Remielle']) {
+                const sc = partner => scoreSpec(`Miyabi/${partner}/${third}`, boss).score;
+                const v = sc('Vivian'), y = sc('Yanagi'), bu = sc('Burnice'), n = sc('Nangong');
+                if ([v, y, bu, n].some(x => x <= 0)) continue;   // not a viable rung on this boss
+                const where = `${boss.name}, third=${third}`;
+                if (!(n > v)) failures.push(`${where}: Nangong (${n.toFixed(1)}) is Miyabi's best-in-slot partner and must stay ahead of Vivian (${v.toFixed(1)})`);
+                if (!(v > y)) failures.push(`${where}: Vivian (${v.toFixed(1)}) must beat Yanagi (${y.toFixed(1)}) — off-field parallel gauge buildup makes her the faster disorder engine`);
+                if (!(y > bu)) failures.push(`${where}: Yanagi (${y.toFixed(1)}) must beat Burnice (${bu.toFixed(1)}) — both cycle, but Yanagi also forces polarity disorders`);
+            }
+        }
+        assert(failures.length === 0,
+            `${failures.length} partner ordering(s) wrong:\n      - ` + failures.join('\n      - '));
+    });
+
+    // ========================================================================
+    // TEST 101: the owner's Miyabi best-in-slot ladder
+    // ========================================================================
+    // The owner's stated ordering, checked per boss. Committed knowing parts of it fail: where
+    // they do, either the engine or the expectation is wrong, and that is settled by review rather
+    // than by tuning the engine until the ladder comes out. Middle entries were explicitly
+    // flagged as arguable.
+    //
+    // Every adjacent pair is checked and ALL violations reported together — failing on the first
+    // would hide the shape of the disagreement, which is the only thing this test is for.
+    //
+    // `Nangong/Miyabi/[Vivian|Nicole]` is one rung: the owner could not say which is better, so
+    // the pair is unordered and only its position relative to its neighbours is asserted. A rung
+    // whose teams are all disqualified on a given boss is skipped for that boss, and its
+    // neighbours compared directly.
+    run('TEST 101: Miyabi best-in-slot ladder (owner-stated; partially red by design)', () => {
+        const ladder = [
+            ['Nangong/Miyabi/Yuzuha'],
+            ['Miyabi/Vivian/Remielle'],
+            ['Nangong/Miyabi/Sunna'],
+            ['Nangong/Miyabi/Astra'],
+            ['Miyabi/Vivian/Yuzuha'],
+            ['Nangong/Miyabi/Vivian', 'Nangong/Miyabi/Nicole'],
+            ['Miyabi/Vivian/Astra'],
+            ['Miyabi/Vivian/Nicole'],
+        ];
+        const violations = [];
+        for (const boss of LADDER_BOSSES) {
+            const rungs = ladder
+                .map(rung => rung.map(spec => scoreSpec(spec, boss)).filter(t => t.score > 0))
+                .filter(rung => rung.length > 0);
+            for (let i = 0; i < rungs.length - 1; i++) {
+                // An unordered rung must sit entirely above the one below it, so compare this
+                // rung's floor against the next rung's ceiling.
+                const upper = rungs[i].reduce((m, t) => (t.score < m.score ? t : m));
+                const lower = rungs[i + 1].reduce((m, t) => (t.score > m.score ? t : m));
+                if (!(upper.score > lower.score)) {
+                    violations.push(`${boss.name}: ${upper.label} (${upper.score.toFixed(1)}) should outrank ${lower.label} (${lower.score.toFixed(1)})`);
+                }
+            }
+        }
+        assert(violations.length === 0,
+            `${violations.length} rung(s) out of order:\n      - ` + violations.join('\n      - '));
+    });
+
+    // ========================================================================
+    // TEST 102: the two disorder supply curves have the shapes they claim
+    // ========================================================================
+    // Pure arithmetic, asserted directly rather than through scores — a score-level test cannot
+    // reach a team supply of 7 to prove the hard cap, and these are the properties the whole
+    // model rests on. The two curves are DELIBERATELY different shapes; a future reader tempted
+    // to unify them should find this red.
+    run('TEST 102: disorder supply curves — consumer diminishes forever, boss weakness hard-caps', () => {
+        // --- consumer side: full credit to the need, then unbounded but strictly diminishing ---
+        for (const need of [2, 3]) {
+            assert(effectiveDisorderSupply(need, need) === need,
+                `E_need must be identity at the need (need=${need})`);
+            assert(effectiveDisorderSupply(need - 1, need) === need - 1,
+                `E_need must be identity below the need (need=${need})`);
+            let prev = effectiveDisorderSupply(need, need);
+            let prevStep = Infinity;
+            for (let s = need + 1; s <= need + 12; s++) {
+                const cur = effectiveDisorderSupply(s, need);
+                const step = cur - prev;
+                assert(step > 0,
+                    `need=${need}: surplus must always be worth something (supply ${s} earned no more than ${s - 1})`);
+                assert(step < prevStep,
+                    `need=${need}: each extra point of surplus must be worth strictly less than the last (supply ${s})`);
+                prev = cur; prevStep = step;
+            }
+            // Smooth join: the derivative at the need is 1, so there is no cliff of the kind the
+            // old flat UNDERSUPPLY_FACTOR step produced.
+            const h = 1e-6;
+            const slope = (effectiveDisorderSupply(need + h, need) - need) / h;
+            assert(Math.abs(slope - 1) < 1e-3,
+                `need=${need}: E_need must join the linear part smoothly, got slope ${slope.toFixed(4)}`);
+            // Unbounded: a truly absurd supply still earns more, just barely.
+            assert(effectiveDisorderSupply(1000, need) > effectiveDisorderSupply(100, need),
+                `need=${need}: E_need must stay unbounded — extreme play is still worth something`);
+        }
+
+        // --- boss weakness: hard cap, sixth source earns nothing ---
+        assert(effectiveDisorderWeakSupply(3) === 3, 'E_weak identity up to the reference weight');
+        assert(effectiveDisorderWeakSupply(4) > effectiveDisorderWeakSupply(3),
+            'E_weak must still reward the 4th source');
+        assert(effectiveDisorderWeakSupply(5) > effectiveDisorderWeakSupply(4),
+            'E_weak must still reward the 5th source');
+        const cap = effectiveDisorderWeakSupply(5);
+        for (const s of [6, 7, 9, 20]) {
+            assert(effectiveDisorderWeakSupply(s) === cap,
+                `E_weak must hard-cap at 5 sources: supply ${s} earned ${effectiveDisorderWeakSupply(s)}, expected ${cap}`);
+        }
+        // The two shapes must not be collapsed into one.
+        assert(effectiveDisorderSupply(20, 3) > effectiveDisorderSupply(6, 3),
+            'the consumer curve must NOT hard-cap the way the boss-weakness curve does');
     });
 
     // ------------------------------------------------------------------------

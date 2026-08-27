@@ -7,6 +7,7 @@
 import { ELEMENTS, DPS_ROLES } from './constants.js';
 import {
     getElement,
+    getElementVariant,
     getEffectiveScaling,
     getEffectiveRoles,
     resolveConditionalValue,
@@ -117,6 +118,14 @@ export function capitalize(str) {
 
 export function getUnitElement(unit) {
     return getElement(unit) || 'unknown';
+}
+
+// Disorder partnering is variant-AWARE, unlike everything else here. An elemental variant
+// tracks its own anomaly gauge, so Miyabi's frost genuinely disorders with plain ice
+// (Soukaku, Promeia). This must agree with `computeAnomalyReactions`, or the pull engine
+// gates a unit out as having no disorder partner on a team the scorer scores happily.
+function getDisorderElement(unit) {
+    return getElementVariant(unit) || 'unknown';
 }
 
 // ============================================================================
@@ -415,10 +424,10 @@ export function checkTeamDependencies(candidate, ownedUnits, allUnits) {
     // Step 2: disorder feasibility (for units with scaling.disorders)
     const disorderScaling = w(scaling.disorders);
     if (disorderScaling > 0 && !CODEPENDENT_SKIP_KEYS.has('disorders')) {
-        const candidateBaseEl = getElement(candidate)?.split(':')[0] || getUnitElement(candidate);
+        const candidateEl = getDisorderElement(candidate);
         const hasDisorderPartner = ownedUnits.some(u => {
-            const uEl = getElement(u)?.split(':')[0] || getUnitElement(u);
-            if (uEl === candidateBaseEl || uEl === 'wind' || uEl === 'unknown') return false;
+            const uEl = getDisorderElement(u);
+            if (uEl === candidateEl || getUnitElement(u) === 'wind' || uEl === 'unknown') return false;
             const isAno = u.tags.includes('anomaly');
             const pseudoRoles = u.mechanics?.pseudoRole;
             const isPseudoAno = Array.isArray(pseudoRoles) &&
@@ -432,8 +441,8 @@ export function checkTeamDependencies(candidate, ownedUnits, allUnits) {
                 .filter(u => {
                     if (u.id === candidate.id) return false;
                     if (!u.limited || u.rank !== 'S') return false;
-                    const uEl = getElement(u)?.split(':')[0] || getUnitElement(u);
-                    if (uEl === candidateBaseEl || uEl === 'wind' || uEl === 'unknown') return false;
+                    const uEl = getDisorderElement(u);
+                    if (uEl === candidateEl || getUnitElement(u) === 'wind' || uEl === 'unknown') return false;
                     const isAno = u.tags.includes('anomaly');
                     const pr = u.mechanics?.pseudoRole;
                     const isPseudoAno = Array.isArray(pr) &&
@@ -466,12 +475,12 @@ export function checkTeamDependencies(candidate, ownedUnits, allUnits) {
         });
     } else if (disorderScaling > 0 && !CODEPENDENT_SKIP_KEYS.has('disorders')) {
         // Verify at least one valid team includes a disorder partner
-        const candidateBaseEl = getElement(candidate)?.split(':')[0] || getUnitElement(candidate);
+        const candidateEl = getDisorderElement(candidate);
         const hasTeamWithDisorder = validTeams.some(team =>
             team.some(u => {
                 if (u.id === candidate.id) return false;
-                const uEl = getElement(u)?.split(':')[0] || getUnitElement(u);
-                if (uEl === candidateBaseEl || uEl === 'wind' || uEl === 'unknown') return false;
+                const uEl = getDisorderElement(u);
+                if (uEl === candidateEl || getUnitElement(u) === 'wind' || uEl === 'unknown') return false;
                 const isAno = u.tags.includes('anomaly');
                 const pr = u.mechanics?.pseudoRole;
                 const isPseudoAno = Array.isArray(pr) &&
@@ -1075,17 +1084,17 @@ function detectAnomalyPartnerGap(gaps, ownedUnits, ownedDPS, ownedSubdps, unowne
     // Only check disorder coverage for non-lumen primary anomaly DPS
     if (nonLumenPrimary.length > 0) {
         const hasSufficientCoverage = disorderPartners.some(partner => {
-            const partnerEl = getUnitElement(partner);
+            const partnerEl = getDisorderElement(partner);
             const partnerQuality = partner.tier != null ? tierToQuality(partner.tier) : 0;
-            const coversAtLeastOneDPS = nonLumenPrimary.some(dps => getUnitElement(dps) !== partnerEl);
+            const coversAtLeastOneDPS = nonLumenPrimary.some(dps => getDisorderElement(dps) !== partnerEl);
             return coversAtLeastOneDPS && partnerQuality >= PARTNER_QUALITY_THRESHOLD;
         });
 
         if (!hasSufficientCoverage) {
             const uncoveredDPS = nonLumenPrimary.filter(dps => {
-                const dpsEl = getUnitElement(dps);
+                const dpsEl = getDisorderElement(dps);
                 return !disorderPartners.some(p =>
-                    getUnitElement(p) !== dpsEl &&
+                    getDisorderElement(p) !== dpsEl &&
                     (p.tier != null ? tierToQuality(p.tier) : 0) >= PARTNER_QUALITY_THRESHOLD
                 );
             });
@@ -1099,10 +1108,10 @@ function detectAnomalyPartnerGap(gaps, ownedUnits, ownedDPS, ownedSubdps, unowne
                     return isAnoSubdps || isPseudoAnomaly;
                 })
                 .sort((a, b) => {
-                    const aEl = getUnitElement(a);
-                    const bEl = getUnitElement(b);
-                    const aDiffers = nonLumenPrimary.some(dps => getUnitElement(dps) !== aEl) ? 1 : 0;
-                    const bDiffers = nonLumenPrimary.some(dps => getUnitElement(dps) !== bEl) ? 1 : 0;
+                    const aEl = getDisorderElement(a);
+                    const bEl = getDisorderElement(b);
+                    const aDiffers = nonLumenPrimary.some(dps => getDisorderElement(dps) !== aEl) ? 1 : 0;
+                    const bDiffers = nonLumenPrimary.some(dps => getDisorderElement(dps) !== bEl) ? 1 : 0;
                     if (aDiffers !== bDiffers) return bDiffers - aDiffers;
                     return a.tier - b.tier;
                 });
