@@ -16,7 +16,7 @@
         },
         "variations": {
             "raging": {
-                "enabled": false,
+                "enabled": true,
                 "name": "Dead End Butcher",
                 "mechanics": {
                     "shill": "stun",
