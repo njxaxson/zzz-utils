@@ -995,7 +995,7 @@
         "tier": 0,
         "tags": ["support", "physical", "assist:defensive"],
         "join": ["attack", "faction"],
-        "synergy": { "units": ["Aria"], "tags": [], "avoid": [] },
+        "synergy": { "units": ["Aria"], "tags": [], "avoid": ["rupture"] },
         "mechanics": {
             "damage": { "basic": 1 },
             "buffs": { "atk": 3, "stun-multiplier": 2 },

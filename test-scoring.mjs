@@ -2764,14 +2764,21 @@ async function main() {
     });
 
     // ========================================================================
-    // TEST 106: Sunna beats Astra on attack and anomaly carries, loses on rupture
+    // TEST 106: Sunna beats Astra on attack and anomaly carries, and is not a rupture support
     // ========================================================================
-    // Owner spec, from actual play results. It is deliberately TWO-SIDED: a lever that simply
-    // pushes Sunna up satisfies the first half and breaks the second, so this cannot be passed
-    // by tuning in one direction. Measured across every core where both are viable rather than
-    // on a handful of named teams, because single comparisons are noisy.
-    // TODO: This test can stand for now, but it is likely volatile as the available units grow. 
-    run('TEST 106: Sunna vs Astra — ahead on attack/anomaly carries, behind on rupture', () => {
+    // Owner spec from actual play results. Two-sided on purpose: a lever that merely pushes
+    // Sunna up satisfies the first half and breaks the second.
+    //
+    // The rupture half is enforced by an explicit role avoid rather than emerging from the
+    // damage arithmetic, which could never separate them: Sunna joins on
+    // attack/faction, so the only way she ever reaches a rupture carry is alongside Nangong
+    // (every rupture unit joins on stun or support). In that team she is extraneous: Nangong
+    // already supplies the stun multiplier, daze and recovery debuff, no rupture unit is
+    // totalize so a second source has nothing to feed, and Sunna's own ATK buff arrives at a
+    // third on a rupture carry. What the team actually wants is crit damage and sheer, which
+    // she does not have. `synergy.avoid: ["rupture"]` says so directly, as a penalty rather
+    // than a disqualification — it is a bad team, not an impossible one.
+    run('TEST 106: Sunna beats Astra on attack/anomaly carries and loses badly on rupture', () => {
         const carryRole = (u) => {
             for (const r of ['rupture', 'anomaly', 'attack', 'armorer']) if (u.tags.includes(r)) return r;
             return u.tags.includes('stun') ? 'stun' : 'support';
@@ -2785,11 +2792,11 @@ async function main() {
             for (let i = 0; i < others.length; i++) {
                 for (let j = i + 1; j < others.length; j++) {
                     const core = [others[i], others[j]];
+                    const roles = core.map(carryRole);
                     const sS = scoreTeamForBoss([...core, sunna], boss, {});
                     if (sS <= 0) continue;
                     const sA = scoreTeamForBoss([...core, astra], boss, {});
                     if (sA <= 0) continue;
-                    const roles = core.map(carryRole);
                     const arch = roles.includes('rupture') ? 'rupture'
                         : roles.includes('anomaly') ? 'anomaly'
                         : roles.includes('attack') ? 'attack' : null;
@@ -2799,6 +2806,7 @@ async function main() {
                 }
             }
         }
+
         const pct = (a) => (100 * a[0]) / a[1];
         for (const arch of ['attack', 'anomaly', 'rupture']) {
             assert(tally[arch][1] >= 20,
@@ -2810,9 +2818,9 @@ async function main() {
         assert(pct(tally.anomaly) > 55,
             `Sunna should be the better pick on most ANOMALY carries; she wins ` +
             `${pct(tally.anomaly).toFixed(0)}% of ${tally.anomaly[1]} cores`);
-        assert(pct(tally.rupture) < 45,
-            `Astra should be the better pick on most RUPTURE carries — her crit-damage and ` +
-            `generic-damage buffs land where Sunna's stun multiplier does not. Sunna wins ` +
+        assert(pct(tally.rupture) < 10,
+            `Sunna is the wrong tool for a rupture carry and carries synergy.avoid: ["rupture"] ` +
+            `to say so; she should essentially never beat Astra there, but wins ` +
             `${pct(tally.rupture).toFixed(0)}% of ${tally.rupture[1]} cores`);
     });
 

@@ -1397,16 +1397,144 @@ function getDebuffRelevance(key, consumer) {
 
 const STAT_BUFF_KEYS = new Set(['atk', 'anomaly', 'sheer', 'laceration', 'pen', 'cr', 'cd', 'stun-multiplier', ...ELEMENTS]);
 
+// How much damage one point of each buff is worth. There used to be two answers to this
+// question: the L4 damage layer priced a buff from MULT, while cohesion consulted a shorter
+// table here and quietly fell through to MULT.ELEMENT_BUFF for anything it did not list. The
+// two disagreed about `laceration`, which L4 pays at 6 and cohesion charged at 2 — so an
+// armorer support like Koleda buffing Claret was measured as if her defining buff were worth
+// a third of what the engine actually pays for it.
+//
+// One table now, sourced from MULT so the two cannot drift again. Every key in
+// STAT_BUFF_KEYS must appear; the assertion below fails loudly at load if one is added
+// without a price, rather than silently pricing it at 2.
 const BUFF_IMPACT = {
-    atk: MULT.ATK_BUFF, cr: MULT.CR_BUFF, cd: MULT.CD_BUFF,
-    sheer: MULT.SHEER_BUFF, anomaly: MULT.ANOMALY_BUFF, pen: MULT.PEN_BUFF,
+    atk: MULT.ATK_BUFF,
+    cr: MULT.CR_BUFF,
+    cd: MULT.CD_BUFF,
+    sheer: MULT.SHEER_BUFF,
+    laceration: MULT.LACERATION_BUFF,
+    anomaly: MULT.ANOMALY_BUFF,
+    pen: MULT.PEN_BUFF,
     'stun-multiplier': MULT.STUN_MULT_BUFF,
+    // Elements were already reaching MULT.ELEMENT_BUFF through the old fallthrough, so they
+    // are unchanged — but listed, so a change to ELEMENT_BUFF cannot silently desync them.
+    ...Object.fromEntries(ELEMENTS.map(e => [e, MULT.ELEMENT_BUFF])),
 };
 
 // Generic damage is a flat, always-on damage term scored in baseline affinity. It is
 // EXCLUDED from cohesion/utilization: it must not rescue a support whose designed buffs
 // are mismatched (e.g. Pan's sheer on an attack team), nor inflate diametric/core stacking.
-const COHESION_EXCLUDED_BUFFS = new Set(['dmg', 'vortex']);
+// Debuffs are priced the same way, from the same source. A defence shred and a recovery
+// debuff are damage amplifiers exactly as an ATK buff is; they were simply never given a
+// value on the cohesion side.
+const DEBUFF_IMPACT = {
+    defense: MULT.DEFENSE_DEBUFF,
+    recovery: MULT.RECOVERY_DEBUFF,
+    dmg: MULT.DMG_DEBUFF,
+    ...Object.fromEntries(ELEMENTS.map(e => [e, MULT.ELEMENT_DEBUFF])),
+};
+
+// Cohesion asks what FRACTION of a support's kit is landing, so only the RELATIVE size of
+// these values matters — the ratio is unchanged if every impact is scaled by a constant.
+// They are divided by 2 because 2 (MULT.ELEMENT_BUFF) was the value cohesion already used
+// for every key it did not list, so a buff worth 2 keeps exactly the weight it has today and
+// everything else moves relative to it. That keeps the absolute-supply terms further down
+// roughly where they were until phase 4e replaces them.
+const IMPACT_UNIT = MULT.ELEMENT_BUFF;
+
+// MULT's values are L4 PAIR-TERM coefficients, not a damage scale. L4 multiplies them by a
+// consumer weight and then soft-caps the whole layer at 100, so a 116x spread between sheer
+// (81.0 to Yixuan) and ATK (0.7) is survivable there. Cohesion has no such cap: used raw, that
+// spread made every ATK support read 26-83% and every sheer/ultimate support saturate.
+//
+// Delivery therefore uses the SQUARE ROOT of the L4 coefficient. Rationale: a support's share
+// of a team's damage is not linear in its pair coefficient, because L4 is one capped layer
+// among several. A buff worth IMPACT_UNIT still maps to exactly 1.0, so the anchor is unmoved
+// and only the spread compresses — sheer to 2.1x and ATK to 0.6x rather than 4.5x and 0.35x.
+function scaleImpact(raw) {
+    return Math.sqrt(raw / IMPACT_UNIT);
+}
+
+/** How much one point of this buff is worth, relative to a buff of average impact. */
+function buffImpact(key) {
+    return scaleImpact(BUFF_IMPACT[key] ?? IMPACT_UNIT);
+}
+
+/** How much one point of this debuff is worth, relative to a buff of average impact. */
+function debuffImpact(key) {
+    return scaleImpact(DEBUFF_IMPACT[key] ?? IMPACT_UNIT);
+}
+
+// Provisions, priced from what L4 actually pays for them. Only two of them have a real
+// provision channel to read a price from, and both are informative:
+//
+//   ultimates  gifting a carry a free ultimate is a big deal, and it is priced like one
+//   chains     a gifted chain attack is worth very little — which is the right answer for
+//              Astra's `chains: 2`, and the engine already believed it
+//
+// EVERY OTHER PROVISION IS DELIBERATELY LEFT AT 1. They are paid only through the need
+// channel, whose multiplier is large BECAUSE it is multiplied by a declared need weight and
+// fires only for the rare consumer who declares one — 6 units supply veils and 2 declare a
+// need for them; nobody at all declares vortex or ablooms. Pricing a veil provision at the
+// need multiplier would make Sunna's `veils: 3` about 78% of her measured kit and land it on
+// almost nobody, cratering a support this engine has just been corrected to rate highly. A
+// niche need going unmet says nothing about whether a support fits the team, which is the
+// same reasoning that keeps PROVISION_WHIFF_PENALTY restricted to ultimates.
+const PROVISION_IMPACT = {
+    ultimates: MULT.ULTIMATES_PROVISION,
+    chains: MULT.CHAINS_PROVISION,
+};
+
+// Defensive provisions are EXEMPT from the delivery measure. The game heavily favours
+// offensive play and these are negligible next to a damage buff, so pricing them would only
+// add noise — and, worse, would let a defensive provision that nobody declared a need for
+// masquerade as a support's flagship. Sunna's `veils: 3` is the case that forced this: it was
+// 48% of her measured kit, landed on nobody, and dragged her below Nicole.
+// (`shields` and `heal:*` are already outside NEED_FULFILLMENT_KEYS and never reached here.)
+const DEFENSIVE_PROVISIONS = new Set(['veils', 'interrupt-resistance']);
+
+// How close to the biggest offering another one has to be to count as an alternative
+// flagship. A unit carrying several comparably huge buffs is not a mismatch on any team,
+// because one of them always lands — the same "menu, not separate offerings" rule phase 1
+// established for Lighter's fire/ice, applied to a whole kit. A unit with ONE dominant
+// offering and a few small ones has no substitute when the big one misses.
+const FLAGSHIP_BAND = 0.6;
+
+// How much of a buff has to actually reach a consumer for it to count as having landed.
+// Half: a buff arriving at RUPTURE_ATK_EFFICIENCY (0.33) has not found a home, it has been
+// tolerated. A buff reaching only non-DPS teammates, at the 0.5 discount, still counts.
+const FLAGSHIP_LAND_THRESHOLD = 0.5;
+
+// Damage-weighted delivery at which a support is contributing a full complement, i.e. the
+// point where utilization saturates at 1.0. Derived from the roster — see the note in
+// computeBuffUtilization.
+const DELIVERY_REFERENCE = 4.5;
+
+/** How much one point of this provision is worth, relative to a buff of average impact. */
+function provisionImpact(key) {
+    return scaleImpact(PROVISION_IMPACT[key] ?? IMPACT_UNIT);
+}
+
+for (const key of STAT_BUFF_KEYS) {
+    if (BUFF_IMPACT[key] === undefined) {
+        throw new Error(`BUFF_IMPACT is missing a damage value for stat buff "${key}". ` +
+            `Add it from MULT rather than letting cohesion price it by accident.`);
+    }
+}
+
+// `vortex` is a contextual situational bonus rather than a designed part of a kit, and its
+// positive signal is already paid in L4 baseline affinity. It stays out of cohesion.
+//
+// `dmg` USED to be excluded alongside it, on the grounds that always-on generic damage must
+// not rescue a support whose designed buffs are mismatched. Under impact weighting that
+// reasoning inverts. Generic damage IS what makes Astra's weak ATK into a rupture carry
+// tolerable — it lands in full on a DPS while her ATK arrives at a third — and a measure that
+// cannot see it reports her as a worse fit than a support who brings less. It is priced at
+// DMG_BUFF like everything else, so it can no longer rescue anyone by being free: it carries
+// its own weight in the denominator too, and because generic damage takes the else-branch it
+// lands at the AVERAGE relevance across teammates rather than the max, so on a team with one
+// DPS and one support it arrives at half.
+const COHESION_EXCLUDED_BUFFS = new Set(['vortex']);
 
 function getScalingBuffs(unit) {
     const explicit = unit.mechanics?.scaling?.buffs;
@@ -1489,7 +1617,24 @@ export function quickAssistCohesionWeight(uv, consumers) {
     return uv * landed;
 }
 
-function computeBuffUtilization(supplier, team) {
+/**
+ * The cohesion measure for one supplier on one team, with its parts exposed.
+ *
+ *   delivered       damage-weighted contribution that actually arrived (no denominator)
+ *   flagship        magnitude of this unit's largest single offering
+ *   flagshipLanded  did that offering, or one within FLAGSHIP_BAND of it, find a target
+ *   util            what computeBuffUtilization returns
+ *
+ * Exported so the model can be asserted directly and so DELIVERY_REFERENCE can be derived
+ * from the roster rather than guessed.
+ */
+export function cohesionBreakdown(supplier, team) {
+    const out = {};
+    out.util = computeBuffUtilization(supplier, team, out);
+    return out;
+}
+
+function computeBuffUtilization(supplier, team, out = null) {
     const scalingBuffs = getScalingBuffs(supplier);
     if (scalingBuffs === 0) return 1.0;
 
@@ -1512,7 +1657,7 @@ function computeBuffUtilization(supplier, team) {
         let totalWeight = 0;
         let effectiveWeight = 0;
         for (const [key, value] of evaluatableBuffs) {
-            const bw = w(value);
+            const bw = w(value) * buffImpact(key);
             totalWeight += bw;
             let totalRelevance = 0;
             for (const consumer of consumers) {
@@ -1521,7 +1666,7 @@ function computeBuffUtilization(supplier, team) {
             effectiveWeight += bw * (nConsumers > 0 ? totalRelevance / nConsumers : 0);
         }
         for (const [key, value] of evaluatableDebuffs) {
-            const dw = w(value);
+            const dw = w(value) * debuffImpact(key);
             totalWeight += dw;
             let maxRelevance = 0;
             for (const consumer of consumers) {
@@ -1542,6 +1687,10 @@ function computeBuffUtilization(supplier, team) {
     const utility = resolveMapForUtil(supplier.mechanics?.utility, supplier, team);
     let totalWeight = 0;
     let effectiveWeight = 0;
+    // Every distinct thing this unit offers, as {magnitude, landed}. Used ONLY for the
+    // flagship test — how much arrived is `effectiveWeight`.
+    const offerings = [];
+    const offer = (magnitude, relevance) => { if (magnitude > 0) offerings.push({ magnitude, relevance }); };
     let coreWeight = 0;
     let coreEffective = 0;
     let coreImpact = 0;
@@ -1563,9 +1712,16 @@ function computeBuffUtilization(supplier, team) {
             elementMenu.push([key, bw]);
             continue;
         }
-        totalWeight += bw;
+        // Weighted by how much damage this buff is actually worth, not by its annotation
+        // weight. Wasting a point of sheer (4.5) costs far more than wasting a point of ATK
+        // (0.35), which is the whole of the Lucia/YSG case: her defining buff is a rupture
+        // stat and YSG is an attack unit, so she is the wrong tool for the job even though
+        // her annotation weights look respectable.
+        const impact = buffImpact(key);
+        totalWeight += bw * impact;
         if (bw < 2) {
-            effectiveWeight += bw;
+            effectiveWeight += bw * impact;
+            offer(bw * impact, 1);
             continue;
         }
 
@@ -1579,16 +1735,19 @@ function computeBuffUtilization(supplier, team) {
             }
             const hasDPS = consumers.some(c => isDPS(c));
             const maxRelevance = Math.max(dpsRelevance, otherRelevance * (hasDPS ? 0.5 : 1.0));
-            effectiveWeight += bw * maxRelevance;
+            effectiveWeight += bw * impact * maxRelevance;
+            offer(bw * impact, maxRelevance);
             coreWeight += bw;
             coreEffective += bw * maxRelevance;
-            coreImpact += bw * maxRelevance * (BUFF_IMPACT[key] || MULT.ELEMENT_BUFF);
+            coreImpact += bw * maxRelevance * BUFF_IMPACT[key];
         } else {
             let totalRelevance = 0;
             for (const consumer of consumers) {
                 totalRelevance += getBuffRelevance(key, consumer);
             }
-            effectiveWeight += bw * (nConsumers > 0 ? totalRelevance / nConsumers : 0);
+            const avgRelevance = nConsumers > 0 ? totalRelevance / nConsumers : 0;
+            effectiveWeight += bw * impact * avgRelevance;
+            offer(bw * impact, avgRelevance);
         }
     }
 
@@ -1607,11 +1766,13 @@ function computeBuffUtilization(supplier, team) {
     // element buff, so he is the only unit this can move.
     if (elementMenu.length > 0) {
         for (const arm of chargeableElementArms(elementMenu, consumers)) {
-            totalWeight += arm.bw;
-            effectiveWeight += arm.bw * arm.rel;
+            const armImpact = buffImpact(arm.key);
+            totalWeight += arm.bw * armImpact;
+            effectiveWeight += arm.bw * armImpact * arm.rel;
+            offer(arm.bw * armImpact, arm.rel);
             coreWeight += arm.bw;
             coreEffective += arm.bw * arm.rel;
-            coreImpact += arm.bw * arm.rel * (BUFF_IMPACT[arm.key] || MULT.ELEMENT_BUFF);
+            coreImpact += arm.bw * arm.rel * BUFF_IMPACT[arm.key];
         }
     }
 
@@ -1619,16 +1780,19 @@ function computeBuffUtilization(supplier, team) {
         if (COHESION_EXCLUDED_BUFFS.has(key)) continue; // dmg: flat L4 only, not cohesion
         const dw = w(value);
         if (dw <= 0) continue;
-        totalWeight += dw;
+        const impact = debuffImpact(key);
+        totalWeight += dw * impact;
         if (dw < 2) {
-            effectiveWeight += dw;
+            effectiveWeight += dw * impact;
+            offer(dw * impact, 1);
             continue;
         }
         let maxRelevance = 0;
         for (const consumer of consumers) {
             maxRelevance = Math.max(maxRelevance, getDebuffRelevance(key, consumer));
         }
-        effectiveWeight += dw * maxRelevance;
+        effectiveWeight += dw * impact * maxRelevance;
+        offer(dw * impact, maxRelevance);
     }
 
     if (!isDPS(supplier)) {
@@ -1650,10 +1814,13 @@ function computeBuffUtilization(supplier, team) {
                 const qw = quickAssistCohesionWeight(uv, consumers);
                 totalWeight += qw;
                 effectiveWeight += qw;
+                offer(qw, 1);
                 continue;
             }
 
-            totalWeight += uv;
+            if (DEFENSIVE_PROVISIONS.has(key)) continue;
+            const impact = provisionImpact(key);
+            totalWeight += uv * impact;
             let maxRelevance = 0;
             for (const consumer of consumers) {
                 // `ultimates` is the one key paid through the PROVISION channel, which lands on
@@ -1676,56 +1843,67 @@ function computeBuffUtilization(supplier, team) {
                     : Math.min(1, w(getEffectiveScaling(consumer)[key]));
                 maxRelevance = Math.max(maxRelevance, rel);
             }
-            effectiveWeight += uv * maxRelevance;
+            effectiveWeight += uv * impact * maxRelevance;
+            offer(uv * impact, maxRelevance);
         }
     }
 
-    if (isStun(supplier) && !isDPS(supplier)) {
-        const dazeContribution = 3 + w(utility.daze);
-        totalWeight += dazeContribution;
-        const hasBeneficiary = consumers.some(c => isDPS(c) && !isStunlessUnit(c));
-        effectiveWeight += dazeContribution * (hasBeneficiary ? 1 : 0);
+    // Daze. A stunner gets a flat 3 for opening the window at all, plus whatever daze they
+    // annotate. A NON-stunner who annotates daze gets only the annotated part — Sunna is shy
+    // of a pseudo-stunner: enough daze to matter, not enough to open a window herself. Before
+    // this, her `daze: 2` counted for nothing at all, because the block was gated on the stun
+    // tag, and she read below Nicole on every team as a result.
+    if (!isDPS(supplier)) {
+        const opensWindow = isStun(supplier);
+        const dazeContribution = (opensWindow ? 3 : 0) + w(utility.daze);
+        if (dazeContribution > 0) {
+            totalWeight += dazeContribution;
+            const hasBeneficiary = consumers.some(c => isDPS(c) && !isStunlessUnit(c));
+            effectiveWeight += dazeContribution * (hasBeneficiary ? 1 : 0);
+            offer(dazeContribution, hasBeneficiary ? 1 : 0);
+        }
     }
 
     if (totalWeight === 0) return 0.0;
-    const BUFF_UTIL_BASELINE = 4;
-    const ratio = effectiveWeight / totalWeight;
-    const threshold = effectiveWeight / BUFF_UTIL_BASELINE;
-    const adjustedRatio = ratio * Math.min(1.0, totalWeight / BUFF_UTIL_BASELINE);
-    const CORE_IMPACT_BASELINE = 4;
-    const rawCoreRatio = coreWeight > 0 ? coreEffective / coreWeight : 0;
-    const coreActivation = Math.min(1.0, coreImpact / CORE_IMPACT_BASELINE);
-    const coreRatio = rawCoreRatio * coreActivation;
-    let baseUtil = Math.min(1.0, Math.max(adjustedRatio, threshold, coreRatio));
-    // A defining stat buff that reaches NO consumer is wasted, and the `ratio` that should have
-    // caught it is masked by the absolute-supply `threshold` above — so charge it directly.
-    // This was historically restricted to sheer and cd; it applies to any stat buff, because a
-    // whiffed `anomaly` buff (Nangong on a team with no anomaly unit) is wasted for exactly the
-    // same reason as sheer with no rupture consumer.
+
+    // TWO questions, and neither of them is "what fraction of your kit was wasted".
     //
-    // Element buffs are a MENU, not separate offerings: Lighter carries fire AND ice so that one
-    // of them matches the carry. They are judged together on their best element — charging him
-    // for the arm that missed would penalise the very thing that makes him flexible.
-    // Only DEFINING buffs (weight 3) generalise. A weight-2 buff is a secondary perk, and a team
-    // that cannot use it has not wasted the supplier — Rina's atk:2 is worthless to an armorer
-    // (ARMORER_ATK_EFFICIENCY is 0) but her pen:3 and def:2 are exactly what Claret wants, and
-    // she is not on the wrong team. sheer and cd keep the older weight-2 bar via
-    // WHIFF_PENALTY_BUFFS, since those were calibrated against it.
-    let elemWeight = 0, elemLands = false;
-    for (const [key, value] of Object.entries(buffs)) {
-        if (!STAT_BUFF_KEYS.has(key)) continue;
-        const bw = w(value);
-        const bar = WHIFF_PENALTY_BUFFS.includes(key) ? 2 : 3;
-        if (bw < bar) continue;
-        const lands = consumers.some(c => getBuffRelevance(key, c) > 0);
-        if (ELEMENTS.includes(key)) {
-            elemWeight = Math.max(elemWeight, bw);
-            if (lands) elemLands = true;
-        } else if (!lands) {
-            baseUtil *= WHIFF_COHESION_PENALTY;
-        }
-    }
-    if (elemWeight >= 3 && !elemLands) baseUtil *= WHIFF_COHESION_PENALTY;
+    // The team asks: DO THE BUFFS I CARE ABOUT LAND? That is an absolute quantity — how much
+    // damage arrived — with no denominator. A support carrying five enormous buffs of which
+    // four have no target on this team is not thereby a bad support; the one that landed is
+    // still enormous, and nobody was ever going to want all five.
+    //
+    // The unit asks: DID MY FLAGSHIP LAND? That is identity, not arithmetic. Lucia's defining
+    // buff is sheer, which is a rupture stat; on an attack carry she is the wrong tool for the
+    // job, and it is that — not the size of the waste — that should cost her.
+    //
+    // A FRACTION answers neither, and answers them wrongly in a specific way: adding an
+    // offering that does not land leaves the numerator alone and raises the denominator, so a
+    // ratio always rewards DELETING a mismatched buff. That was issue 3's visible symptom
+    // (strip Sunna's ATK and Nangong/Yixuan/Sunna scored higher), and it is inherent to
+    // ratios rather than a calibration miss. The old `effectiveWeight / 4` term that looked
+    // like the bug was in fact the answer to the first question all along, just unweighted;
+    // `Math.max(ratio, threshold, coreRatio)` was what let the fraction win.
+    //
+    // Note that removing a buff CAN now raise a unit's score, and correctly so. A support
+    // whose one armorer buff dominates her kit is wasted on an attack team; strip that buff
+    // and her flagship becomes whatever she offers next, which may well land. She is a
+    // different unit with less kit, and a better one for that team.
+    const delivered = effectiveWeight;
+
+    // A flagship has to SUBSTANTIALLY land, not merely be nonzero. Yuzuha's ATK buff reaches
+    // a rupture carry at RUPTURE_ATK_EFFICIENCY — a third — and counting that as "my flagship
+    // landed" is how an anomaly support read as a reasonable pick for Yixuan. Partial landing
+    // is already priced correctly in `delivered`, where relevance multiplies magnitude; this is
+    // the separate, categorical question of whether the unit found a home at all.
+    const flagship = offerings.reduce((m, o) => Math.max(m, o.magnitude), 0);
+    const flagshipLanded = flagship === 0 || offerings.some(
+        o => o.magnitude >= FLAGSHIP_BAND * flagship && o.relevance >= FLAGSHIP_LAND_THRESHOLD);
+
+    let baseUtil = Math.min(1.0, delivered / DELIVERY_REFERENCE);
+    if (!flagshipLanded) baseUtil *= WHIFF_COHESION_PENALTY;
+    if (out) { out.delivered = delivered; out.flagship = flagship; out.flagshipLanded = flagshipLanded; }
+
     // Provision side. A provision is only "wasted" when the consumer is ACTIVELY barred from
     // using something they would otherwise want — not merely when nobody happens to scale for
     // it. Most need-fulfillment keys are niche (only 2 of 60 units scale off veils, 1 off
@@ -3562,19 +3740,42 @@ function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs =
 // SYNERGY AVOID CHECK
 // ============================================================================
 
+// Charged once per (unit, avoided-role teammate) pair. Sized so that a support who is the
+// wrong tool for the archetype falls clearly below every support who is the right one, while
+// the team stays legal and scoreable: Nangong/Yixuan/Sunna lands beneath Nangong/Yixuan/Nicole
+// rather than vanishing from the corpus.
+const ROLE_AVOID_PENALTY = -85;
+
 function checkSynergyAvoid(team, { lenient = false, debug = false } = {}) {
+    let penalty = 0;
     for (const unit of team) {
         const avoidList = unit.synergy?.avoid || [];
         for (const teammate of team) {
             if (teammate === unit) continue;
+            // Matches a unit NAME or a ROLE/TAG, the same way synergy.units and synergy.tags
+            // pair up on the positive side. A role entry states that a unit is mechanically
+            // wrong for a whole archetype rather than for one teammate: Sunna's kit is stun
+            // infrastructure plus an ATK buff, and on a rupture carry the ATK arrives at a
+            // third while the stun contribution is redundant beside the stunner she had to
+            // bring to join the team at all. There is no rupture team she belongs on.
             if (avoidList.includes(teammate.name)) {
                 if (debug) console.log(`  AVOID: ${unit.name} explicitly avoids ${teammate.name}`);
                 if (!lenient) return -1;
                 return -200;
             }
+            // A ROLE avoid is a different claim from a unit avoid, and gets a different answer.
+            // Naming a unit says these two do not function together at all, and disqualifies.
+            // Naming a role says this unit is the wrong tool for that archetype — a matter of
+            // degree, not legality. Sunna on a rupture carry is a bad team, not an impossible
+            // one; it is nothing like running a fire team into a fire-resistant boss.
+            const avoidedRole = teammate.tags.find(tag => avoidList.includes(tag));
+            if (avoidedRole) {
+                if (debug) console.log(`  AVOID: ${unit.name} is the wrong tool for a ${avoidedRole} carry (${teammate.name}): ${ROLE_AVOID_PENALTY}`);
+                penalty += ROLE_AVOID_PENALTY;
+            }
         }
     }
-    return 0;
+    return penalty;
 }
 
 // ============================================================================
