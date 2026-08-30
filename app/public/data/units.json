@@ -183,26 +183,6 @@
         "species": "human"
     },
     {
-        "id": "claret",
-        "name": "Claret",
-        "image": "./assets/characters/claret.webp",
-        "rank": "S",
-        "limited": true,
-        "tier": 0.5,
-        "tags": ["armorer", "electric", "assist:defensive"],
-        "join": ["stun", "support", "armorer"],
-        "synergy": { "units": [], "tags": [], "avoid": [] },
-        "mechanics": {
-            "buffs" : { "laceration": 3 },
-            "scaling": { "buffs" : 0, "cd" : 1 }
-        },
-        "faction": "Flint Workshop",
-        "available": false,
-        "displayText": "Goth Barbie is the first armorer unit and craves crit rate and defense. Her favorite support is Rina P6.",
-        "gender": "female",
-        "species": "human"
-    },
-    {
         "id": "caesar",
         "name": "Caesar",
         "image": "./assets/characters/caesar.webp",
@@ -248,6 +228,26 @@
         "displayText": "Snake girl is an electric sub-DPS primarily designed to work with Seed.",
         "gender": "female",
         "species": "thiren:snake:half"
+    },
+    {
+        "id": "claret",
+        "name": "Claret",
+        "image": "./assets/characters/claret.webp",
+        "rank": "S",
+        "limited": true,
+        "tier": 0.5,
+        "tags": ["armorer", "electric", "assist:defensive"],
+        "join": ["stun", "support", "armorer"],
+        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {
+            "buffs" : { "laceration": 3 },
+            "scaling": { "buffs" : 0, "cd" : 1 }
+        },
+        "faction": "Flint Workshop",
+        "available": false,
+        "displayText": "Goth Barbie is the first armorer unit and craves crit rate and defense. Her favorite support is Rina P6.",
+        "gender": "female",
+        "species": "human"
     },
     {
         "id": "corin",
@@ -1192,7 +1192,7 @@
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "buffs": { "atk": 3, "dmg" : 4 },
-            "utility": { "heal:team": 2, "veils": 2 },
+            "utility": { "heal:team": 2, "veils": 2, "quick-assists": true },
             "scaling": { "hp": 2 }
         },
         "faction": "Krampus",

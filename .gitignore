@@ -58,3 +58,6 @@ archive/
 
 
 
+
+# Score dumps produced by score-dump.mjs (large TSV, regenerated per phase)
+matchups/

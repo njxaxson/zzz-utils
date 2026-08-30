@@ -260,6 +260,13 @@ const POLARITY_VORTEX_DISCOUNT = 0.35;
 // it for something almost no teammate could supply. Reward the upside, do not bill the absence.
 // See engine-context.md, "The ultimates two-channel model", before changing this.
 const NATURALLY_AVAILABLE_NEEDS = new Set(['ultimates', 'chains']);
+// What one quick assist is worth to a unit that does nothing special with it — which is
+// almost everyone. Every unit in the game benefits from a quick assist; most just take the
+// standard small bonus, and a few (Anton) declare a real `scaling.quick-assists` need and
+// earn more. This is a statement about SIZE, not about landing: a quick assist never misses.
+// Read in two places that must agree — the implicit consumer need in getEffectiveScaling,
+// and the cohesion weight in computeBuffUtilization.
+const QUICK_ASSIST_VALUE = 0.25;
 const STAT_SCALING_KEYS = ['am', 'ap', 'cr', 'cd', 'hp', 'def', 'pen', 'sheer'];
 
 // ============================================================================
@@ -992,7 +999,7 @@ export function getEffectiveScaling(unit) {
         // a need for units like Evelyn and Seed (neither annotates one), paid twice for the
         // same free ultimate, and exposed the fabricated need to the undersupply gate. See
         // scoring-engine-open-issues.md.
-        baseline['quick-assists'] = 0.25;
+        baseline['quick-assists'] = QUICK_ASSIST_VALUE;
         const totalizeWeight = w(damage.totalize);
         if (totalizeWeight > 0) {
             baseline.recovery = totalizeWeight * 2;
@@ -1347,6 +1354,79 @@ function getScalingBuffs(unit) {
     return 0;
 }
 
+/**
+ * Decide which of a supplier's element buffs are charged against its cohesion.
+ *
+ * Element buffs are a MENU, not separate offerings: a unit carries fire AND ice so that one
+ * of them matches whatever the team runs. The rule:
+ *
+ *   - every arm that lands is charged and credited in full;
+ *   - an arm with no target is not charged at all;
+ *   - if NOTHING on the menu lands, the largest arm is charged as dead weight — one
+ *     mismatch, not one per arm.
+ *
+ * For a unit with a single element buff the result is arithmetically identical to charging
+ * that buff directly (a lone landing arm charges itself; a lone missing arm is also the
+ * largest), which is why Soukaku's unmatched ice buff keeps taking the hit it takes today.
+ * Lighter is the only unit in the roster with more than one element buff.
+ *
+ * Exported so the rule can be asserted directly. It cannot be observed through a team's score
+ * while the absolute-supply threshold in computeBuffUtilization pins Lighter's utilization at
+ * 100% regardless — see issue 3.
+ *
+ * @param {Array<[string, number]>} elementMenu - [elementKey, weight] pairs, weight >= 2
+ * @param {Object[]} consumers - the supplier's teammates
+ * @returns {Array<{key: string, bw: number, rel: number}>} the arms to charge
+ */
+export function chargeableElementArms(elementMenu, consumers) {
+    const hasDPS = consumers.some(c => isDPS(c));
+    const arms = elementMenu.map(([key, bw]) => {
+        let dpsRelevance = 0;
+        let otherRelevance = 0;
+        for (const consumer of consumers) {
+            const rel = getBuffRelevance(key, consumer);
+            if (isDPS(consumer)) dpsRelevance = Math.max(dpsRelevance, rel);
+            else otherRelevance = Math.max(otherRelevance, rel);
+        }
+        return { key, bw, rel: Math.max(dpsRelevance, otherRelevance * (hasDPS ? 0.5 : 1.0)) };
+    });
+    const live = arms.filter(a => a.rel > 0);
+    if (live.length > 0) return live;
+    return [arms.reduce((biggest, a) => (a.bw > biggest.bw ? a : biggest))];
+}
+
+/**
+ * What a quick-assist provision is worth to a team's cohesion — charged and credited alike.
+ *
+ * Quick assists are a SMALL benefit that ALWAYS lands. Every unit in the game benefits from
+ * one; most do nothing special with it, and a few (Anton) declare a real
+ * `scaling.quick-assists` need and get more out of it. So offering them is never a mismatch
+ * and must not read as one — but it must not read as a big contribution either.
+ *
+ * Judging them purely by declared need got both halves wrong: Astra's `quick-assists: 3`
+ * entered cohesion at weight 3 and came back at 3 x 0.25 = 0.75, recording her as wasting
+ * 2.25 of her kit on the thing every carry in the game happily uses. Charging the SIZE
+ * instead leaves the credit exactly where it was and stops charging for a phantom shortfall.
+ *
+ * The caller adds this to BOTH the total and the effective weight — that is the "always
+ * lands" half, and it is the property worth asserting. How little a quick assist is worth is
+ * priced separately, in L4's need channel, against the same QUICK_ASSIST_VALUE baseline.
+ *
+ * @param {number} uv - the provider's annotated `utility['quick-assists']` weight
+ * @param {Object[]} consumers - the provider's teammates
+ * @returns {number} weight to charge, which is also the weight to credit
+ */
+export function quickAssistCohesionWeight(uv, consumers) {
+    // The floor is the standard bonus everyone takes. A consumer who declares a real need is
+    // worth more, and the provider must still be credited for it — which the old
+    // declared-need lookup got right and which must not be lost.
+    let landed = QUICK_ASSIST_VALUE;
+    for (const consumer of consumers) {
+        landed = Math.max(landed, Math.min(1, w(getEffectiveScaling(consumer)['quick-assists'])));
+    }
+    return uv * landed;
+}
+
 function computeBuffUtilization(supplier, team) {
     const scalingBuffs = getScalingBuffs(supplier);
     if (scalingBuffs === 0) return 1.0;
@@ -1404,10 +1484,23 @@ function computeBuffUtilization(supplier, team) {
     let coreEffective = 0;
     let coreImpact = 0;
 
+    // Element buffs are a MENU, not separate offerings. Lighter carries fire AND ice so that
+    // one of them matches whatever the team runs; charging him for the arm with no target
+    // penalises the exact thing that makes him flexible. They are collected here and settled
+    // together below, after the ordinary buffs.
+    const elementMenu = [];
+
     for (const [key, value] of Object.entries(buffs)) {
         if (COHESION_EXCLUDED_BUFFS.has(key)) continue; // dmg/vortex: flat L4 only, not cohesion
         const bw = w(value);
         if (bw <= 0) continue;
+        // Weight-1 element buffs (Nicole's ether) stay on the auto-credit path below, which
+        // never consults relevance — routing them through the menu would change a unit this
+        // phase is not about.
+        if (bw >= 2 && ELEMENTS.includes(key)) {
+            elementMenu.push([key, bw]);
+            continue;
+        }
         totalWeight += bw;
         if (bw < 2) {
             effectiveWeight += bw;
@@ -1437,6 +1530,29 @@ function computeBuffUtilization(supplier, team) {
         }
     }
 
+    // Settle the element menu.
+    //
+    // Charge only the arms that LAND, and credit each of them in full. A unit is never
+    // penalised for an arm with no target, but two arms landing is genuinely worth more than
+    // one, because both add weight to the numerator AND to the absolute-supply term. If NO arm
+    // lands, the largest one is charged as dead weight — a menu where nothing matches is a real
+    // mismatch and still deserves the hit.
+    //
+    // For a unit with a single element buff this is arithmetically identical to charging it
+    // directly: one landing arm charges itself, and a lone missing arm is also the largest.
+    // That is deliberate — Soukaku's lone ice buff on a team with no ice consumer must keep
+    // taking the hit it takes today. Lighter is the only unit in the roster with more than one
+    // element buff, so he is the only unit this can move.
+    if (elementMenu.length > 0) {
+        for (const arm of chargeableElementArms(elementMenu, consumers)) {
+            totalWeight += arm.bw;
+            effectiveWeight += arm.bw * arm.rel;
+            coreWeight += arm.bw;
+            coreEffective += arm.bw * arm.rel;
+            coreImpact += arm.bw * arm.rel * (BUFF_IMPACT[arm.key] || MULT.ELEMENT_BUFF);
+        }
+    }
+
     for (const [key, value] of Object.entries(debuffs)) {
         if (COHESION_EXCLUDED_BUFFS.has(key)) continue; // dmg: flat L4 only, not cohesion
         const dw = w(value);
@@ -1457,6 +1573,24 @@ function computeBuffUtilization(supplier, team) {
         for (const key of NEED_FULFILLMENT_KEYS) {
             const uv = w(utility[key]);
             if (uv <= 0) continue;
+
+            // Quick assists are a SMALL benefit that ALWAYS lands. Every unit in the game
+            // benefits from one; most do nothing special with it, and a few (Anton) declare a
+            // real need and earn more in L4. So offering them is never a mismatch and must not
+            // read as one — but it must not read as a big contribution either.
+            //
+            // Judging them by declared need got both halves wrong: Astra's `quick-assists: 3`
+            // entered at weight 3 and came back at 3 x 0.25 = 0.75, so the engine recorded her
+            // as wasting 2.25 of her kit on the thing every carry in the game happily uses.
+            // Charging the SIZE instead — the same 0.25 the consumer baseline uses — leaves the
+            // credit exactly as it was and stops charging for the phantom shortfall.
+            if (key === 'quick-assists') {
+                const qw = quickAssistCohesionWeight(uv, consumers);
+                totalWeight += qw;
+                effectiveWeight += qw;
+                continue;
+            }
+
             totalWeight += uv;
             let maxRelevance = 0;
             for (const consumer of consumers) {
@@ -3366,7 +3500,11 @@ function checkSynergyAvoid(team, { lenient = false, debug = false } = {}) {
 // ============================================================================
 
 export function scoreTeamForBoss(team, boss, options = {}) {
-    const { lenient = false, debug = false } = options;
+    // `trace`, when supplied, is an object this call fills with the per-layer contributions.
+    // It is pure observability — nothing read back out of it affects the score — and exists so
+    // `score-dump.mjs` can attribute a score movement to a layer without re-running `--debug`
+    // team by team.
+    const { lenient = false, debug = false, trace = null } = options;
 
     // Lumen units morph their damage to a teammate's element via Attribute Mutation.
     // Try each possible morph combination and return the highest score — the player will
@@ -3383,7 +3521,7 @@ export function scoreTeamForBoss(team, boss, options = {}) {
         let bestCombo = null;
         const tryMorphCombinations = (idx) => {
             if (idx === lumenUnits.length) {
-                const s = scoreTeamForBoss(team, boss, { ...options, debug: false });
+                const s = scoreTeamForBoss(team, boss, { ...options, debug: false, trace: null });
                 if (s > bestScore) {
                     bestScore = s;
                     bestCombo = lumenUnits.map(u => u._morphedElement ?? null);
@@ -3403,7 +3541,9 @@ export function scoreTeamForBoss(team, boss, options = {}) {
         };
         tryMorphCombinations(0);
         if (bestScore === -Infinity) return -1;
-        if (!debug) return bestScore;
+        // A trace is re-run on the WINNING combination for the same reason debug is: a trace of
+        // whichever morph happened to be tried last would not describe the score returned.
+        if (!debug && !trace) return bestScore;
         lumenUnits.forEach((u, i) => { u._morphedElement = bestCombo[i]; });
         const traced = scoreTeamForBoss(team, boss, options);
         lumenUnits.forEach(u => { delete u._morphedElement; });
@@ -3448,11 +3588,11 @@ export function scoreTeamForBoss(team, boss, options = {}) {
 
     // Layer 1: Disqualifications
     const disq = checkDisqualifications(team, boss, debug);
-    if (disq < 0) { cleanupRoles(); return disq; }
+    if (disq < 0) { cleanupRoles(); if (trace) trace.disqualified = true; return disq; }
 
     // Synergy avoid check (near-disqualification)
     const avoidResult = checkSynergyAvoid(team, { lenient, debug });
-    if (avoidResult === -1) { cleanupRoles(); return -1; }
+    if (avoidResult === -1) { cleanupRoles(); if (trace) trace.disqualified = true; return -1; }
     score += avoidResult;
 
     // Layer 1.5: Team Structure (feeds into teamwork multiplier, not additive)
@@ -3486,11 +3626,12 @@ export function scoreTeamForBoss(team, boss, options = {}) {
     if (debug) console.log(`    Field time: ${onFieldCount} on-field agent(s) → ${fieldTimeAdj >= 0 ? '+' : ''}${fieldTimeAdj}`);
 
     // Layer 2: Inherent Quality
-    score += scoreInherentQuality(team, { lenient, debug, boss });
+    const l2 = scoreInherentQuality(team, { lenient, debug, boss });
+    score += l2;
 
     // Layer 3: Boss Matchup
     const bossResult = scoreBossMatchup(team, boss, { lenient, debug });
-    if (bossResult.disqualified) { cleanupRoles(); return -1; }
+    if (bossResult.disqualified) { cleanupRoles(); if (trace) trace.disqualified = true; return -1; }
     score += bossResult.score;
 
     // Layer 4: Mechanical Synergy (with diminishing returns via hyperbolic soft cap)
@@ -3504,7 +3645,8 @@ export function scoreTeamForBoss(team, boss, options = {}) {
     if (debug && rawL4 !== adjustedL4) console.log(`    L4 soft cap: raw ${rawL4.toFixed(1)} → adjusted ${adjustedL4.toFixed(1)}`);
 
     // Layer 5: Additional Synergies
-    score += scoreAdditionalSynergies(team, debug);
+    const l5 = scoreAdditionalSynergies(team, debug);
+    score += l5;
 
     // Apply teamwork multiplier (replaces additive structure scoring)
     const rawScore = score;
@@ -3518,6 +3660,22 @@ export function scoreTeamForBoss(team, boss, options = {}) {
     }
     const teamwork = computeTeamworkMultiplier(team, structureScore, debug, maxDiametricPairs, maxDiametricFloor, boss);
     score = Math.round(rawScore * teamwork * 10) / 10;
+
+    if (trace) {
+        trace.disqualified = false;
+        trace.base = baseScore;
+        trace.avoid = avoidResult;
+        trace.structure = structureScore;
+        trace.fieldTime = fieldTimeAdj;
+        trace.l2 = l2;
+        trace.l3 = bossResult.score;
+        trace.l4raw = rawL4;
+        trace.l4 = adjustedL4;
+        trace.l5 = l5;
+        trace.raw = rawScore;
+        trace.teamwork = teamwork;
+        trace.final = score;
+    }
 
     if (debug) {
         console.log(`\n  RAW SCORE: ${rawScore.toFixed(1)}`);
