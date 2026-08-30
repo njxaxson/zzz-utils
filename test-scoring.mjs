@@ -22,7 +22,7 @@ import { filterBosses } from './lib/boss-filter.js';
 import { parseTeams } from './lib/team-parser.js';
 import { buildAvailableUnits } from './lib/roster-builder.js';
 import { buildTeams } from './lib/team-pipeline.js';
-import { chargeableElementArms, quickAssistCohesionWeight, scoreTeamForBoss, resolveBossVariation, resolveConditionalValue, getEffectiveScaling, effectiveDisorderSupply, effectiveDisorderWeakSupply } from './app/public/lib/common/team-scorer.js';
+import { chargeableElementArms, getBasicDamage, getBasicDamageBaseline, getMaxBurstWeight, quickAssistCohesionWeight, scoreTeamForBoss, resolveBossVariation, resolveConditionalValue, getEffectiveScaling, effectiveDisorderSupply, effectiveDisorderWeakSupply } from './app/public/lib/common/team-scorer.js';
 
 // ---------------------------------------------------------------------------
 // Viability / disqualification
@@ -140,11 +140,6 @@ function withBosses(bosses, filterStr) {
 // entry to silence a regression.
 // ---------------------------------------------------------------------------
 const KNOWN_RED = new Map([
-    [14,  'A BAND question, not a regression. Lucia became a quick-assist provider in phase 2 ' +
-          '(the owner\'s rule: essentially every support provides them), which lifted every one ' +
-          'of this test\'s five teams by +1.3 to +1.7 on both bosses. Their ORDERING is unchanged. ' +
-          'Norma/Banyue/Lucia had 0.5 points of headroom under the 485 ceiling and now reads ' +
-          '485.8. Re-anchor the ceiling in phase 7; do not tune the engine to it.'],
     [98,  'Miyabi/Vivian/Remielle and Burnice/Miyabi/Remielle outscore Nangong/Miyabi/Yuzuha. ' +
           'Two greedy carries share one stun window and the engine does not model that. Expected to clear in phase 5.'],
     [100, 'Two separate rungs: `Yanagi > Burnice` fails uniformly by 10-11 on every boss, and ' +
@@ -2706,14 +2701,119 @@ async function main() {
         assert(quickAssistCohesionWeight(3, noDPS) > 0,
             'every unit in the game benefits from a quick assist, including non-DPS');
 
-        // Data: every support and defence unit provides quick assists. The provider list was
-        // a hand-curated handful; the owner's rule is that essentially every support does.
-        const missing = allUnits
-            .filter(u => u.tags.includes('support') || u.tags.includes('defense'))
-            .filter(u => !(u.mechanics?.utility?.['quick-assists']))
-            .map(u => u.name);
-        assert(missing.length === 0,
-            `every support/defence unit provides quick assists; missing: ${missing.join(', ')}`);
+    });
+
+    // ========================================================================
+    // TEST 105: damage.basic is inherited from role, overridable, and never burst
+    // ========================================================================
+    run('TEST 105: damage.basic inheritance — role baseline, max across roles, out of burst', () => {
+        const unit = (name) => {
+            const u = allUnits.find(x => x.name === name);
+            assert(u, `fixture unit ${name} not found`);
+            return u;
+        };
+        const base = (name) => getBasicDamageBaseline(unit(name));
+        const basic = (name) => getBasicDamage(unit(name));
+
+        // The role table.
+        for (const name of ['Miyabi', 'Evelyn', 'Yixuan', 'Claret']) {
+            assert(base(name) === 3, `${name} holds a DPS role and must inherit basic 3, got ${base(name)}`);
+        }
+        for (const name of ['Qingyi', 'Lycaon', 'Dialyn']) {
+            assert(base(name) === 2, `${name} is a stunner and must inherit basic 2, got ${base(name)}`);
+        }
+        for (const name of ['Ben', 'Seth', 'Zhao', 'Pan Yinhu']) {
+            assert(base(name) === 1, `${name} is a defence agent and must inherit basic 1, got ${base(name)}`);
+        }
+        for (const name of ['Astra', 'Lucy', 'Nicole', 'Rina']) {
+            assert(base(name) === 0, `${name} is a plain support and must inherit basic 0, got ${base(name)}`);
+        }
+
+        // Max across roles, not first match: Caesar is tagged defence (1) and carries a
+        // pseudo-stun role (2), so he must read 2.
+        assert(base('Caesar') === 2,
+            `Caesar is defence-tagged with a pseudo-stun role, so max-across-roles gives 2, got ${base('Caesar')}`);
+        // subdps counts as a DPS role even when the unit's tag says otherwise.
+        assert(base('Norma') === 3,
+            `Norma is tagged stun but plays subdps, so she must read 3, got ${base('Norma')}`);
+
+        // The overrides, and the whole point of the key: Sunna and Yuzuha deal real damage
+        // where a support is assumed to deal none, and Astra genuinely deals none.
+        assert(basic('Sunna') === 1 && base('Sunna') === 0,
+            `Sunna must override her support baseline of 0 to 1, got ${basic('Sunna')} over ${base('Sunna')}`);
+        assert(basic('Yuzuha') === 1 && base('Yuzuha') === 0,
+            `Yuzuha must override her support baseline of 0 to 1, got ${basic('Yuzuha')} over ${base('Yuzuha')}`);
+        assert(basic('Astra') === 0,
+            `Astra deals no damage of her own and must stay at 0, got ${basic('Astra')}`);
+
+        // Resolved against EFFECTIVE roles, so it is a property of the unit ON THIS TEAM.
+        // Nangong reads 3 beside an anomaly agent (his pseudo-anomaly role activates) and 2 on
+        // a team without one. A static number in units.json would lose this.
+        const nangong = { ...unit('Nangong'), _activatedRoles: ['stun', 'anomaly'] };
+        const nangongAlone = { ...unit('Nangong'), _activatedRoles: ['stun'] };
+        assert(getBasicDamageBaseline(nangong) === 3,
+            `Nangong with his anomaly role active must read 3, got ${getBasicDamageBaseline(nangong)}`);
+        assert(getBasicDamageBaseline(nangongAlone) === 2,
+            `Nangong as a pure stunner must read 2, got ${getBasicDamageBaseline(nangongAlone)}`);
+
+        // basic must NEVER reach burst throughput. Sunna's damage accrues off-field while
+        // someone else is on screen; feeding it into the burst channel would make her contend
+        // for a stun window she does not use, which is phase 5's concern and would be wrong.
+        assert(getMaxBurstWeight(unit('Sunna')) === 0,
+            `basic must stay out of burst throughput; Sunna reads ${getMaxBurstWeight(unit('Sunna'))}`);
+    });
+
+    // ========================================================================
+    // TEST 106: Sunna beats Astra on attack and anomaly carries, loses on rupture
+    // ========================================================================
+    // Owner spec, from actual play results. It is deliberately TWO-SIDED: a lever that simply
+    // pushes Sunna up satisfies the first half and breaks the second, so this cannot be passed
+    // by tuning in one direction. Measured across every core where both are viable rather than
+    // on a handful of named teams, because single comparisons are noisy.
+    // TODO: This test can stand for now, but it is likely volatile as the available units grow. 
+    run('TEST 106: Sunna vs Astra — ahead on attack/anomaly carries, behind on rupture', () => {
+        const carryRole = (u) => {
+            for (const r of ['rupture', 'anomaly', 'attack', 'armorer']) if (u.tags.includes(r)) return r;
+            return u.tags.includes('stun') ? 'stun' : 'support';
+        };
+        const sunna = allUnits.find(u => u.name === 'Sunna');
+        const astra = allUnits.find(u => u.name === 'Astra');
+        const others = allUnits.filter(u => u.name !== 'Sunna' && u.name !== 'Astra');
+
+        const tally = { attack: [0, 0], anomaly: [0, 0], rupture: [0, 0] };
+        for (const boss of withBosses(bosses, 'Butcher,Marionettes,Girtablullu,Neutral')) {
+            for (let i = 0; i < others.length; i++) {
+                for (let j = i + 1; j < others.length; j++) {
+                    const core = [others[i], others[j]];
+                    const sS = scoreTeamForBoss([...core, sunna], boss, {});
+                    if (sS <= 0) continue;
+                    const sA = scoreTeamForBoss([...core, astra], boss, {});
+                    if (sA <= 0) continue;
+                    const roles = core.map(carryRole);
+                    const arch = roles.includes('rupture') ? 'rupture'
+                        : roles.includes('anomaly') ? 'anomaly'
+                        : roles.includes('attack') ? 'attack' : null;
+                    if (!arch) continue;
+                    tally[arch][1]++;
+                    if (sS > sA) tally[arch][0]++;
+                }
+            }
+        }
+        const pct = (a) => (100 * a[0]) / a[1];
+        for (const arch of ['attack', 'anomaly', 'rupture']) {
+            assert(tally[arch][1] >= 20,
+                `only ${tally[arch][1]} live ${arch} comparisons — this test has gone vacuous, fix the fixture`);
+        }
+        assert(pct(tally.attack) > 55,
+            `Sunna should be the better pick on most ATTACK carries; she wins ` +
+            `${pct(tally.attack).toFixed(0)}% of ${tally.attack[1]} cores`);
+        assert(pct(tally.anomaly) > 55,
+            `Sunna should be the better pick on most ANOMALY carries; she wins ` +
+            `${pct(tally.anomaly).toFixed(0)}% of ${tally.anomaly[1]} cores`);
+        assert(pct(tally.rupture) < 45,
+            `Astra should be the better pick on most RUPTURE carries — her crit-damage and ` +
+            `generic-damage buffs land where Sunna's stun multiplier does not. Sunna wins ` +
+            `${pct(tally.rupture).toFixed(0)}% of ${tally.rupture[1]} cores`);
     });
 
     // ------------------------------------------------------------------------

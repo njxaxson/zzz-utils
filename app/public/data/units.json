@@ -997,6 +997,7 @@
         "join": ["attack", "faction"],
         "synergy": { "units": ["Aria"], "tags": [], "avoid": [] },
         "mechanics": {
+            "damage": { "basic": 1 },
             "buffs": { "atk": 3, "stun-multiplier": 2 },
             "utility": { "veils": 3, "daze": 2, "quick-assists" : true, "heal:team": true }
         },
@@ -1170,7 +1171,7 @@
         "join": ["anomaly", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
-            "damage": { "aftershock": true },
+            "damage": { "aftershock": true, "basic": 1 },
             "buffs": { "atk": 3, "anomaly": 3, "disorders": 3, "dmg": 1 },
             "utility": { "kaleidoscope": true, "quick-assists": 2, "daze": true },
             "scaling": { "ap": 2 }

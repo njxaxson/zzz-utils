@@ -19,6 +19,9 @@ export const NON_DPS_ROLES = ["defense", "stun", "support"];
 
 const MULT = {
     NEED_FULFILLMENT: 7,
+    // Per point by which a unit's `damage.basic` exceeds what its role already implies.
+    // Only the excess is paid; see the L2 block that reads it.
+    BASIC_DAMAGE_CREDIT: 5,
     DAMAGE_NEED: 3,
     TOTALIZE_QTY: 5,
     STUN_EMERGENCE: 1.0,
@@ -1016,7 +1019,12 @@ function resolveBaselineWeight(consumer, category) {
     switch (category) {
         case 'atk':
             if (scaling?.atk) return w(scaling.atk);
-            return isDPSByRoles(roles) ? 1 : 0;
+            // How much a raw ATK buff is worth to this consumer, scaled by how much damage it
+            // actually deals. `basic` runs 0-3 with a full DPS at 3, so a DPS reads 1 and is
+            // unchanged; a stunner reads 0.67, a defence agent 0.33, and a plain support 0.
+            // Sunna, who overrides her support baseline to 1, reads 0.33 — she attacks, so ATK
+            // on her is worth something, where on Astra it is worth nothing at all.
+            return getBasicDamage(consumer) / 3;
         case 'anomaly-affinity': {
             const am = scaling?.am;
             const ap = scaling?.ap;
@@ -1116,6 +1124,53 @@ function getBurstRoleFactor(roles) {
  * the same "never give a unit something it did not declare" rule that governs the need
  * channel; see scoring-engine-open-issues.md.
  */
+// BASIC DAMAGE. A plain baseline of how much damage a unit puts out, independent of any
+// special mechanism. It answers one question the rest of the `damage` map cannot: how do we
+// know Sunna deals more damage than most supports — more than Astra, who deals none?
+//
+// Every other key in `damage` names a MECHANISM (`aftershock`, `abloom`, `enhanced`,
+// `ultimate:strong`) and is read either for stun-window throughput or to create a need for a
+// matching teammate buff. `basic` is the odd one out on purpose: it is magnitude, not
+// mechanism, and it is deliberately NOT part of burst throughput — Sunna's damage accrues
+// while someone else is on field, so feeding it into getMaxBurstWeight would make her contend
+// for a stun window she never uses.
+//
+// The value is INHERITED from role and can be overridden per unit in units.json:
+//
+//   3   any DPS role (attack / anomaly / rupture / armorer), or subdps
+//   2   stun
+//   1   defense
+//   0   support
+//
+// Resolved against EFFECTIVE roles, so it is a property of the unit ON THIS TEAM, not of the
+// unit in isolation. That is the whole point for the conditional pseudo-roles: Nangong reads 3
+// beside an anomaly agent and 2 on a pure stun team, and Soukaku swings from 0 to 3 when
+// Miyabi is present — which is correct, because Soukaku alongside Miyabi is tuned and played
+// as a DPS. Baking static numbers into units.json would have got both of those wrong.
+//
+// Max across roles, so Caesar (defense tagged, pseudo-stun) reads 2 rather than 1.
+const BASIC_DAMAGE_BY_ROLE = { attack: 3, anomaly: 3, rupture: 3, armorer: 3, subdps: 3, stun: 2, defense: 1, support: 0 };
+
+/**
+ * This unit's baseline damage output on this team: 0-3, inherited from role unless the unit
+ * declares `mechanics.damage.basic`. See BASIC_DAMAGE_BY_ROLE.
+ */
+export function getBasicDamage(unit) {
+    const declared = (unit._resolvedDamage || unit.mechanics?.damage || {}).basic;
+    if (declared !== undefined) return w(declared);
+    return getBasicDamageBaseline(unit);
+}
+
+/** What this unit's roles alone imply, ignoring any override. */
+export function getBasicDamageBaseline(unit) {
+    let best = 0;
+    for (const role of getEffectiveRoles(unit)) {
+        best = Math.max(best, BASIC_DAMAGE_BY_ROLE[role] ?? 0);
+    }
+    if (hasSubDPSRole(unit)) best = Math.max(best, BASIC_DAMAGE_BY_ROLE.subdps);
+    return best;
+}
+
 export function getMaxBurstWeight(unit) {
     const damage = unit._resolvedDamage || unit.mechanics?.damage || {};
     const roles = getEffectiveRoles(unit);
@@ -1261,11 +1316,18 @@ function getBuffRelevance(key, consumer) {
     const dps = isDPSByRoles(roles);
 
     switch (key) {
-        case 'atk':
-            if (!dps) return 0;
-            if (roles.includes('rupture')) return RUPTURE_ATK_EFFICIENCY;
-            if (roles.includes('armorer')) return ARMORER_ATK_EFFICIENCY;
-            return 1;
+        case 'atk': {
+            // Scaled by how much damage the consumer actually deals, matching the L4 need
+            // weight in resolveBaselineWeight. A DPS reads 1 and is unchanged; a stunner 0.67,
+            // a defence agent 0.33, a plain support 0. Without this, L4 would pay a support for
+            // buffing a stunner's ATK while cohesion recorded that same buff as landing on
+            // nobody — two readings of one fact, and they must agree.
+            const scale = getBasicDamage(consumer) / 3;
+            if (scale <= 0) return 0;
+            if (roles.includes('rupture')) return RUPTURE_ATK_EFFICIENCY * scale;
+            if (roles.includes('armorer')) return ARMORER_ATK_EFFICIENCY * scale;
+            return scale;
+        }
         case 'anomaly':
             return roles.includes('anomaly') ? 1 : 0;
         case 'sheer':
@@ -2143,6 +2205,26 @@ function scoreInherentQuality(team, { lenient = false, debug = false, boss = nul
             const utilPct = Math.round(utilization * 100);
             console.log(`      ${unit.name}: T${tier} → tier ${tierBonus >= 0 ? '+' : ''}${tierBonus}, rank ${rankBonus >= 0 ? '+' : ''}${rankBonus} (${role}, util ${utilPct}%)`);
         }
+    }
+
+    // --- Damage output beyond what the role already implies ---
+    //
+    // `basic` is a baseline INHERITED from role (see BASIC_DAMAGE_BY_ROLE), and the baseline
+    // is a description of damage the engine already prices everywhere else — tier, rank, burst
+    // throughput, L4 pair terms. Paying the baseline again here would double-count it and,
+    // worse, would reward stacking DPS roles, which the field-time economy exists to prevent.
+    //
+    // What is NEWS is a unit whose damage EXCEEDS its role. Sunna is a support, so the engine
+    // assumes she deals nothing at all — but she attacks from off-field and does considerably
+    // more in a matchup than Astra, who deals none. `damage.basic: 1` against a support
+    // baseline of 0 is exactly that one point of difference, and this is where it is paid.
+    // Generalises: a stunner annotated `basic: 3` would be paid the one point over stun's 2.
+    for (const unit of team) {
+        const excess = getBasicDamage(unit) - getBasicDamageBaseline(unit);
+        if (excess <= 0) continue;
+        const credit = Math.round(excess * MULT.BASIC_DAMAGE_CREDIT);
+        score += credit;
+        if (debug) console.log(`      ${unit.name}: basic damage +${credit} (${getBasicDamage(unit)} vs role baseline ${getBasicDamageBaseline(unit)})`);
     }
 
     // --- DPS Rank ---
