@@ -140,16 +140,6 @@ function withBosses(bosses, filterStr) {
 // entry to silence a regression.
 // ---------------------------------------------------------------------------
 const KNOWN_RED = new Map([
-    [7,   'The Pompey rung of the Evelyn stunner ladder. Owner asked for a greedy carry to get ' +
-          'more from a stun-recovery debuff (TEST 108), which lifts Lighter. On fire-weak Pompey ' +
-          'his fire element amplifies that further and he passes Dialyn. Measured: with NO greed ' +
-          'bonus at all the gap there is 1.7 points (Dialyn 409.3, Lighter 407.6), so ANY bonus ' +
-          'flips it -- a bonus of 1 already does. The rung and the mechanic cannot both stand; ' +
-          'owner adjudication in phase 7. Neutral ordering is correct and TEST 108 guards it.'],
-    [15,  'Nangong/Yixuan/Sunna reads 279 against a 265 ceiling. Yixuan is greedy 3 and Nangong ' +
-          'debuffs recovery, so the TEST 108 bonus lifts the team ~18. Sunna is already charged ' +
-          'ROLE_AVOID_PENALTY for being the wrong tool on a rupture carry; raising that again to ' +
-          'chase this ceiling would be tuning one lever to hide another. Re-band in phase 7.'],
     [100, 'Two separate rungs: `Yanagi > Burnice` fails uniformly by 10-11 on every boss, and ' +
           '`Nangong > Vivian` fails by 74-94 when the third slot is Remielle (Nangong is not tagged ' +
           'anomaly, so he halves her conditional ATK buff). Both go to owner adjudication in phase 7.'],
@@ -351,17 +341,44 @@ async function main() {
                 `${b.name}: Dialyn/Lighter/Evelyn > JF/Lighter/Evelyn`
             );
         }
-        // On Pompey (fire-weak): Dialyn still beats Lighter despite fire element
+        // On Pompey (fire-weak): Lighter's fire element carries him past Dialyn.
+        // Owner-confirmed 2026-08-31 from play: for Evelyn with Astra third, the
+        // stunner ladder on a fire-weak boss is
+        //   Norma > Lighter > Dialyn > Ju Fufu > Trigger > Koleda > Caesar > Pulchra > Qingyi
+        // ("this laddering is 100% correct"). Lighter leads Dialyn by ~11 points of
+        // raw damage BEFORE cohesion, so this is element weakness, not the greed bonus.
+        // Shelved, deliberately: Lighter and Dialyn end up ~30 apart and arguably belong
+        // in one epsilon band. Owner declined to hold the engine on it.
         for (const b of withBosses(bosses, 'Pompey')) {
-            const astraTriple =
-                'Dialyn/Evelyn/Astra,Lighter/Evelyn/Astra,Ju Fufu/Evelyn/Astra';
-            const m1 = scoreMapForBoss(scoreForTeamString(astraTriple, allUnits), b);
-            assert(
-                m1.get('Dialyn / Evelyn / Astra') > m1.get('Lighter / Evelyn / Astra') &&
-                m1.get('Dialyn / Evelyn / Astra') > m1.get('Ju Fufu / Evelyn / Astra') && 
-                m1.get('Lighter / Evelyn / Astra') > m1.get('Ju Fufu / Evelyn / Astra'),
-                `${b.name}: Evelyn+Astra: want Dialyn > Lighter > JF (fire-weak)`
+            const ladder = [
+                'Norma / Evelyn / Astra',
+                'Lighter / Evelyn / Astra',
+                'Dialyn / Evelyn / Astra',
+                'Ju Fufu / Evelyn / Astra',
+                'Trigger / Evelyn / Astra',
+                'Koleda / Evelyn / Astra',
+                'Evelyn / Caesar / Astra',
+                'Pulchra / Evelyn / Astra',
+                'Qingyi / Evelyn / Astra',
+            ];
+            const m1 = scoreMapForBoss(
+                scoreForTeamString(
+                    'Norma/Evelyn/Astra,Lighter/Evelyn/Astra,Dialyn/Evelyn/Astra,' +
+                        'Ju Fufu/Evelyn/Astra,Trigger/Evelyn/Astra,Koleda/Evelyn/Astra,' +
+                        'Caesar/Evelyn/Astra,Pulchra/Evelyn/Astra,Qingyi/Evelyn/Astra',
+                    allUnits
+                ),
+                b
             );
+            for (let i = 0; i + 1 < ladder.length; i++) {
+                const hi = m1.get(ladder[i]);
+                const lo = m1.get(ladder[i + 1]);
+                assert(
+                    hi !== undefined && lo !== undefined && hi > lo,
+                    `${b.name}: fire-weak stunner ladder: want ${ladder[i]} (${hi}) > ` +
+                        `${ladder[i + 1]} (${lo})`
+                );
+            }
         }
     });
 

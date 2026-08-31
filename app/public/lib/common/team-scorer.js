@@ -1622,6 +1622,12 @@ const FLAGSHIP_BAND = 0.6;
 // tolerated. A buff reaching only non-DPS teammates, at the 0.5 discount, still counts.
 const FLAGSHIP_LAND_THRESHOLD = 0.5;
 
+// What a unit is worth when the thing that DEFINES it lands on nobody. Lucia without her
+// sheer buff is not a diminished T0, she is a worse Koleda; Yuzuha on a rupture team is not a
+// slightly-off anomaly support, she is a wasted slot. Set low on purpose — this is where
+// opportunity cost bites.
+const FLAGSHIP_MISS_PENALTY = 0.4;
+
 // Damage-weighted delivery at which a support is contributing a full complement, i.e. the
 // point where utilization saturates at 1.0. Derived from the roster — see the note in
 // computeBuffUtilization.
@@ -1974,10 +1980,21 @@ function computeBuffUtilization(supplier, team, out = null) {
         const opensWindow = isStun(supplier);
         const dazeContribution = (opensWindow ? 3 : 0) + w(utility.daze);
         if (dazeContribution > 0) {
-            totalWeight += dazeContribution;
             const hasBeneficiary = consumers.some(c => isDPS(c) && !isStunlessUnit(c));
-            effectiveWeight += dazeContribution * (hasBeneficiary ? 1 : 0);
-            offer(dazeContribution, hasBeneficiary ? 1 : 0);
+            // A stunless carry does not make the stunner a bad fit. Ye Shunguong inherits the
+            // stun damage multiplier without opening a window herself, so Qingyi's daze finds
+            // no consumer — but that is YSG's property, not Qingyi's mismatch, and the freed
+            // slot is already priced by the stun-shill credit a stunless team earns. Charging
+            // her for it read the game's premier stun unit at 63% on a team she suits, and put
+            // her 70 points behind Lycaon, who offers the same package and escapes only
+            // because he carries an explicit scaling.buffs override.
+            const noOneCanUseStuns = consumers.some(isDPS)
+                && consumers.filter(isDPS).every(isStunlessUnit);
+            if (!noOneCanUseStuns) {
+                totalWeight += dazeContribution;
+                effectiveWeight += dazeContribution * (hasBeneficiary ? 1 : 0);
+                offer(dazeContribution, hasBeneficiary ? 1 : 0);
+            }
         }
     }
 
@@ -2006,20 +2023,57 @@ function computeBuffUtilization(supplier, team, out = null) {
     // whose one armorer buff dominates her kit is wasted on an attack team; strip that buff
     // and her flagship becomes whatever she offers next, which may well land. She is a
     // different unit with less kit, and a better one for that team.
-    const delivered = effectiveWeight;
+    // Cohesion asks ONE question: IS THIS UNIT DOING ITS JOB ON THIS TEAM?
+    //
+    // Not "how much did it bring". That distinction is the whole point of the Fiona/Marissa
+    // reasoning and it was nearly lost twice:
+    //
+    //   Qingyi on YSG/Sunna    delivers 2.0, her one buff lands, it IS her entire job  → fine
+    //   Yuzuha on Yixuan/Lucia delivers 1.9, her defining kit lands on nobody          → waste
+    //
+    // Those two are almost identical in SIZE and opposite in JOB. A measure driven by size
+    // scores them the same, which is how a perfectly-employed stunner read 63%. Size is not
+    // ignored — it is already paid twice, in the unit's tier credit and in what each of its
+    // buffs is worth to each teammate — it simply must not be charged a third time as a
+    // team-wide multiplier.
+    //
+    // The multiplier itself stays, and that is deliberate: a team slot is scarce, so a member
+    // who contributes nothing does not merely fail to help, it makes the team bad. That is
+    // opportunity cost, and the geometric mean is how the engine expresses it. What changes is
+    // only what feeds it.
+    //
+    //   fit       of the kit this team can use at all, how much is actually arriving
+    //   flagship  did the thing that DEFINES this unit find a home
+    //
+    // Lucia is T0 because of her sheer buff. On Sigrid it misses, so she is delivering
+    // Koleda's package — and the flagship collapse is what stops her being paid as a T0 for it.
+    // Only what this team can USE is charged. Fiona brings five enormous buffs, four of which
+    // have no target on any given team, and she is still tier zero — nobody was ever going to
+    // want all five. Charging the misses would punish breadth, which is how a tiny-kit support
+    // like Nicole started out-fitting Astra. If NOTHING lands, everything is charged, and the
+    // flagship collapse below lands on top of that.
+    const landing = offerings.filter(o => o.relevance > 0);
+    const charged = landing.length > 0 ? landing : offerings;
+    const chargedTotal = charged.reduce((sum, o) => sum + o.magnitude, 0);
+    const chargedLanded = charged.reduce((sum, o) => sum + o.magnitude * o.relevance, 0);
+    const fit = chargedTotal > 0 ? chargedLanded / chargedTotal : 1;
 
-    // A flagship has to SUBSTANTIALLY land, not merely be nonzero. Yuzuha's ATK buff reaches
-    // a rupture carry at RUPTURE_ATK_EFFICIENCY — a third — and counting that as "my flagship
-    // landed" is how an anomaly support read as a reasonable pick for Yixuan. Partial landing
-    // is already priced correctly in `delivered`, where relevance multiplies magnitude; this is
-    // the separate, categorical question of whether the unit found a home at all.
+    // A flagship has to SUBSTANTIALLY land, not merely be nonzero. Yuzuha's ATK reaches a
+    // rupture carry at a third, and counting that as "my flagship found a home" is how an
+    // anomaly support read as a reasonable pick for Yixuan.
     const flagship = offerings.reduce((m, o) => Math.max(m, o.magnitude), 0);
     const flagshipLanded = flagship === 0 || offerings.some(
         o => o.magnitude >= FLAGSHIP_BAND * flagship && o.relevance >= FLAGSHIP_LAND_THRESHOLD);
 
-    let baseUtil = Math.min(1.0, delivered / DELIVERY_REFERENCE);
-    if (!flagshipLanded) baseUtil *= WHIFF_COHESION_PENALTY;
-    if (out) { out.delivered = delivered; out.flagship = flagship; out.flagshipLanded = flagshipLanded; }
+    let baseUtil = fit;
+    if (!flagshipLanded) baseUtil *= FLAGSHIP_MISS_PENALTY;
+    const delivered = effectiveWeight;   // retained for the breakdown; no longer scores anything
+    if (out) {
+        out.delivered = delivered;
+        out.fit = fit;
+        out.flagship = flagship;
+        out.flagshipLanded = flagshipLanded;
+    }
 
     // Provision side. A provision is only "wasted" when the consumer is ACTIVELY barred from
     // using something they would otherwise want — not merely when nobody happens to scale for

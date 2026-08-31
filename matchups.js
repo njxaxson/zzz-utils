@@ -61,7 +61,7 @@ async function main() {
     let teamEntries;
 
     if (options.teams) {
-        const { teams: parsedTeams, warnings } = parseTeams(options.teams, allUnits, { preview: options.preview });
+        const { teams: parsedTeams, warnings } = parseTeams(options.teams, allUnits, { preview: options.preview, exclude: options.exclude });
         for (const w of warnings) console.warn(`WARNING: ${w}`);
         teamEntries = parsedTeams;
         if(!options.omit) console.log(`Explicit teams: ${teamEntries.length}\n`);

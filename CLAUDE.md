@@ -17,6 +17,8 @@ share one mechanics vocabulary (`app/public/lib/common/team-scorer.js` and
 | `app/public/data/bosses.json` | Boss data |
 | `*.js` / `*.mjs` at repo root | CLI scripts (`matchups.js`, `compositions.js`, `test-scoring.mjs`, …) |
 | `engine-context.md` | Game-domain knowledge and design intent — see below |
+| `scoring-engine-open-issues.md` | **Short.** What is open, current test status, what to do next |
+| `scoring-engine-internals.md` | The long form: post-mortems, mechanisms, and the wrong diagnoses. Read the relevant section before changing cohesion, disorders or the teamwork multiplier |
 
 ## When to read `engine-context.md`
 
