@@ -12,7 +12,7 @@
         "mechanics": {
             "damage": { "enhanced": 2 },
             "utility": { "anomaly:physical": 2 },
-            "scaling": { "disorders": 2, "am": 3 }
+            "scaling": { "disorders": 2, "am": 3, "greedy": 1 }
         },
         "faction": "Spook Shack",
         "displayText": "Literal bunny girl is a strong physical anomaly unit.",
@@ -63,7 +63,7 @@
         "synergy": { "units": ["Sunna", "Nangong"], "tags": [], "avoid": [] },
         "mechanics": {
             "damage": { "enhanced": 2, "abloom": 2 },
-            "scaling": { "veils": 2 }
+            "scaling": { "veils": 2, "greedy": 1 }
         },
         "faction": "Angels of Delusion",
         "displayText": "Intelligent construct masquerading as a human, Aria is top-tier primary ether anomaly DPS.",
@@ -317,7 +317,7 @@
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "damage": { "chain": 3, "chain:extra": 2, "ultimate:strong": 1 },
-            "scaling": { "chains": 3, "recovery": 1 }
+            "scaling": { "chains": 3, "recovery": 1, "greedy": 3 }
         },
         "faction": "Stars of Lyra",
         "displayText": "This fire attacker specializes in chain attacks and does well when paired with her faction member Astra.",
@@ -358,7 +358,7 @@
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "damage": { "aftershock": 1, "enhanced" : 3 },
-            "scaling": { "anomaly": 2 }
+            "scaling": { "anomaly": 2, "greedy": 1 }
         },
         "faction": "Section 6",
         "displayText": "One of the most difficult characters to master, Harumasa struggles to keep up with endgame content without high levels of investment.",
@@ -560,7 +560,7 @@
         "mechanics": {
             "elementalVariant": "frost",
             "damage": { "enhanced": 3, "ultimate:strong": 2 },
-            "scaling": { "ultimates": 1, "disorders": 3, "cr": 3, "cd": 3 }
+            "scaling": { "ultimates": 1, "disorders": 3, "cr": 3, "cd": 3, "greedy": 3 }
         },
         "faction": "Section 6",
         "displayText": "Void Hunter Hoshimi Miyabi reporting for duty. An anomaly agent built like an attacker, Miyabi has a low skill floor but a very high skill ceiling and can produce some of the highest damage output in the game with precise technical play.",
@@ -722,7 +722,7 @@
         "mechanics": {
             "damage": { "abloom": 3, "enhanced": 2 },
             "buffs": { "abloom": 3 },
-            "scaling": { "buffs": 1, "am" : 3 }
+            "scaling": { "buffs": 1, "am" : 3, "greedy": 1 }
         },
         "faction": "Krampus",
         "displayText": "She's not Batman, but she's got that vibe. Very strong ice anomaly agent that goes a different route from Miyabi. In certain scenarios, she can be even better than Miyabi.",
@@ -815,7 +815,7 @@
                     { "value": 0 }
                 ] }
             },
-            "scaling": { "ap": 3, "atk": 3, "anomaly": 3, "codependent" : true, "buffs": 3 },
+            "scaling": { "ap": 3, "atk": 3, "anomaly": 3, "codependent" : true, "buffs": 3, "greedy": 3 },
             "utility": { "daze": 2,  "rotations": "limited" },
             "onfield": false
         },
@@ -942,7 +942,7 @@
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "damage": { "enhanced": 3, "ultimate:weak": 2 },
-            "scaling": { "chains" : 3, "anomaly:wind": 1 }
+            "scaling": { "chains" : 3, "anomaly:wind": 1, "greedy": 1 }
         },
         "faction": "Airspace Patrol Department",
         "displayText": "Horse lady with spear.",
@@ -1152,7 +1152,7 @@
         "mechanics": {
             "elementalVariant": "auricInk",
             "damage": { "enhanced": 2, "ultimate:double": 3, "ultimate:strong": 1 },
-            "scaling": { "ultimates": 2 }
+            "scaling": { "ultimates": 2, "greedy": 3 }
         },
         "faction": "Yunkui Summit",
         "displayText": "Grandmaster Yixuan is one of the strongest DPS agents in the game and can even brute force nearly every boss in endgame content.",

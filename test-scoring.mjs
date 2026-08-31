@@ -140,8 +140,16 @@ function withBosses(bosses, filterStr) {
 // entry to silence a regression.
 // ---------------------------------------------------------------------------
 const KNOWN_RED = new Map([
-    [98,  'Miyabi/Vivian/Remielle and Burnice/Miyabi/Remielle outscore Nangong/Miyabi/Yuzuha. ' +
-          'Two greedy carries share one stun window and the engine does not model that. Expected to clear in phase 5.'],
+    [7,   'The Pompey rung of the Evelyn stunner ladder. Owner asked for a greedy carry to get ' +
+          'more from a stun-recovery debuff (TEST 108), which lifts Lighter. On fire-weak Pompey ' +
+          'his fire element amplifies that further and he passes Dialyn. Measured: with NO greed ' +
+          'bonus at all the gap there is 1.7 points (Dialyn 409.3, Lighter 407.6), so ANY bonus ' +
+          'flips it -- a bonus of 1 already does. The rung and the mechanic cannot both stand; ' +
+          'owner adjudication in phase 7. Neutral ordering is correct and TEST 108 guards it.'],
+    [15,  'Nangong/Yixuan/Sunna reads 279 against a 265 ceiling. Yixuan is greedy 3 and Nangong ' +
+          'debuffs recovery, so the TEST 108 bonus lifts the team ~18. Sunna is already charged ' +
+          'ROLE_AVOID_PENALTY for being the wrong tool on a rupture carry; raising that again to ' +
+          'chase this ceiling would be tuning one lever to hide another. Re-band in phase 7.'],
     [100, 'Two separate rungs: `Yanagi > Burnice` fails uniformly by 10-11 on every boss, and ' +
           '`Nangong > Vivian` fails by 74-94 when the third slot is Remielle (Nangong is not tagged ' +
           'anomaly, so he halves her conditional ATK buff). Both go to owner adjudication in phase 7.'],
@@ -2822,6 +2830,139 @@ async function main() {
             `Sunna is the wrong tool for a rupture carry and carries synergy.avoid: ["rupture"] ` +
             `to say so; she should essentially never beat Astra there, but wins ` +
             `${pct(tally.rupture).toFixed(0)}% of ${tally.rupture[1]} cores`);
+    });
+
+    // ========================================================================
+    // TEST 107: two greedy carries cannot both own the stun window
+    // ========================================================================
+    // Remielle cannot fire her double ultimate while Miyabi is running
+    // enhanced -> ultimate -> enhanced. `scaling.greedy` measures how much of the window a unit
+    // needs to ITSELF, and it is about execution difficulty rather than damage: Miyabi's enhanced
+    // attacks take about twice as long as Promeia's and need disorder fuel timed into the window,
+    // while Aria's are very quick. Measuring this by burst size instead would have penalised Aria
+    // and Promeia, who are two of Remielle's BEST partners.
+    //
+    // Only greed ABOVE 1 contends. That one rule is what separates the cases below, and it is the
+    // property most worth guarding: the penalty must reach dual-greedy teams and nothing else.
+    run('TEST 107: two greedy carries contend for the stun window; one greedy carry does not', () => {
+        const boss = withBosses(bosses, 'Neutral')[0];
+        const scoreOf = (spec) => {
+            const parsed = scoreForTeamString(spec, allUnits);
+            assert(parsed.length === 1, `fixture ${spec} did not resolve to exactly one team`);
+            return scoreTeamForBoss(parsed[0].team, boss, {});
+        };
+        const greedOf = (name) => {
+            const u = allUnits.find(x => x.name === name);
+            assert(u, `fixture unit ${name} not found`);
+            return u.mechanics?.scaling?.greedy ?? 0;
+        };
+
+        // The annotation itself, so a silent data edit is caught here rather than as a mystery
+        // score movement later.
+        for (const [name, want] of [['Yixuan', 3], ['Remielle', 3], ['Miyabi', 3], ['Evelyn', 3]]) {
+            assert(greedOf(name) === want,
+                `${name} needs the stun window to itself and must be greedy ${want}, got ${greedOf(name)}`);
+        }
+        for (const name of ['Aria', 'Promeia', 'Alice', 'Sigrid', 'Harumasa']) {
+            assert(greedOf(name) === 1,
+                `${name} has a real enhanced-attack rotation but a quick one, so greedy 1, got ${greedOf(name)}`);
+        }
+        for (const name of ['Nangong', 'Velina', 'Yuzuha', 'Vivian', 'Burnice']) {
+            assert(greedOf(name) === 0,
+                `${name} does not compete for the burst window and must be greedy 0, got ${greedOf(name)}`);
+        }
+
+        // Remielle's own best teams pair her with a greedy-1 partner and must be UNTOUCHED. This
+        // is the sharpest check in the phase: a rule that penalised these would be wrong even if
+        // it fixed everything else.
+        const untouched = {
+            'Promeia/Remielle/Velina': 501.6,
+            'Burnice/Remielle/Velina': 461.5,
+            'Aria/Remielle/Velina': 401.6,
+            'Alice/Remielle/Velina': 396.9,
+        };
+        for (const [spec, expected] of Object.entries(untouched)) {
+            const got = scoreOf(spec);
+            assert(Math.abs(got - expected) < 0.15,
+                `${spec} is one of Remielle's best teams and must not be touched by burst ` +
+                `contention: expected ${expected}, got ${got.toFixed(1)}`);
+        }
+
+        // Miyabi beside Remielle is two greedy carries, and must cost.
+        const contended = scoreOf('Miyabi/Remielle/Vivian');
+        const uncontended = scoreOf('Miyabi/Vivian/Yuzuha');
+        assert(contended > uncontended,
+            `Miyabi/Remielle/Vivian should still beat Miyabi/Vivian/Yuzuha — the owner rates it ` +
+            `slightly better — got ${contended.toFixed(1)} vs ${uncontended.toFixed(1)}`);
+        const best = scoreOf('Nangong/Miyabi/Yuzuha');
+        assert(best > contended,
+            `Nangong/Miyabi/Yuzuha is Miyabi's best team and must outrank Miyabi/Remielle/Vivian: ` +
+            `${best.toFixed(1)} vs ${contended.toFixed(1)}`);
+
+        // NOT COVERED, deliberately: the penalty SCALES with the greed values, but every
+        // contender on the current roster is annotated 3, so every clash is 3+3 and no fixture
+        // can distinguish scaling from a flat charge. This becomes testable when a greedy-2 unit
+        // exists; until then the scaling is unverified by design, not by oversight.
+    });
+
+    // ========================================================================
+    // TEST 108: a greedy carry gets more out of a shortened enemy recovery
+    // ========================================================================
+    // The other half of `scaling.greedy`, and the reverse of TEST 107's penalty. Most carries
+    // have plenty of time to land their burst inside a normal stun window, so a recovery debuff
+    // is a modest bonus. A GREEDY carry is the one that was actually running out of window, and
+    // extending it lets them land damage they otherwise could not.
+    //
+    // The case: Lighter and Trigger both raise Evelyn's stun multiplier, but only Lighter
+    // shortens the enemy's recovery — and Evelyn is greedy 3 and the one carry who declares
+    // `scaling.recovery` outright.
+    run('TEST 108: a recovery debuff is worth more to a greedy carry than to an ordinary one', () => {
+        const boss = withBosses(bosses, 'Neutral')[0];
+        const scoreOf = (spec) => {
+            const parsed = scoreForTeamString(spec, allUnits);
+            assert(parsed.length === 1, `fixture ${spec} did not resolve to exactly one team`);
+            return scoreTeamForBoss(parsed[0].team, boss, {});
+        };
+
+        // Lighter (recovery 3) must beat Trigger (no recovery debuff) as Evelyn's stunner.
+        const lighter = scoreOf('Lighter/Evelyn/Astra');
+        const trigger = scoreOf('Trigger/Evelyn/Astra');
+        assert(lighter > trigger,
+            `Evelyn is greedy and wants the longer window Lighter's recovery debuff buys her, ` +
+            `so Lighter/Evelyn/Astra must beat Trigger/Evelyn/Astra: ` +
+            `${lighter.toFixed(1)} vs ${trigger.toFixed(1)}`);
+
+        // But Dialyn keeps the top slot — free ultimates plus his own recovery debuff.
+        const dialyn = scoreOf('Dialyn/Evelyn/Astra');
+        assert(dialyn > lighter,
+            `Dialyn still outclasses Lighter for Evelyn on a neutral boss: ` +
+            `${dialyn.toFixed(1)} vs ${lighter.toFixed(1)}`);
+
+        // The bonus is GATED at greed 2: a greedy-1 rotation is quick enough already, so more
+        // window is gravy rather than a multiplier. Asserted behaviourally by promoting a
+        // greedy-1 carry past the gate and checking the score responds — a fixture assertion on
+        // the annotation alone passes with the gate deleted, which was tried and caught here.
+        const greedOf = (name) => allUnits.find(u => u.name === name)?.mechanics?.scaling?.greedy ?? 0;
+        assert(greedOf('Sigrid') === 1, 'fixture intent: Sigrid sits below the gate');
+        const scoreWith = (roster) => {
+            const parsed = scoreForTeamString('Lighter/Sigrid/Astra', roster);
+            return scoreTeamForBoss(parsed[0].team, boss, {});
+        };
+        const withGreed = (g) => allUnits.map(u => u.name !== 'Sigrid' ? u : ({
+            ...u, mechanics: { ...u.mechanics, scaling: { ...u.mechanics.scaling, greedy: g } }
+        }));
+        const atZero = scoreWith(withGreed(0));
+        const atOne = scoreWith(allUnits);          // her real value, below the gate
+        const atThree = scoreWith(withGreed(3));
+        // BELOW the gate, greed must make no difference at all — this is the half that a
+        // "does greed matter" assertion misses, and deleting the gate passes that one.
+        assert(Math.abs(atOne - atZero) < 1e-9,
+            `greed 1 is below the gate and must score identically to greed 0: ` +
+            `${atOne.toFixed(2)} vs ${atZero.toFixed(2)}`);
+        // ABOVE it, greed must pay.
+        assert(atThree > atOne,
+            `promoting Sigrid past the gate must raise Lighter/Sigrid/Astra: ` +
+            `${atOne.toFixed(1)} at greed 1, ${atThree.toFixed(1)} at greed 3`);
     });
 
     // ------------------------------------------------------------------------

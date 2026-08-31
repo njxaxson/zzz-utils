@@ -19,6 +19,8 @@ export const NON_DPS_ROLES = ["defense", "stun", "support"];
 
 const MULT = {
     NEED_FULFILLMENT: 7,
+    // Per greed unit squeezed out of the stun window; see getBurstContention.
+    GREED_CONTENTION: -3,
     // Per point by which a unit's `damage.basic` exceeds what its role already implies.
     // Only the excess is paid; see the L2 block that reads it.
     BASIC_DAMAGE_CREDIT: 5,
@@ -252,6 +254,9 @@ const REFRINGE_VORTEX_CASCADE = 3;
 // Conditional buff underutilization: squared-gap penalty per buff key.
 // gap² × MULT punishes large missed buffs disproportionately (duo-anomaly Rem: 140, solo: 560).
 const CONDITIONAL_BUFF_PENALTY_MULT = 35;
+// Floor for codependencyFactor: what a codependent unit is still worth with its composition
+// need entirely unmet. Not zero — Remielle off triple-anomaly keeps her double ultimate.
+const CODEPENDENCY_FLOOR = 0.25;
 const L4_SOFT_CAP = 250;
 const POLARITY_VORTEX_DISCOUNT = 0.35;
 // Needs exempt from L5 cohesion penalties. INTENTIONAL, and NOT an L4/L5 inconsistency -
@@ -592,6 +597,54 @@ function resolveMapForUtil(map, supplier, team) {
 
 // Under-activation penalty for team-scoped conditional buffs (e.g. Remielle's ATK curve).
 // Recipient-scoped conditionals are exempt.
+// How much of a CODEPENDENT unit's kit this team actually switches on.
+//
+// `scaling.codependent` says a unit's worth depends on the team meeting its composition needs.
+// The pull engine has always honoured that — it is why Remielle drops off a roster with no
+// anomaly agents — but the scorer only ever charged the shortfall on the ONE conditional buff,
+// through computeConditionalBuffPenalty, and went on paying her as a full anomaly body for
+// everything else.
+//
+// Remielle needs THREE anomaly-tagged bodies. On Nangong/Miyabi/Remielle there are two —
+// Nangong reaches anomaly through a pseudo-role, which her `countTag: "anomaly"` condition
+// rightly does not count — so her ATK buff resolves to 2 of 4 and her kit does not come
+// together. She was scoring 539 there against 201 for the same team with Lucy in the slot.
+// The owner: "Rem's value CRASHES when she isn't on triple-anomaly."
+//
+// Fulfilment is read off the unit's own team-scoped conditionals, so it needs no new
+// annotation and no per-unit special case: the condition the designer already wrote down IS
+// the composition need. A codependent unit with no conditional buff (Ye Shunguong, who buffs
+// nothing) reads 1 and is untouched.
+//
+// Returns 0-1. Scaling, not gating — she is a fraction of the unit she should be, not absent.
+function codependencyFulfilment(unit, team) {
+    if (!unit.mechanics?.scaling?.codependent) return 1;
+    const buffs = unit.mechanics?.buffs;
+    if (!buffs) return 1;
+    let worst = 1;
+    for (const spec of Object.values(buffs)) {
+        if (!isTeamScopedConditional(spec)) continue;
+        const maxLevel = maxConditionalValue(spec);
+        if (maxLevel <= 0) continue;
+        const resolved = resolveConditionalValue(spec, { team, self: unit, consumer: null });
+        worst = Math.min(worst, resolved / maxLevel);
+    }
+    return worst;
+}
+
+/**
+ * What a codependent unit's contributions are worth on this team.
+ *
+ * Blended toward a floor rather than run to zero: Remielle off triple-anomaly still brings a
+ * double ultimate, aftershock and luminize, and the owner's own read is that she should land
+ * meaningfully above the same team built with Lucy. The floor is what keeps her there.
+ */
+function codependencyFactor(unit, team) {
+    const f = codependencyFulfilment(unit, team);
+    if (f >= 1) return 1;
+    return CODEPENDENCY_FLOOR + (1 - CODEPENDENCY_FLOOR) * f;
+}
+
 function computeConditionalBuffPenalty(supplier, team) {
     const buffs = supplier.mechanics?.buffs;
     if (!buffs) return 0;
@@ -1169,6 +1222,70 @@ export function getBasicDamageBaseline(unit) {
     }
     if (hasSubDPSRole(unit)) best = Math.max(best, BASIC_DAMAGE_BY_ROLE.subdps);
     return best;
+}
+
+// BURST WINDOW CONTENTION.
+//
+// Some carries need the stun window to THEMSELVES to reach their ceiling. Remielle cannot fire
+// her double ultimate while Miyabi is running enhanced -> ultimate -> enhanced; that is the same
+// reason dual-attacker and dual-rupture teams do not exist, and why Yixuan wants the whole window.
+//
+// `scaling.greedy` measures how much of the window a unit needs, and it is about EXECUTION
+// DIFFICULTY rather than damage. Miyabi's enhanced attacks take about twice as long as Promeia's
+// and additionally need disorder fuel timed into the window to land a second one; Aria's are very
+// quick. So the greedy list is not the biggest-burst list — measuring this by burst size would
+// penalise Aria and Promeia, who are two of Remielle's BEST partners.
+//
+//   3   needs the window to itself: Yixuan, Remielle, Miyabi, Evelyn
+//   1   a real enhanced-attack rotation, but quick and easy: Aria, Promeia, Alice, Sigrid, Harumasa
+//   0   everyone else
+//
+// ONLY GREED ABOVE 1 CONTENDS. That single rule is what separates the cases: Remielle/Velina/Aria
+// and Remielle/Velina/Promeia are among Remielle's best teams and must not be touched, while
+// Miyabi/Vivian/Remielle is the team to demote.
+const GREED_CONTENTION_FLOOR = 1;
+
+/** How much of the stun window this unit needs to itself, 0-3. */
+function getGreed(unit) {
+    return w(unit.mechanics?.scaling?.greedy);
+}
+
+/**
+ * How much burst window this team is short of, in greed units.
+ *
+ * Zero unless at least TWO units need the window above the floor. The greediest keeps the window;
+ * everyone else is contending for what is left, and their greed is what is squeezed out. So a
+ * greedy-3 beside a greedy-3 costs 3, and a greedy-2 beside a greedy-3 costs 2.
+ *
+ * NOTE: every contender on the current roster is annotated 3, so the value-scaling is not
+ * exercised by anything today and no test can cover it. It is written this way because the owner
+ * chose scaling over a flat charge, and it becomes live the moment a greedy-2 unit exists.
+ */
+function getBurstContention(team) {
+    const greeds = team.map(getGreed).filter(g => g > GREED_CONTENTION_FLOOR);
+    if (greeds.length < 2) return 0;
+    return greeds.reduce((sum, g) => sum + g, 0) - Math.max(...greeds);
+}
+
+/**
+ * Can this team's greedy carry actually cash in a longer stun window?
+ *
+ * Two gates, and both are about whether the window is real rather than about the carry.
+ *
+ * 1. NO CONTENTION. If two greedy carries are fighting over the window, neither of them is
+ *    getting enough of it to exploit an extension — that is the same claim getBurstContention
+ *    makes. Paying both the extension bonus while charging contention once was worth a net +27
+ *    to Nangong/Miyabi/Remielle and put Remielle in four of Miyabi's top five teams.
+ *
+ * 2. SOMEBODY HAS TO OPEN THE WINDOW. A recovery debuff on a team with no stunner is close to
+ *    comical: Miyabi/Vivian/Remielle has Remielle's recovery debuff and nobody to stun with it,
+ *    so it lands maybe once in a fight. The team still earns the BASE recovery credit for that
+ *    — this gate only withholds the greedy EXTRA, which is about repeatedly getting a longer
+ *    window, and a stunner opens three to five in a fight where an incidental debuff opens one.
+ */
+function canExploitLongWindow(consumer, team) {
+    if (getBurstContention(team) > 0) return false;
+    return team.some(u => u !== consumer && getEffectiveRoles(u).includes('stun'));
 }
 
 export function getMaxBurstWeight(unit) {
@@ -2377,6 +2494,12 @@ function scoreInherentQuality(team, { lenient = false, debug = false, boss = nul
         if (tierBonus > 0) tierBonus = Math.round(tierBonus * relevanceMult);
         if (rankBonus > 0) rankBonus = Math.round(rankBonus * relevanceMult);
 
+        // A codependent unit whose composition need is unmet is not the tier it says it is.
+        const codepFactor = codependencyFactor(unit, team);
+        if (codepFactor < 1) {
+            tierBonus = Math.round(tierBonus * codepFactor);
+            rankBonus = Math.round(rankBonus * codepFactor);
+        }
         score += tierBonus + rankBonus;
         if (debug) {
             const role = isStun(unit) ? 'stun' : 'support/def';
@@ -2962,7 +3085,21 @@ function scoreBaselineAffinity(supplier, consumer, debug, options = {}) {
             const chainsScaling = w(consumer.mechanics?.scaling?.chains);
             const totalizeWeight = w(consumer.mechanics?.damage?.totalize);
             const recoveryScaling = w(consumer.mechanics?.scaling?.recovery);
-            const effectiveBurst = burstWeight + chainsScaling + totalizeWeight * 2 + recoveryScaling;
+            // A GREEDY carry gets more out of a longer window than anyone else. Most units have
+            // plenty of time to land their burst inside a normal stun, so a shortened recovery
+            // is a modest bonus; a greedy carry is the one that was actually running out of
+            // window, and extending it lets them land damage they otherwise could not.
+            //
+            // This is the other half of `scaling.greedy`, and the reason Lighter beats Trigger as
+            // Evelyn's stunner: both raise her stun multiplier, but only Lighter shortens the
+            // enemy's recovery, and Evelyn - greedy 3, and the one carry who declares
+            // `scaling.recovery` outright - is exactly who that helps. Gated at 2 because a
+            // greedy-1 rotation (Aria, Promeia) is quick enough already; more window is gravy.
+            const team = options?.team ?? [supplier, consumer];
+            const greedBonus = (getGreed(consumer) >= 2 && canExploitLongWindow(consumer, team))
+                ? getGreed(consumer) : 0;
+            const effectiveBurst = burstWeight + chainsScaling + totalizeWeight * 2
+                + recoveryScaling + greedBonus;
             const val = w(supplierDebuffs.recovery) * effectiveBurst * MULT.RECOVERY_DEBUFF;
             score += val;
             dbg('recovery', val);
@@ -3293,12 +3430,29 @@ function scoreMechanicalSynergy(team, debug, options = {}) {
             const stunScore = scoreStunEmergence(supplier, consumer, debug);
             consumerTotal += stunScore;
 
-            if (debug) {
-                const pairTotal = affinityScore + needScore + stunScore;
-                console.log(`        pair total: ${pairTotal.toFixed(1)}`);
+            // ...and what a codependent unit GIVES is worth less too. Remielle's buffs on a
+            // team that cannot switch her on are the same shortfall seen from the other side.
+            const supplierCodep = codependencyFactor(supplier, team);
+            let pairTotal = affinityScore + needScore + stunScore;
+            if (supplierCodep < 1 && pairTotal > 0) {
+                const scaled = pairTotal * supplierCodep;
+                consumerTotal -= (pairTotal - scaled);
+                if (debug) console.log(`        ${supplier.name} codependency unmet → ×${supplierCodep.toFixed(2)}`);
+                pairTotal = scaled;
             }
+            if (debug) console.log(`        pair total: ${pairTotal.toFixed(1)}`);
         }
 
+        // Everything the team pours INTO a codependent unit is worth less when its
+        // composition need is unmet — buffs it cannot convert are not buffs.
+        const codepFactor = codependencyFactor(consumer, team);
+        if (codepFactor < 1) {
+            if (debug && consumerTotal > 0) {
+                console.log(`      ${consumer.name}: codependency unmet → ×${codepFactor.toFixed(2)} ` +
+                    `on ${consumerTotal.toFixed(1)}`);
+            }
+            consumerTotal *= codepFactor;
+        }
         consumerScores.set(consumer.name, consumerTotal);
     }
 
@@ -3908,6 +4062,18 @@ export function scoreTeamForBoss(team, boss, options = {}) {
     score += fieldTimeAdj;
     if (debug) console.log(`    Field time: ${onFieldCount} on-field agent(s) → ${fieldTimeAdj >= 0 ? '+' : ''}${fieldTimeAdj}`);
 
+    // Burst window contention. DELIBERATELY ITS OWN TERM rather than folded into field time:
+    // field time is about who is standing on the screen, and greed is about who needs the burst
+    // window. They are different questions and this one must be traceable and removable on its own.
+    const contention = getBurstContention(team);
+    const contentionAdj = contention * MULT.GREED_CONTENTION;
+    score += contentionAdj;
+    if (debug && contention > 0) {
+        const who = team.filter(u => getGreed(u) > GREED_CONTENTION_FLOOR)
+            .map(u => `${u.name}(${getGreed(u)})`).join(' + ');
+        console.log(`    Burst window contention: ${who} → ${contentionAdj.toFixed(1)}`);
+    }
+
     // Layer 2: Inherent Quality
     const l2 = scoreInherentQuality(team, { lenient, debug, boss });
     score += l2;
@@ -3950,6 +4116,7 @@ export function scoreTeamForBoss(team, boss, options = {}) {
         trace.avoid = avoidResult;
         trace.structure = structureScore;
         trace.fieldTime = fieldTimeAdj;
+        trace.contention = contentionAdj;
         trace.l2 = l2;
         trace.l3 = bossResult.score;
         trace.l4raw = rawL4;

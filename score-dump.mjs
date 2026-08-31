@@ -47,7 +47,7 @@ const NEUTRAL_BOSS = {
 
 // The columns after `score`. Kept in one place because score-delta.mjs reads the header
 // rather than hard-coding them, so adding a layer here needs no change over there.
-const LAYERS = ['base', 'avoid', 'structure', 'fieldTime', 'l2', 'l3', 'l4raw', 'l4', 'l5', 'raw', 'teamwork'];
+const LAYERS = ['base', 'avoid', 'structure', 'fieldTime', 'contention', 'l2', 'l3', 'l4raw', 'l4', 'l5', 'raw', 'teamwork'];
 
 function num(v) {
     // 4dp is well below any threshold the engine cares about but enough that a rounding

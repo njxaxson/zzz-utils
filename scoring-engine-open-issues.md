@@ -1,78 +1,162 @@
 # Scoring engine — open issues
 
-Live register of what is actually open in the scorer. **The scoring suite is 99/102 — TESTs 98, 100
-and 101 are RED on purpose**, documented under issue 7; recommendations 43/43 and bucketing 6/6.
-Everything else below is a *modelling* problem rather than a failing test. **Issue 5 is the one to read first if you are
-touching disorders**; it records four confident diagnoses that were all wrong, and a symptom whose
-own wording sent the fix in the wrong direction. Historical post-mortems are demoted to the end.
+Live register of what is actually open in the scorer. **The scoring suite is 102/108.** TESTs 100
+and 101 are RED on purpose (issue 7); TESTs 7 and 15 are bands the phase-5 greed work pushed out
+and are recorded in `KNOWN_RED`; TESTs 13, 18, 25 and 26 are the residue of the issue-3 rework.
+**Recommendations 43/44**, with TEST 43 red on purpose — the pull engine cannot distinguish a
+Remielle roster with Velina from one without. **Bucketing is 4/6** — a side effect of YSG's
+support valuations moving, not a separate defect; see issue 8.
+Everything else below is a *modelling* problem rather than a failing test. **Issue 5 is the one to
+read first if you are touching disorders**; it records four confident diagnoses that were all
+wrong. **Issue 3 is the one to read first if you are touching cohesion**; it now records four more.
+Historical post-mortems are demoted to the end.
 
-Open: issues 3, 5 (reopened) and 7, plus the two notes at the end of issue 5.
+Open: issues 3 (residue), 5 (reopened), 7 (adjudication), 8 and 9, plus the two notes at
+the end of issue 5.
 
-Last reviewed 2026-08-27.
+Last reviewed 2026-08-31.
 
 | # | Issue | Status | Size |
 |----|----|----|----|
 | 1 | Ultimate credit is derived from the wrong axes | **Resolved** — see the post-mortem below | Done |
 | 2 | Undersupply gating prices partial coverage flat | **Resolved** — see the post-mortem below | Done |
-| 3 | Partial relevance is never priced | **Open, parked** by owner | Large; broad retune |
+| 3 | Partial relevance is never priced | **Reworked, not closed** — cohesion no longer charges waste, and deleting a mismatched buff no longer improves a team. Four tests remain, and one structural flaw is now named | Large; one structural piece left |
 | 4 | Burst throughput measured by the wrong aggregate | **Resolved** — see the post-mortem below | Done |
 | 5 | Disorder supply was never measured | **Not resolved** — fix landed and is correct in direction, but its oversupply shape caused issue 7. Do not close until 7 is green | Blocked on 7 |
 | 6 | `isLumenUnit()` is false during morph scoring, so every *natively lumen* rule inverts | **Resolved** — see the post-mortem below | Done |
-| 7 | Miyabi's composition ordering is wrong: triple-anomaly over-valued, off-field partners under-valued | **Partly fixed** — five changes landed; TEST 99 green, 98/100/101 red by documented decision | Blocked on 3 |
-
+| 7 | Miyabi's composition ordering is wrong: triple-anomaly over-valued, off-field partners under-valued | **Mostly fixed** — TEST 98 and 99 green after phase 5's burst-window contention; 100 and 101 are ladder questions for owner adjudication | Adjudication |
+| 8 | Cohesion is a per-unit judgement applied as a whole-team multiplier | **Open, new** — named during the issue-3 rework; explains TESTs 25 and 26 as one thing | Large; layer-boundary rework |
+| 9 | The pull engine never consults team scores, so it cannot see partner quality | **Open, new** — surfaced by recommendations TEST 43 | Feature, not a fix |
 
 ---
 
 ## 3. Partial relevance is never priced
 
-**Parked by the owner.** Not dropped — this is the largest outstanding modelling problem in the
-scorer, and the notes below are the accumulated evidence. Do not start on it without a decision.
+**Reworked over five phases, not closed.** The headline symptom is gone. Four tests and one
+structural problem remain. The notes from before the rework are kept below the fold because two of
+their premises turned out to be wrong, and knowing which ones is the point of this register.
 
-Nothing in the engine charges a buff that lands *badly* — only one that lands on nobody.
-`getBuffRelevance` grades the shortfall (`atk` into rupture = `0.33`, into armorer `0`, else `1`),
-that grading feeds `ratio`, and `ratio` is then discarded by
-`Math.max(adjustedRatio, threshold, coreRatio)`, because `threshold` reads `effectiveWeight`
-alone, is blind to waste, and usually wins.
+### What the issue turned out to be
 
-**Consequence A — removing a badly-landing buff improves the team:**
+The old cohesion measure took the best of three numbers:
 
-```
-Nangong/Yixuan/Sunna
-  with atk:3      team 242.5    Sunna util  81%
-  atk:3 removed   team 285.2    Sunna util 100%
+```js
+Math.max(adjustedRatio, threshold, coreRatio)     // threshold = effectiveWeight / 4
 ```
 
-Pre-existing — before the 3.2 work the same comparison read 272.2 → 322.1 — and inherent to
-scoring cohesion as a ratio: a partially-effective buff always drags a ratio down even though it
-adds real absolute damage. `threshold` exists as the counterweight, which is why it cannot simply
-be deleted. A modelling wart rather than a live bug, since `units.json` never removes a real
-buff, but it keeps generating knife-edge tuning.
+This register used to call `threshold` the bug — a quantity with no denominator, blind to waste,
+that usually won. **That reading was wrong, and it is the single most important correction here.**
+`threshold` was the only term that answered the question a team actually asks, and deleting it
+without a replacement made everything worse.
 
-**Consequence B — Sunna vs Astra on a rupture carry is right for the wrong reason.** Both buff
-`atk:3` at 0.33 efficiency into a rupture unit. What *should* separate them is that Astra keeps
-contributing regardless (`cd:3` lands fully, `dmg:3` is a constant multiplier, and she provisions
-chains and quick-assists a rupture team can use) whereas Sunna's one fully-landing lever is
-`stun-multiplier`, which only pays inside stun windows, and her `veils:3` is dead.
+The owner settled it with two hypothetical units, and they are worth keeping:
 
-The ordering comes out right:
+> **Fiona** buffs sheer, laceration, elemental damage, disorder damage, and debuffs wind. On any
+> real team exactly one of those lands and four miss — and she is still a tier-zero support,
+> because the one that landed is enormous. Nobody was ever going to want all five.
+>
+> **Marissa** buffs laceration hugely, plus small ATK, CD and a unique ultimate buff. On an attack
+> team her laceration is wasted *and* it is her defining feature. **Delete her laceration buff and
+> she gets better on that team**, because her flagship becomes the ultimate buff, which lands.
 
+So there are two questions, and *what fraction of your kit was wasted* is neither of them:
+
+| who asks | question | shape |
+|----|----|----|
+| the team | do the buffs **I** care about land? | absolute — how much damage arrived, no denominator |
+| the unit | did **my flagship** land? | identity — not a quantity at all |
+
+A ratio answers neither, and fails in a specific way: adding an offering that does not land leaves
+the numerator alone and raises the denominator, so **a ratio always rewards deleting a mismatched
+buff**. That is what "removing a badly-landing buff improves the team" always was. It is inherent
+to ratios, not a calibration miss, and no amount of tuning reaches it.
+
+### What landed
+
+```js
+delivered = Σ (weight × impact × relevance)          // no denominator; waste is never charged
+util      = min(1, delivered / DELIVERY_REFERENCE) × (flagshipLanded ? 1 : WHIFF_COHESION_PENALTY)
 ```
-Nangong/Yixuan/Astra   277.4   Astra util 100%   cohesion 0.56
-Nangong/Yixuan/Sunna   242.5   Sunna util  81%   cohesion 0.46
-```
 
-But it gets there from the raw `ratio`/`threshold` arithmetic happening to favour Astra's kit,
-not from modelling either of the two things that actually matter: the 0.33 ATK shortfall, or the
-fact that `stun-multiplier` is *window-limited* value while `cd`/`dmg` are constant. Note
-`STUN_MULT_BUFF: 2` is the second-largest impact constant in the file (only `SHEER_BUFF: 9` is
-bigger; `ATK`/`CR`/`CD` are all `0.7`) — so the engine currently rates Sunna's situational lever
-as the single biggest thing she offers. **There is no concept anywhere of always-on versus
-window-limited value.** That is worth revisiting on its own, and is the smallest independent
-piece of this issue.
+Waste is not charged at all. Only mismatch is, once, on identity. `flagshipLanded` asks whether the
+unit's largest offering — or one within `FLAGSHIP_BAND` of it — **substantially** reached a
+consumer. That last word is load-bearing: it used to mean `relevance > 0`, so Yuzuha's ATK buff
+arriving at a third on a rupture carry counted as her flagship finding a home.
 
-A real fix means making the fit ratio authoritative over the absolute-supply `threshold`, and
-letting absolute contribution live in L4 baseline affinity where it belongs rather than being
-smuggled into cohesion. That is a broad retune, not a patch.
+The acid test, which is what this issue exists for:
+
+| team | strip | before | after | |
+|----|----|----|----|----|
+| `Nangong/Yixuan/Sunna` | Sunna's `atk` | 194.5 | 175.5 | correctly worse |
+| `Nangong/Miyabi/Sunna` | Sunna's `atk` | 367.6 | 249.0 | correctly worse |
+| `YSG/Zhao/Lucia` | Lucia's `sheer` | 190.9 | 223.3 | **correctly better** — the Marissa case |
+
+Supporting changes, each measured separately against a stated prediction with zero exceptions:
+
+- **Element buffs are a menu** (`chargeableElementArms`). Lighter carries fire AND ice so that one
+  matches; the dead arm is no longer charged. He is the only multi-element unit in the roster, so
+  he is the only unit it can move — by construction, not by a guard.
+- **Quick assists are small and always land** (`quickAssistCohesionWeight`). Astra's
+  `quick-assists: 3` used to enter cohesion at weight 3 and return 0.75, recording her as wasting
+  the thing every carry in the game happily uses.
+- **`damage.basic`** — a role-inherited baseline (DPS/subdps 3, stun 2, defence 1, support 0),
+  overridable. Answers "how do we know Sunna deals more damage than Astra", which nothing else
+  could. Resolved against *effective* roles, so Nangong reads 3 beside an anomaly agent and 2 on a
+  pure stun team.
+- **Daze counts for non-stunners.** Sunna is shy of a pseudo-stunner: enough daze to matter, not
+  enough to open a window. Her `daze: 2` previously counted for nothing and she read below Nicole
+  on every team.
+- **Defensive provisions are exempt** from delivery — the game heavily favours offence and veils
+  or shields are negligible beside a damage buff. Sunna's `veils: 3` was 48% of her measured kit
+  and landed on nobody.
+
+### The four wrong premises, recorded so they are not repeated
+
+1. **"`threshold` is the bug."** It was the answer to the team's question, unweighted. Deleting it
+   exposed the ratio's flaw in full: `YSG/Zhao/Lucia` improved by **126 points** when Lucia's
+   defining buff was deleted from the data.
+2. **"There are two impact tables and they disagree — merge them."** `MULT` is not a damage scale.
+   It is a table of **L4 pair-term coefficients**, multiplied by a consumer weight and then
+   soft-capped at 100. L4 pays sheer **81.0** into Yixuan and ATK **0.7** — a 116× spread that is
+   survivable inside a capped additive layer and catastrophic inside an uncapped multiplier. Used
+   raw as delivery weights, every ATK support collapsed and every sheer or ultimate support
+   saturated. Delivery now uses the square root of the coefficient.
+3. **"A team must never score higher for a unit having strictly less kit."** Disproved by Marissa.
+   Waste and mismatch are different things and only the second should cost anything.
+4. **"The remaining failures are a calibration problem."** They are not. TESTs 25 and 26 fail at
+   every value of the delivery scale, the delivery reference, the flagship band **and** the
+   non-DPS utilisation exponent. Four independent dials, none of which touches them. See issue 8.
+
+### Still open
+
+**TESTs 13, 18, 25 and 26.**
+
+| test | reads | wants | what it is |
+|----|----|----|----|
+| 13 | `Dialyn/Evelyn/Pan Yinhu` 147.3 | < 100 | band. Owner has called it a re-band |
+| 18 | `YSG/Zhao/Soukaku` 147.3 | higher | band. Soukaku's lone ice buff genuinely lands on nobody here — YSG is physical and Zhao is a defence unit who deals little damage. Correct behaviour, stale band |
+| 26 | `Qingyi/YSG/Sunna` 220 | 300+ | **not a defect.** YSG has `utility: {stunless: true}`, so Qingyi's daze credit lands on nobody and her whole delivery is `stun-multiplier: 2`. The engine is right that her stun is wasted on a stunless carry; the band predates that being modelled. See issue 8 for why the *consequence* is still wrong |
+| 25 | `Yixuan/Lucia/Yuzuha` 303.7 | ≤ 220 | the one genuinely open case. Lucia is a *correct* pairing for Yixuan and sits at 100%; the team is only supposed to be weak because Yuzuha is a poor third, and Yuzuha at 55% does not drag it enough |
+
+**Two cases needed a hand-written annotation rather than emergent mechanics**, which is worth
+noticing as a pattern rather than treating as two accidents:
+
+- **Sunna on a rupture carry** carries `synergy.avoid: ["rupture"]`. She joins on attack/faction, so
+  she only ever reaches a rupture team beside Nangong (every rupture unit joins on stun or
+  support) — and there she is extraneous: Nangong already brings the stun multiplier, daze and
+  recovery debuff, no rupture unit is `totalize` so a second source has nothing to feed, and her
+  own ATK arrives at a third. What the team wants is crit damage and sheer, which she lacks.
+  `avoid` now distinguishes two claims: naming a **unit** disqualifies, naming a **role** applies
+  `ROLE_AVOID_PENALTY` — a bad team, not an impossible one.
+- **Lycaon** keeps `scaling.buffs: 0`, exempting him from cohesion entirely. Deliberate: he is one
+  of only two anomaly stunners, and should not be penalised when his ice debuff is useless, since
+  he is what there is. A **scarcity exemption**, and there is no mechanism for that concept.
+
+### Everything below this line predates the rework
+
+Kept as evidence, not as guidance. It was written while the fit ratio was assumed to be the right
+shape and `threshold` was assumed to be the bug — both of which turned out to be backwards. The
+measurements are still real; the conclusions drawn from them are not.
 
 ### Measured: the cohesion tax falls on one archetype, ~9 points
 
@@ -117,6 +201,149 @@ retune rather than a patch. All measured against the full 86-test suite:
 
 
 ---
+
+## 8. Cohesion is a per-unit judgement applied as a whole-team multiplier
+
+**New, and it is the structural residue of issue 3.** Named by the owner, from the game side:
+
+> All of these teams should be strong against Typhon because YSG/Sunna is already strong against
+> Typhon and any bonuses from a third teammate with defensive assist are **gravy**.
+
+Gravy *adds*. But `computeBuffUtilization` produces a per-unit fit judgement, which feeds the
+teamwork multiplier, which scales the **entire team score**. So a third member's poor fit does not
+reduce that member's contribution — it scales down the damage the other two are doing.
+
+This explains TESTs 25 and 26 as one thing, in opposite directions:
+
+| team | the third member | reads | effect |
+|----|----|----|----|
+| `Qingyi/YSG/Sunna` | Qingyi's stun is wasted on a stunless carry | 63% | drags a strong core **down** to 220 |
+| `Yixuan/Lucia/Yuzuha` | Lucia is a correct pairing for Yixuan | 100% | multiplies a weak team **up** to 303.7 |
+
+Neither judgement is wrong. Qingyi's stun really is wasted on YSG; Lucia really does suit Yixuan.
+The error is applying either one to the whole team.
+
+**Do not attack this with a dial.** It was measured against four of them — the delivery scale
+(flat through sqrt), the delivery reference (2.5 through 7), the flagship band (0.5 through 1.0),
+and the non-DPS utilisation exponent (0.5 through 2). TESTs 25 and 26 fail at every value of every
+one. Softening the exponent, which is the obvious move, makes the overall picture strictly worse:
+
+| non-DPS exponent | unexpected failures |
+|----|----|
+| 2 (current) | 4 |
+| 1.5 | 5 |
+| 1.0 | 7 |
+| 0.5 | 7 |
+
+The fix is a rework of how L2, L4 and the teamwork multiplier divide responsibility — a
+mismatched support should contribute less, not multiply the team down. That is its own phase with
+its own baseline, not a tuning pass.
+
+**Bucketing 4/6 is a side effect of this, not a separate front.** YSG's support valuations moved,
+so mixes of Dialyn / Sunna / Zhao with YSG no longer fall inside the same epsilon band:
+`YSG/Zhao/Sunna` (429.4) and `Dialyn/YSG/Sunna` (476.6) are 47 points apart against a 9.5-point
+band on Thrall, and bucketing TEST 1's allocation fails downstream of that. It needs no diagnosis
+of its own — it resolves when the YSG support question does, or it is a re-band. Do not open it as
+a separate workstream.
+
+
+---
+
+## 9. The pull engine never consults team scores, so it cannot see partner quality
+
+Remielle's ceiling depends enormously on **one** partner. Her best teams are all
+`Remielle/Velina/X`; without Velina the best available line is around `Alice/Vivian/Remielle` —
+Alice generating disorders and Remielle absorbing anomaly procs, which is good but is not the same
+thing. The owner's words: *"Velina is incredibly strong and there is a very clear difference
+between Rem/Vel teams and Rem/Viv teams."*
+
+**The pull engine cannot tell those two rosters apart.** It imports helpers from `team-scorer.js`
+but never calls `scoreTeamForBoss`; it reasons about scaling keys, role coverage, element coverage
+and codependency. Velina changes none of those on a roster that is already anomaly-heavy, so
+Remielle rates Medium with her and Medium without her.
+
+Recommendations TEST 43 pins this. It is red on purpose and carries the reason.
+
+**A `synergy.units` annotation on the pair was tried and rejected.** It does not move the
+recommendation at all — the pull engine's mech-synergy gaps do not reach this decision — and in the
+scorer it lifts `Promeia/Remielle/Velina` from 501.6 to **581.6**, an 80-point change for a
+side effect. Do not reach for it again without measuring both halves.
+
+Closing this means teaching the pull engine to weigh partner QUALITY, most likely by consulting
+the scorer for a candidate's best achievable team on the current roster versus with the candidate
+added. That is a feature, not a fix, and it is the first thing that would make the two engines
+genuinely share a model rather than share a vocabulary.
+
+Note that Remielle rating Medium without Velina is **correct** and was accepted as such — the old
+fixture asserted High because it was blind to the distinction, not because the engine was wrong.
+
+---
+
+## Phase 5 post-mortem — burst window contention (`scaling.greedy`)
+
+Landed, and it closed issue 7's TEST 98.
+
+Some carries need the stun window to THEMSELVES. Remielle cannot fire her double ultimate while
+Miyabi is running enhanced → ultimate → enhanced, which is the same reason dual-attacker and
+dual-rupture teams do not exist. `scaling.greedy` measures that, and it is about **execution
+difficulty rather than damage**: Miyabi's enhanced attacks take about twice as long as Promeia's
+and need disorder fuel timed into the window, while Aria's are very quick.
+
+    3   needs the window to itself   Yixuan, Remielle, Miyabi, Evelyn
+    1   real rotation, quick         Aria, Promeia, Alice, Sigrid, Harumasa
+    0   everyone else
+
+**Measuring this by burst size would have been wrong** — it would have penalised Aria and Promeia,
+who are two of Remielle's *best* partners. Only greed above 1 contends, and that one rule is what
+separates the cases.
+
+**Two halves, penalty and bonus:**
+
+- **Contention** (`MULT.GREED_CONTENTION`, −3 per greed unit squeezed out). The greediest keeps the
+  window; everyone else's greed is what is lost. −3 is the only value in the window: −2 leaves
+  `Nangong/Miyabi/Yuzuha` losing on Neutral, −4 pushes `Miyabi/Remielle/Vivian` below
+  `Miyabi/Vivian/Yuzuha` on Girtablullu.
+- **A shortened enemy recovery is worth more to a greedy carry** — most units have plenty of time
+  to land their burst inside a normal stun; a greedy carry is the one that was running out of
+  window. Gated at greed 2. This is why Lighter beats Trigger as Evelyn's stunner: both raise her
+  stun multiplier, only Lighter shortens recovery, and Evelyn declares `scaling.recovery` outright.
+
+Resulting ladder, correct on all four bosses:
+
+| boss | NMYuzuha | MVRemielle | MVYuzuha |
+|----|----|----|----|
+| Butcher | **593.2** | 574.7 | 561.2 |
+| Marionettes | **570.5** | 551.7 | 538.2 |
+| Girtablullu | **469.1** | 457.4 | 454.5 |
+| Neutral | **499.4** | 489.3 | 486.0 |
+
+Both halves held their predictions with zero exceptions: contention moved 414 rows all attributed
+to the `contention` layer, every one containing two units with greed above 1; the recovery bonus
+moved 2,322 rows all attributed to `l4`, every one containing a recovery debuffer *and* a greedy-2
+carry. Combined, 2.1% of the corpus.
+
+### What it cost, and what is not covered
+
+**TEST 7's Pompey rung and the greed mechanic cannot both stand.** The rung wants
+Dialyn > Lighter > Ju Fufu on fire-weak Pompey. With **no greed bonus at all** that gap is
+**1.7 points** (Dialyn 409.3, Lighter 407.6), and Lighter's fire element is amplified on a fire-weak
+boss — so any bonus flips it, including a bonus of 1. Measured across four candidate bonus shapes;
+none satisfies both this rung and the Neutral ordering the owner asked for. Owner adjudication.
+
+**TEST 15** re-bands: `Nangong/Yixuan/Sunna` reads 279 against a 265 ceiling because Yixuan is
+greedy and Nangong debuffs recovery. Sunna is already charged `ROLE_AVOID_PENALTY` there; raising
+that again to chase this ceiling would be tuning one lever to hide another.
+
+**The value-scaling is unverifiable today.** The contention penalty scales with the greed values,
+but every contender on the current roster is annotated 3, so every clash is 3+3 and no fixture can
+distinguish scaling from a flat charge. It becomes testable when a greedy-2 unit exists. Recorded
+in TEST 107 rather than left as an implicit gap.
+
+**A literal reading of the phase's stop-if was violated and judged acceptable.** The rule was "any
+`Remielle/Velina/X` team moves"; `Miyabi/Remielle/Velina` moved. That is Miyabi(3) + Remielle(3) —
+a real contention case that happens to contain Velina, not one of her best teams. Against the
+named list — `Remielle/Velina/{Aria, Promeia, Alice, Burnice}` — 95 rows were checked and none
+moved.
 
 ## 5. Disorder supply was never measured
 
