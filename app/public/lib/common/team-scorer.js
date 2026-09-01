@@ -1240,6 +1240,107 @@ export function getBasicDamageBaseline(unit) {
     return best;
 }
 
+// ============================================================================
+// ARCHETYPE FIT  (mechanics.archetypes)
+// ============================================================================
+//
+// The engine spent eight attempts trying to DERIVE whether a support fits a team from its buff
+// list, and a ratio over a support's own kit cannot separate "wrong tool" (Yuzuha's anomaly kit
+// on a rupture carry) from "narrow but right" (Fiona lands one buff and is tier zero). So the
+// answer is DECLARED instead: `mechanics.archetypes = { intended: [...], avoid: [...] }` names the
+// carry archetypes a support is built for and the ones it is wrong for. Unlisted archetypes, and
+// units with no annotation at all, are neutral.
+//
+// This is a deliberate, documented departure from the mechanics-emergent premise (see CLAUDE.md
+// and engine-context.md). It is applied as a SEPARATE additive term — it must never feed the
+// cohesion multiplier, or the same judgement is charged twice, which is the compounding that made
+// every earlier cohesion change violent.
+
+// A team is built around its PRIMARY carry — the highest-value real DPS. Owner: "we don't build
+// teams around pseudo-DPS agents... even on Miyabi/Vivian/Remielle, Rem is the support agent."
+// So a pseudo-anomaly stunner (Nangong) is never the hub; only a unit TAGGED with a DPS role is a
+// candidate, and among those the best tier wins (titled, then S-rank breaks ties).
+function getPrimaryCarry(team) {
+    const carries = team.filter(u => DPS_ROLES.some(r => u.tags.includes(r)));
+    if (carries.length === 0) return null;
+    return [...carries].sort((a, b) => {
+        const ta = a.tier ?? 2.5, tb = b.tier ?? 2.5;
+        if (ta !== tb) return ta - tb;
+        if (isTitled(a) !== isTitled(b)) return isTitled(a) ? -1 : 1;
+        if (isSRank(a) !== isSRank(b)) return isSRank(a) ? -1 : 1;
+        return 0;
+    })[0];
+}
+
+// The carry's own archetype(s): the DPS role tags it actually carries. Clean on every carry —
+// exactly one of attack/anomaly/rupture/armorer in the common case.
+function carryArchetypes(carry) {
+    return DPS_ROLES.filter(r => carry.tags.includes(r));
+}
+
+// intended / neutral / avoided. `avoid` wins ties (they should never overlap in the data, but a
+// mismatch is the more important claim). A unit with no annotation is always neutral.
+function getArchetypeFit(unit, carryArchs) {
+    const arch = unit.mechanics?.archetypes;
+    if (!arch || carryArchs.length === 0) return 'neutral';
+    const avoid = arch.avoid || [];
+    const intended = arch.intended || [];
+    if (carryArchs.some(a => avoid.includes(a))) return 'avoided';
+    if (carryArchs.some(a => intended.includes(a))) return 'intended';
+    return 'neutral';
+}
+
+// A unit that plays support infrastructure — the population whose archetype fit we judge, and log
+// even when unannotated so a missing annotation is visible rather than silently neutral.
+function isSupportLike(unit) {
+    return unit.tags.includes('support') || unit.tags.includes('defense') ||
+        (unit.mechanics?.pseudoRole || []).some(e => (typeof e === 'string' ? e : e?.role) === 'support');
+}
+
+// `intended` is ZERO on purpose. Fitting the carry's archetype is the BASELINE a support is
+// expected to meet, not a bonus to be stacked — the owner's rarity-vs-importance point one level
+// up. Measured: a positive intended bonus is not load-bearing for any fixture judgement (the avoid
+// penalty carries all the discrimination) and it inflates well-matched teams past their ceilings
+// (TESTs 14, 18). So only the mismatch is priced.
+//
+// `avoid` = -40 is calibrated, not a guess. Two live constraints bracket it tightly: TEST 15
+// (`Nangong/Yixuan/Sunna` <= 265) needs the penalty deep enough, and TEST 25
+// (`Yixuan/Lucia/Yuzuha` >= 130 on Wandering Hunter) needs it shallow enough. -40 lands both
+// (261.1 and 130.7) with the fixture at 10/11. This term is scaled by the teamwork multiplier,
+// so its effective bite is smaller on already-incohesive teams — matching the existing
+// `synergy.avoid` role penalty it supersedes.
+const ARCHETYPE_INTENDED_BONUS = 0;
+const ARCHETYPE_AVOID_PENALTY = -40;
+
+// Total archetype adjustment for a team, plus its debug trace. Applied once per support against
+// the PRIMARY carry only. Returns 0 (and logs nothing scored) when there is no real carry.
+function scoreArchetypeFit(team, debug) {
+    const carry = getPrimaryCarry(team);
+    if (debug) console.log('\n  ARCHETYPE FIT');
+    if (!carry) {
+        if (debug) console.log('    no primary carry — skipped');
+        return 0;
+    }
+    const carryArchs = carryArchetypes(carry);
+    let total = 0;
+    for (const unit of team) {
+        if (unit === carry) continue;
+        if (!isSupportLike(unit) && !unit.mechanics?.archetypes) continue;
+        const fit = getArchetypeFit(unit, carryArchs);
+        let delta = 0;
+        if (fit === 'intended') delta = ARCHETYPE_INTENDED_BONUS;
+        else if (fit === 'avoided') delta = ARCHETYPE_AVOID_PENALTY;
+        total += delta;
+        if (debug) {
+            const tag = unit.mechanics?.archetypes ? '' : ' (unannotated)';
+            const sign = delta > 0 ? `+${delta}` : `${delta}`;
+            console.log(`    ${unit.name} → ${carry.name} [${carryArchs.join('/') || 'none'}]: ` +
+                `${fit}${delta ? ` ${sign}` : ''}${tag}`);
+        }
+    }
+    return total;
+}
+
 // BURST WINDOW CONTENTION.
 //
 // Some carries need the stun window to THEMSELVES to reach their ceiling. Remielle cannot fire
@@ -1736,7 +1837,11 @@ export function chargeableElementArms(elementMenu, consumers) {
             if (isDPS(consumer)) dpsRelevance = Math.max(dpsRelevance, rel);
             else otherRelevance = Math.max(otherRelevance, rel);
         }
-        return { key, bw, rel: Math.max(dpsRelevance, otherRelevance * (hasDPS ? 0.5 : 1.0)) };
+        // `dpsRel` is the arm's reach to an actual DAMAGE DEALER, no half-credit — the flagship
+        // test needs it. Buffing the ice STUNNER's element is not the same as buffing the carry's:
+        // judged on `rel`, Soukaku's ice arm scored exactly 0.50 on Lycaon/Yixuan/Soukaku through
+        // ice-elemental Lycaon and falsely passed the flagship band.
+        return { key, bw, rel: Math.max(dpsRelevance, otherRelevance * (hasDPS ? 0.5 : 1.0)), dpsRel: dpsRelevance };
     });
     const live = arms.filter(a => a.rel > 0);
     if (live.length > 0) return live;
@@ -1862,8 +1967,20 @@ function computeBuffUtilization(supplier, team, out = null) {
     // flagship test — how much arrived is `effectiveWeight`.
     const offerings = [];
     // `declared` marks an offering the unit is BUILT around — see the flagship test below.
-    const offer = (magnitude, relevance, declared = false, baseline = false) => {
-        if (magnitude > 0) offerings.push({ magnitude, relevance, declared, baseline });
+    // `relevance` is what actually arrived; `achievable` is what COULD have arrived on this team
+    // — the same relevance before any CONDITIONAL GATE (Remielle's ATK curve). They are equal for
+    // every offering except a gated one, and the gap between the two is the only thing `fit`
+    // charges. See the fit computation for why.
+    const offer = (magnitude, relevance, declared = false, baseline = false, achievable, dpsRel) => {
+        if (magnitude > 0) offerings.push({
+            magnitude, relevance, declared, baseline,
+            achievable: achievable === undefined ? relevance : achievable,
+            // Reach to an actual DAMAGE DEALER, with NO half-credit for a non-carry teammate. Only
+            // the flagship test consults it: a buff that "lands" on the stunner is not this support
+            // doing its job for the carry. Defaults to `relevance` for offerings with no separate
+            // carry reach (provisions, quick assists).
+            dpsRel: dpsRel === undefined ? relevance : dpsRel,
+        });
     };
     let coreWeight = 0;
     let coreEffective = 0;
@@ -1918,7 +2035,9 @@ function computeBuffUtilization(supplier, team, out = null) {
         totalWeight += bw * impact;
         if (bw < 2) {
             effectiveWeight += bw * impact * reachFactor;
-            offer(bw * impact, reachFactor, !!reach);
+            // Auto-credited, so conversion is full (1); only the gate limits delivery. achievable
+            // is 1, delivered is reachFactor — the gap is the gated shortfall.
+            offer(bw * impact, reachFactor, !!reach, false, 1);
             continue;
         }
 
@@ -1948,10 +2067,16 @@ function computeBuffUtilization(supplier, team, out = null) {
             else otherRelevance = Math.max(otherRelevance, rel);
         }
         const hasDPS = consumers.some(c => isDPS(c));
-        const maxRelevance = Math.max(dpsRelevance, otherRelevance * (hasDPS ? 0.5 : 1.0)) * reachFactor;
+        // conversionRel = how well this buff converts on this carry (the Fiona/screwdriver
+        // question, no gate). maxRelevance = that, gated. achievable is conversionRel, delivered
+        // is maxRelevance, so a partly-CONVERTING buff (Astra's cd at 0.30 on anomaly) contributes
+        // equally to both sums and does not drag fit, while a partly-GATED buff still does.
+        const conversionRel = Math.max(dpsRelevance, otherRelevance * (hasDPS ? 0.5 : 1.0));
+        const maxRelevance = conversionRel * reachFactor;
         effectiveWeight += bw * impact * maxRelevance;
         offer(bw * impact, maxRelevance, !!reach,
-              BASELINE_BUFF_KEYS.has(key) && bw >= BASELINE_BUFF_MIN_WEIGHT);
+              BASELINE_BUFF_KEYS.has(key) && bw >= BASELINE_BUFF_MIN_WEIGHT, conversionRel,
+              dpsRelevance * reachFactor);
         // Only the stat keys feed the "core" accumulators; that distinction is about which buffs
         // constitute a support's central stat package, not about how relevance is measured.
         if (STAT_BUFF_KEYS.has(key)) {
@@ -1979,7 +2104,7 @@ function computeBuffUtilization(supplier, team, out = null) {
             const armImpact = buffImpact(arm.key);
             totalWeight += arm.bw * armImpact;
             effectiveWeight += arm.bw * armImpact * arm.rel;
-            offer(arm.bw * armImpact, arm.rel);
+            offer(arm.bw * armImpact, arm.rel, false, false, undefined, arm.dpsRel);
             coreWeight += arm.bw;
             coreEffective += arm.bw * arm.rel;
             coreImpact += arm.bw * arm.rel * BUFF_IMPACT[arm.key];
@@ -2151,11 +2276,32 @@ function computeBuffUtilization(supplier, team, out = null) {
     // want all five. Charging the misses would punish breadth, which is how a tiny-kit support
     // like Nicole started out-fitting Astra. If NOTHING lands, everything is charged, and the
     // flagship collapse below lands on top of that.
-    const landing = offerings.filter(o => o.relevance > 0);
-    const charged = landing.length > 0 ? landing : offerings;
-    const chargedTotal = charged.reduce((sum, o) => sum + o.magnitude, 0);
-    const chargedLanded = charged.reduce((sum, o) => sum + o.magnitude * o.relevance, 0);
-    const fit = chargedTotal > 0 ? chargedLanded / chargedTotal : 1;
+    // FIT IS MEASURED AGAINST WHAT WAS ACHIEVABLE, NOT AGAINST WHAT WAS BROUGHT.
+    //
+    // `relevance` below 1 had two different causes and the old ratio charged both identically:
+    //
+    //   CONVERSION EFFICIENCY — Aria converts 30% of a crit-damage buff into damage. Astra
+    //   delivered every bit of the 30% that was ever available. She failed at nothing; this is
+    //   the Fiona case one step short of a total miss, and archetype fit now judges "wrong tool"
+    //   separately, so fit must not also punish it.
+    //
+    //   AN UNMET GATE — Remielle's ATK unlocks at three anomaly bodies and the team supplied two.
+    //   The team WANTED the whole buff and got half. That is a real shortfall and the team's doing.
+    //
+    // The old form divided delivered magnitude by BROUGHT magnitude over offerings with
+    // relevance > 0. That filter is a cliff: a buff the team cannot use at all was dropped as
+    // inapplicable and cost nothing, while a buff the team could PARTLY use was charged for the
+    // remainder — so making a buff strictly WORSE (relevance 0.30 → 0) raised the team. The acid
+    // test failed by 94.6 points on Astra's crit damage.
+    //
+    // Dividing by ACHIEVABLE removes the cliff by construction. An offering the team cannot use
+    // contributes zero to both sums; one it can partly use contributes its share to both. What
+    // survives in the gap is exactly the GATED shortfall — the only miss the team is responsible
+    // for. No filter, and none is needed. Discrimination that this ratio used to attempt badly now
+    // lives in archetype fit (wrong tool) and the flagship test (defining buff missed).
+    const chargedAchievable = offerings.reduce((sum, o) => sum + o.magnitude * o.achievable, 0);
+    const chargedDelivered = offerings.reduce((sum, o) => sum + o.magnitude * o.relevance, 0);
+    const fit = chargedAchievable > 0 ? chargedDelivered / chargedAchievable : 1;
 
     // A flagship has to SUBSTANTIALLY land, not merely be nonzero. Yuzuha's ATK reaches a
     // rupture carry at a third, and counting that as "my flagship found a home" is how an
@@ -2183,12 +2329,18 @@ function computeBuffUtilization(supplier, team, out = null) {
     // 1.77 >= 0.6 x 3.00 = 1.80 and answered no, BY 0.03. Her ATK buff lands fully on Ye
     // Shunguong and she was charged the full miss penalty anyway. The dead ice arm is the Fiona
     // case: a unit is not punished for carrying something this particular team cannot use.
+    // BOTH clauses require reaching an actual DAMAGE DEALER (dpsRel), not a stunner or defence unit
+    // at half-credit. The flagship question is "did this support do its job for the CARRY", and the
+    // owner's whole reframing was that a support's strongest relationship can be with the STUNNER
+    // rather than the carry (Soukaku's ice on Lycaon/Yixuan) — which is not the support fitting the
+    // team. A declared conditional still overrides everything; its own relevance already reflects
+    // its (recipient-routed) target.
     const baselineLanded = offerings.some(
-        o => o.baseline && o.relevance >= FLAGSHIP_LAND_THRESHOLD);
+        o => o.baseline && o.dpsRel >= FLAGSHIP_LAND_THRESHOLD);
     const flagshipLanded = declaredOfferings.length > 0
         ? declaredOfferings.every(o => o.relevance > FLAGSHIP_LAND_THRESHOLD)
         : (baselineLanded || flagship === 0 || offerings.some(
-            o => o.magnitude >= FLAGSHIP_BAND * flagship && o.relevance >= FLAGSHIP_LAND_THRESHOLD));
+            o => o.magnitude >= FLAGSHIP_BAND * flagship && o.dpsRel >= FLAGSHIP_LAND_THRESHOLD));
 
     let baseUtil = fit;
     if (!flagshipLanded) baseUtil *= FLAGSHIP_MISS_PENALTY;
@@ -4302,7 +4454,16 @@ export function scoreTeamForBoss(team, boss, options = {}) {
         maxDiametricFloor = Math.max(maxDiametricFloor, floor);
     }
     const teamwork = computeTeamworkMultiplier(team, structureScore, debug, maxDiametricPairs, maxDiametricFloor, boss);
-    score = Math.round(rawScore * teamwork * 10) / 10;
+
+    // Archetype fit: does the support infrastructure suit the primary carry's archetype? Applied
+    // FLAT, AFTER the teamwork multiplier — deliberately not scaled by it. "Wrong tool for this
+    // carry" is a property of the pairing, not of how cohesive the rest of the team is; scaling it
+    // by teamwork would perversely punish a mismatch LESS on an otherwise-cohesive team, which is
+    // backwards. Sunna's stun-multiplier genuinely lands on rupture Yixuan, so her cohesion reads
+    // high and a teamwork-scaled penalty barely moved her — the flat form is what makes the
+    // wrong-tool verdict bite reliably. Still separate from cohesion (see scoreArchetypeFit).
+    const archetype = scoreArchetypeFit(team, debug);
+    score = Math.round((rawScore * teamwork + archetype) * 10) / 10;
 
     if (trace) {
         trace.disqualified = false;
@@ -4316,6 +4477,7 @@ export function scoreTeamForBoss(team, boss, options = {}) {
         trace.l4raw = rawL4;
         trace.l4 = adjustedL4;
         trace.l5 = l5;
+        trace.archetype = archetype;
         trace.raw = rawScore;
         trace.teamwork = teamwork;
         trace.final = score;

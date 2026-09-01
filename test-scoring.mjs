@@ -588,16 +588,34 @@ async function main() {
     });
 
     // ========================================================================
-    // TEST 15: Nangong/Yixuan/Sunna - should not be good 
+    // TEST 15: Nangong/Yixuan/Sunna — the emergent-team-building proof
     // ========================================================================
-    run('TEST 15: Nangong/Yixuan/Sunna suboptimal mix ceiling (Butcher, Marionettes, Neutral)', () => {
-        const { team } = scoreForTeamString('Nangong/Yixuan/Sunna', allUnits)[0];
+    // REVERSED 2026-09-01 after owner play-testing. This test used to assert the team was BAD
+    // (a "cross-archetype mix" capped first at 265, then 305). Prevalent thought agrees: Sunna is
+    // an attack/anomaly support, Yixuan is rupture, so the pairing looks like trash. The engine
+    // insisted otherwise the whole time, and the owner played ~7 matches against Butcher to check:
+    //
+    //   "That team actually kinda rocks... Yixuan REALLY loves the stacking stun multipliers and
+    //    her greedy stun windows rack up huge burst damage. The engine was right and prevalent
+    //    thought was wrong."
+    //
+    // So this is now the FLAGSHIP proof that emergent scoring beats template matching. The claim:
+    // Sunna, the support everyone would dismiss on a rupture carry, is at least as good as Astra,
+    // the "correct" attack support — because Nangong (T0 fast stunner) + Sunna's daze + their
+    // combined stun-multiplier is exactly what a greedy-window rupture carry wants.
+    //
+    // Sunna's rupture avoid was removed from units.json for the same reason: she can only reach a
+    // rupture carry ALONGSIDE Nangong (join rules), and Nangong+Sunna is precisely the wheelchair
+    // that makes it work. Tagging her to avoid rupture in a vacuum was wrong in practice.
+    run('TEST 15: Nangong/Yixuan/Sunna rises — Sunna >= Astra on rupture with Nangong', () => {
         for (const b of withBosses(bosses, 'Neutral,Marionettes,Butcher')) {
-            const s = scoreTeamForBoss(team, b, {});
-            assert(
-                s <= 265,
-                `${b.name}: got ${s}, expected <= 265 (cross-archetype mix should not score well)`
-            );
+            const m = scoreMapForBoss(
+                scoreForTeamString('Nangong/Yixuan/Sunna,Nangong/Yixuan/Astra', allUnits), b);
+            const sunna = m.get('Nangong / Yixuan / Sunna');
+            const astra = m.get('Nangong / Yixuan / Astra');
+            assert(sunna >= astra,
+                `${b.name}: Nangong/Yixuan/Sunna (${sunna?.toFixed(1)}) must be at least as good as ` +
+                `Nangong/Yixuan/Astra (${astra?.toFixed(1)}) — the stun wheelchair works on rupture`);
         }
     });
 
@@ -2885,21 +2903,18 @@ async function main() {
     });
 
     // ========================================================================
-    // TEST 106: Sunna beats Astra on attack and anomaly carries, and is not a rupture support
+    // TEST 106: Sunna beats Astra on attack and anomaly carries
     // ========================================================================
-    // Owner spec from actual play results. Two-sided on purpose: a lever that merely pushes
-    // Sunna up satisfies the first half and breaks the second.
+    // Owner spec from actual play results.
     //
-    // The rupture half is enforced by an explicit role avoid rather than emerging from the
-    // damage arithmetic, which could never separate them: Sunna joins on
-    // attack/faction, so the only way she ever reaches a rupture carry is alongside Nangong
-    // (every rupture unit joins on stun or support). In that team she is extraneous: Nangong
-    // already supplies the stun multiplier, daze and recovery debuff, no rupture unit is
-    // totalize so a second source has nothing to feed, and Sunna's own ATK buff arrives at a
-    // third on a rupture carry. What the team actually wants is crit damage and sheer, which
-    // she does not have. `synergy.avoid: ["rupture"]` says so directly, as a penalty rather
-    // than a disqualification — it is a bad team, not an impossible one.
-    run('TEST 106: Sunna beats Astra on attack/anomaly carries and loses badly on rupture', () => {
+    // The rupture half was REMOVED 2026-09-01 after play-testing (see TEST 15). It used to assert
+    // Sunna "essentially never" beats Astra on rupture, enforced by a rupture avoid. That was
+    // wrong in practice: Sunna can only reach a rupture carry alongside Nangong (join rules), and
+    // Nangong+Sunna is exactly the stun wheelchair that makes rupture Yixuan sing — Yixuan loves
+    // the stacking stun multipliers in her greedy burst windows. So Sunna does beat Astra on
+    // rupture, and she SHOULD; the rupture avoid was removed from her data and this half of the
+    // test with it. What remains is the attack/anomaly claim, which is unaffected.
+    run('TEST 106: Sunna beats Astra on attack/anomaly carries', () => {
         const carryRole = (u) => {
             for (const r of ['rupture', 'anomaly', 'attack', 'armorer']) if (u.tags.includes(r)) return r;
             return u.tags.includes('stun') ? 'stun' : 'support';
@@ -2929,7 +2944,7 @@ async function main() {
         }
 
         const pct = (a) => (100 * a[0]) / a[1];
-        for (const arch of ['attack', 'anomaly', 'rupture']) {
+        for (const arch of ['attack', 'anomaly']) {
             assert(tally[arch][1] >= 20,
                 `only ${tally[arch][1]} live ${arch} comparisons — this test has gone vacuous, fix the fixture`);
         }
@@ -2939,10 +2954,6 @@ async function main() {
         assert(pct(tally.anomaly) > 55,
             `Sunna should be the better pick on most ANOMALY carries; she wins ` +
             `${pct(tally.anomaly).toFixed(0)}% of ${tally.anomaly[1]} cores`);
-        assert(pct(tally.rupture) < 10,
-            `Sunna is the wrong tool for a rupture carry and carries synergy.avoid: ["rupture"] ` +
-            `to say so; she should essentially never beat Astra there, but wins ` +
-            `${pct(tally.rupture).toFixed(0)}% of ${tally.rupture[1]} cores`);
     });
 
     // ========================================================================

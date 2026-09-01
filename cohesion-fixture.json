@@ -1,0 +1,133 @@
+{
+  "_readme": [
+    "Owner-derived judgements about support fit, held as ORDERED PAIRS and BANDS rather than",
+    "absolute scores. This is the objective function for the cohesion / archetype work: a design",
+    "is good to the extent that it satisfies these, NOT to the extent that the 109-test suite is",
+    "green (unrelated bands move and mask the signal there).",
+    "",
+    "Run:  node cohesion-fixture.mjs            (summary: how many hold)",
+    "      node cohesion-fixture.mjs --verbose  (every entry, with the numbers)",
+    "      node cohesion-fixture.mjs --fail     (only the failing entries)",
+    "",
+    "PROVENANCE is load-bearing. 'stated' = the owner gave this ordering independently of the",
+    "engine. 'confirmed' = the owner looked at engine output and agreed. The Evelyn ladder was",
+    "'confirmed' and was later REVERSED against player statistics, so 'confirmed' entries are",
+    "weaker evidence and are marked. Never tune the engine toward a 'confirmed' target without",
+    "re-deriving it first.",
+    "",
+    "ENTRY TYPES:",
+    "  pair   {greater, less, boss}          greater must outscore less on that boss",
+    "  margin {greater, less, boss, by}      greater must outscore less by at least `by`",
+    "  band   {team, boss, min?, max?}       team's score must fall in [min, max]",
+    "  ladder {teams:[...], boss}            teams must score in strictly descending order",
+    "Each team is a '/'-joined spec parsed the same way matchups.js parses -t.",
+    "`boss` is a boss-filter string (matchups.js -b); 'neutral' is the synthetic neutral boss."
+  ],
+
+  "entries": [
+    {
+      "id": "sunna-astra-aria-anomaly",
+      "type": "pair",
+      "greater": "Nangong/Aria/Astra",
+      "less": "Nangong/Aria/Nicole",
+      "boss": "Sweeper",
+      "provenance": "stated",
+      "note": "TEST 9. Astra out-delivers Nicole to the anomaly carry Aria; she must win. Currently FAILS: Nicole 472 > Astra 423. This is the headline regression."
+    },
+    {
+      "id": "claret-rina-over-astra",
+      "type": "margin",
+      "greater": "Koleda/Claret/Rina",
+      "less": "Koleda/Claret/Astra",
+      "boss": "neutral",
+      "by": 60,
+      "provenance": "stated",
+      "note": "TEST 68. Rina is an armorer-facing support (pen/atk/def); Astra's ATK and CD are both dead on an armorer. Rina must clear Astra by a clear margin."
+    },
+    {
+      "id": "soukaku-fine-on-ysg",
+      "type": "band",
+      "team": "Ye Shunguong/Zhao/Soukaku",
+      "boss": "Nightmare",
+      "min": 250,
+      "provenance": "stated",
+      "note": "Soukaku's ATK buff lands on the attack carry YSG; her dead ice arm is the Fiona case. A sound core plus a real modest contributor -- must not read as a wasted slot."
+    },
+    {
+      "id": "soukaku-bad-on-lycaon-yixuan",
+      "type": "band",
+      "team": "Lycaon/Yixuan/Soukaku",
+      "boss": "Butcher",
+      "max": 180,
+      "provenance": "stated",
+      "note": "The mirror of the above on IDENTICAL 0.33 ATK reach. Yixuan is rupture and Soukaku avoids rupture; her strongest relationship here is with the ice STUNNER, not the carry. Must read bad."
+    },
+    {
+      "id": "sunna-rises-on-nangong-yixuan",
+      "type": "pair",
+      "greater": "Nangong/Yixuan/Sunna",
+      "less": "Nangong/Yixuan/Astra",
+      "boss": "Butcher",
+      "provenance": "stated",
+      "note": "THE FLAGSHIP PROOF that emergent scoring beats template matching, PLAY-CONFIRMED 2026-09-01. This entry used to say the opposite (Sunna is BAD on rupture Yixuan, capped at 265 then 310) — prevalent thought agrees, since Sunna is an attack/anomaly support and Yixuan is rupture. The engine insisted the team was good the whole time; the owner played ~7 matches against Butcher and confirmed it: 'that team actually kinda rocks... Yixuan REALLY loves the stacking stun multipliers and her greedy stun windows rack up huge burst damage. The engine was right and prevalent thought was wrong.' Sunna >= Astra here (340 vs 328 on Butcher) because Nangong's fast T0 stun + Sunna's daze + their combined stun-multiplier is exactly what a greedy-window rupture carry wants. Sunna's rupture avoid was removed: she only reaches a rupture carry alongside Nangong (join rules), and that pairing IS the wheelchair that works, so tagging her to avoid rupture in a vacuum was wrong in practice."
+    },
+    {
+      "id": "yuzuha-bad-on-yixuan-lucia",
+      "type": "band",
+      "team": "Yixuan/Lucia/Yuzuha",
+      "boss": "neutral",
+      "max": 220,
+      "provenance": "stated",
+      "note": "Yuzuha is an anomaly support on a rupture carry: her anomaly and disorder buffs land on nobody and only a third of her ATK arrives. Duo-plus-waste. Lucia is the CORRECT partner for Yixuan and is not what makes this weak; Yuzuha is."
+    },
+    {
+      "id": "banyue-astra-lucia-strong",
+      "type": "band",
+      "team": "Banyue/Astra/Lucia",
+      "boss": "Pompey",
+      "min": 350,
+      "provenance": "stated",
+      "note": "TEST 14. Banyue is rupture; Lucia (sheer) is intended and lands, Astra is merely NEUTRAL on rupture (her CD/dmg land even if ATK is weak). Collides with soukaku-bad-on-lycaon-yixuan on identical 0.33 ATK reach -- the pair no derived model separated."
+    },
+    {
+      "id": "remielle-off-triple-anomaly-capped",
+      "type": "band",
+      "team": "Nangong/Miyabi/Remielle",
+      "boss": "neutral",
+      "max": 240,
+      "provenance": "stated",
+      "note": "Remielle's ATK is gated on three anomaly bodies; Nangong is only pseudo-anomaly so it half-unlocks. No non-triple-anomaly Remielle team belongs near the top. Neutral-boss figure; a favourable matchup may exceed it (open question)."
+    },
+    {
+      "id": "evelyn-stunner-ladder-pompey",
+      "type": "ladder",
+      "teams": [
+        "Norma/Evelyn/Astra",
+        "Dialyn/Evelyn/Astra",
+        "Lighter/Evelyn/Astra",
+        "Ju Fufu/Evelyn/Astra"
+      ],
+      "boss": "Pompey",
+      "provenance": "stated",
+      "note": "TEST 7. Corrected 2026-09-01 against aggregated player statistics: Norma > Dialyn > Lighter > Ju Fufu, with Norma/Dialyn close and Lighter a step below. The ORIGINAL nine-rung version of this ladder was 'confirmed' from engine output and turned out wrong -- hence only the verified top four are pinned."
+    },
+    {
+      "id": "burnice-over-yanagi-neutral-third",
+      "type": "pair",
+      "greater": "Miyabi/Burnice/Astra",
+      "less": "Miyabi/Yanagi/Astra",
+      "boss": "neutral",
+      "provenance": "stated",
+      "note": "With a disorder-NEUTRAL third (Astra), Burnice beats Yanagi as Miyabi's anomaly partner: equal disorder supply, so it comes down to tier and off-field time."
+    },
+    {
+      "id": "yanagi-over-burnice-yuzuha-third",
+      "type": "pair",
+      "greater": "Miyabi/Yanagi/Yuzuha",
+      "less": "Miyabi/Burnice/Yuzuha",
+      "boss": "neutral",
+      "provenance": "stated",
+      "note": "The exception: Yuzuha buffs disorders, polarity is a disorder subclass, so she amplifies Yanagi's own polarity damage. Yanagi wins here and only here."
+    }
+  ]
+}

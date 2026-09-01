@@ -621,7 +621,7 @@
         "join": ["ether", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
-            "archetypes" : { "intended" : ["attack", "anomaly", "armorer"], "avoid": ["rupture"] },
+            "archetypes" : { "avoid": ["rupture"] },
             "buffs": { "ether": 1, "cr" : 1 },
             "debuffs": { "defense": 3 },
             "utility": { "quick-assists": true }
@@ -1008,7 +1008,7 @@
         "join": ["attack", "faction"],
         "synergy": { "units": ["Aria"], "tags": [], "avoid": [] },
         "mechanics": {
-            "archetypes" : { "intended" : ["attack", "anomaly"], "avoid": ["armorer", "rupture"] },
+            "archetypes" : { "intended" : ["attack", "anomaly"], "avoid": ["armorer"] },
             "damage": { "basic": 1 },
             "buffs": { "atk": 3, "stun-multiplier": 2 },
             "utility": { "veils": 3, "daze": 2, "quick-assists" : true, "heal:team": true }

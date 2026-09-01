@@ -364,6 +364,7 @@ Weights throughout: `true`/`1` = minor, `2` = strong, `3` = defining. (Values ab
 | `debuffs` | What it debuffs on enemies |
 | `utility` | Non-stat contributions |
 | `scaling` | What it benefits *from* |
+| `archetypes` | Which carry archetypes this support is built for / wrong for (see below) |
 | `replaces` | Supplier-side: this provision costs the consumer another resource |
 | `converts` | Consumer-side: self-conversion of one resource into another |
 
@@ -694,6 +695,38 @@ Three keys are carved out, each for the same reason:
 carve-out.** That bug has now been found three times in the same place.
 
 
+#### `archetypes` — declared support fit
+
+`mechanics.archetypes = { intended: [roles], avoid: [roles] }`, where roles are drawn from the
+four carry archetypes `attack` / `anomaly` / `rupture` / `armorer`. A support says outright which
+carry archetypes it is built for and which it is the wrong tool for. Unlisted archetypes, and units
+with no annotation at all (Ben, Caesar — neither plays a support role), are **neutral**.
+
+This is a DELIBERATE departure from the mechanics-emergent premise, made after eight attempts to
+*derive* support fit from buff lists all failed on the same rock: a ratio over a support's own kit
+cannot tell "wrong tool" (Yuzuha's anomaly kit on a rupture carry) from "narrow but right" (a
+support who lands one huge buff and is tier zero). Declaring it is more honest than a model that
+produces wrong answers for opaque reasons.
+
+Scored by `scoreArchetypeFit` against the **primary carry only** — the highest-tier real DPS; a
+pseudo-anomaly stunner is never the hub. `intended` pays nothing (fitting the carry is the
+baseline, not a bonus). `avoid` pays a flat penalty applied AFTER the teamwork multiplier, so a
+wrong-tool verdict bites the same regardless of how cohesive the rest of the team is. The penalty
+is separate from the cohesion multiplier — the two must never charge the same judgement twice.
+
+Every support's archetype verdict (intended / neutral / avoided) is printed in the `--debug` trace,
+so a wrong or missing annotation is visible rather than silently neutral.
+
+**An `avoid` is for a unit that is genuinely the wrong tool, not for a team that merely looks
+unconventional — and it can be wrong in practice while looking right in a vacuum.** Sunna carried
+`avoid: ["rupture"]` because an attack/anomaly support on a rupture carry looks like a mismatch. It
+was removed after play-testing: Sunna can only reach a rupture carry alongside Nangong (join rules),
+and Nangong + Sunna is exactly the stun wheelchair — fast T0 stun, extra daze, stacking
+stun-multiplier — that a greedy-window rupture carry like Yixuan wants. The emergent logic had this
+right the whole time; the avoid tag was suppressing the engine's own correct answer. When the engine
+confidently disagrees with intuition about a support, test it in play before overriding with an
+avoid. (See `scoring-engine-internals.md` §8d.)
+
 #### `scaling`
 
 What the unit benefits from. Non-stat keys go through Need Fulfillment; stat keys feed Baseline
@@ -837,6 +870,12 @@ scoring **emerges from pairwise mechanical interactions** rather than template m
 constraint is: *a mechanic's existence has no value; points are only awarded when something consumes
 it.* The exception is foundational stats (ATK/CR/CD), which have automatic role-gated value because
 every DPS intrinsically benefits from them.
+
+**One deliberate exception to "emergent, not template": `mechanics.archetypes`.** Support fit by
+carry archetype resisted eight attempts to derive it from mechanics — a ratio over a support's own
+kit cannot separate wrong-tool from narrow-but-right. It is now DECLARED per support and read
+directly (see the `archetypes` field above), the one place the engine is told an archetype-level
+judgement rather than deriving it. Everything else remains emergent.
 
 ### Pipeline
 

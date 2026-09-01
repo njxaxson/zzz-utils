@@ -32,7 +32,8 @@ involves:
   `scaling`, `buffs`, `join`, conditional `when` predicates, etc.) is defined
   there, not in comments on the data file.
 - Changing scoring logic in `team-scorer.js` or `pull-engine.js` — you need
-  the design premise (mechanics-emergent scoring, not template matching) and
+  the design premise (mechanics-emergent scoring, not template matching — with one deliberate
+  exception, `mechanics.archetypes`, which declares support-by-carry fit directly) and
   the L1–L5 layer responsibilities to know where a change belongs and what
   it might ripple into (role activation effects, cohesion, teamwork
   multiplier).

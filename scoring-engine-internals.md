@@ -433,6 +433,108 @@ change one, check the other.**
 
 ---
 
+## 8d. Intentional archetypes + the acid test, closed 2026-09-01
+
+The ninth attempt at "does this support belong here?", and the one that held. Two changes, plus a
+measuring instrument built first.
+
+### The instrument — `cohesion-fixture.json` / `cohesion-fixture.mjs`
+
+Every prior attempt was judged against the 109-test suite, where unrelated bands move on any change
+and drown the signal. So a change that FIXED the mechanism could read as a regression. The fixture
+holds ~11 owner judgements as ordered pairs / bands / ladders and prints one number: how many hold.
+It is the objective function. Provenance is marked per entry (`stated` vs `confirmed`), because a
+`confirmed`-from-engine-output target was reversed once already (the Evelyn ladder).
+
+### Change 1 — archetypes are DECLARED, not derived (`mechanics.archetypes`)
+
+Eight attempts tried to derive archetype fit from buff lists. A ratio over a support's own kit
+cannot separate "wrong tool" from "narrow but right" (Fiona). So the owner annotated 14 supports
+with `{ intended:[...], avoid:[...] }` naming the carry archetypes they suit and the ones they are
+wrong for. The engine now reads it (`getPrimaryCarry`, `getArchetypeFit`, `scoreArchetypeFit`):
+
+- The hub is the PRIMARY carry only — the highest-tier real DPS. A pseudo-anomaly stunner is never
+  the hub. Owner: "even on Miyabi/Vivian/Remielle, Rem is the support agent."
+- `intended` pays **0**. Fitting the carry is the BASELINE, not a bonus — a positive value was not
+  load-bearing for any judgement and inflated well-matched teams past their ceilings. Only mismatch
+  is priced.
+- `avoid` pays a FLAT **-40**, applied AFTER the teamwork multiplier, not scaled by it. "Wrong tool"
+  is a property of the pairing, not of how cohesive the rest is; a teamwork-scaled penalty punished
+  a mismatch LESS on a cohesive team, which is backwards. Sunna's stun-multiplier genuinely lands on
+  rupture Yixuan so her cohesion reads high — only the flat form bit reliably.
+
+`synergy.avoid`'s role half is now redundant but was KEPT as a future L5 lever, per owner.
+
+Prediction "only annotated-unit teams move" held with zero exceptions.
+
+### Change 2 — the acid test, fixed (option 3, now that archetypes carry discrimination)
+
+`fit` was `delivered / brought` over offerings with `relevance > 0`. That filter is a cliff: a buff
+the team cannot use at all was free, one it could PARTLY use was charged for the remainder — so
+making Astra's crit-damage buff strictly worse RAISED her team by 94.6 points. `fit` is now
+`delivered / achievable`, where achievable is the relevance before any conditional gate. A partly-
+CONVERTING buff contributes equally to both sums (no drag); only a partly-GATED buff (Remielle)
+charges its shortfall. No filter. In isolation: 7,836 rows up, 0 down. Acid test holds.
+
+This same change was built and reverted on 2026-08-31 because it broke five rupture/armorer tests —
+fit went blind and nothing carried archetype discrimination. Change 1 is what carries it now.
+
+One necessary companion fix: the FLAGSHIP test now requires reaching an actual DPS (`dpsRel`), no
+half-credit for a non-carry. Option 3 exposed that Soukaku's ice buff was "landing" on Lycaon the
+ice STUNNER at 0.50 and passing the flagship band — the owner's directed-cohesion point exactly
+(stunner/support cohesion is not carry/support cohesion). Fixed `Lycaon/Yixuan/Soukaku` → 137.
+
+### The team that looked like the bane and turned out to be the flagship proof — Nangong/Yixuan/Sunna (TEST 15)
+
+This is the most important entry in the section, and it inverted itself.
+
+For most of this work `Nangong/Yixuan/Sunna` was treated as the engine's bane: Sunna is an
+attack/anomaly support, Yixuan is rupture, so an archetype avoid capped the team as a bad
+"cross-archetype mix" (265, then a reluctant 305). It resisted every attempt to make the cap clean.
+Sunna's stun-multiplier STACKS additively with Nangong's (owner-confirmed) and genuinely lands on
+Yixuan, so her team was ~340 before any penalty — the cap could only be reached with an avoid
+penalty of ~75, which sank Yuzuha/Yixuan/Lucia below its 130 floor. One scalar could not serve both,
+because Sunna genuinely contributes MORE to a rupture carry than Yuzuha does.
+
+**The reason it would not close is that the belief being enforced was wrong.** The owner played ~7
+matches against Butcher and reported back:
+
+> "That team actually kinda rocks against Butcher... Yixuan REALLY loves the stacking stun
+> multipliers and her greedy stun windows rack up huge burst damage. The engine showcased a team
+> that prevalent thought would have dismissed, and despite that it consistently insisted the team
+> was good — AND YET, the engine was right and prevalent thought was wrong."
+
+So the resolution was not a cap at all. **Rupture was removed from Sunna's `archetypes.avoid`**, and
+TEST 15 was reversed from "this team is bad (ceiling)" to "this team rises (Sunna >= Astra on
+Nangong/Yixuan)." The team scores 340 vs Astra's 328 on Butcher and wins on every viable boss.
+
+**Why the blanket removal is safe, not too coarse.** Sunna joins on attack/faction, so the ONLY way
+she reaches a rupture carry is alongside Nangong (every rupture unit joins on stun or support). And
+Nangong + Sunna is exactly the stun wheelchair that makes rupture work — Nangong's fast T0 stun,
+Sunna's extra daze, and their combined stun-multiplier are what a greedy-window carry like Yixuan
+wants. So the join rules already restrict her to the good rupture teams; a per-unit "avoid rupture"
+tag was wrong in practice even though it looks right in a vacuum.
+
+**The lesson, recorded because it is the whole point of the emergent-scoring premise.** The engine
+produced a team ranking that contradicted prevalent thought, held it under repeated pressure to
+"fix" it, and was vindicated by play. An override (`archetypes.avoid`) had been added specifically
+to suppress the engine's own correct answer. The general caution: when the emergent logic
+confidently disagrees with intuition, that is a case to TEST in play before overriding it — the
+disagreement may be the engine seeing a real interaction (here, stun-multiplier stacking feeding a
+greedy burst window) that the intuition misses. Archetype avoids are for units that are genuinely
+the wrong tool, not for teams that merely look unconventional.
+
+### Result
+
+TEST 9 green, acid test holds, fixture 11/11, bucketing 6/6, recommendations 43/44. Scoring suite
+green but for TEST 101 (red by design). Constants: `ARCHETYPE_INTENDED_BONUS = 0`,
+`ARCHETYPE_AVOID_PENALTY = -40`.
+
+**Watch in the correctness pass (step 6):** option 3 lifted some rupture teams with mismatched
+supports high — `Yixuan/Zhao/Astra` reached 361, unpinned by any test. Read those ladders.
+
+---
+
 ## Codependency in the scorer (`scaling.codependent`)
 
 Previously honoured only by the pull engine. Now also scales a codependent unit's contributions
