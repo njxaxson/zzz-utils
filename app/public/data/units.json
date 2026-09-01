@@ -82,6 +82,7 @@
         "join": ["anomaly", "attack", "rupture"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
+            "archetypes" : { "intended" : ["attack"], "avoid": ["armorer"] },
             "buffs": { "atk": 3, "cd": 3, "dmg": 3 },
             "utility": { "quick-assists": 3, "chains": 2, "heal:team": true, "rotations": "limited" }
         },
@@ -219,6 +220,7 @@
                 { "role": "subdps", "when":{"countTag":"attack","minCount":2} },
                 { "role": "support", "when":{"hasUnit":"seed"} }
             ],
+            "archetypes" : { "intended" : ["attack"] },
             "buffs": { "cr": 1, "cd": 3 },
             "debuffs": { "electric": 2 },
             "utility": { "daze": 1, "veils": 1 },
@@ -499,6 +501,7 @@
         "join": ["rupture", "stun"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
+            "archetypes" : { "intended" : ["rupture"], "avoid": ["attack", "anomaly", "armorer"] },
             "damage": { "aftershock": true },
             "buffs": { "sheer": 3, "cd": 3, "dmg": 3 },
             "utility": { "veils": true, "heal:team": 1 },
@@ -519,6 +522,7 @@
         "join": ["fire", "faction", "rupture"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
+            "archetypes" : { "intended" : ["attack", "anomaly"], "avoid": ["armorer"] },
             "buffs": { "atk": 2, "cd" : 1 },
             "utility": { "quick-assists": true }
         },
@@ -617,6 +621,7 @@
         "join": ["ether", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
+            "archetypes" : { "intended" : ["attack", "anomaly", "armorer"], "avoid": ["rupture"] },
             "buffs": { "ether": 1, "cr" : 1 },
             "debuffs": { "defense": 3 },
             "utility": { "quick-assists": true }
@@ -663,6 +668,7 @@
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "pseudoRole": ["support", "subdps"],
+            "archetypes" : { "intended" : ["attack"] },
             "onfield": false,
             "damage": { "aftershock": 3 },
             "buffs": { "atk": 2, "aftershock" : 2 },
@@ -684,6 +690,7 @@
         "join": ["rupture", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
+            "archetypes" : { "intended" : ["rupture"], "avoid": ["attack", "anomaly", "armorer"] },
             "buffs": { "sheer": 2 },
             "debuffs": { "dmg": 3 },
             "utility": { "quick-assists": true, "heal:team": true }
@@ -805,6 +812,7 @@
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "pseudoRole": ["subdps", "support"],
+            "archetypes" : { "intended" : ["anomaly"], "avoid": ["attack", "rupture", "armorer"] },
             "damage": { "ultimate:double": 3, "aftershock": 2, "luminize": 3 },
             "buffs": {
                 "anomaly": 2,
@@ -836,6 +844,7 @@
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "damage": { "ultimate:strong": 2 },
+            "archetypes" : { "intended" : ["armorer", "attack", "anomaly"], "avoid": ["rupture"] },
             "buffs": { "pen": 3, "atk": 2, "def": 2, "anomaly:electric": 1 },
             "scaling": { "ap": true },
             "utility": { "quick-assists": true }
@@ -921,6 +930,7 @@
         "join": ["electric", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
+            "archetypes" : { "intended" : ["anomaly"] },
             "buffs": { "anomaly": 1 },
             "utility": { "shields": true, "quick-assists": true },
             "onfield": true
@@ -978,6 +988,7 @@
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "pseudoRole": [{"role":"anomaly","when":{ "hasUnit": "miyabi" }}],
+            "archetypes" : { "intended" : ["attack", "anomaly"], "avoid": ["armorer", "rupture"] },
             "buffs": { "atk": 3, "ice": 3 },
             "utility": { "quick-assists": true }
         },
@@ -995,8 +1006,9 @@
         "tier": 0,
         "tags": ["support", "physical", "assist:defensive"],
         "join": ["attack", "faction"],
-        "synergy": { "units": ["Aria"], "tags": [], "avoid": ["rupture"] },
+        "synergy": { "units": ["Aria"], "tags": [], "avoid": [] },
         "mechanics": {
+            "archetypes" : { "intended" : ["attack", "anomaly"], "avoid": ["armorer", "rupture"] },
             "damage": { "basic": 1 },
             "buffs": { "atk": 3, "stun-multiplier": 2 },
             "utility": { "veils": 3, "daze": 2, "quick-assists" : true, "heal:team": true }
@@ -1171,6 +1183,7 @@
         "join": ["anomaly", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
+            "archetypes" : { "intended" : ["anomaly"], "avoid": ["armorer", "rupture"] },
             "damage": { "aftershock": true, "basic": 1 },
             "buffs": { "atk": 3, "anomaly": 3, "disorders": 3, "dmg": 1 },
             "utility": { "kaleidoscope": true, "quick-assists": 2, "daze": true },
@@ -1192,6 +1205,7 @@
         "join": ["attack", "anomaly", "support"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
+            "archetypes" : { "intended" : ["attack", "anomaly"], "avoid": ["armorer", "rupture"] },
             "buffs": { "atk": 3, "dmg" : 4 },
             "utility": { "heal:team": 2, "veils": 2, "quick-assists": true },
             "scaling": { "hp": 2 }
