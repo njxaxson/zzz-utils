@@ -3,30 +3,56 @@
 Short by design. Long-form history, mechanisms and recorded wrong turns live in
 `scoring-engine-internals.md`.
 
-Last reviewed 2026-08-31. Branch `wide-blast-radius-recovery` — **not mergeable yet**, see
+Last reviewed 2026-09-01. Branch `wide-blast-radius-recovery` — **not mergeable yet**, see
 *Where this stands* at the bottom.
 
 ## Test status
 
 | suite | state |
 |----|----|
-| scoring | **103 of 109 pass.** 1 red on purpose (101). 5 need attention — 3 bands, 1 issue-8 question, 1 blocked on two ring-fenced constants |
-| recommendations | 43 of 44. TEST 43 red on purpose |
+| scoring | **107 of 109 pass.** 1 red on purpose (101). **1 needs attention: TEST 9** |
 | bucketing | **6 of 6** |
+| recommendations | 43 of 44. TEST 43 red on purpose, parked behind the scoring work |
 
-The 15 split roughly in half: about six are numeric bands that moved when the engine was
-rescaled and just need re-anchoring; the rest are orderings that may be real. They have not been
-triaged since the cohesion rework.
+Closed on 2026-09-01, in order: TESTs 13, 74 and the `Lycaon/Yixuan/Soukaku` half of 18 by owner
+recalibration; TESTs 4, 14, 22, 62, 63, 64, 75, 80, 81 and 108 by the relevance-is-a-max fix;
+TEST 3's tie by the same; TEST 7 by the off-element stunner fix plus two owner rulings; TEST 100
+entirely; TEST 18 by the baseline-buff rule; and bucketing from 4/6 to 6/6.
 
-TEST 7 joined that list rather than leaving it. Its fire-weak rung is now adjudicated and green;
-what still fails is the **Neutral** rung, and that is a genuine defect — see issue 8.
+| test | what it is |
+|----|----|
+| **9** | **Genuine regression** (owner's ruling). `Astra > Nicole` for Nangong/Aria. Astra's raw score is 30 points higher and she loses only on the cohesion multiplier. The one clean fix was built and reverted — see issue 13 |
+| 101 | The Miyabi ladder. Direction still unsettled; see issue 7 |
 
+### TEST 7 — two parked assertions, both recorded in the test itself
+
+**The Norma/Dialyn band mandate: dropped.** Asserted for one day, then removed at the owner's
+direction. The band matters for **bucketing** — teams inside one band share a rank, so a banded
+pair does not consume a rank slot — but that only bites when *Dialyn* is on top: "with Norma on
+top Dialyn will naturally be free to be taken to a Yixuan team while leaving Norma for Evelyn."
+The allocator gets what it needs from the ordering alone.
+
+**The Dialyn-beats-Lighter margin: parked, 0.6 points short.** The owner's spec is that Lighter
+sits *outside* Dialyn's epsilon band. The engine separates them by **8.1** against an epsilon of
+**8.7**. The ordering is asserted and green; only the margin is parked, because closing 0.6 points
+means moving one of the two ring-fenced constants that produce it.
+
+**Both hinge on the same two constants**, and if either is ever reopened this is the evidence:
+
+| term | what it does here |
+|----|----|
+| **+15 sole on-field carry** | Norma is off-field, so Evelyn owns the screen. Worth 14.4 of the Norma/Dialyn gap |
+| **+15 on-element stunner** | fires only on a boss weak to the stunner's element; the rest of the Pompey gap |
+
+The sole-carry bonus has now been the deciding term in **three** separate owner-specified
+orderings — Burnice vs Yanagi, Norma vs Dialyn, and Trigger vs Lighter for Evelyn. That is the
+strongest single argument on file for reopening it, and also the reason not to touch it casually.
 
 ---
 
 ## Open
 
-### 8. Cohesion — mostly rebuilt, needs calibration
+### 8. Cohesion — rebuilt; the acid test still does not hold in general
 
 **What it is.** Whether a support "fits" a team is judged per unit and then multiplies the
 *whole team's* score. That multiplication is correct and deliberate — a team slot is scarce, so
@@ -43,10 +69,10 @@ Two teams made it obvious. Both have a small third member; one is fine and one i
 
 Nearly identical on size, opposite on job, scored the same.
 
-**What changed.** Cohesion now asks whether the unit's *defining* offering found a home, and
-what fraction of the kit this team can actually use is arriving. Size still costs a unit — it is
-already paid in their tier credit and in what each buff is worth to each teammate — it just
-stops being charged a third time against everyone else's damage.
+**What changed.** Cohesion now asks whether the unit's *defining* offering found a home, and what
+fraction of the kit this team can actually use is arriving. Size still costs a unit — it is already
+paid in their tier credit and in what each buff is worth to each teammate — it just stops being
+charged a third time against everyone else's damage.
 
 |    | before | now |
 |----|----|----|
@@ -54,30 +80,26 @@ stops being charged a third time against everyone else's damage.
 | Yuzuha on Yixuan/Lucia | 303.7 | **156.5** — flagship misses, team collapses |
 | Lucia on YSG/Zhao | 190.9 | **114.1** — she is delivering Koleda's package, priced as such |
 
-**Still to do.** Calibration. 15 scoring tests need triage, and the numeric ones need
-re-anchoring against the new scale (only orderings matter, so this is bookkeeping). Bucketing is
-at 4/6.
+**The old witness here is RESOLVED.** This section used to carry the Evelyn/Neutral stunner ladder
+as evidence that the multiplier was reordering a correct damage estimate — Dialyn 3rd behind
+Trigger despite an 18-point damage lead. The relevance-is-a-max fix and the off-element stunner fix
+closed it. The ladder now reads `Dialyn 378.8 > Lighter 356.1 > Trigger 344.3 > Ju Fufu 325.5`,
+which is the owner's ordering, and TESTs 7 and 108 both pass.
 
-**The clearest witness for what is left.** Evelyn on the Neutral boss, with Astra third and the
-stunner varying. The damage estimate and the final score disagree completely:
+**What is still to do.**
 
-| stunner | damage the team does | cohesion | final |
-|----|----|----|----|
-| Dialyn | **365.8** | 0.75 | 293.4 — *3rd* |
-| Lighter | 347.1 | 0.82 | 296.2 — *2nd* |
-| Trigger | 335.3 | 0.90 | **308.5** — *1st* |
-| Ju Fufu | 316.5 | 0.82 | 270.2 — *4th* |
+1. **The acid test does not hold in general.** A buff the team cannot use at all is free; one it
+   can *partly* use is charged for the remainder — so making Astra's crit damage strictly worse
+   raises her team by 94.6 points. This is the last red scoring test. **Issue 13 has the full
+   diagnosis and the record of a fix that was built and reverted**; read it before attempting
+   anything here, because the obvious repairs each move the problem rather than solve it.
+2. **The multiplier's depth is still uncalibrated.** A 17-point difference in measured fit costs
+   Astra 58 points of final score against Nicole. Whether that is the right exchange rate has never
+   been decided; it is the question behind both remaining cohesion issues.
+3. **Two dials have never been examined:** the squaring of a non-DPS unit's fit before it enters
+   the geometric mean, and the spread of the fit measure itself.
 
-**The damage column is the owner's ladder exactly.** Everything that reorders it happens after,
-in the multiplier. Dialyn is measured at 92% fit and Lighter and Trigger at 100%; the fit is
-squared and then geometric-meaned, so eight points of fit swing the whole team by twenty-six and
-an eighteen-point damage lead becomes a three-point deficit. Trigger additionally collects +15 for
-being the only agent on the field.
-
-Two dials are implicated and it is not yet clear which one is wrong: the **squaring** of a
-non-DPS unit's fit, and the **spread** of the fit measure itself (92% versus 100% may simply be
-too wide a gap for what separates Dialyn from Lighter here). TESTs 7 and 108 both pin this.
-
+---
 
 ### 3. Remielle off triple-anomaly — mechanism fixed, ceiling still short
 
@@ -162,48 +184,327 @@ adjudication log in the internals doc.
 
 ---
 
-### 10. Astra is Evelyn's best support and the engine ranks her tenth
+### 10. ~~Astra is Evelyn's best support and the engine ranks her tenth~~ — CLOSED 2026-09-01
 
-Owner-confirmed: **Astra is Evelyn's best-in-slot support.** The engine disagrees badly. Asking
-for Evelyn's best teams on fire-weak Pompey across every stunner, Astra's first appearance is rank
-10:
+Re-measured and closed. The relevance-is-a-max fix did it: Astra's generic damage buff had been
+charged at 0.50 whenever a stunner was on the team, which is every Evelyn team.
 
-| rank | team | score |
+| | before | now |
 |----|----|----|
-| 1 | Norma / Evelyn / Sunna | 424.6 |
-| 2 | Norma / Evelyn / Orphie | 419.4 |
-| 3 | Lighter / Evelyn / Sunna | 412.0 |
-| … |    |    |
-| 8 | Norma / Evelyn / **Soldier 11** | 376.5 |
-| 10 | Norma / Evelyn / **Astra** | 366.1 |
+| Astra's first appearance as Evelyn's support on Pompey | rank **10** | rank **1** |
+| the teams above her | Sunna, Orphie, and a second attacker | — |
 
-Sunna, Orphie and a second attacker all outrank her. The stunner ordering in that same output is
-correct throughout, so this is specific to the support slot.
-
-Note that Sunna over Astra here is the *opposite* of the Sunna/Yixuan adjudication, where Astra
-correctly wins on a rupture carry. Evelyn is an attack carry, and phase 3 deliberately put Sunna
-ahead of Astra on attack carries — so this may be that change reaching too far, or it may be Astra
-being under-valued generally. Not yet diagnosed.
-
-```bash
-node matchups.js -t "Dialyn/Evelyn,Norma/Evelyn,Lighter/Evelyn,Trigger/Evelyn,JF/Evelyn,Koleda/Evelyn,Caesar/Evelyn" -o -b Pompey -50
-```
-
+She now holds ranks 1, 3, 5 and 12 of the top twelve. No further action.
 
 ---
 
 ### 11. Two attackers on one team are not penalised
 
-`Norma / Evelyn / Soldier 11` scores 376.5 and sits at rank 8 for Evelyn on Pompey. Soldier 11 and
-Evelyn are both attack carries; they cannot both have the field. Dual-attacker teams are supposed
-to be bad for the same reason dual-rupture teams are, and the engine is not charging for it at all.
+Still open, and less severe than when it was filed — `Norma / Evelyn / Soldier 11` has fallen from
+rank 8 to rank **15** (376.5) as a side effect of the support fixes, but it is still there, along
+with `Dialyn / Evelyn / Soldier 11` at 18 and `Lighter / Evelyn / Soldier 11` at 29.
 
-The burst-window contention rule from issue 7 (`scaling.greedy`) does not reach this — it only
-fires when two units are annotated greedy above 1, and Soldier 11 is not. This is a *role*
-collision rather than a window collision, and it wants its own check.
+Soldier 11 and Evelyn are both attack carries and cannot both have the field. Dual-attacker teams
+should be bad for the same reason dual-rupture teams are, and the engine does not charge for it.
+
+The burst-window rule from issue 7 (`scaling.greedy`) does not reach this — it fires only when two
+units are annotated greedy above 1, and Soldier 11 is not. This is a **role** collision rather than
+a window collision and wants its own check.
 
 Owner: "that's definitely a bug."
 
+
+---
+
+### 12. ~~Soukaku on YSG/Zhao~~ — CLOSED 2026-09-01
+### FIXED 2026-09-01 — rarity is not importance
+
+The owner supplied the missing distinction:
+
+> "Almost all support agents buff ATK. That means the buff isn't RARE. From a fit perspective, when
+> you are trying to decide who is better — Yuzuha or Astra — you aren't looking at ATK as the
+> discriminator... But an attack buff not fully landing is like yoinking the rug out from underneath
+> the support. The baseline is 'I buff ATK and X,Y,Z' and you're picking which support is best based
+> on XYZ because everyone is offering ATK."
+
+The engine was conflating two different questions. **"Which support is best here?"** is answered by
+the discriminating buffs — crit damage for attackers, anomaly and disorder buffs for anomaly teams.
+**"Is this support doing their job?"** is answered by the baseline. The flagship test asks the
+second question and was using a heuristic built for the first: largest offering by damage weight.
+
+So `atk` — and `sheer`, the rupture-side equivalent that Lucia carries instead — is now
+flagship-eligible at weight ≥ 3 regardless of whether it is the unit's largest offering.
+
+For Soukaku this settles it. Her dead ice arm is **the Fiona case**: a unit is not punished for
+carrying something this particular team cannot use. Her ATK buff lands fully on Ye Shunguong, so
+she is doing her job.
+
+**Weight 3 is the bar and it is load-bearing in both directions**, which is what keeps this from
+becoming a blanket amnesty:
+
+| unit | baseline | on an attack carry | outcome |
+|----|----|----|----|
+| Soukaku | `atk: 3` | lands fully | penalty lifted — correct |
+| Lucia | `sheer: 3`, no ATK at all | does **not** land | penalty kept — the Lucia/YSG "wrong tool" case stays broken, as it must |
+| Pan Yinhu | `sheer: 2` | below the bar | penalty kept — stays useless on an attack team |
+| Yuzuha | `atk: 3` | reaches a rupture carry at 0.33, below threshold | penalty kept — deserved collapse preserved |
+
+**Blast radius: 114 rows, every one containing both Zhao and Soukaku.** An earlier attempt that
+admitted *any* top-annotation-weight buff moved 4,192 rows and re-broke TESTs 5 and 13; scoping the
+rule to the baseline keys avoids that entirely.
+
+**Result.** `YSG/Zhao/Soukaku` goes 169.1 → **382.7** on Nightmare (owner floor 250) and
+142.4 → **322.1** on Butcher.
+
+**Still open: the Butcher band.** TEST 18 wants [180, 275] there and now reads 322.1 — it was
+failing the 180 FLOOR before and now exceeds the 275 ceiling. For scale, YSG's best line on Butcher
+is 426.5 and his top seventeen all sit above 333, so 322.1 lands just below that pack — which does
+read as "mid" for him. The band predates several engine changes. **Owner call: re-anchor, or is
+322.1 genuinely too high?**
+
+
+**Owner ruling 2026-09-01: genuine failure, not a band.** `YSG/Zhao/Soukaku` reads **169.1** and
+should be **≥ 250**.
+
+> "This is similar to the Qingyi/YSG/Sunna case: YSG/Zhao is a sound core and Soukaku brings a
+> meaningful attack bonus to YSG. She isn't the best in the universe — neither would Qingyi be —
+> but she helps and contributes."
+
+That is the same shape the cohesion rebuild was supposed to have fixed. Qingyi on YSG/Sunna used to
+read 63% and 220.0; after the rebuild she reads 352.2, because cohesion started asking *is this unit
+doing its job* rather than *how much did it bring*. Soukaku here is the case that did not come
+along.
+
+**Why she is being charged.** Soukaku's element buff is ice. YSG is physical; Zhao is ice but is a
+defence unit who deals little damage. So her one element buff genuinely lands on nobody, and the
+engine treats that as a total mismatch. The previous plan explicitly recorded this as correct
+behaviour and marked the 250 floor as a band to re-anchor. **The owner has now ruled the opposite**,
+and the reasoning is that her ATK buff to YSG is real and meaningful, so she is a contributor whose
+flagship missed — not dead weight.
+
+The distinction the engine is failing to draw: **a missed flagship is not the same as a wasted
+slot.** Soukaku still delivers a meaningful ATK buff to the carry. Compare Yuzuha on Yixuan/Lucia,
+which correctly collapsed to 156.5 — there the defining kit lands on *nobody* and nothing else
+lands either.
+
+Related and probably the same mechanism: `FLAGSHIP_MISS_PENALTY` is a flat ×0.4 on a unit's
+utilisation regardless of what else that unit is still delivering. See the internals doc, issue 8.
+
+### Diagnosis (2026-09-01) — the flagship test is a cliff, and one dial serves three cases
+
+**Soukaku's fit is 1.000.** Everything this team can use from her arrives; her ATK buff lands fully
+on Ye Shunguong. Her *entire* penalty is the flat `FLAGSHIP_MISS_PENALTY` of ×0.4, applied because
+her ice buff has no target. Two further penalties then compound off the same number: rank −5, and
+the **structure downgrade** — a hard cliff that strips the team's +35 and its structure factor
+whenever any support-like member measures below 50%. She sits at 40%.
+
+The four neighbouring cases, measured:
+
+| unit | fit | flagship | landed | util | owner's verdict |
+|----|----|----|----|----|----|
+| Qingyi on YSG/Sunna | 1.000 | `stun-mult` 2.00 | **yes** | 1.000 | correct, 352.2 |
+| **Soukaku on YSG/Zhao** | **1.000** | `ice` 3.00 | no | 0.400 | **too low, wants ≥ 250** |
+| Remielle on Nangong/Miyabi | 0.835 | `atk`, gated | no | 0.334 | correct, 273.8 |
+| Yuzuha on Yixuan/Lucia | 0.722 | `anomaly` 3.00 | no | 0.289 | correct, 156.5 |
+
+**Soukaku misses the existing band mechanism by 0.03.** `FLAGSHIP_BAND` already forgives a miss
+when another offering sits within 60% of the flagship. Her ATK offering is **1.77** against a
+threshold of 0.6 × 3.00 = **1.80**. Her data reads `atk: 3, ice: 3` — the two are equally central
+by annotation, and only the damage pricing separates them.
+
+#### Four designs tried and rejected, all measured
+
+1. **Scale the penalty by delivered share.** Soukaku delivers 2.02 of 5.02 magnitude = **0.402** —
+   it reproduces the current 0.4 exactly. A no-op.
+2. **Scale by flagship share.** Yuzuha's flagship is only 30% of her kit, so she would be *rescued*.
+   Wrong direction.
+3. **Judge the band on annotation weight, not damage-weighted magnitude.** Principled — identity is
+   a kit question — and it does fix Soukaku. But it **overshoots to 382.7** (owner floor 250) and
+   puts her at 322.1 on Butcher against the owner's own [180, 275] band, while re-breaking TESTs 5
+   and 13. Corpus mean +62.6, max +356.7.
+4. **`FLAGSHIP_BAND` 0.60 → 0.55.** Identical overshoot, 382.7, because the test is BINARY: crossing
+   it removes the penalty entirely *and* clears the structure cliff, taking her util from 0.400 to
+   1.000 in one step.
+
+#### Why one dial cannot do it
+
+Sweeping `FLAGSHIP_MISS_PENALTY` with everything else held fixed:
+
+| penalty | Soukaku (want ≥250) | Yuzuha (want ~156) | Remielle (want ≤250) |
+|----|----|----|----|
+| **0.40 (today)** | 169.1 ✗ | 169.4 ✓ | 273.8 |
+| 0.50 | 229.6 ✗ | 192.9 | 297.0 ✗ |
+| 0.55 | 244.9 ✗ | 204.3 | 308.1 ✗ |
+| 0.60 | 260.2 ✓ | 216.6 ✗ | 375.7 ✗ |
+| 0.70 | 290.8 ✓ | 283.0 ✗ | 398.0 ✗ |
+
+Reaching Soukaku's floor costs Yuzuha her deserved collapse and pushes Remielle far past her
+ceiling. **The flat penalty is a single dial serving three cases that need different answers**, and
+that — not its value — is the thing to fix.
+
+#### Where this points
+
+The unresolved question is what separates Soukaku from Yuzuha, given both have a missed flagship.
+Fit does order them correctly (1.000 vs 0.722) but not by nearly enough, and no smooth function of
+fit alone can lift Soukaku without also lifting Remielle, who sits between them at 0.835.
+
+Worth noting for whoever picks this up: Soukaku's contribution to Ye Shunguong is priced at **3.8**
+in layer 4 against Zhao's 37.9, and her signature ATK buff — the thing the owner calls "a meaningful
+attack bonus" — pays **2.1**. If the engine's own damage layer thinks she brings almost nothing,
+cohesion is not the only place to look.
+
+
+---
+
+### 13. Astra loses to Nicole on Nangong/Aria (TEST 9)
+#### Part one, FIXED 2026-09-01 — chains land on every DPS
+
+Owner: *"Of course anomaly teams can use free chains; every DPS loves a free chain. Why would
+Astra's offered chains be relevance=zero to an anomaly team?"*
+
+They were, and the reason was a rule the engine had already decided was wrong elsewhere. A
+provision's cohesion relevance was `Math.min(1, w(scaling[key]))` — it landed only on a consumer
+who **declares** a scaling need. `ultimates` was explicitly carved out of that, with a comment
+saying judging it by declared need "would read Dialyn's provision as landing on nobody... which is
+wrong: they use the free ultimate, they just don't get anything extra from it."
+
+Chains are the same and never got the same treatment:
+
+| | |
+|----|----|
+| provide `utility.chains` | Astra, Norma |
+| declare `scaling.chains` | Evelyn, Sigrid |
+
+So on every team without Evelyn or Sigrid, Astra's and Norma's chain provision was scored as a
+**total miss**. Astra appears in 5,286 team-boss rows.
+
+Fixed: chains land on any DPS consumer. The declared scalers lose nothing — they already earn the
+extra through the L4 need channel. Prediction "every moved team contains Astra or Norma" held with
+**zero exceptions**; 1,674 rows, mean +3.8, max +10.0.
+
+`Nangong/Aria/Astra` 413.9 → **423.3**. Nicole still leads at 472.2, so this was real but not the
+main cause.
+
+**Watch for a third member of this family.** `ultimates` and `chains` are both fixed; any other
+provision key that is universally usable but rarely declared has the same latent bug.
+
+
+### Diagnosis (2026-09-01) — a partially-useful buff costs more than a useless one
+
+**The acid test fails again.** Make Astra's crit-damage buff strictly worse and her team scores
+strictly better:
+
+| Astra's `cd` relevance to an anomaly carry | `Nangong/Aria/Astra` | `Nangong/Aria/Nicole` |
+|----|----|----|
+| **0.30** — 30% useful, today | **413.9** — loses | 472.2 |
+| **0.00** — completely useless | **508.5** — wins | 472.2 |
+
+**+94.6 points for making a buff worse.** That is the same rule issue 3 was opened to enforce —
+"removing a badly-fitting buff must not improve a team" — failing in a new place.
+
+**The mechanism is a discontinuity in the fit ratio.** `fit` is computed over *landing* offerings
+only, where landing means `relevance > 0`:
+
+| Astra's offering | magnitude | relevance | treated as |
+|----|----|----|----|
+| `atk` | 1.77 | 1.00 | delivered (baseline) |
+| `dmg` | 3.00 | 1.00 | delivered |
+| `cd` | 1.77 | **0.30** | **70% charged as waste** |
+| `chains` | 0.89 | **0.00** | **dropped — inapplicable, free** |
+| (quick assists) | 0.75 | 1.00 | delivered |
+
+A buff the team cannot use at all is free. A buff the team can *partly* use is charged for the
+part it cannot. So the cheapest thing a support can carry is something completely worthless to
+this team, which is precisely backwards.
+
+**And she is not delivering less than Nicole — she is delivering more:**
+
+| | brings | delivers | fit | util |
+|----|----|----|----|----|
+| Astra | 8.18 | **6.05** | 0.830 | 0.830 |
+| Nicole | 4.44 | 4.44 | **1.000** | 1.000 |
+
+Astra delivers 36% more and is scored lower, because fit is a ratio and a ratio punishes breadth.
+Layer 2 also prefers Astra — tier +9 / rank +10 against Nicole's tier +7 / rank **−5** — and her
+raw score is 30 points higher. The engine agrees she is the better unit and that she contributes
+more, then reverses both on fit.
+
+#### The design fork
+
+The question is what `relevance` below 1 actually means, and the answer differs by cause:
+
+- **Conversion efficiency.** Aria converts 30% of a crit-damage buff into damage. Astra delivered
+  every bit of the 30% that was ever available. She did not fail at anything — this is the Fiona
+  case, one step short of a total miss.
+- **An unmet gate.** Remielle's ATK is unlocked at three anomaly bodies and the team supplied two.
+  The team *wanted* the whole buff and got half. That is a real shortfall.
+
+The engine currently charges both identically. Three ways out:
+
+1. **Charge every offering, drop the landing filter.** Removes the discontinuity, but restores the
+   breadth-punishing ratio the Fiona case exists to reject. Astra gets worse, not better.
+2. **Drop offerings below a relevance floor.** Removes the discontinuity by moving it. Arbitrary,
+   and at a floor of 0.5 it also rescues Yuzuha on `Yixuan/Lucia`, whose collapse is correct.
+3. **Weight the denominator by what was achievable.** An offering can only ever deliver
+   `relevance × magnitude`, so that is its potential; delivering all of it is a fit of 1. Low
+   conversion then stops being charged as waste, while a *gated* shortfall still is, because the
+   gate is a team failure rather than a property of the target.
+
+Option 3 is the only one that separates the two causes rather than trading one wrong answer for
+another, and it matches the owner's rarity-versus-importance framing: a support is judged on
+whether it is doing its job, not on whether this particular team happens to convert every stat.
+
+**It is not free.** Under option 3, Yuzuha's ATK reaching a rupture carry at 0.33 also stops being
+charged, so her fit rises to 1.0 and only the flagship penalty holds her down. Her `Yixuan/Lucia`
+score would rise from the 156.5 the owner endorsed. The scales have since widened, so that may be
+acceptable — but it needs checking, not assuming.
+
+
+#### Option 3 was BUILT AND REVERTED 2026-09-01 — the record
+
+It fixes TEST 9 and cannot pay for itself. Kept here so it is not re-attempted blind.
+
+**What was built.** `fit` became `Σ(magnitude × relevance) / Σ(magnitude × achievable)`, where
+*achievable* is the same relevance before any conditional gate. An offering the team cannot use
+contributes zero to both sums; one it can partly use contributes its share to both. The
+`relevance > 0` filter was deleted — the cliff it created disappears by construction.
+
+Prediction stated first: **no score may decrease.** Held exactly — 7,841 rows moved, all upward.
+TEST 9 went green and the ladder came out as owner-specified.
+
+**What it cost.** Three tests broke, all ceilings. Fixing them took three further changes, each
+correct in isolation:
+
+| refinement | why | result |
+|----|----|----|
+| a baseline buff must reach a **DPS**, not a stunner at half credit | Soukaku's ATK "landed" on `Lycaon/Yixuan/Soukaku` at exactly 1.0 × 0.5 = 0.50 via Lycaon | necessary, insufficient |
+| the **band clause** must also reach a DPS | her ice arm then landed at 0.50 the same way, through the element menu | TEST 18 green |
+| a unit with a baseline buff is **decided by it** | Astra on a Claret armorer has ATK and CD both converting at 0, yet passed on her generic `dmg` buff — the "rug pulled out" case | TESTs 15, 68 green; **14 and 25 broke** |
+
+**Why it dead-ends.** The last step penalises every ATK support on every rupture carry, because
+`RUPTURE_ATK_EFFICIENCY` is 0.33 and the landing threshold is 0.50. `Banyue/Astra/Lucia` fell to
+181.4 against a floor of 350.
+
+And the threshold cannot be lowered to rescue it, because **the two cases collide on the same
+number**:
+
+| team | Astra's / Soukaku's ATK reach | wanted |
+|----|----|----|
+| `Banyue / Astra / Lucia` | 0.33 (Banyue is rupture) | **≥ 350** |
+| `Lycaon / Yixuan / Soukaku` | 0.33 (Yixuan is rupture) | **≤ 180** |
+
+Identical ATK reach, opposite verdicts. What actually separates them is that Astra's other two
+buffs land on Banyue while Soukaku's ice is dead on Lycaon/Yixuan — that is **breadth of usable
+kit**, which the old ratio captured badly and which option 3 discards entirely.
+
+**The real lesson.** Option 3 makes `fit` blind to everything except gates, so the whole burden of
+discrimination falls on the flagship test — and that test is binary. A binary gate cannot express
+"two of my three buffs are dead." Any future attempt needs a continuous measure of usable-kit
+breadth that does not punish breadth itself, which is the Fiona constraint. Those two requirements
+are in tension and that tension is the actual open problem.
+
+**Net effect measured:** option 3 plus all three refinements left the suite at 2 unexpected
+failures against 1 before it. Reverted.
 
 ---
 
@@ -242,19 +543,22 @@ Settled, and now pinned by a test rather than sitting here:
 
 | what | owner's call |
 |----|----|
-| ~~The Evelyn stunner ladder on fire-weak Pompey~~ | **REOPENED 2026-09-01 and reversed.** Owner checked aggregated player statistics: Dialyn is definitively better than Lighter. True ladder is `Norma > Dialyn > Lighter > …`, Norma and Dialyn inside one epsilon band, Lighter clearly outside it. TEST 7 now asserts that and is red — a real engine defect, not a band |
-| **Burnice vs Yanagi as Miyabi's partner** | Depends on the third slot. Disorder supply is equal either way (Burnice cycles in parallel off-field; Yanagi cycles serially but forces polarity), so Burnice wins on tier and field time — **except with Yuzuha third**, where Yuzuha's disorder buff amplifies Yanagi's own polarity damage and Yanagi wins. Abloom is a separate mechanic that Promeia, not Yuzuha, amplifies. TEST 100's rung is now keyed off `buffs.disorders` and passes in both branches |
-| **Remielle as a third slot in the partner ladder** | Removed. A third slot has to be a control and she is not one — with Nangong the team has two anomaly bodies, with Vivian three, so swapping the partner changed the team archetype rather than the partner. TEST 100 is now fully green and out of `KNOWN_RED` |
+| **The Evelyn stunner ladder** | Reopened 2026-09-01 and REVERSED against player statistics: Dialyn is definitively better than Lighter. `Norma > Dialyn > Lighter > Ju Fufu`, now green. The unverified tail of the old ladder (Trigger/Koleda/Caesar/Pulchra/Qingyi ordering) was **dropped**, not re-asserted — it came from the same reversed ruling. Only "all of them sit below Ju Fufu" is asserted |
+| **Burnice vs Yanagi as Miyabi's partner** | Depends on the third slot. Disorder supply is equal either way, so Burnice wins on tier and field time — **except with Yuzuha third**, where Yuzuha's disorder buff amplifies Yanagi's own polarity damage. Abloom is separate and Promeia, not Yuzuha, amplifies it. Keyed off `buffs.disorders`; green in both branches |
+| **Remielle as a third slot in the partner ladder** | Removed — a third slot has to be a control and she is not one. TEST 100 fully green and out of `KNOWN_RED` |
+| **Rarity is not importance** | ATK is the baseline every support pays, not the discriminator between supports. A baseline buff landing answers "is this support doing their job." Drives the `BASELINE_BUFF_KEYS` rule; closed TEST 18 |
+| **Crit damage on anomaly** | 30% stands over the owner's stated 15%: "as long as it isn't zero." Miyabi reads 100% through her declared `scaling.cd`, not by name |
+| **The Norma/Dialyn band** | Dropped. Bucketing only needs it when Dialyn is on top, and he is not |
+| **TESTs 13, 18, 74** | Recalibrated by the owner. Scales have widened; a final correctness pass will re-anchor the numeric bands wholesale |
 
 Still waiting:
 
 | test | question |
 |----|----|
-| 101 | The remaining Miyabi ladder rungs |
-| 13, 14, 18, 74, 75, 80 | Numeric bands that moved with the rescale. Re-anchor rather than tune toward |
-| **3** | `Ju Fufu / Orphie / SAnby` and `Dialyn / Orphie / SAnby` now score **exactly 331.80** on UCC, and the test wants Dialyn strictly ahead. Caused by routing Orphie to the support branch. Their raw scores still differ (345.5 vs 361.1) so it is a coincidence at the final score, not a collapse — a tie-break question, not a defect |
+| **9** | The only red test. See issue 13 — the clean fix was built and reverted, and the real question is bigger than this rung |
+| **101** | The Miyabi ladder. **Do not work on this before re-reading the target.** It was produced the same way the Evelyn ladder was — owner confirmation of engine output — and that method has now been shown to fail once. Ask whether the target is independently derived before making the engine match it |
 | **Remielle ceiling** | Is 240 a hard cap on every boss, or a neutral-boss figure a favourable matchup may exceed? See issue 3 |
-
+| **The two ring-fenced constants** | +15 sole on-field carry and +15 on-element stunner. Implicated in three owner-specified orderings; see the TEST 7 note at the top |
 
 ---
 
@@ -274,7 +578,7 @@ Written 2026-09-01 after the owner objected — correctly — that 92/109 was be
 though it were nearly done, and that the split between "adjust a number" and "real regression"
 was an estimate rather than a measurement. It is now a measurement.
 
-### What the 16 failures actually are
+### What the 16 failures were, as measured on 2026-09-01 (historical)
 
 | kind | tests | count |
 |----|----|----|
@@ -384,7 +688,7 @@ prediction by tag.**
 The Remielle work was re-verified afterwards and is bit-identical: triple-anomaly controls
 unmoved, `Nangong/Miyabi/Remielle` still 273.8 on Butcher.
 
-### What the remaining five are
+### What the remaining five were (superseded — see Test status at the top)
 
 | test | kind | detail |
 |----|----|----|
@@ -397,39 +701,24 @@ unmoved, `Nangong/Miyabi/Remielle` still 273.8 on Butcher.
 Three of the five are numeric bands, one is an issue-8 calibration question, and one needs two
 constants the plan deliberately ring-fenced. **None is an unexplained regression.**
 
-### The sequence
+### The sequence — progress against it
 
-**P1 — fix the `dmg` averaging.** A buff that lands on the carry has landed; it should not be
-diluted by non-DPS teammates. Check the other keys on the average path at the same time (`chains`,
-`defense`, `disorders`, `abloom`, `recovery`) and decide per key, the way issue 5 was handled —
-some genuinely are team-wide and averaging may be right for those.
-*Prediction to state before running:* every team containing a `dmg` buffer or debuffer moves.
-*Expected to clear or move:* 4, 7, 9, 14, 22, 63, 80, 108, and issue 10 (Astra ranked tenth as
-Evelyn's support).
+| step | state |
+|----|----|
+| **P1 — fix the `dmg` averaging** | **DONE.** Checked per key; all five keys on that path wanted a max, so the two paths were merged. Cleared ten tests and took bucketing to 6/6 |
+| **P2 — re-triage from scratch** | **DONE**, twice. The list is now one test long |
+| **P3 — account for the other movers** | **NOT DONE.** Still outstanding and still worth doing: `Seth +86.7` was the largest single-unit move in the corpus and no change on this branch asked for it; Komano −31.3, Pan Yinhu −27.8, Orphie −30.8, Piper −21.7 are likewise unexplained. **An unexplained +86 is as much a defect as a red test** |
+| **P4 — re-anchor genuine bands** | **SUPERSEDED.** The owner has widened the scoring scales and will re-anchor the numeric bands wholesale in a final correctness pass, rather than one at a time |
+| **P5 — TEST 101 and bucketing** | Bucketing **done** (6/6). TEST 101 open, and see the warning in *Adjudications* before starting it |
+| **P6 — correctness sweep** | **NOT DONE**, and now the most valuable thing left. Green tests are not the goal; the owner's original complaint came from reading `compositions.js -10` output, not from a test |
 
-**P2 — re-triage from scratch.** Re-run the per-unit drift against the branch point. The remaining
-list will be smaller and different, and anything still red gets classified again. Do not carry
-forward the classification above.
-
-**P3 — account for the other movers.** `Seth +86.7` was not asked for by any change on this branch
-and is the largest single-unit move in the corpus; Komano −31.3, Pan Yinhu −27.8, Orphie −30.8 and
-Piper −21.7 are likewise unexplained. Each needs a one-line justification or a fix. An unexplained
-+86 is as much a defect as a red test.
-
-**P4 — re-anchor what is genuinely a band**, one at a time, with the before/after numbers shown and
-owner sign-off. No band moves silently.
-
-**P5 — TEST 101 and bucketing.** The ladder rungs and 4/6 → 6/6.
-
-**P6 — correctness sweep, not just green.** Green tests are not the goal; the owner's original
-complaint was found by reading `compositions.js -10` output, not by a test. Dump the top ten for
-every boss and read them. Anything that looks wrong becomes a new test.
-
-### Reporting rule going forward
+### Reporting rule
 
 Lead with the aggregate and the ordering/band split, not with what was closed. "92 of 109" without
-"seven of the failures are ordering inversions" is a misleading way to describe this state, and it
-was the framing the owner objected to.
+"seven of the failures are ordering inversions" is a misleading way to describe a state, and it was
+the framing the owner objected to. The corollary learned the same day: **do not call a numeric band
+a re-anchor without measuring whether the corpus actually moved.** That assumption was made in
+every status write-up on this branch and was false — the corpus median delta was 0.0.
 
 ---
 
@@ -437,27 +726,32 @@ was the framing the owner objected to.
 
 Sound and settled:
 
-* Deleting a badly-fitting buff no longer improves a team. That was issue 3's headline symptom
-  and the acid test now passes.
 * Element buffs are a menu — a unit is not charged for an arm with no target.
-* Quick assists are a small benefit that always lands.
+* Quick assists, ultimates and chains are provisions that land on everyone who can use them,
+  not only on units that declare a scaling need.
 * `damage.basic` distinguishes a support who deals damage from one who does not.
-* Burst-window contention (`scaling.greedy`): two greedy carries cannot both own the stun
-  window, and a greedy carry gets more from a shortened enemy recovery.
+* Burst-window contention (`scaling.greedy`): two greedy carries cannot both own the stun window,
+  and a greedy carry gets more from a shortened enemy recovery.
+* Cohesion asks whether a unit is doing its job, not how much it brought, and a **baseline** buff
+  is what answers that.
+* Remielle collapses off triple-anomaly, and her best teams did not move by a single point while
+  it was fixed.
 * A measurement harness that catches this class of mistake — `score-dump.mjs` and
   `score-delta.mjs`, plus `KNOWN_RED` in two suites so exit codes mean something.
 
-Not mergeable until the 16 scoring tests are triaged and re-banded, bucketing is back to 6/6,
-and the remaining Miyabi ladder errors are closed.
+**One claim that used to be here has been withdrawn.** This section previously said "deleting a
+badly-fitting buff no longer improves a team — the acid test now passes." **That is not true.**
+Making Astra's crit-damage buff strictly worse raises her team by 94.6 points, because a buff the
+team cannot use at all is dropped from the fit ratio for free while a buff it can *partly* use is
+charged for the remainder. Issue 13 has the numbers. The acid test passes for the case issue 3 was
+opened on and fails for this one.
 
-Closed this session: the Evelyn stunner ladder on Pompey (now a nine-rung positive assertion),
-all of TEST 100, and issue 3’s mechanism. Issue 3’s remaining question is a number, not a
-mechanism.
+Not mergeable until TEST 9 is resolved and P3 and P6 have been done.
 
-**Suggested order.** Triage and re-band first — it is cheap and it shrinks the red list to the
-genuine defects. Then the ladder (3/4 inversion, Remielle, the subdps/pseudo-anomaly credit).
-Issue 9 last, or never, since it blocks nothing.
-
+**Suggested order.** The correctness sweep (P6) first, because the scales have moved a long way
+today and reading the tables is the only thing that finds distortions no test covers. Then P3, the
+unexplained unit-level movers. TEST 9 and TEST 101 both need design conversations rather than
+tuning, and neither blocks the sweep.
 
 ---
 

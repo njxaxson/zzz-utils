@@ -141,8 +141,14 @@ function withBosses(bosses, filterStr) {
 // entry to silence a regression.
 // ---------------------------------------------------------------------------
 const KNOWN_RED = new Map([
-    [101, 'The Miyabi best-in-slot ladder, red by design per issue 7. Phases 3 and 5 are expected to ' +
-          'clear several rungs; the remainder is a ladder question for phase 7.'],
+    [101, 'The Miyabi best-in-slot ladder, red by design per issue 7. Five rungs fail and they share ' +
+          'a shape: Nangong/Miyabi/X sitting below Miyabi/Vivian/Y where the ladder wants the ' +
+          'reverse. BEFORE WORKING ON THIS, re-read the target with the owner. It was produced the ' +
+          'same way the Evelyn stunner ladder was -- owner confirmation of engine output -- and on ' +
+          '2026-09-01 that ladder was reversed against aggregated player statistics. Recognising ' +
+          'output is not the same as checking it, so it is not yet known whether this target is ' +
+          'independently derived. Making the engine match an unverified target is the expensive ' +
+          'mistake here.'],
 ]);
 
 async function main() {

@@ -606,24 +606,59 @@ three differ again from `utility["anomaly:<element>"]` (extra procs *produced*) 
 (procs *needed*) — four senses of one stem, listed here because the overlap has been misread before.
 Buildup and quantity are causally connected, though: more buildup means more procs.
 
-Two keys behave unlike the rest and are excluded from cohesion (`COHESION_EXCLUDED_BUFFS`):
+One key behaves unlike the rest and is excluded from cohesion (`COHESION_EXCLUDED_BUFFS`):
 
-* `dmg` — generic damage. A universal multiplier on all damage that is relevant to every DPS
-  unconditionally. There is no team where it fails to land, so it's scored as a flat term and
-  **must not count toward utilization** — otherwise it would rescue the cohesion of a support whose
-  *designed* buffs are mismatched (a rupture support's `sheer` on an attack team). This lets an
-  otherwise-thin `dmg`-heavy kit like Koleda's be universally valuable without distorting fit.
-  Debuff-side `dmg` is worth slightly less than buff-side: a buff helps the team against every
-  enemy, a debuff marks only one — irrelevant on single-target Deadly Assault, real on Shiyu Defense.
 * `vortex` — a contextual bonus (Jane Doe's retroactive vortex crit, generalized). It scores
   only when consumers actually generate vortex this fight, tier-scaled, and carries no cohesion
   penalty when it doesn't apply.
 
+`dmg` — generic damage — **used to be excluded here and no longer is.** It is a universal
+multiplier relevant to every DPS, and the original worry was that counting it would rescue the
+cohesion of a support whose *designed* buffs are mismatched (a rupture support's `sheer` on an
+attack team). That worry is now handled properly by the baseline rule below rather than by hiding
+the buff. Debuff-side `dmg` is worth slightly less than buff-side: a buff helps against every
+enemy, a debuff marks only one — irrelevant on single-target Deadly Assault, real on Shiyu Defense.
+
+#### Baseline buffs, and why rarity is not importance
+
+`BASELINE_BUFF_KEYS` = `atk`, `sheer`. At annotation weight ≥ 3 these are **flagship-eligible**: if
+one lands on an actual damage dealer, the unit's flagship has landed, whatever else missed.
+
+The reasoning is a distinction the engine got wrong for a long time. Almost every S-rank support
+buffs ATK at weight 3, so ATK is **not what discriminates** between two supports — you pick Yuzuha
+over Astra on crit damage, or on anomaly and disorder buffs, never on ATK. But common is not the
+same as unimportant. ATK is the baseline every support is paid for, and a support whose ATK buff
+does not reach the carry has had the rug pulled out. `sheer` is the rupture-side equivalent: Lucia
+carries `sheer: 3` and no ATK at all.
+
+So there are two questions and they need different answers:
+
+| question | answered by |
+|----|----|
+| Which support is best on this team? | the discriminating buffs |
+| Is this support doing their job at all? | the baseline |
+
+The flagship test asks the second. Weight 3 is the bar in both directions — Pan Yinhu's `sheer: 2`
+is a token amount and does not qualify, so he stays useless on an attack team.
+
 Buff relevance (`getBuffRelevance`) is where role asymmetries live: rupture units get reduced ATK
 efficiency, armorers get zero; anomaly units get low CR/CD relevance because their damage comes from
 ATK/AP/reactions rather than crits (Miyabi is the exception — she has effectively 100% crit rate
-and explicit `scaling.cr`/`cd`, so both are fully valuable to her). `abloom` and `disorders` are
-always relevant to anomaly-role units, and to others only if they have matching damage types.
+and explicit `scaling.cr`/`cd`, so both are fully valuable to her; the exception is DECLARED in her
+data, never special-cased by name). `abloom` and `disorders` are always relevant to anomaly-role
+units, and to others only if they have matching damage types.
+
+**Relevance is combined across the team as a MAX, never an average.** The question is "did anybody
+here want this", not "how much of the roster wanted it". Averaging punished a support for the
+composition of her own team: Astra's `dmg` returned 1 from Evelyn and 0 from Norma the stunner, and
+was charged 0.50.
+
+**Two things the flagship test requires, both learned the hard way.** An offering only counts as
+landing if it reaches an actual **damage dealer** — non-carry teammates get half credit for scoring
+purposes, and half credit lands exactly on the 0.5 threshold, so judging the flagship on the
+team-wide figure let a support "do her job" by buffing the stunner. And a *declared* conditional
+(`buffs.<key>.cases`, i.e. Remielle's gated ATK) overrides everything: the designer gated it, so it
+is the unit's identity by construction.
 
 #### `utility`
 
@@ -641,6 +676,23 @@ It is element-scoped, not a generic flag, so it composes with the head-count it 
 the way a real agent would: a **generic** `scaling.anomaly` consumer (Harumasa, Remielle) absorbs
 procs of any element; an **element-scoped** one (Grace's `anomaly:electric`, Roxy/Sigrid's
 `anomaly:wind`) absorbs only matching procs and is blind to Alice's physical ones.
+
+**How a provision is judged for cohesion — universal versus declared.** A provision's default
+cohesion relevance is `min(1, scaling[key])` on the best consumer: it lands only on a teammate who
+**declares** a matching scaling need. That is right for narrow provisions (only two units in the
+roster scale off `veils`), and wrong for the ones every carry uses regardless.
+
+Three keys are carved out, each for the same reason:
+
+| key | why it is carved out |
+|----|----|
+| `ultimates` | Lands on any primary DPS whose ultimate is a real burst. Judged by declared need it would read Dialyn's provision as landing on nobody whenever the carry is Seed or Evelyn — they use the free ultimate, they just get nothing extra from it |
+| `quick-assists` | A small benefit that ALWAYS lands. Charged at its size rather than against a declared need (`quickAssistCohesionWeight`), so offering one is never a mismatch and never a large contribution either |
+| `chains` | Every DPS uses a free chain attack. Only Evelyn and Sigrid annotate `scaling.chains`, so judged by declared need, Astra's and Norma's chain provision read as a **total miss** on every other team |
+
+**If you add a provision key that is universally usable but rarely declared, it needs the same
+carve-out.** That bug has now been found three times in the same place.
+
 
 #### `scaling`
 
@@ -1244,6 +1296,18 @@ update it and note why in the comment block.
 
 Kept deliberately — these are things that look wrong when you read the code, and are.
 
+* **A partially-usable buff costs a support more than a completely useless one.** `fit` divides
+  delivered magnitude by brought magnitude over offerings with `relevance > 0`. An offering the team
+  cannot use at all is dropped from the ratio as inapplicable and is free; one the team can *partly*
+  use is charged for the remainder. So making Astra's crit-damage buff strictly worse — 0.30
+  relevance to 0.00 — raises her team by **94.6 points**. This is the issue-3 acid test failing, it
+  is the cause of the one red scoring test, and a full fix was attempted on 2026-09-01 and reverted;
+  see issue 13 in `scoring-engine-open-issues.md` for why the obvious repairs all move the problem
+  rather than solve it.
+* **Dual-attacker teams are not penalised.** Two attack carries cannot both hold the field, but
+  nothing charges for it — `Norma / Evelyn / Soldier 11` sits mid-ladder for Evelyn. The
+  burst-window rule (`scaling.greedy`) does not reach it: that fires on two units annotated greedy
+  above 1, and this is a **role** collision rather than a window collision.
 * **Armorer ATK efficiency disagrees between engines.** The scorer treats it as zero — ATK is worthless
   to armorers. `mechanicsFitScore` in the pull engine still applies a partial multiplier, so pull
   recommendations credit ATK supports for armorers that the scorer would not.

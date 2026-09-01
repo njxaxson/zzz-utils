@@ -337,6 +337,102 @@ A **scarcity exemption** — the engine has no mechanism for that concept and th
 
 ---
 
+## 8b. Cohesion — the 2026-09-01 pass
+
+Four changes shipped, one large design attempt built and reverted. Read §8 first for what cohesion
+is; this section is only what changed and why.
+
+### The four that shipped
+
+**1. Relevance is a MAX over the team, never an average.** `getBuffRelevance('dmg')` returns
+`dps ? 1 : 0` under a comment reading *"generic damage: never misses on any DPS"* — but `dmg` is
+not in `STAT_BUFF_KEYS`, so it took an averaging path. On `Norma/Evelyn/Astra`, Evelyn returned 1,
+Norma the stunner returned 0, and Astra's largest offering was charged **0.50**. A support was
+being punished for the composition of her own team.
+
+Checked per key rather than blanket. Every key that reached that path — `dmg`, `aftershock`,
+`disorders`, `abloom`, `def` — asks the same per-consumer capability question. There was no correct
+member of it, so the two paths were merged. **Effect: 16 unexpected failures to 5, and bucketing
+4/6 to 6/6, from one change.**
+
+**2. No penalty for an off-element stunner.** The +15 bonus is defensible — an on-element stunner's
+own damage is amplified. The symmetric −15 is not: an off-element stunner has lost nothing, he
+simply does not collect. Together they made the swing between two stunners **30 points** on a unit
+whose job is dazing.
+
+The diagnostic worth reusing: on the NEUTRAL boss, where this term never fires, Evelyn's stunner
+ladder was already exactly the owner's. On fire-weak Pompey it was not. **A term that is right in
+its presence and wrong in its magnitude reorders only where it fires.**
+
+**3. A baseline buff is flagship-eligible — rarity is not importance.** See §8c below; this is the
+most reusable idea from the session.
+
+**4. Chains land on every DPS.** A provision's relevance was `min(1, scaling[key])` — it landed only
+on a consumer who *declares* a need. `ultimates` had already been carved out of that rule with a
+comment explaining why. Chains were not, so Astra's and Norma's chain provision read as a **total
+miss** on every team without Evelyn or Sigrid, the only two units annotating `scaling.chains`.
+Watch for a third member of this family: any provision that is universally usable but rarely
+declared has the same latent bug.
+
+### 8c. Rarity is not importance
+
+The owner's framing, and the single most useful idea to come out of the session:
+
+> "Almost all support agents buff ATK. That means the buff isn't RARE. From a fit perspective, when
+> you are trying to decide who is better — Yuzuha or Astra — you aren't looking at ATK as the
+> discriminator... But an attack buff not fully landing is like yoinking the rug out from underneath
+> the support. The baseline is 'I buff ATK and X,Y,Z' and you're picking which support is best based
+> on XYZ because everyone is offering ATK."
+
+Two different questions were being answered by one heuristic:
+
+| question | answered by |
+|----|----|
+| **Which support is best here?** | the DISCRIMINATING buffs — crit damage for attackers, anomaly and disorder buffs for anomaly teams |
+| **Is this support doing their job?** | the BASELINE — `atk`, or `sheer` for the rupture-facing case |
+
+The flagship test asks the second and was using a heuristic built for the first: largest offering
+by damage weight. Soukaku's data reads `atk: 3, ice: 3` — equally central — but priced by damage
+the ice arm is 3.00 and the ATK arm 1.77, so the band asked whether `1.77 >= 0.6 × 3.00 = 1.80` and
+answered no, **by 0.03**.
+
+Weight 3 is the bar and is load-bearing in both directions:
+
+| unit | baseline | on an attack carry | outcome |
+|----|----|----|----|
+| Soukaku | `atk: 3` | lands | penalty lifted |
+| Lucia | `sheer: 3`, no ATK | misses | penalty kept — the Lucia/YSG "wrong tool" case must stay broken |
+| Pan Yinhu | `sheer: 2` | below the bar | penalty kept |
+| Yuzuha | `atk: 3` | 0.33 on a rupture carry | penalty kept |
+
+An earlier attempt that admitted *any* top-annotation-weight buff moved 4,192 rows and re-broke
+TESTs 5 and 13. Scoping to the baseline keys moved 114.
+
+### The lesson that cost the most time: never predict by tag
+
+Twice in two days, a prediction was written by enumerating units by TAG while the code being changed
+reads EFFECTIVE ROLES:
+
+- Routing support-playing units to the support cohesion branch: predicted Remielle, Orphie, Cissia.
+  **225 exceptions, all Soukaku** — she is support-*tagged* with an anomaly pseudo-role, the mirror
+  case.
+- Removing the off-element stunner penalty: predicted the 12 stun-tagged units. **1,456 exceptions,
+  all Caesar** — a pseudo-stunner.
+
+Both predictions were otherwise sound and both failed for the same reason. **When a gate reads
+`getEffectiveRoles` or an `is<Role>()` helper, enumerate the prediction the same way — and check
+both directions, tag-with-pseudo and pseudo-with-tag.**
+
+### A correction worth recording
+
+`ANOMALY_CRIT_DMG_EFFICIENCY` was introduced into `resolveBaselineWeight` — the L4 damage-weight
+table — while its comment described `getBuffRelevance`, the cohesion table. Both independently held
+`0.3`, so it was value-neutral and no scores moved, but the documentation sat on the wrong function
+and the two sites could have drifted. It now drives both. **Two tables price crit damage; if you
+change one, check the other.**
+
+---
+
 ## Codependency in the scorer (`scaling.codependent`)
 
 Previously honoured only by the pull engine. Now also scales a codependent unit's contributions
@@ -456,7 +552,22 @@ Supporting changes, each measured separately against a stated prediction with ze
    every value of the delivery scale, the delivery reference, the flagship band **and** the
    non-DPS utilisation exponent. Four independent dials, none of which touches them. See issue 8.
 
-### Still open
+### Still open — SUPERSEDED, all four are green as of 2026-09-01
+
+> The table below is kept for its reasoning, not its status. **TESTs 13, 18, 25 and 26 all pass
+> now**, closed by a mix of owner recalibration and the 2026-09-01 cohesion pass (§8b). Two of its
+> conclusions were also overturned and are worth flagging, because both were stated here with
+> confidence:
+>
+> - **TEST 18 is called "correct behaviour, stale band" below. It was not.** The owner ruled it a
+>   genuine failure: Soukaku's dead ice arm is the Fiona case, and her ATK buff — the baseline —
+>   lands fully on Ye Shunguong. See §8c.
+> - **TEST 25's `Yixuan/Lucia/Yuzuha` is called "the one genuinely open case."** It closed on its
+>   own as the surrounding fixes landed, without ever being worked on directly.
+>
+> The paragraphs *below* the table, on Sunna's `synergy.avoid` and Lycaon's scarcity exemption,
+> are still live and still accurate.
+
 
 **TESTs 13, 18, 25 and 26.**
 
