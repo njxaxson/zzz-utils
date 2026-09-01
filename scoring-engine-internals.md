@@ -21,6 +21,21 @@ keeping them is so the same argument is not had twice.
 
 ### The Evelyn stunner ladder on fire-weak Pompey (2026-08-31)
 
+> **REVERSED 2026-09-01 — read this before trusting the section below.** The owner checked
+> aggregated player statistics on Evelyn's stunners and corrected the ruling: **Dialyn is
+> definitively better than Lighter.** The true ladder is `Norma > Dialyn > Lighter > …`, with
+> Norma and Dialyn inside one epsilon band and Lighter clearly outside it. TEST 7 now asserts
+> that, is red, and the failure is a real engine defect rather than a band.
+>
+> **The lesson, and it is the important part.** The ruling below was obtained by showing the owner
+> the engine's own output and asking whether it looked right. They said "100% correct" — and it
+> was not. **Confirming an engine-produced ordering is much weaker evidence than a spec stated
+> independently of the engine**, because recognising output is not the same as checking it. Ask
+> for the expected ordering *before* showing the scores, or ask for an external source. Every
+> other adjudication in this log obtained the same way carries the same risk.
+
+
+
 **Question put:** TEST 7 asserted Dialyn beats Lighter for Evelyn on Pompey. The engine had Lighter
 ahead by 30 points of final score and 11 points of raw damage. Was that element weakness being
 over-paid, or was the rung wrong?
@@ -57,6 +72,181 @@ epsilon band. Order confirmed, gap arguable, not worth holding the engine for.
 order is the owner's ladder exactly and the cohesion multiplier inverts it. That is the issue-8
 tail, not a game-knowledge question, and it is written up in `scoring-engine-open-issues.md` under
 issue 8 as the clearest remaining witness.
+
+---
+
+### Burnice versus Yanagi as Miyabi's anomaly partner (2026-08-31)
+
+**Question put:** TEST 100 asserted Yanagi beats Burnice on every boss and every third slot. The
+engine had Burnice ahead by a uniform 10-11. Was the field-time bonus over-paying off-field units?
+
+**Ruling: the rung was wrong, but only outside Yuzuha teams.** The owner's original expectation came
+from thinking of Yuzuha as the default third — which is exactly the one case where Yanagi does win.
+
+**Miyabi's disorder supply is 4 with either partner, by two different routes:**
+
+| | cycling | polarity | total |
+|----|----|----|----|
+| Yanagi | 2 — both on field, procs land serially | +2 from `utility.disorders` | **4** |
+| Burnice | 4 — off-field, `hasParallelGaugeSource` doubles the rate | 0 | **4** |
+
+Disorder is therefore a wash, and the rung is decided by everything else:
+
+| term | |
+|----|----|
+| sole on-field carry (Miyabi owns the screen) | Burnice **+15.0** |
+| tier — Burnice T1, Yanagi T1.5 | Burnice **+1.5** |
+| Yanagi's disorder-*damage* buff into Miyabi | Yanagi **−5.5** |
+| **net, disorder-neutral third** | **Burnice +11.0** |
+
+Verified by probe rather than by reading the code: forcing Burnice on-field costs 56.6 (the disorder
+collapse plus the field bonus), stripping Yanagi's `utility.disorders` costs 40.7 — the same disorder
+term from the other side — and stripping her `buffs.disorders` costs exactly the predicted 5.5.
+Retiering Yanagi to 1 gains her exactly 1.5 and does not flip the rung.
+
+**Yuzuha inverts it, and that is real.** She buffs disorders; polarity is a subclass of disorders;
+Yanagi has `damage.polarity: 2`. So Yuzuha pays **18.0** into Yanagi's own damage and Yanagi wins by
+4.3. Burnice's `damage.abloom` gets nothing from her.
+
+**That is not a data gap.** Abloom is a distinct mechanic — owner: it "is actually what causes
+significant diversion between Miyabi and Promeia's kits, even though they are both anomaly," and
+Yuzuha does not buff it. The abloom amplifier is **Promeia** (`buffs.abloom: 3`), and the engine
+already pays it: `Promeia → Burnice: need(damage:abloom): 9.0`. That is part of why
+`Lighter/Burnice/Promeia` is a real team.
+
+**How it is encoded.** The rung is keyed off `buffs.disorders` on the third slot rather than off
+Yuzuha's name, so a newly added disorder buffer makes a real prediction instead of silently landing
+in the wrong branch. The test also asserts that both branches actually ran, so the split cannot go
+vacuous.
+
+**Worth remembering:** `onfield: false` pays a unit twice on a Miyabi team — the disorder-rate
+doubling and the sole-carry bonus. Different effects of the same fact, judged not to be
+double-counting, but it is why off-field status dominates this comparison.
+
+---
+
+### Crit damage on anomaly agents (2026-09-01)
+
+**Ruling: 30% stands. The property that matters is that it is not zero.**
+
+The owner raised this on seeing TEST 9 explained: *"Crit Damage buffs on anomaly aren't fully
+wasted. They are like ATK buffs on rupture. CD on anomaly has about 15% efficiency, EXCEPT on
+Miyabi where it has 100%."*
+
+Two things were already true in the engine and only needed confirming:
+
+- The generic anomaly figure was **0.3**, not zero.
+- **Miyabi already reads 100%**, and not by name — the `cd` case short-circuits on
+  `scaling.cd`, and she carries `cr: 3, cd: 3`. The exception is declared in the unit data, which
+  is where it belongs.
+
+Offered the choice between the stated 15% and the existing 30%, the owner took the existing value:
+*"if anomaly already credits CD buffs at 30%, use that over my stated 15%. As long as it isn't
+zero."* Applying 0.15 was measured first — 1,569 rows, all downward, mean −6.4 — and reverted.
+
+What survives is the naming: the figure is now `ANOMALY_CRIT_DMG_EFFICIENCY` alongside
+`RUPTURE_ATK_EFFICIENCY` and `ARMORER_ATK_EFFICIENCY`, carrying the reasoning and the Miyabi note.
+Verified as a pure refactor — **zero rows moved** across the 125,476-row corpus.
+
+**Worth remembering:** this makes TEST 9 *harder*, not easier. Astra loses to Nicole on
+`Nangong/Aria` only through the cohesion multiplier — her raw score is 30 points higher — and
+crit-damage relevance is exactly what is costing her. Lowering it further would have pushed
+against that test. The owner declined to move a corpus-wide constant to chase one rung, which is
+the right instinct and the same one that keeps the sole-carry bonus ring-fenced.
+
+---
+
+### Remielle off triple-anomaly — issue 3, closed 2026-08-31
+
+**The rule, in the owner's words.** "Remielle without triple anomaly is like a slightly better
+version of Lucy... MAYBE hitting 220-240 IF THE STARS ALIGN." And the evidence from the game
+itself: her **M6 — the highest mindscape unlock there is — does nothing but remove the
+triple-anomaly restriction.** A whole M6 spent on lifting one gate is how large the gap is.
+
+The two questions a team asks, also in the owner's words:
+
+> Support asks "Did my flagship buff land?" **FUCK NO.**
+> Team asks "Did the buffs I care about land?" **NO, NOT REALLY** (1600 ATK → 700 is 45%, which we
+> have rounded to 50%).
+
+**What the engine said instead.** Her cohesion was **100% whether or not the condition was met**:
+
+| team | her ATK buff pays | cohesion (before) |
+|----|----|----|
+| `Miyabi/Vivian/Remielle` — 3 anomaly bodies | 4 | 100% |
+| `Nangong/Miyabi/Remielle` — 2 anomaly bodies | 2 | 100% |
+
+Identical. The first question was never asked.
+
+**Three separate reasons, each needing its own fix.**
+
+**A. She was being judged as a damage dealer.** Remielle is tagged `anomaly`, so cohesion routed
+her down the branch built for carries. That branch discards every "generic" buff — `atk`, `cr`,
+`cd`, `pen`, `dmg`, `stun-multiplier` — because a carry should not be judged on stat buffs it
+incidentally carries, and it floors cohesion at 0.65. Both are right for a carry and wrong for
+her: **her conditional ATK buff is an `atk` buff, so it was discarded before anything was
+measured.** What survived was `anomaly: 2`, which lands on any anomaly teammate, so she scored
+full marks.
+
+Fix: `isDPS(supplier) && !isSupport(supplier)`. Owner: "for damage-dealing calcs she is a subdps
+... for buff relevance she is support. But generally speaking, **support wins**."
+
+`isSupport()` reads ACTIVATED roles, so a conditional support pseudo-role only counts when its
+predicate holds. Affected units, enumerated and verified against the corpus:
+
+| unit | why | when |
+|----|----|----|
+| Remielle | anomaly tag, `support` pseudo-role | always |
+| Orphie | attack tag, `support` pseudo-role | always |
+| Cissia | attack tag, `support` pseudo-role | only with Seed |
+| **Soukaku** | **support tag, `anomaly` pseudo-role** | **only with Miyabi** |
+
+Soukaku is the mirror case and **I missed her in the first prediction** — I enumerated units with
+a support *pseudo-role* and forgot units with a support *tag* and a DPS pseudo-role. The delta
+caught it: 225 exceptions, every one a Miyabi/Soukaku team. Corrected prediction held with zero
+exceptions. Lesson: when a gate reads two role sources, enumerate both directions.
+
+**B. The conditional was measured after it had already been shrunk.** `resolveMapForUtil` hands
+cohesion the value the team actually unlocked, so measuring it only ever asks "did the 2 land?" —
+trivially yes. Now the buff is offered at its **full** size with relevance scaled by
+`resolved / max`. At two anomaly bodies that is 2/4, which is the owner's 45%-rounded-to-50%.
+
+This moved her from 100% to 83% — right direction, nowhere near enough.
+
+**C. A team-scoped conditional IS the unit's declared flagship.** 83% happened because the engine
+prices ATK cheaply (a point of ATK is worth ~0.35 against sheer's 4.5), since ATK scales poorly in
+general. So half of her defining buff is a *small* loss by damage-weight, and her flagship by
+magnitude was `anomaly`, not `atk`.
+
+But the gate is the designer saying "this unit is built around this" — that is what the M6 tells
+you. So a declared offering now decides the flagship test by itself, and it must land **strictly**
+above the threshold: at two anomaly bodies she unlocks exactly half, and half is a miss.
+
+| | before | after A+B | after A+B+C |
+|----|----|----|----|
+| Remielle's cohesion on `Nangong/Miyabi/Remielle` | 100% | 83% | **33%** |
+| `Nangong/Miyabi/Remielle` on Butcher | 502.4 | 462.1 | **273.8** |
+| `Miyabi/Vivian/Remielle` on Butcher (control) | 574.7 | 574.7 | **574.7** |
+
+**Verification.** Each change was dumped and delta'd separately with a stated prediction. A and B
+and C each held with **zero exceptions** (A only after the Soukaku correction). The plan's sharpest
+check — "any `Remielle/Velina/X` team moving means stop" — was run as 114 rows of her
+triple-anomaly teams across all 19 bosses: **zero moved.**
+
+Non-triple-anomaly Remielle teams at or above the ladder floor, per boss: **22→6, 22→4, 13→1,
+14→1**.
+
+**What this did NOT fix.** Sixteen non-triple-anomaly Remielle teams still reach 200 on at least
+one of the 18 bosses, and six of those clear the owner's 240 ceiling, topping out at 288.8
+(`Nangong/Promeia/Remielle` on fire-weak Scorched Horizon). That list is in
+`scoring-engine-open-issues.md` awaiting review.
+
+**A test-design note worth keeping.** TEST 109 was written to pin this rule and asserts the teams
+sit below the ladder's bottom rung. It was red when written and went green after **A+B alone** —
+before change C, which is where most of the correction actually came from. A test anchored to the
+ladder floor (~385-495) is far weaker than the owner's stated bar (~240) and cannot tell a large
+fix from a small one. It is kept because it is structural and boss-relative, but do not read it as
+evidence that the numbers are right.
 
 ---
 

@@ -22,6 +22,7 @@ import { filterBosses } from './lib/boss-filter.js';
 import { parseTeams } from './lib/team-parser.js';
 import { buildAvailableUnits } from './lib/roster-builder.js';
 import { buildTeams } from './lib/team-pipeline.js';
+import { rankBandEpsilon } from './app/public/lib/common/team-builder.js';
 import { chargeableElementArms, getBasicDamage, getBasicDamageBaseline, getMaxBurstWeight, quickAssistCohesionWeight, scoreTeamForBoss, resolveBossVariation, resolveConditionalValue, getEffectiveScaling, effectiveDisorderSupply, effectiveDisorderWeakSupply } from './app/public/lib/common/team-scorer.js';
 
 // ---------------------------------------------------------------------------
@@ -140,9 +141,6 @@ function withBosses(bosses, filterStr) {
 // entry to silence a regression.
 // ---------------------------------------------------------------------------
 const KNOWN_RED = new Map([
-    [100, 'Two separate rungs: `Yanagi > Burnice` fails uniformly by 10-11 on every boss, and ' +
-          '`Nangong > Vivian` fails by 74-94 when the third slot is Remielle (Nangong is not tagged ' +
-          'anomaly, so he halves her conditional ATK buff). Both go to owner adjudication in phase 7.'],
     [101, 'The Miyabi best-in-slot ladder, red by design per issue 7. Phases 3 and 5 are expected to ' +
           'clear several rungs; the remainder is a ladder question for phase 7.'],
 ]);
@@ -341,44 +339,62 @@ async function main() {
                 `${b.name}: Dialyn/Lighter/Evelyn > JF/Lighter/Evelyn`
             );
         }
-        // On Pompey (fire-weak): Lighter's fire element carries him past Dialyn.
-        // Owner-confirmed 2026-08-31 from play: for Evelyn with Astra third, the
-        // stunner ladder on a fire-weak boss is
-        //   Norma > Lighter > Dialyn > Ju Fufu > Trigger > Koleda > Caesar > Pulchra > Qingyi
-        // ("this laddering is 100% correct"). Lighter leads Dialyn by ~11 points of
-        // raw damage BEFORE cohesion, so this is element weakness, not the greed bonus.
-        // Shelved, deliberately: Lighter and Dialyn end up ~30 apart and arguably belong
-        // in one epsilon band. Owner declined to hold the engine on it.
+        // On Pompey (fire-weak). REOPENED 2026-09-01 and the previous adjudication REVERSED.
+        //
+        // On 2026-08-31 the owner confirmed the engine's own ordering here (Norma > Lighter >
+        // Dialyn) as "100% correct". They then checked aggregated player statistics and corrected
+        // it: "Dialyn is indeed definitively better than Lighter and I had it pretty wrong."
+        //
+        //     Norma > Dialyn > Lighter > Ju Fufu
+        //
+        // with Norma and Dialyn inside one epsilon band and Lighter clearly outside it.
+        //
+        // SCOPE NOTE. The earlier version of this test also asserted the tail of the ladder
+        // (Trigger > Koleda > Caesar > Pulchra > Qingyi). That came from the SAME reversed
+        // adjudication and the owner has not re-confirmed it, so it is no longer asserted as an
+        // order — only that all of them sit below Ju Fufu, which was never in dispute. Do not
+        // restore the tail ordering without an independent source.
+        //
+        // THE LESSON, and it is why the tail was dropped: confirming an engine-produced ordering
+        // is much weaker evidence than a spec stated independently of the engine. The nine-rung
+        // ladder was adopted because the owner recognised the engine's output, and recognising
+        // output is not the same as checking it.
         for (const b of withBosses(bosses, 'Pompey')) {
-            const ladder = [
-                'Norma / Evelyn / Astra',
-                'Lighter / Evelyn / Astra',
-                'Dialyn / Evelyn / Astra',
-                'Ju Fufu / Evelyn / Astra',
-                'Trigger / Evelyn / Astra',
-                'Koleda / Evelyn / Astra',
-                'Evelyn / Caesar / Astra',
-                'Pulchra / Evelyn / Astra',
-                'Qingyi / Evelyn / Astra',
-            ];
-            const m1 = scoreMapForBoss(
-                scoreForTeamString(
-                    'Norma/Evelyn/Astra,Lighter/Evelyn/Astra,Dialyn/Evelyn/Astra,' +
-                        'Ju Fufu/Evelyn/Astra,Trigger/Evelyn/Astra,Koleda/Evelyn/Astra,' +
-                        'Caesar/Evelyn/Astra,Pulchra/Evelyn/Astra,Qingyi/Evelyn/Astra',
-                    allUnits
-                ),
-                b
-            );
-            for (let i = 0; i + 1 < ladder.length; i++) {
-                const hi = m1.get(ladder[i]);
-                const lo = m1.get(ladder[i + 1]);
-                assert(
-                    hi !== undefined && lo !== undefined && hi > lo,
-                    `${b.name}: fire-weak stunner ladder: want ${ladder[i]} (${hi}) > ` +
-                        `${ladder[i + 1]} (${lo})`
-                );
+            const spec =
+                'Norma/Evelyn/Astra,Lighter/Evelyn/Astra,Dialyn/Evelyn/Astra,' +
+                'Ju Fufu/Evelyn/Astra,Trigger/Evelyn/Astra,Koleda/Evelyn/Astra,' +
+                'Caesar/Evelyn/Astra,Pulchra/Evelyn/Astra,Qingyi/Evelyn/Astra';
+            const m1 = scoreMapForBoss(scoreForTeamString(spec, allUnits), b);
+            const top = ['Norma / Evelyn / Astra', 'Dialyn / Evelyn / Astra',
+                         'Lighter / Evelyn / Astra', 'Ju Fufu / Evelyn / Astra'];
+            for (let i = 0; i + 1 < top.length; i++) {
+                const hi = m1.get(top[i]), lo = m1.get(top[i + 1]);
+                assert(hi !== undefined && lo !== undefined && hi > lo,
+                    `${b.name}: fire-weak stunner ladder: want ${top[i]} (${hi}) > ${top[i + 1]} (${lo})`);
             }
+            // The unverified tail: no internal order asserted, only that it sits below Ju Fufu.
+            const juFufu = m1.get('Ju Fufu / Evelyn / Astra');
+            let tailChecked = 0;
+            for (const t of ['Trigger / Evelyn / Astra', 'Koleda / Evelyn / Astra',
+                             'Evelyn / Caesar / Astra', 'Pulchra / Evelyn / Astra',
+                             'Qingyi / Evelyn / Astra']) {
+                const v = m1.get(t);
+                if (v === undefined) continue;
+                tailChecked++;
+                assert(v < juFufu, `${b.name}: ${t} (${v}) must sit below Ju Fufu (${juFufu})`);
+            }
+            assert(tailChecked >= 4,
+                `only ${tailChecked} tail team(s) were live — fixture drift, fix it rather than letting this pass on nothing`);
+            // Norma and Dialyn are one band; Lighter is a step below, not a shuffle.
+            const norma = m1.get('Norma / Evelyn / Astra');
+            const dialyn = m1.get('Dialyn / Evelyn / Astra');
+            const lighter = m1.get('Lighter / Evelyn / Astra');
+            assert(norma - dialyn <= rankBandEpsilon(norma),
+                `${b.name}: Norma (${norma}) and Dialyn (${dialyn}) must sit in ONE epsilon band ` +
+                `(eps ${rankBandEpsilon(norma).toFixed(1)}), gap is ${(norma - dialyn).toFixed(1)}`);
+            assert(dialyn - lighter > rankBandEpsilon(dialyn),
+                `${b.name}: Dialyn (${dialyn}) must beat Lighter (${lighter}) by MORE than one ` +
+                `epsilon band (eps ${rankBandEpsilon(dialyn).toFixed(1)}), gap is ${(dialyn - lighter).toFixed(1)}`);
         }
     });
 
@@ -2464,22 +2480,73 @@ async function main() {
     // Ordering among Miyabi's TRUE anomaly partners only. Nangong is her absolute best-in-slot
     // partner and sits ahead of all three — the `Nangong > Vivian` assertion is a guard against
     // the fix overshooting, since raising Vivian for off-field buildup must not lift her past him.
-    run('TEST 100: Vivian is Miyabi\'s best actually-anomaly partner, then Yanagi, then Burnice', () => {
+    //
+    // Burnice vs Yanagi was ADJUDICATED 2026-08-31 and turns out to DEPEND ON THE THIRD SLOT.
+    // The original expectation (Yanagi always ahead) came from thinking of Yuzuha as the default
+    // third, which is the one case where it is true.
+    //
+    // Miyabi's disorder supply is 4 with either partner, reached two different ways. Burnice is
+    // off-field, so her fire gauge fills while Miyabi applies frost and `hasParallelGaugeSource`
+    // doubles the cycling rate from 2 to 4. Yanagi shares the field, cycles serially at 2, and her
+    // `utility.disorders: 2` polarity puts back exactly the 2 she lost. So disorder supply is a
+    // wash and the rung is decided by everything else:
+    //
+    //   Burnice   +15.0   sole on-field carry (Miyabi owns the screen)
+    //   Burnice    +1.5   tier — Burnice T1, Yanagi T1.5
+    //   Yanagi     -5.5   her disorder-DAMAGE buff into Miyabi
+    //             -----
+    //   Burnice   +11.0   net, whenever the third slot is disorder-neutral
+    //
+    // Yuzuha inverts it. She buffs disorders, polarity is a subclass of disorders, and Yanagi
+    // has `damage.polarity: 2` — so Yuzuha pays 18.0 into Yanagi's own damage and Yanagi wins by
+    // 4.3. Burnice's `damage.abloom` gets nothing from her: abloom is a distinct mechanic that
+    // Yuzuha does not buff. It is not a data gap — Promeia is the abloom amplifier (`buffs.abloom`
+    // pays her 9.0 into Burnice), which is part of why Lighter/Burnice/Promeia is a real team.
+    //
+    // Owner: "Yuzuha changes the math... Yuzuha is super-dominant in anomaly team compositions and
+    // Miyabi/Yanagi/Yuzuha > Miyabi/Burnice/Yuzuha makes sense."
+    //
+    // Keyed off `buffs.disorders` on the third rather than off Yuzuha's name, so a newly added
+    // disorder buffer makes a real prediction here instead of silently landing in the wrong branch.
+    // Remielle is NOT a valid third here — removed 2026-08-31. A third slot has to be a CONTROL,
+    // and she is not one. She is tagged anomaly, so with Vivian, Yanagi or Burnice as the partner
+    // the team has three anomaly bodies and her conditional ATK buff pays 4; with Nangong, who is
+    // only pseudo-anomaly, it has two and pays 2. Swapping the partner changes the team's
+    // ARCHETYPE, not just its partner, so the rung was measuring composition rather than partner
+    // quality. Owner: "Any team with Rem that does NOT have a triple-anomaly team composition
+    // should be nowhere near the ladder at all." That rule is pinned by TEST 109 instead.
+    const PARTNER_THIRDS = ['Yuzuha', 'Astra', 'Nicole'];
+
+    run('TEST 100: Miyabi\'s anomaly partners — Vivian first, then Burnice unless the third buffs disorders', () => {
         const vivian = allUnits.find(u => u.id === 'vivian');
         assert(vivian && vivian.mechanics?.onfield === false,
             'fixture assumption broken: Vivian should be an off-field unit');
         const failures = [];
+        let disorderThirds = 0, neutralThirds = 0;
         for (const boss of LADDER_BOSSES) {
-            for (const third of ['Yuzuha', 'Astra', 'Nicole', 'Remielle']) {
-                const sc = partner => scoreSpec(`Miyabi/${partner}/${third}`, boss).score;
+            for (const thirdName of PARTNER_THIRDS) {
+                const third = allUnits.find(u => u.name === thirdName);
+                const bd = third?.mechanics?.buffs?.disorders;
+                const amplifiesPolarity = bd === true || (typeof bd === 'number' && bd > 0);
+                const sc = partner => scoreSpec(`Miyabi/${partner}/${thirdName}`, boss).score;
                 const v = sc('Vivian'), y = sc('Yanagi'), bu = sc('Burnice'), n = sc('Nangong');
                 if ([v, y, bu, n].some(x => x <= 0)) continue;   // not a viable rung on this boss
-                const where = `${boss.name}, third=${third}`;
+                const where = `${boss.name}, third=${thirdName}`;
                 if (!(n > v)) failures.push(`${where}: Nangong (${n.toFixed(1)}) is Miyabi's best-in-slot partner and must stay ahead of Vivian (${v.toFixed(1)})`);
-                if (!(v > y)) failures.push(`${where}: Vivian (${v.toFixed(1)}) must beat Yanagi (${y.toFixed(1)}) — off-field parallel gauge buildup makes her the faster disorder engine`);
-                if (!(y > bu)) failures.push(`${where}: Yanagi (${y.toFixed(1)}) must beat Burnice (${bu.toFixed(1)}) — both cycle, but Yanagi also forces polarity disorders`);
+                if (!(v > bu)) failures.push(`${where}: Vivian (${v.toFixed(1)}) must beat Burnice (${bu.toFixed(1)}) — both off-field, but Vivian is the stronger anomaly engine`);
+                if (amplifiesPolarity) {
+                    disorderThirds++;
+                    if (!(y > bu)) failures.push(`${where}: ${thirdName} buffs disorders, which amplifies Yanagi's own polarity damage, so Yanagi (${y.toFixed(1)}) must beat Burnice (${bu.toFixed(1)})`);
+                } else {
+                    neutralThirds++;
+                    if (!(bu > y)) failures.push(`${where}: ${thirdName} does not buff disorders, so Burnice (${bu.toFixed(1)}) must beat Yanagi (${y.toFixed(1)}) on tier and on leaving Miyabi the field`);
+                }
             }
         }
+        // Both branches must actually be exercised, or the split is asserting nothing.
+        assert(disorderThirds > 0 && neutralThirds > 0,
+            `the third-slot split went vacuous: ${disorderThirds} disorder-buffing third(s), ` +
+            `${neutralThirds} neutral. Both branches must run for this test to mean anything.`);
         assert(failures.length === 0,
             `${failures.length} partner ordering(s) wrong:\n      - ` + failures.join('\n      - '));
     });
@@ -2980,6 +3047,55 @@ async function main() {
         assert(atThree > atOne,
             `promoting Sigrid past the gate must raise Lighter/Sigrid/Astra: ` +
             `${atOne.toFixed(1)} at greed 1, ${atThree.toFixed(1)} at greed 3`);
+    });
+
+    // ========================================================================
+    // TEST 109: Remielle off triple-anomaly does not belong near the ladder
+    // ========================================================================
+    // Owner rule, stated 2026-08-31: "Any team with Rem that does NOT have a triple-anomaly
+    // team composition should be nowhere near the ladder at all, not even Nangong/Miyabi/
+    // Remielle, not even Nangong/Velina/Remielle."
+    //
+    // Remielle's ATK buff is `countTag: anomaly` — 4 at three anomaly bodies, 2 at two, 0 at one.
+    // It counts TAGS, not effective roles, so Nangong's pseudo-anomaly does not feed it. Without
+    // the third anomaly body her kit does not come together and her value crashes.
+    //
+    // The floor is TEST 101's bottom rung rather than a hardcoded number, so this test tracks the
+    // ladder through a rescale instead of needing to be re-anchored after every calibration pass.
+    //
+    // NOT asserted here, deliberately: triple-anomaly Remielle teams WITHOUT Vivian
+    // (Miyabi/Burnice/Remielle, Miyabi/Yanagi/Remielle, Alice, Velina...) may legitimately land
+    // in the middle of the ladder or interleave with its lower rungs. Owner: "that can be
+    // adjudicated based on results." Only the non-triple-anomaly ones are pinned.
+    run('TEST 109: non-triple-anomaly Remielle teams sit below the Miyabi ladder', () => {
+        const LADDER_FLOOR_SPEC = 'Miyabi/Vivian/Nicole';
+        const violations = [];
+        let checked = 0;
+        for (const boss of LADDER_BOSSES) {
+            const floor = scoreSpec(LADDER_FLOOR_SPEC, boss).score;
+            assert(floor > 0,
+                `${boss.name}: the ladder floor ${LADDER_FLOOR_SPEC} is not viable, so this test ` +
+                `has nothing to measure against. Fix the fixture rather than skipping the boss.`);
+            for (const { label, team } of allTeamEntries) {
+                if (!team.some(u => u.name === 'Remielle')) continue;
+                const anomalyBodies = team.filter(u => u.tags.includes('anomaly')).length;
+                if (anomalyBodies >= 3) continue;
+                const score = scoreTeamForBoss(team, boss, {});
+                if (score <= 0) continue;               // not viable on this boss
+                checked++;
+                if (score >= floor) {
+                    violations.push(
+                        `${boss.name}: ${label} (${score.toFixed(1)}, ${anomalyBodies} anomaly ` +
+                        `bodies) is at or above the ladder floor ${floor.toFixed(1)}`);
+                }
+            }
+        }
+        assert(checked > 50,
+            `only ${checked} non-triple-anomaly Remielle team(s) were live across the ladder ` +
+            `bosses — this test has gone vacuous. Expected well over a hundred.`);
+        assert(violations.length === 0,
+            `${violations.length} non-triple-anomaly Remielle team(s) crack the ladder:\n      - `
+            + violations.join('\n      - '));
     });
 
     // ------------------------------------------------------------------------

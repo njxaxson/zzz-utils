@@ -77,6 +77,18 @@ const RUPTURE_ATK_EFFICIENCY = 0.33;
 // Armorers do NOT scale off ATK at all (0%) — ATK buffs are worthless to them. Their only
 // stat levers are crit rate and defense.
 const ARMORER_ATK_EFFICIENCY = 0;
+// Crit damage on an anomaly agent: mostly, but NOT entirely, wasted. Anomaly damage does not
+// crit, so the buff only reaches whatever direct damage the agent does on the side. The owner
+// described this as "like ATK buffs on rupture" and put it near 15%, then ruled that the 30%
+// already in the engine should stand — the important property is that it is NOT zero, and the
+// exact figure is not worth a corpus-wide move. Recorded 2026-09-01.
+//
+// The exception is DECLARED, not inferred: an anomaly agent that annotates `scaling.cd` is
+// saying it genuinely wants crit damage, and the short-circuit at the top of the `cd` case
+// catches it before this applies. Miyabi carries `cr: 3, cd: 3` and so reads 100%, which is
+// correct — she cares a lot about crit damage. Do not special-case her by name; annotate the
+// unit instead.
+const ANOMALY_CRIT_DMG_EFFICIENCY = 0.3;
 
 // Maim: only armorers OPEN Gash meters; all meters share one pool of marks (max 3). Stun and
 // armorer agents BUILD that pool, but only armorers DETONATE it into a Maim burst (parallel to
@@ -1109,7 +1121,7 @@ function resolveBaselineWeight(consumer, category) {
             if (scaling?.cd) return w(scaling.cd);
             // Armorer crit damage is FIXED — CD is worthless to them (no armorer branch).
             if (roles.includes('attack') || roles.includes('rupture')) return 2;
-            if (roles.includes('anomaly')) return 0.3;
+            if (roles.includes('anomaly')) return ANOMALY_CRIT_DMG_EFFICIENCY;
             return 0;
         case 'def':
             if (scaling?.def) return w(scaling.def);
@@ -1764,7 +1776,20 @@ function computeBuffUtilization(supplier, team, out = null) {
     const consumers = team.filter(t => t !== supplier);
     const nConsumers = consumers.length;
 
-    if (isDPS(supplier)) {
+    // A unit that is PLAYING support is judged as one, even when it also carries a DPS tag.
+    // Remielle is tagged anomaly but is the support slot on a triple-anomaly team; the branch
+    // below discards every "generic" buff (atk, cr, cd, dmg...) on the grounds that a carry
+    // should not be judged on stat buffs it incidentally carries, and it floors cohesion at 0.65.
+    // Both are right for a carry and wrong for her: her conditional ATK buff is not incidental,
+    // it is the whole unit. Measured on this branch her cohesion was 100% whether or not the
+    // triple-anomaly condition was met, so the engine never asked whether her defining buff
+    // landed. Owner: "for damage-dealing calcs she is a subdps... for buff relevance she is
+    // support. But generally speaking, support wins."
+    //
+    // isSupport() reads ACTIVATED roles, so a conditional support pseudo-role only counts when
+    // its predicate holds — Cissia routes here only on a team with Seed. Affects exactly three
+    // units: Remielle, Orphie, and Cissia-with-Seed.
+    if (isDPS(supplier) && !isSupport(supplier)) {
         const buffs = resolveMapForUtil(supplier.mechanics?.buffs, supplier, team);
         const debuffs = resolveMapForUtil(supplier.mechanics?.debuffs, supplier, team);
         // vortex is a contextual situational bonus, not a must-use designed mechanic.
@@ -1813,7 +1838,10 @@ function computeBuffUtilization(supplier, team, out = null) {
     // Every distinct thing this unit offers, as {magnitude, landed}. Used ONLY for the
     // flagship test — how much arrived is `effectiveWeight`.
     const offerings = [];
-    const offer = (magnitude, relevance) => { if (magnitude > 0) offerings.push({ magnitude, relevance }); };
+    // `declared` marks an offering the unit is BUILT around — see the flagship test below.
+    const offer = (magnitude, relevance, declared = false) => {
+        if (magnitude > 0) offerings.push({ magnitude, relevance, declared });
+    };
     let coreWeight = 0;
     let coreEffective = 0;
     let coreImpact = 0;
@@ -1824,14 +1852,37 @@ function computeBuffUtilization(supplier, team, out = null) {
     // together below, after the ordinary buffs.
     const elementMenu = [];
 
+    // A team-scoped conditional that has not been unlocked is a MISS, not a smaller offering.
+    // `resolveMapForUtil` hands back the value the team actually unlocked, so measuring THAT
+    // value only ever asks "did the 2 land?" — to which the answer is trivially yes. Remielle's
+    // cohesion was 100% whether or not her triple-anomaly condition was met, which is the engine
+    // declining to ask whether her defining buff landed at all.
+    //
+    // So measure the buff at its FULL size and treat the shortfall as relevance that never
+    // arrived. Her ATK buff is offered at 4 with half of it landing — the shape of the real
+    // effect (owner: 1600 ATK down to 700 is 45%, which we round to 50%).
+    //
+    // Team-scoped only. A recipient-scoped conditional is already routed to its best consumer by
+    // `resolveMapForUtil` and is not a shortfall at all — it is a buff correctly aimed elsewhere.
+    const conditionalReach = {};
+    for (const [key, spec] of Object.entries(supplier.mechanics?.buffs ?? {})) {
+        if (!isTeamScopedConditional(spec)) continue;
+        const full = maxConditionalValue(spec);
+        if (full <= 0) continue;
+        conditionalReach[key] = { full, ratio: Math.min(1, w(buffs[key]) / full) };
+    }
+
     for (const [key, value] of Object.entries(buffs)) {
         if (COHESION_EXCLUDED_BUFFS.has(key)) continue; // dmg/vortex: flat L4 only, not cohesion
-        const bw = w(value);
+        const reach = conditionalReach[key];
+        const bw = reach ? reach.full : w(value);
+        // How much of a locked conditional actually reaches the team. 1 for everything else.
+        const reachFactor = reach ? reach.ratio : 1;
         if (bw <= 0) continue;
         // Weight-1 element buffs (Nicole's ether) stay on the auto-credit path below, which
         // never consults relevance — routing them through the menu would change a unit this
         // phase is not about.
-        if (bw >= 2 && ELEMENTS.includes(key)) {
+        if (bw >= 2 && ELEMENTS.includes(key) && !reach) {
             elementMenu.push([key, bw]);
             continue;
         }
@@ -1843,34 +1894,46 @@ function computeBuffUtilization(supplier, team, out = null) {
         const impact = buffImpact(key);
         totalWeight += bw * impact;
         if (bw < 2) {
-            effectiveWeight += bw * impact;
-            offer(bw * impact, 1);
+            effectiveWeight += bw * impact * reachFactor;
+            offer(bw * impact, reachFactor, !!reach);
             continue;
         }
 
+        // "Did this buff find a user?" — a MAX over the team, never an average.
+        //
+        // Every buff key asks the same question: does anybody here convert this into damage. It
+        // is not "how much of the team benefits", so dividing by the roster size is wrong. The
+        // stat keys always did this correctly; the rest averaged, and that quietly punished a
+        // support for the COMPOSITION OF HER OWN TEAM. Astra's generic damage buff is her largest
+        // offering and `getBuffRelevance('dmg')` returns `dps ? 1 : 0` under a comment reading
+        // "never misses on any DPS" — yet on Norma/Evelyn/Astra it was charged 0.50, because
+        // Evelyn returned 1, Norma the stunner returned 0, and the two were averaged. She lost
+        // 38 points on average across 5,286 team-boss rows for having a stunner on the team.
+        //
+        // Checked per key rather than blanket, the way issue 5 insists. Every key that reached
+        // the averaging path — dmg, aftershock, disorders, abloom, def — is a per-consumer
+        // capability question with exactly one natural answer: did ANY consumer want it. There
+        // was no correct member of that path.
+        //
+        // A buff landing only on a non-carry is still worth half, which is what the DPS/other
+        // split below encodes; that shape is unchanged, it is just applied to every key now.
+        let dpsRelevance = 0;
+        let otherRelevance = 0;
+        for (const consumer of consumers) {
+            const rel = getBuffRelevance(key, consumer);
+            if (isDPS(consumer)) dpsRelevance = Math.max(dpsRelevance, rel);
+            else otherRelevance = Math.max(otherRelevance, rel);
+        }
+        const hasDPS = consumers.some(c => isDPS(c));
+        const maxRelevance = Math.max(dpsRelevance, otherRelevance * (hasDPS ? 0.5 : 1.0)) * reachFactor;
+        effectiveWeight += bw * impact * maxRelevance;
+        offer(bw * impact, maxRelevance, !!reach);
+        // Only the stat keys feed the "core" accumulators; that distinction is about which buffs
+        // constitute a support's central stat package, not about how relevance is measured.
         if (STAT_BUFF_KEYS.has(key)) {
-            let dpsRelevance = 0;
-            let otherRelevance = 0;
-            for (const consumer of consumers) {
-                const rel = getBuffRelevance(key, consumer);
-                if (isDPS(consumer)) dpsRelevance = Math.max(dpsRelevance, rel);
-                else otherRelevance = Math.max(otherRelevance, rel);
-            }
-            const hasDPS = consumers.some(c => isDPS(c));
-            const maxRelevance = Math.max(dpsRelevance, otherRelevance * (hasDPS ? 0.5 : 1.0));
-            effectiveWeight += bw * impact * maxRelevance;
-            offer(bw * impact, maxRelevance);
             coreWeight += bw;
             coreEffective += bw * maxRelevance;
             coreImpact += bw * maxRelevance * BUFF_IMPACT[key];
-        } else {
-            let totalRelevance = 0;
-            for (const consumer of consumers) {
-                totalRelevance += getBuffRelevance(key, consumer);
-            }
-            const avgRelevance = nConsumers > 0 ? totalRelevance / nConsumers : 0;
-            effectiveWeight += bw * impact * avgRelevance;
-            offer(bw * impact, avgRelevance);
         }
     }
 
@@ -2061,9 +2124,23 @@ function computeBuffUtilization(supplier, team, out = null) {
     // A flagship has to SUBSTANTIALLY land, not merely be nonzero. Yuzuha's ATK reaches a
     // rupture carry at a third, and counting that as "my flagship found a home" is how an
     // anomaly support read as a reasonable pick for Yixuan.
+    // A DECLARED flagship overrides the size test. A team-scoped conditional is the designer
+    // saying "this unit is built around this" — Remielle's ATK curve is gated on three anomaly
+    // bodies, and her M6, the highest unlock in the game, exists purely to remove that gate.
+    // That is how drastic the difference is, so the gate cannot be judged on damage-weight:
+    // ATK is priced cheaply because it scales poorly in general, which makes her defining buff
+    // look like a small offering next to her anomaly buff and lets a half-locked Remielle read
+    // as a fine fit. When a declared offering exists it decides the flagship test by itself.
+    //
+    // STRICTLY greater than the threshold: at two anomaly bodies her buff unlocks exactly half,
+    // and half is a miss, not a landing. Owner: 1600 ATK down to 700 "is 45%, which we have
+    // rounded to 50%" — and "did my flagship buff land? DEFINITIVELY NO."
+    const declaredOfferings = offerings.filter(o => o.declared);
     const flagship = offerings.reduce((m, o) => Math.max(m, o.magnitude), 0);
-    const flagshipLanded = flagship === 0 || offerings.some(
-        o => o.magnitude >= FLAGSHIP_BAND * flagship && o.relevance >= FLAGSHIP_LAND_THRESHOLD);
+    const flagshipLanded = declaredOfferings.length > 0
+        ? declaredOfferings.every(o => o.relevance > FLAGSHIP_LAND_THRESHOLD)
+        : (flagship === 0 || offerings.some(
+            o => o.magnitude >= FLAGSHIP_BAND * flagship && o.relevance >= FLAGSHIP_LAND_THRESHOLD));
 
     let baseUtil = fit;
     if (!flagshipLanded) baseUtil *= FLAGSHIP_MISS_PENALTY;
@@ -2863,10 +2940,25 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
             score += scaledBonus;
             if (debug) console.log(`    ${unit.name} stun on-element: +${scaledBonus} (util ${Math.round(util * 100)}%)`);
         } else if (!bossResistances.includes(element) && bossWeaknesses.length > 0) {
-            const hasAnomPseudo = unit._activatedRoles?.some(r => DPS_ROLES.includes(r));
-            const penalty = hasAnomPseudo ? 0 : 15;
+            // NO PENALTY for an off-element stunner. Removed 2026-09-01.
+            //
+            // The bonus above is defensible: an on-element stunner's own damage is amplified by
+            // the boss's weakness. A symmetric penalty is not — an off-element stunner has not
+            // lost anything relative to baseline, he simply does not collect the bonus. Charging
+            // both made the swing between two stunners 30 points on a unit whose job is dazing,
+            // and that is what reordered Evelyn's stunners on fire-weak Pompey.
+            //
+            // The evidence: on the NEUTRAL boss, where this term does not fire at all, the ladder
+            // is already exactly the owner's — Norma > Dialyn > Lighter > Ju Fufu. On Pompey the
+            // ±15 swing lifted Lighter (fire) past Dialyn, which aggregated player statistics say
+            // is wrong. A term that is right in its presence and wrong in its magnitude reorders
+            // only where it fires, which is the signature to look for.
+            //
+            // A resisted element still costs 80 above; that is a real damage loss, not a missed
+            // bonus, and it is unchanged.
+            const penalty = 0;
             score -= penalty;
-            if (debug) console.log(`    ${unit.name} stun off-element: -${penalty}${hasAnomPseudo ? ' (DPS pseudo-role)' : ''}`);
+            if (debug) console.log(`    ${unit.name} stun off-element: no penalty`);
         }
     }
 
