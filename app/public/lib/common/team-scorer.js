@@ -83,6 +83,10 @@ const ARMORER_ATK_EFFICIENCY = 0;
 // already in the engine should stand — the important property is that it is NOT zero, and the
 // exact figure is not worth a corpus-wide move. Recorded 2026-09-01.
 //
+// Used in BOTH tables that price crit damage: `resolveBaselineWeight`, which sets the L4 pair
+// weight, and `getBuffRelevance`, which sets cohesion relevance. They independently held 0.3 and
+// are now tied together so they cannot drift.
+//
 // The exception is DECLARED, not inferred: an anomaly agent that annotates `scaling.cd` is
 // saying it genuinely wants crit damage, and the short-circuit at the top of the `cd` case
 // catches it before this applies. Miyabi carries `cr: 3, cd: 3` and so reads 100%, which is
@@ -1480,7 +1484,7 @@ function getBuffRelevance(key, consumer) {
             if (consumer.mechanics?.scaling?.cd) return Math.min(1, w(consumer.mechanics.scaling.cd) / 2);
             // Armorers otherwise have FIXED crit damage — CD-buffing supports earn nothing.
             if (roles.includes('attack') || roles.includes('rupture')) return 1;
-            if (roles.includes('anomaly')) return 0.3;
+            if (roles.includes('anomaly')) return ANOMALY_CRIT_DMG_EFFICIENCY;
             return 0;
         case 'def':
             return (consumer.mechanics?.scaling?.def || roles.includes('armorer')) ? 1 : 0;
@@ -1627,6 +1631,25 @@ const DEFENSIVE_PROVISIONS = new Set(['veils', 'interrupt-resistance']);
 // because one of them always lands — the same "menu, not separate offerings" rule phase 1
 // established for Lighter's fire/ice, applied to a whole kit. A unit with ONE dominant
 // offering and a few small ones has no substitute when the big one misses.
+// RARITY IS NOT IMPORTANCE. Almost every S-rank support buffs ATK at weight 3, so ATK is not
+// what DISCRIMINATES between two supports — you pick Yuzuha over Astra on crit damage or on
+// anomaly buffs, never on ATK. But that makes ATK common, not unimportant: it is the baseline
+// every support is paid for, and a support whose ATK buff does not land has had the rug pulled
+// out. Owner, 2026-09-01: "the baseline is 'I buff ATK and X,Y,Z' and you're picking which
+// support is best based on XYZ because everyone is offering ATK."
+//
+// So a baseline buff landing answers "is this support doing their job?" — which is the question
+// the flagship test exists to ask — even when it is not the unit's largest offering by damage
+// weight. `sheer` is the rupture-side equivalent: Lucia carries `sheer: 3` and no ATK at all,
+// doing "the comparative thing for rupture agents".
+//
+// Weight 3 is the bar, and it is load-bearing in both directions. Lucia's `sheer: 3` is a real
+// baseline, so on an attack carry like Ye Shunguong it does NOT land and she keeps her penalty —
+// that is the Lucia/YSG "wrong tool" case and it must stay broken. Pan Yinhu's `sheer: 2` is a
+// token amount, below the bar, so he stays useless on an attack team.
+const BASELINE_BUFF_KEYS = new Set(['atk', 'sheer']);
+const BASELINE_BUFF_MIN_WEIGHT = 3;
+
 const FLAGSHIP_BAND = 0.6;
 
 // How much of a buff has to actually reach a consumer for it to count as having landed.
@@ -1839,8 +1862,8 @@ function computeBuffUtilization(supplier, team, out = null) {
     // flagship test — how much arrived is `effectiveWeight`.
     const offerings = [];
     // `declared` marks an offering the unit is BUILT around — see the flagship test below.
-    const offer = (magnitude, relevance, declared = false) => {
-        if (magnitude > 0) offerings.push({ magnitude, relevance, declared });
+    const offer = (magnitude, relevance, declared = false, baseline = false) => {
+        if (magnitude > 0) offerings.push({ magnitude, relevance, declared, baseline });
     };
     let coreWeight = 0;
     let coreEffective = 0;
@@ -1927,7 +1950,8 @@ function computeBuffUtilization(supplier, team, out = null) {
         const hasDPS = consumers.some(c => isDPS(c));
         const maxRelevance = Math.max(dpsRelevance, otherRelevance * (hasDPS ? 0.5 : 1.0)) * reachFactor;
         effectiveWeight += bw * impact * maxRelevance;
-        offer(bw * impact, maxRelevance, !!reach);
+        offer(bw * impact, maxRelevance, !!reach,
+              BASELINE_BUFF_KEYS.has(key) && bw >= BASELINE_BUFF_MIN_WEIGHT);
         // Only the stat keys feed the "core" accumulators; that distinction is about which buffs
         // constitute a support's central stat package, not about how relevance is measured.
         if (STAT_BUFF_KEYS.has(key)) {
@@ -2024,8 +2048,20 @@ function computeBuffUtilization(supplier, team, out = null) {
                 // reaches her by relay. Tracing provisions through an intermediary is a lot of
                 // machinery for a difference this small. Not modelled on purpose; revisit only
                 // if this hair genuinely needs splitting.
+                //
+                // `chains` is the SECOND key in that family, fixed 2026-09-01. Owner: "Of course
+                // anomaly teams can use free chains; every DPS loves a free chain." Judged by
+                // declared need it was landing almost nowhere — only Evelyn and Sigrid annotate
+                // `scaling.chains`, so Astra's and Norma's chain provision read as a TOTAL MISS on
+                // every team without one of those two. Astra appears in 5,286 team-boss rows.
+                //
+                // The declared scalers are not being short-changed by this: they already earn the
+                // extra through the L4 need channel. This is only about cohesion no longer calling
+                // a universally-useful provision a mismatch.
                 const rel = key === 'ultimates'
                     ? (isDPS(consumer) && !hasSubDPSRole(consumer) && getUltimateMagnitude(consumer) > 0 ? 1 : 0)
+                    : key === 'chains'
+                    ? (isDPS(consumer) ? 1 : 0)
                     : Math.min(1, w(getEffectiveScaling(consumer)[key]));
                 maxRelevance = Math.max(maxRelevance, rel);
             }
@@ -2137,9 +2173,21 @@ function computeBuffUtilization(supplier, team, out = null) {
     // rounded to 50%" — and "did my flagship buff land? DEFINITIVELY NO."
     const declaredOfferings = offerings.filter(o => o.declared);
     const flagship = offerings.reduce((m, o) => Math.max(m, o.magnitude), 0);
+    // A DECLARED flagship still overrides everything — Remielle's gated ATK is decided above and
+    // is not rescued by being an ATK buff.
+    //
+    // Otherwise the flagship has landed if EITHER the unit's baseline buff landed (see
+    // BASELINE_BUFF_KEYS) OR something within the damage-weighted band did. Soukaku is why the
+    // first clause exists: her data reads `atk: 3, ice: 3`, the two are equally central, but
+    // priced by damage the ice buff is 3.00 and the ATK buff 1.77 — so the band asked whether
+    // 1.77 >= 0.6 x 3.00 = 1.80 and answered no, BY 0.03. Her ATK buff lands fully on Ye
+    // Shunguong and she was charged the full miss penalty anyway. The dead ice arm is the Fiona
+    // case: a unit is not punished for carrying something this particular team cannot use.
+    const baselineLanded = offerings.some(
+        o => o.baseline && o.relevance >= FLAGSHIP_LAND_THRESHOLD);
     const flagshipLanded = declaredOfferings.length > 0
         ? declaredOfferings.every(o => o.relevance > FLAGSHIP_LAND_THRESHOLD)
-        : (flagship === 0 || offerings.some(
+        : (baselineLanded || flagship === 0 || offerings.some(
             o => o.magnitude >= FLAGSHIP_BAND * flagship && o.relevance >= FLAGSHIP_LAND_THRESHOLD));
 
     let baseUtil = fit;
