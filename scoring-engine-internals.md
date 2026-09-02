@@ -535,6 +535,87 @@ supports high — `Yixuan/Zhao/Astra` reached 361, unpinned by any test. Read th
 
 ---
 
+## 8e. TEST 101 — the Miyabi ladder (2026-09-02)
+
+Owner triaged the 5 failing rungs: 3 were a wrong assertion, 2 were real. After correcting the
+ladder, **4 of 6 rungs closed with one mechanism** and 2 remain, over-constrained.
+
+### Fixed — the no-support tier
+
+`Nangong/Miyabi/Vivian` has no support (stunner + carry + anomaly subdps). The engine already
+demoted supportless teams, but to the SHARED `UNCONVENTIONAL_VIABLE` tier at factor 0.85 — not
+enough, because NMV's raw L4 synergy is enormous (234.5 on Butcher vs MVNicole's 120.9) and
+survived the hit. Split into a dedicated `STRUCTURE.NO_SUPPORT` tier at **0.80**; the tightest
+margin needed 0.812 (Marionettes). Owner: "no support really makes DPS seem lackluster."
+
+Verified: 2,318 rows moved, **all downward, zero exceptions** — every mover is a genuinely
+supportless team. (The checker for that initially reported 882 false exceptions because it counted
+Cissia's *conditional* support pseudo-role as unconditional. The engine was right and the check was
+wrong — the "predict by effective role, never by tag" lesson, committed again in a verification
+script this time.)
+
+### Resolved — the ordering below the top two is BOSS-CONDITIONAL
+
+The last rung, `Nangong/Miyabi/Sunna` > `Miyabi/Vivian/Yuzuha`, held on Butcher and Marionettes
+and failed on Girtablullu and the neutral boss. The cause is elemental, and measurable:
+
+| boss | NMSunna | MVYuzuha | NMSunna L3 | MVYuzuha L3 | |
+|----|----|----|----|----|----|
+| Butcher | 563.7 | 561.2 | **82** | 61 | +2.5 |
+| Marionettes | 541.1 | 538.2 | 82 | 61 | +2.9 |
+| Girtablullu | 437.3 | 454.5 | — | — | −17.2 |
+| Neutral | 468.7 | 486.0 | **0** | **0** | −17.3 |
+
+The ordering survives only on a ~21-point elemental L3 advantage. Strip the element and it inverts.
+
+**Forcing it everywhere was proven impossible with any uniform lever.** On Butcher
+`Miyabi/Vivian/Remielle` (rung 2) sits only **11.0** above NMSunna (rung 3), so a lift big enough
+for Neutral (17.2+) breaks rung 2 > rung 3 there. Lowering the Miyabi/Vivian teams fails for the
+mirror reason; lowering Yuzuha fails because she is rung 1's third and can absorb only ~10 before
+`Nangong/Miyabi/Yuzuha` drops below `MVRemielle`.
+
+**Owner ruling 2026-09-02:** "I can accept that the ordering is different based on elemental
+weakness. Assume the laddering as I expressed is definitive for Butcher/Marionettes, and accept
+that it can switch for Girta/Neutral. As long as NMY and MVR are the top 2 in all cases."
+
+So TEST 101 now has two parts: the **full ladder on the element-favourable bosses only**, and — on
+every boss — **`Nangong/Miyabi/Yuzuha` #1 and `Miyabi/Vivian/Remielle` #2 across the whole corpus
+of Miyabi teams**, not merely within the ladder fixture. The corpus-wide form is the stronger claim
+and it already held; it is what actually protects the two wheelchairs.
+
+No engine change was needed for this half. The L4 soft cap was offered as fungible and was NOT
+touched — it is load-bearing for the supportless rungs above.
+
+### Three levers tried and rejected — measured, do not repeat
+
+1. **Raise `L4_SOFT_CAP`.** Helps here (Nangong's raw L4 advantage of 27.3 is compressed to 17.8 —
+   the cap takes 16.7 off Nangong and 7.2 off Yuzuha), but it **un-fixes the supportless rungs**:
+   NMVivian's 234.5 raw L4 is exactly what the cap is holding down. The two bugs pull the cap in
+   opposite directions, which is why no single value serves both. Removing the cap entirely still
+   only nets Nangong +9.5 — short of the 19.3 needed anyway.
+2. **Halve subdps RANK** for consistency with its halved tier. This is a genuine inconsistency —
+   Vivian reads `T1 → +9 (subdps x0.5)` yet banks the full +22 of S-rank/limited credit — and it
+   closes 11 of the gap. But it lowers EVERY Vivian team uniformly, and the ladder interleaves them:
+   `MVRemielle` and `MVAstra` must stay ABOVE certain Nangong teams while `MVYuzuha` drops BELOW
+   others. A uniform lever cannot change their relative order. Broke 4 other rungs; reverted, with
+   the reasoning left in a comment at the rank loop.
+3. **The +15 sole-carry bonus.** Removing it entirely still leaves MVYuzuha ahead by 4.3. A **red
+   herring here**, though it was the genuine cause in three other orderings. The owner predicted
+   this ("on many previous occasions you assigned it to on-field status and it turned out to be a
+   red herring"). *Check the arithmetic before blaming that constant.*
+
+Also ruled out: lowering Yuzuha directly. She is rung 1's third (`Nangong/Miyabi/Yuzuha`), which
+must stay top — she can absorb at most ~10 before that breaks, and MVYuzuha needs ≥19.3.
+
+### What it needs
+
+An owner decision on the ladder, not more tuning: is `Miyabi/Vivian/Yuzuha` genuinely below
+NMSunna/NMAstra on a *neutral* boss, or is that order boss-conditional? It already holds on the two
+element-favourable bosses. Worth remembering that this ladder was produced by confirming engine
+output — the method that produced the Evelyn ladder later reversed against player statistics.
+
+---
+
 ## Codependency in the scorer (`scaling.codependent`)
 
 Previously honoured only by the pull engine. Now also scales a codependent unit's contributions

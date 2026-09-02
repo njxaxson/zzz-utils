@@ -2469,6 +2469,15 @@ function checkDisqualifications(team, boss, debug) {
 const STRUCTURE = {
     CONVENTIONAL_BONUS: 35,
     UNCONVENTIONAL_VIABLE: 0,
+    // A team with NO support/defense agent at all. Its own tier because it is a different and
+    // worse failure than merely being unconventional: an unconventional-but-viable team has made a
+    // stylistic choice, a supportless team has given up its largest source of damage
+    // amplification. The value is only a MAP KEY — structureScore feeds the teamwork multiplier
+    // and is never added to the raw score — so -1 costs nothing on its own; the harsher factor in
+    // STRUCTURE_FACTOR is the whole effect. Split out 2026-09-01 because the shared 0.85 was not
+    // enough to stop `Nangong/Miyabi/Vivian`, whose raw L4 synergy is enormous (234 on Butcher),
+    // outranking supported teams the owner places below it.
+    NO_SUPPORT: -1,
     UNCONVENTIONAL_NO_INTERACTION: -50,
     WILDLY_UNCONVENTIONAL: -150,
 };
@@ -2485,8 +2494,10 @@ const FIELD_TIME = {
 // `Nangong/Miyabi/Vivian` and `Nangong/Miyabi/Yuzuha` as identically CONVENTIONAL, which is why
 // triple-anomaly lines outranked the wheelchairs they should lose to (issue 7).
 //
-// Demotion is to the EXISTING `UNCONVENTIONAL_VIABLE` tier, so no new tier or factor is needed.
-// The hit is deliberately large (~-35 raw, then -15% on the total): it is meant to be.
+// Demotion is to the dedicated `NO_SUPPORT` tier (was `UNCONVENTIONAL_VIABLE` until 2026-09-01).
+// It needed its own factor: at the shared 0.85, `Nangong/Miyabi/Vivian` still outranked supported
+// teams the owner places below it, because its raw L4 synergy is big enough to absorb the hit.
+// The hit is deliberately large (loses the +35 structure bonus, then -20% on the total).
 //
 // `isEffectiveSupport || isEffectiveDefense` reads activated pseudo-roles, which is what makes
 // Orphie, Remielle, and Cissia-alongside-Seed count as the team's support.
@@ -2501,8 +2512,8 @@ function scoreTeamStructure(team, debug) {
         if (debug) console.log('    Structure: ^ kept — no support, but the second stunner serves as one (totalize)');
         return classified;
     }
-    if (debug) console.log('    Structure: ^ DEMOTED to UNCONVENTIONAL viable — no support or defense agent');
-    return STRUCTURE.UNCONVENTIONAL_VIABLE;
+    if (debug) console.log('    Structure: ^ DEMOTED to NO-SUPPORT tier — no support or defense agent');
+    return STRUCTURE.NO_SUPPORT;
 }
 
 function secondStunnerActsAsSupport(team) {
@@ -2700,6 +2711,11 @@ function scoreInherentQuality(team, { lenient = false, debug = false, boss = nul
     if (debug) console.log('    DPS Tier:');
     const forcedSecondaryUnits = new Set();
     const reactionDisabledUnits = new Set();
+    // A SECONDARY dps (a subdps standing beside a primary of the same type) already has its TIER
+    // halved below. Its RANK was not halved, which was an inconsistency: the same unit was rated
+    // "half a damage dealer" for tier and "a whole premium S-rank" for rank. Vivian beside Miyabi
+    // read T1 -> +9 (halved) but still banked the full +22 of S-rank/limited credit.
+    const secondaryDPSUnits = new Set();
     for (const unit of dpsUnits) {
         const tier = unit.tier ?? 2.5;
 
@@ -2721,6 +2737,7 @@ function scoreInherentQuality(team, { lenient = false, debug = false, boss = nul
             (isRupture(unit) && isForcedSecondaryDPS(unit, team.filter(isRupture))) ||
             (isArmorer(unit) && isForcedSecondaryDPS(unit, armorerUnits));
         if (forcedSecondary) forcedSecondaryUnits.add(unit);
+        if (isSecondaryAttacker || isSecondaryAnomaly) secondaryDPSUnits.add(unit);
         let tierMult = (isSecondaryAttacker || isSecondaryAnomaly || forcedSecondary) ? 0.5 : 1.0;
         const unitReaction = reactions.get(unit);
         const onElementWeakness = getBossWeaknesses(boss).includes(getElement(unit));
@@ -2871,6 +2888,11 @@ function scoreInherentQuality(team, { lenient = false, debug = false, boss = nul
             const tier = unit.tier ?? 2.5;
             rankBonus = (tier >= 2) ? -(lenient ? 12 : 30) : -10;
         }
+        // NOT halved for a plain secondary DPS, despite the tier halving above. Tried 2026-09-01
+        // and reverted: it lowers EVERY Vivian team uniformly, but the Miyabi ladder interleaves
+        // them — `Miyabi/Vivian/Remielle` and `Miyabi/Vivian/Astra` must stay ABOVE certain Nangong
+        // teams while `Miyabi/Vivian/Yuzuha` must drop BELOW others. A uniform lever cannot change
+        // their relative order, so it closed the target gap by 11 and broke 4 other rungs.
         if (forcedSecondaryUnits.has(unit) && rankBonus > 0) {
             rankBonus = Math.round(rankBonus * 0.5);
         }
@@ -4036,6 +4058,11 @@ function scoreAdditionalSynergies(team, debug) {
 const STRUCTURE_FACTOR = new Map([
     [STRUCTURE.CONVENTIONAL_BONUS, 1.0],
     [STRUCTURE.UNCONVENTIONAL_VIABLE, 0.85],
+    // Harsher than merely-unconventional. Calibrated against the Miyabi ladder: at 0.85 the
+    // supportless `Nangong/Miyabi/Vivian` still outranked supported teams on all four bosses
+    // (tightest margin needed 0.812 on Marionettes), because its raw L4 synergy is large enough to
+    // survive the demotion. 0.80 clears all four with margin.
+    [STRUCTURE.NO_SUPPORT, 0.80],
     [STRUCTURE.UNCONVENTIONAL_NO_INTERACTION, 0.6],
     [STRUCTURE.WILDLY_UNCONVENTIONAL, 0.35],
 ]);

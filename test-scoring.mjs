@@ -141,14 +141,6 @@ function withBosses(bosses, filterStr) {
 // entry to silence a regression.
 // ---------------------------------------------------------------------------
 const KNOWN_RED = new Map([
-    [101, 'The Miyabi best-in-slot ladder, red by design per issue 7. Five rungs fail and they share ' +
-          'a shape: Nangong/Miyabi/X sitting below Miyabi/Vivian/Y where the ladder wants the ' +
-          'reverse. BEFORE WORKING ON THIS, re-read the target with the owner. It was produced the ' +
-          'same way the Evelyn stunner ladder was -- owner confirmation of engine output -- and on ' +
-          '2026-09-01 that ladder was reversed against aggregated player statistics. Recognising ' +
-          'output is not the same as checking it, so it is not yet known whether this target is ' +
-          'independently derived. Making the engine match an unverified target is the expensive ' +
-          'mistake here.'],
 ]);
 
 async function main() {
@@ -2444,6 +2436,12 @@ async function main() {
         .flatMap(f => withBosses(bosses, f));
     assert(LADDER_BOSSES.length === 4,
         `ladder fixture broken: expected 4 bosses, resolved ${LADDER_BOSSES.length} (${LADDER_BOSSES.map(b => b.name).join(', ')})`);
+    // The bosses whose element favours the Miyabi/Nangong lines, and the only ones where the FULL
+    // ladder order is asserted. Below the top two the order is boss-conditional by owner ruling —
+    // see TEST 101 part 2.
+    const STRICT_LADDER_BOSSES = ['Butcher', 'Marionettes'].flatMap(f => withBosses(bosses, f));
+    assert(STRICT_LADDER_BOSSES.length === 2,
+        `strict ladder fixture broken: expected 2 bosses, resolved ${STRICT_LADDER_BOSSES.length}`);
 
     /** Score one parsed spec against one boss. Returns -1 for a disqualified team. */
     const scoreSpec = (spec, boss, roster = allUnits) => {
@@ -2613,19 +2611,75 @@ async function main() {
     // the pair is unordered and only its position relative to its neighbours is asserted. A rung
     // whose teams are all disqualified on a given boss is skipped for that boss, and its
     // neighbours compared directly.
-    run('TEST 101: Miyabi best-in-slot ladder (owner-stated; partially red by design)', () => {
+    run('TEST 101: Miyabi best-in-slot ladder (owner-stated)', () => {
+        // Bottom four REORDERED 2026-09-01 by owner triage of the previous failure list.
+        //
+        // `Miyabi/Vivian/Astra` moved ABOVE the Nangong pair, and `Nangong/Miyabi/Vivian` moved to
+        // dead last. The reason is structural and the engine already models it: NMV has NO SUPPORT
+        // (stunner + carry + anomaly subdps), and `scoreTeamStructure` demotes a supportless team
+        // from CONVENTIONAL to UNCONVENTIONAL_VIABLE for exactly that. Owner: "NMV feels like it's
+        // lacking the necessary oomph, having no support really makes DPS seem lackluster."
+        //
+        // The old unordered rung [NMVivian, NMNicole] is dissolved — they are no longer adjacent.
+        // NMNicole keeps a real support and stays mid-table; NMVivian does not and sinks.
+        //
+        // LOW CONFIDENCE on the bottom four specifically. Owner: "Super challenging question. Not
+        // perfectly sure... honestly very hard to answer." Re-derive during the correctness pass
+        // rather than treating this half as a hard spec — and note the ladder as a whole was
+        // originally produced by confirming ENGINE OUTPUT, which is the same method that produced
+        // the Evelyn stunner ladder later reversed against player statistics.
+        // `Nangong/Miyabi/Sunna` above `Miyabi/Vivian/Yuzuha` is DEFINITIVE and play-proven —
+        // owner: "the Nangong/Sunna wheelchair for Miyabi is very strong, only surpassed by the
+        // Nangong/Yuzuha wheelchair." That rung is a hard assertion.
+        //
+        // `Nangong/Miyabi/Astra` vs `Miyabi/Vivian/Yuzuha` is NOT. Owner: "honestly a close call...
+        // I think NMA is better, but I wouldn't be surprised if MVY was better. Conceptually very,
+        // very close." So they share an UNORDERED rung — the ladder asserts only where the pair
+        // sits relative to its neighbours, not which of the two wins.
         const ladder = [
             ['Nangong/Miyabi/Yuzuha'],
             ['Miyabi/Vivian/Remielle'],
             ['Nangong/Miyabi/Sunna'],
-            ['Nangong/Miyabi/Astra'],
-            ['Miyabi/Vivian/Yuzuha'],
-            ['Nangong/Miyabi/Vivian', 'Nangong/Miyabi/Nicole'],
+            ['Nangong/Miyabi/Astra', 'Miyabi/Vivian/Yuzuha'],
             ['Miyabi/Vivian/Astra'],
+            ['Nangong/Miyabi/Nicole'],
             ['Miyabi/Vivian/Nicole'],
+            ['Nangong/Miyabi/Vivian'],
         ];
         const violations = [];
+
+        // PART 1 — holds on EVERY boss: the top two Miyabi teams are Nangong/Miyabi/Yuzuha then
+        // Miyabi/Vivian/Remielle. Owner: "As long as NMY and MVR are the top 2 in all cases, I can
+        // accept this." Asserted across the WHOLE corpus of Miyabi teams, not just the ladder
+        // fixture, which is a stronger claim than the ladder alone and is what actually protects
+        // the two wheelchairs.
         for (const boss of LADDER_BOSSES) {
+            const top = getTopViableTeams(allTeamEntries, boss, 2, ['Miyabi']);
+            if (top.length < 2) {
+                violations.push(`${boss.name}: only ${top.length} viable Miyabi team(s) — fixture broken`);
+                continue;
+            }
+            if (top[0].label !== 'Nangong / Miyabi / Yuzuha') {
+                violations.push(`${boss.name}: Miyabi's #1 must be Nangong/Miyabi/Yuzuha, got ${top[0].label} (${top[0].score.toFixed(1)})`);
+            }
+            if (top[1].label !== 'Miyabi / Remielle / Vivian') {
+                violations.push(`${boss.name}: Miyabi's #2 must be Miyabi/Vivian/Remielle, got ${top[1].label} (${top[1].score.toFixed(1)})`);
+            }
+        }
+
+        // PART 2 — the FULL ladder, asserted only on the element-favourable bosses.
+        //
+        // Below the top two the order is BOSS-CONDITIONAL, and that is accepted rather than a
+        // defect. Owner 2026-09-02: "I can accept that the ordering is different based on elemental
+        // weakness. Assume the laddering as I expressed is definitive for Butcher/Marionettes, and
+        // accept that it can switch for Girta/Neutral."
+        //
+        // The measurement behind that: `Nangong/Miyabi/Sunna` outranks `Miyabi/Vivian/Yuzuha` only
+        // because Nangong's teams earn ~21 more L3 on the element-weak bosses (82 vs 61). On
+        // Girtablullu and the neutral boss L3 is 0 for both and the ordering inverts. Forcing it
+        // everywhere was proven impossible with any uniform lever: on Butcher `MVRemielle` sits
+        // just 11.0 above NMSunna, so a lift big enough for Neutral (17.2+) breaks rung 2 > rung 3.
+        for (const boss of STRICT_LADDER_BOSSES) {
             const rungs = ladder
                 .map(rung => rung.map(spec => scoreSpec(spec, boss)).filter(t => t.score > 0))
                 .filter(rung => rung.length > 0);
@@ -2640,7 +2694,7 @@ async function main() {
             }
         }
         assert(violations.length === 0,
-            `${violations.length} rung(s) out of order:\n      - ` + violations.join('\n      - '));
+            `${violations.length} ladder violation(s):\n      - ` + violations.join('\n      - '));
     });
 
     // ========================================================================
