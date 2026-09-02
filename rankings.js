@@ -8,7 +8,7 @@
  * changes and against compositions.js output.
  */
 
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, writeFile, rename, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parseArgs } from './lib/cli.js';
 import { loadAllData } from './lib/data.js';
@@ -18,7 +18,7 @@ import { buildAvailableUnits } from './lib/roster-builder.js';
 import { filterBosses } from './lib/boss-filter.js';
 import { buildTeams } from './lib/team-pipeline.js';
 import { parseTeams } from './lib/team-parser.js';
-import { scoreTeamForBoss } from './app/public/lib/common/team-scorer.js';
+import { scoreTeamForBoss, getBossWeaknesses, getBossShill } from './app/public/lib/common/team-scorer.js';
 import { rawScorePassesFilter } from './lib/score-filter.js';
 import { ELEMENTS } from './app/public/lib/common/constants.js';
 
@@ -28,12 +28,13 @@ const MATCHUPS_DIR = join(process.cwd(), 'matchups');
 const options = parseArgs({
     name: 'rankings.js',
     description: 'Writes matchups/<unit>.csv ladders: one column per boss, top -n teams per agent, best first.',
-    options: ['depth', 'onlyMine', 'preview', 'debug', 'units', 'exclude', 'include', 'flex', 'bosses', 'omit', 'query', 'teams', 'rank', 'element', 'tsv'],
-    defaults: { depth: 3, preview: true },
+    options: ['depth', 'onlyMine', 'preview', 'debug', 'units', 'exclude', 'include', 'flex', 'bosses', 'omit', 'query', 'teams', 'rank', 'element', 'tsv', 'clean'],
+    defaults: { depth: 3 },
     examples: [
         '  node rankings.js                    Native S-rank DPS agents, top 3 teams each',
         '  node rankings.js -7                  Top 7 teams per agent',
         '  node rankings.js --tsv               Tab-separated, padded for alignment',
+        '  node rankings.js --clean             Clear stale .csv/.tsv first, then write',
         '  node rankings.js -m                  Whole roster, filtered to personal roster',
         '  node rankings.js -R S                Whole roster, filtered to S-rank',
         '  node rankings.js :Alice :Miyabi       Only Alice and Miyabi'
@@ -42,6 +43,25 @@ const options = parseArgs({
 
 function slugify(name) {
     return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
+/**
+ * Is this boss a theoretically favored matchup for this agent?
+ *
+ * Only favored bosses get a column. Banyue teams are technically viable against
+ * Butcher, but nobody picks them over the ice/ether/anomaly options, so listing
+ * them is noise. An agent qualifies on any one of:
+ *   - element weakness: the agent's element is one the boss is weak to
+ *   - archetype shill: the boss shills a role the agent natively has
+ *   - named favor: the boss's `favored` list names the agent
+ */
+function isFavoredMatchup(agent, boss) {
+    const tags = agent.tags || [];
+    if (getBossWeaknesses(boss).some(w => tags.includes(w))) return true;
+    const shill = getBossShill(boss);
+    if (shill && tags.includes(shill)) return true;
+    if (boss.favored && boss.favored.includes(agent.name)) return true;
+    return false;
 }
 
 function csvCell(value) {
@@ -71,6 +91,38 @@ function writeTsv(headers, rows) {
     const lines = [formatRow(headers)];
     for (const row of rows) lines.push(formatRow(row));
     return lines.join('\n') + '\n';
+}
+
+// Builds and scores the full team pool for one preview setting. `previewOverride`
+// controls whether preview/unavailable units can fill team slots — independent of
+// the CLI's own options.preview, since a preview agent's own ladder needs preview
+// teammates even when -p wasn't passed for the run as a whole.
+function buildScoredTeams(allUnits, roster, filteredBosses, previewOverride) {
+    const poolOptions = { ...options, preview: previewOverride };
+    const { availableUnits, universalUnits } = buildAvailableUnits(allUnits, poolOptions, roster);
+    const { threeCharTeams, teamLabels } = buildTeams(availableUnits, universalUnits);
+    let teamEntries = teamLabels.map(label => ({ label, team: threeCharTeams[label] }));
+
+    if (options.include && options.include.length > 0) {
+        teamEntries = teamEntries.filter(({ team }) => {
+            const teamUnitNames = team.map(u => u.name);
+            return options.include.some(req => teamUnitNames.includes(req));
+        });
+    }
+
+    const scoredTeams = [];
+    for (const { label, team } of teamEntries) {
+        const bossScores = [];
+        for (const boss of filteredBosses) {
+            const score = scoreTeamForBoss(team, boss, { debug: options.debug });
+            if (score > 0 && rawScorePassesFilter(score, options)) {
+                bossScores.push({ bossName: boss.name, score });
+            }
+        }
+        if (bossScores.length === 0) continue;
+        scoredTeams.push({ label, team, bossScores });
+    }
+    return { scoredTeams, unitCount: availableUnits.length };
 }
 
 async function main() {
@@ -117,47 +169,12 @@ async function main() {
 
     if (!options.omit) console.log("===== Rankings - Per-Agent Boss Ladders =====\n");
 
-    let teamEntries;
-
-    if (options.teams) {
-        const { teams: parsedTeams, warnings } = parseTeams(options.teams, allUnits, { preview: options.preview });
-        for (const w of warnings) console.warn(`WARNING: ${w}`);
-        teamEntries = parsedTeams;
-        if (!options.omit) console.log(`Explicit teams: ${teamEntries.length}\n`);
-    } else {
-        const { availableUnits, universalUnits } = buildAvailableUnits(allUnits, options, roster);
-        if (!options.omit) console.log(`Using ${availableUnits.length} units\n`);
-        const { threeCharTeams, teamLabels } = buildTeams(availableUnits, universalUnits);
-        teamEntries = teamLabels.map(label => ({ label, team: threeCharTeams[label] }));
-    }
-
-    if (options.include && options.include.length > 0) {
-        teamEntries = teamEntries.filter(({ team }) => {
-            const teamUnitNames = team.map(u => u.name);
-            return options.include.some(req => teamUnitNames.includes(req));
-        });
-    }
-
     let filteredBosses = bosses;
     if (options.bosses) {
         filteredBosses = filterBosses(bosses, options.bosses);
         if (!options.omit) console.log(`Boss filter: "${options.bosses}" (${filteredBosses.length} matches)\n`);
     } else if (options.queryBosses) {
         filteredBosses = filterBosses(bosses, options.queryBosses.join(','));
-    }
-
-    // Score every team against every boss once; keep only viable results.
-    const scoredTeams = [];
-    for (const { label, team } of teamEntries) {
-        const bossScores = [];
-        for (const boss of filteredBosses) {
-            const score = scoreTeamForBoss(team, boss, { debug: options.debug });
-            if (score > 0 && rawScorePassesFilter(score, options)) {
-                bossScores.push({ bossName: boss.name, score });
-            }
-        }
-        if (bossScores.length === 0) continue;
-        scoredTeams.push({ label, team, bossScores });
     }
 
     let sectionAgents;
@@ -180,11 +197,61 @@ async function main() {
     }
     sectionAgents = [...sectionAgents].sort((a, b) => a.name.localeCompare(b.name));
 
+    // Team-building pool: a released agent's teammates exclude preview units
+    // unless -p was passed for the whole run; a preview agent's own ladder always
+    // needs preview teammates available, since it can't otherwise pair with the
+    // other not-yet-released units its kit is designed around.
+    let scoredTeamsReleased, scoredTeamsPreview;
+    if (options.teams) {
+        const { teams: parsedTeams, warnings } = parseTeams(options.teams, allUnits, { preview: options.preview });
+        for (const w of warnings) console.warn(`WARNING: ${w}`);
+        if (!options.omit) console.log(`Explicit teams: ${parsedTeams.length}\n`);
+        const scoredTeams = [];
+        for (const { label, team } of parsedTeams) {
+            const bossScores = [];
+            for (const boss of filteredBosses) {
+                const score = scoreTeamForBoss(team, boss, { debug: options.debug });
+                if (score > 0 && rawScorePassesFilter(score, options)) {
+                    bossScores.push({ bossName: boss.name, score });
+                }
+            }
+            if (bossScores.length === 0) continue;
+            scoredTeams.push({ label, team, bossScores });
+        }
+        scoredTeamsReleased = scoredTeams;
+        scoredTeamsPreview = scoredTeams;
+    } else {
+        const releasedPool = buildScoredTeams(allUnits, roster, filteredBosses, options.preview);
+        scoredTeamsReleased = releasedPool.scoredTeams;
+        if (!options.omit) console.log(`Using ${releasedPool.unitCount} units for released agents\n`);
+
+        const needsPreviewPool = !options.preview && sectionAgents.some(a => a.available === false);
+        if (needsPreviewPool) {
+            const previewPool = buildScoredTeams(allUnits, roster, filteredBosses, true);
+            scoredTeamsPreview = previewPool.scoredTeams;
+            if (!options.omit) console.log(`Using ${previewPool.unitCount} units for preview agents\n`);
+        } else {
+            scoredTeamsPreview = scoredTeamsReleased;
+        }
+    }
+
     await mkdir(MATCHUPS_DIR, { recursive: true });
+
+    // --clean drops every ladder file from previous runs so what is left on disk
+    // afterwards is exactly this run's output — no stale agent from a wider run
+    // sitting alongside a narrow one. Only .csv/.tsv go; score-dump.mjs keeps its
+    // before.txt/after.txt in this same directory and must survive.
+    if (options.clean) {
+        const entries = await readdir(MATCHUPS_DIR);
+        const stale = entries.filter(f => f.endsWith('.csv') || f.endsWith('.tsv'));
+        for (const f of stale) await rm(join(MATCHUPS_DIR, f), { force: true });
+        if (!options.omit) console.log(`Cleaned ${stale.length} existing .csv/.tsv file(s)\n`);
+    }
 
     let written = 0;
     for (const agent of sectionAgents) {
-        const agentTeams = scoredTeams.filter(t => t.team.some(u => u.name === agent.name));
+        const pool = agent.available === false ? scoredTeamsPreview : scoredTeamsReleased;
+        const agentTeams = pool.filter(t => t.team.some(u => u.name === agent.name));
         if (agentTeams.length === 0) {
             if (!options.omit) console.log(`${agent.name}: no viable teams, skipped`);
             continue;
@@ -193,6 +260,7 @@ async function main() {
         // Per boss: this agent's teams, sorted best-first, deduped by boss.
         const bossColumns = [];
         for (const boss of filteredBosses) {
+            if (!isFavoredMatchup(agent, boss)) continue;
             const rows = [];
             for (const t of agentTeams) {
                 const entry = t.bossScores.find(bs => bs.bossName === boss.name);
@@ -204,7 +272,7 @@ async function main() {
         }
 
         if (bossColumns.length === 0) {
-            if (!options.omit) console.log(`${agent.name}: no relevant bosses, skipped`);
+            if (!options.omit) console.log(`${agent.name}: no favored bosses, skipped`);
             continue;
         }
 
@@ -215,8 +283,21 @@ async function main() {
         }
 
         const content = options.tsv ? writeTsv(headers, rows) : writeCsv(headers, rows);
-        const filePath = join(MATCHUPS_DIR, `${slugify(agent.name)}.${options.tsv ? 'tsv' : 'csv'}`);
-        await writeFile(filePath, content, 'utf-8');
+        const slug = slugify(agent.name);
+        const filePath = join(MATCHUPS_DIR, `${slug}.${options.tsv ? 'tsv' : 'csv'}`);
+
+        // Write-then-rename so an interrupted run can never leave a half-written
+        // ladder that reads as real output, and so a previous file is replaced
+        // wholesale rather than truncated in place.
+        const tmpPath = `${filePath}.tmp`;
+        await writeFile(tmpPath, content, 'utf-8');
+        await rename(tmpPath, filePath);
+
+        // Drop this agent's file in the other format: a stale miyabi.tsv sitting
+        // next to a fresh miyabi.csv is two different answers to one question.
+        const stalePath = join(MATCHUPS_DIR, `${slug}.${options.tsv ? 'csv' : 'tsv'}`);
+        await rm(stalePath, { force: true });
+
         written++;
         if (!options.omit) console.log(`${agent.name}: wrote ${filePath} (${headers.length} bosses)`);
     }
