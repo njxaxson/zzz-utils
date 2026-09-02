@@ -233,6 +233,16 @@ const ULTIMATE_MAGNITUDE = { 0: 1.0, 1: 1.1, 2: 1.25, 3: 2.0 };
 //   1 / 2 / 3       - progressively harder-hitting, Evelyn at the top
 // A non-DPS returns 0 from getChainMagnitude before this table is consulted.
 const CHAIN_MAGNITUDE = { 0: 1.0, 1: 1.15, 2: 1.3, 3: 1.45 };
+// NEED keys, and they are a SEPARATE NAMESPACE from the damage keys — plural here, singular
+// there. `ablooms` reads `scaling.ablooms` and is declared by nobody, so it is dormant; the live
+// abloom channel is the singular `abloom`, a `damage` key, matched against a supplier's
+// `buffs.abloom` by the damage-type loop in scoreNeedFulfillment (Promeia's `buffs.abloom: 3` into
+// Velina's `damage.abloom: 2` is 18 points). `vortex` is the same shape: `buffs.vortex` is priced
+// via MULT.VORTEX_BUFF, `scaling.vortex` is declared by nobody. DO NOT "fix" the plurals to match
+// the damage keys — they are not typos, and renaming them would not wire anything up, because the
+// need side reads `scaling.*` and no unit declares `scaling.abloom` either. The real hazard runs
+// the other way: a future unit declaring `scaling.abloom` intending a need would be silently
+// ignored.
 const NEED_FULFILLMENT_KEYS = [
     'disorders', 'ablooms', 'chains', 'ultimates', 'veils',
     'quick-assists', 'interrupt-resistance', 'vortex'
@@ -284,6 +294,32 @@ const POLARITY_VORTEX_DISCOUNT = 0.35;
 // it for something almost no teammate could supply. Reward the upside, do not bill the absence.
 // See engine-context.md, "The ultimates two-channel model", before changing this.
 const NATURALLY_AVAILABLE_NEEDS = new Set(['ultimates', 'chains']);
+// HOW MUCH AN UNMET NEED COSTS, as a function of the weight the unit declared.
+//
+// `scaling.<key>: N` says how much the unit DEPENDS on that key, and the cohesion charge used
+// to ignore N entirely: any weight >= 1 counted as one whole unmet need. That flattened two
+// very different statements. Ye Shunguong's `veils: 2` is a design gate — without Sunna or
+// Zhao she is severely hamstrung, and the full charge is right. Aria's ether-veil scaling is a
+// BONUS for pairing her with Nangong or Sunna, better with both, and charging her the same as
+// YSG cost `Aria/Remielle/Velina` 13% of its cohesion for a missing bonus.
+//
+// Convex on purpose (owner: weight 1 or 2 should not be penalised nearly as much as weight 3),
+// so the curve separates "this team does not function" from "this team misses a bonus":
+//
+//   weight 1 -> 0.11    weight 2 -> 0.44    weight 3 -> 1.00
+//
+// Feeds BOTH sides of the reception ratio, so a unit with several needs of differing weight is
+// judged on how much of its declared dependence is covered rather than on a headcount.
+// Reads the DECLARED VALUE, not its coerced weight. `w(true)` is 1, but `true` in the data
+// means "this unit depends on this" with no grading — Anton's `scaling['quick-assists']: true`
+// is a real dependency — so grading it as the weakest possible need inverts what the author
+// wrote. Only an explicit number is graded.
+const NEED_SEVERITY_EXPONENT = 2;
+function needSeverity(declared) {
+    if (declared === true) return 1;
+    if (typeof declared !== 'number') return 1;
+    return Math.min(1, Math.pow(declared / 3, NEED_SEVERITY_EXPONENT));
+}
 // What one quick assist is worth to a unit that does nothing special with it — which is
 // almost everyone. Every unit in the game benefits from a quick assist; most just take the
 // standard small bonus, and a few (Anton) declare a real `scaling.quick-assists` need and
@@ -300,6 +336,18 @@ const STAT_SCALING_KEYS = ['am', 'ap', 'cr', 'cd', 'hp', 'def', 'pen', 'sheer'];
 export function isDPS(unit) {
     if (unit._activatedRoles) return DPS_ROLES.some(r => unit._activatedRoles.includes(r));
     return DPS_ROLES.some(role => unit.tags.includes(role));
+}
+
+// "Can this unit's damage be resisted?" — a DPS role OR an active `subdps` pseudo-role.
+// DELIBERATELY NARROW: used only by the element-resistance disqualification in L1, NOT as a
+// general widening of isDPS. Norma is tagged `stun` with an active `subdps` pseudo-role, so
+// isDPS(Norma) is false and she used to survive a boss that resists fire on nothing but the
+// flat -80 stunner penalty. That is wrong for her specifically: a pure stunner's job is the
+// stun window and survives a resisted element, but a subdps IS a damage dealer and her value
+// craters. See the note above isBurstDPS for why DPS_ROLES itself must not absorb `subdps` —
+// ultimate provision is limited to one primary carry and would break.
+function isDamageDealer(unit) {
+    return isDPS(unit) || hasSubDPSRole(unit);
 }
 
 export function isAttacker(unit) {
@@ -2420,8 +2468,11 @@ function checkDisqualifications(team, boss, debug) {
         }
     }
 
+    // Resistance reads DAMAGE DEALERS, not just DPS-role units, so a subdps whose element the
+    // boss resists is disqualified alongside a primary carry. `isEffectiveSupport` still
+    // exempts Remielle and Orphie, who carry a subdps pseudo-role but play as supports.
     const bossResistances = getBossResistances(boss);
-    for (const unit of dpsUnits) {
+    for (const unit of team.filter(isDamageDealer)) {
         if (isEffectiveSupport(unit) || isEffectiveDefense(unit)) continue;
         const morphOptions = getPossibleMorphElements(unit, team);
         if (morphOptions !== null) {
@@ -2478,6 +2529,21 @@ const STRUCTURE = {
     // enough to stop `Nangong/Miyabi/Vivian`, whose raw L4 synergy is enormous (234 on Butcher),
     // outranking supported teams the owner places below it.
     NO_SUPPORT: -1,
+    // A team with a carry but NO STUNNER, graded by what the carry loses without a stun
+    // window. The Starlight Billy / Pan Yinhu case: `Billy/Pan/Lucia` and `Dialyn/Billy/Lucia`
+    // both classified CONVENTIONAL at 1.0, so two supports and no stunner earned the identical
+    // structural credit as stunner-plus-support, and Pan then won on raw supply (366.1 to
+    // 365.8 on Priest). engine-context.md 2 already states the rupture archetype as
+    // *stunner + rupture DPS + Lucia or Pan Yinhu* — Pan is the SUPPORT slot, not the stunner.
+    //
+    // Two tiers, not one, per the owner's ordering: an attacker without a stunner is
+    // generally bad because an attacker's damage lives inside the stun window; a rupture
+    // carry without one is worse than with one but not as bad, and rupture-with-double-support
+    // stays clearly ahead of a stunnerless attacker. Anomaly is deliberately absent — anomaly
+    // teams lean on reactions rather than burst, so they need supports more than stunners and
+    // their existing tiers are correct. A `stunless` carry (Ye Shunguong) never reaches these.
+    NO_STUN_RUPTURE: -2,
+    NO_STUN_ATTACK: -3,
     UNCONVENTIONAL_NO_INTERACTION: -50,
     WILDLY_UNCONVENTIONAL: -150,
 };
@@ -2503,13 +2569,25 @@ const FIELD_TIME = {
 // Orphie, Remielle, and Cissia-alongside-Seed count as the team's support.
 function scoreTeamStructure(team, debug) {
     const classified = classifyTeamStructure(team, debug);
-    if (classified !== STRUCTURE.CONVENTIONAL_BONUS) return classified;
     if (team.some(u => isEffectiveSupport(u) || isEffectiveDefense(u))) return classified;
     // Exemption: in a totalize + double-stun comp the SECOND STUNNER *is* the support. Totalize
     // damage is stun uptime, so a second stunner is feeding the carry's damage the way a support
     // otherwise would. Deliberate, not an oversight.
     if (secondStunnerActsAsSupport(team)) {
         if (debug) console.log('    Structure: ^ kept — no support, but the second stunner serves as one (totalize)');
+        return classified;
+    }
+    // The demotion USED TO BE GATED on the team already classifying CONVENTIONAL_BONUS, which
+    // meant a supportless team was scored BETTER for also being unconventional.
+    // `Nangong/Alice/Miyabi` classifies as double-anomaly-plus-stunner (UNCONVENTIONAL_VIABLE,
+    // 0.85) and so never reached the 0.80 no-support tier: on Fiend it beat
+    // `Nangong/Alice/Sunna` 456.9 to 456.5, which is the Alice/Jane/Miyabi family of ranking
+    // complaints. The gate is gone; the demotion now applies to every classification.
+    //
+    // Take the HARSHER of the two factors rather than overriding, so a supportless
+    // WILDLY_UNCONVENTIONAL team is not PROMOTED from 0.35 up to 0.80.
+    if ((STRUCTURE_FACTOR.get(classified) ?? 0.35) <= STRUCTURE_FACTOR.get(STRUCTURE.NO_SUPPORT)) {
+        if (debug) console.log('    Structure: ^ kept — no support, but the classified tier is already harsher');
         return classified;
     }
     if (debug) console.log('    Structure: ^ DEMOTED to NO-SUPPORT tier — no support or defense agent');
@@ -2537,6 +2615,18 @@ function classifyTeamStructure(team, debug) {
     const nArm = armorerUnits.length;
     const nStun = stunUnits.length;
     const nSup = supportLike.length;
+
+    // A CARRY THAT DOES NOT WANT THE STUN WINDOW AT ALL. Read off the carry lists rather than
+    // assumed to be an attacker: Ye Shunguong is the only stunless unit today and she happens to
+    // be `attack`, but nothing stops a rupture or armorer carry being stunless, and such a team
+    // must not be charged a no-stunner tier for a window it never wanted. Every other stunless
+    // read in the engine is already role-agnostic (`stun-infra` baseline, the recovery-debuff
+    // gate, the L3 stun-shill exemption); this was the one place that assumed a role.
+    //
+    // Anomaly is deliberately EXCLUDED. Anomaly has no no-stun tier to be exempted from, and a
+    // stunless anomaly agent would have knock-on effects on reaction cadence that deserve their
+    // own decision rather than being swept in here.
+    const stunlessCarry = [...attackers, ...ruptureUnits, ...armorerUnits].some(isStunlessUnit);
 
     // --- CONVENTIONAL COMPOSITIONS ---
 
@@ -2593,16 +2683,25 @@ function classifyTeamStructure(team, debug) {
         return STRUCTURE.CONVENTIONAL_BONUS;
     }
 
-    // Rupture + Stunner + Support/Defense
-    if (nRup >= 1 && nStun >= 1 && nSup >= 1 && nAtk === 0 && nAno === 0) {
+    // Rupture + Stunner + Support/Defense.
+    // `nRup === 1`, not `>= 1`: rupture NEVER accepts a second rupture carry (owner ruling —
+    // unlike anomaly, which wants two bodies). Both of these branches used `>= 1`, so two
+    // rupture carries plus a stunner plus a support scored a full CONVENTIONAL 1.0.
+    if (nRup === 1 && nStun >= 1 && nSup >= 1 && nAtk === 0 && nAno === 0) {
         if (debug) console.log('    Structure: CONVENTIONAL (rupture + stunner + support)');
         return STRUCTURE.CONVENTIONAL_BONUS;
     }
 
-    // Rupture + 2x Support/Defense
-    if (nRup >= 1 && nSup >= 2 && nAtk === 0 && nAno === 0) {
-        if (debug) console.log('    Structure: CONVENTIONAL (rupture + double support)');
-        return STRUCTURE.CONVENTIONAL_BONUS;
+    // Rupture + 2x Support/Defense — reached only when nStun === 0, because the branch above
+    // already claims any rupture team that has a stunner AND a support. So this IS the
+    // stunnerless rupture shape, and it must not be CONVENTIONAL: see STRUCTURE.NO_STUN_RUPTURE.
+    if (nRup === 1 && nSup >= 2 && nAtk === 0 && nAno === 0) {
+        if (stunlessCarry) {
+            if (debug) console.log('    Structure: CONVENTIONAL (stunless rupture + double support)');
+            return STRUCTURE.CONVENTIONAL_BONUS;
+        }
+        if (debug) console.log('    Structure: NO-STUN rupture (rupture + double support, no stunner)');
+        return STRUCTURE.NO_STUN_RUPTURE;
     }
 
     // --- UNCONVENTIONAL BUT VIABLE ---
@@ -2629,24 +2728,33 @@ function classifyTeamStructure(team, debug) {
         return STRUCTURE.UNCONVENTIONAL_VIABLE;
     }
 
-    // Stunless attacker + 2x Support/Defense (YSG-type compositions)
+    // Stunless attacker + 2x Support/Defense (YSG-type compositions).
+    // Also reached only when nStun === 0 — the attacker + stunner + support branch at the top
+    // claims the rest. A stunless carry is CONVENTIONAL because she does not need the window;
+    // an ordinary attacker without one has lost what she scales on, hence NO_STUN_ATTACK
+    // rather than the merely-unconventional 0.85 this used to hand out.
     if (nAtk === 1 && nSup >= 2) {
-        const stunlessAttacker = attackers.some(u => u.mechanics?.utility?.stunless);
-        if (stunlessAttacker) {
+        if (stunlessCarry) {
             if (debug) console.log('    Structure: CONVENTIONAL (stunless attacker + double support)');
             return STRUCTURE.CONVENTIONAL_BONUS;
         }
-        if (debug) console.log('    Structure: UNCONVENTIONAL viable (attacker + double support)');
-        return STRUCTURE.UNCONVENTIONAL_VIABLE;
+        if (debug) console.log('    Structure: NO-STUN attacker (attacker + double support, no stunner)');
+        return STRUCTURE.NO_STUN_ATTACK;
     }
 
     // Anomaly + Attacker + (Stun|Support) — Monoshock variant
     // Valid if the attacker has anomaly scaling; boss matchup (Layer 3) handles
     // whether both DPS agents align with weaknesses
     if (nAno >= 1 && nAtk >= 1 && (nStun >= 1 || nSup >= 1) && nRup === 0) {
+        // `scaling.anomaly` ONLY. `am` and `ap` are STATS — anomaly mastery and anomaly
+        // proficiency — not a statement that the unit's kit runs on anomaly mechanics, and
+        // conflating the two let any attacker with a stat line into the monoshock carve-out.
+        // The units that genuinely belong here are Harumasa and Sigrid, both of whom declare
+        // `scaling.anomaly`. No current attacker qualified on `am`/`ap` alone, so this is a
+        // correctness fix with no scoring change today; it stops the next one slipping in.
         const attackerHasAnomalyScaling = attackers.some(u => {
             const scaling = u.mechanics?.scaling || {};
-            return scaling.anomaly || scaling.am || scaling.ap;
+            return !!scaling.anomaly;
         });
         if (attackerHasAnomalyScaling) {
             if (debug) console.log('    Structure: UNCONVENTIONAL viable (monoshock)');
@@ -2663,9 +2771,17 @@ function classifyTeamStructure(team, debug) {
             if (debug) console.log('    Structure: CONVENTIONAL (attacker + subdps + stunner)');
             return STRUCTURE.CONVENTIONAL_BONUS;
         }
-        const sameElement = attackers.every(a => getElement(a) === getElement(attackers[0]));
-        if (hasSubDPS || sameElement) {
-            if (debug) console.log('    Structure: UNCONVENTIONAL viable (double attacker with interaction)');
+        // SAME ELEMENT IS NOT INTERACTION. Two attackers of one element used to keep the
+        // 0.85 tier on the theory that they share buffs, but two carries of the same element
+        // cannot disorder with each other and still cannot both hold the field. Owner ruling:
+        // a second attacker is legitimate only when it is explicitly a subdps or a
+        // pseudosupport — unlike anomaly, which genuinely wants two bodies.
+        // This is what kept `Norma/Ellen/Sigrid` (both ice) and
+        // `Nekomata/Ye Shunguong/Sunna` (both physical) mid-ladder. A pseudo-support attacker
+        // (Orphie) needs no clause here: the `attackers` filter above already excludes any
+        // unit with an active support or defense role.
+        if (hasSubDPS) {
+            if (debug) console.log('    Structure: UNCONVENTIONAL viable (double attacker, second is a subdps)');
             return STRUCTURE.UNCONVENTIONAL_VIABLE;
         }
         if (debug) console.log('    Structure: UNCONVENTIONAL (double attacker, no interaction)');
@@ -4063,6 +4179,12 @@ const STRUCTURE_FACTOR = new Map([
     // (tightest margin needed 0.812 on Marionettes), because its raw L4 synergy is large enough to
     // survive the demotion. 0.80 clears all four with margin.
     [STRUCTURE.NO_SUPPORT, 0.80],
+    // See the STRUCTURE.NO_STUN_* comment. 0.92 puts `Billy/Pan Yinhu/Lucia` at 336.8 on
+    // Priest, clearing `Dialyn/Billy/Lucia` (365.8) by 29 — a real gap rather than the 0.3
+    // it had. 0.75 for the attacker case is harsher than merely-unconventional 0.85 because
+    // an attacker with no stun window has lost the thing it scales on.
+    [STRUCTURE.NO_STUN_RUPTURE, 0.92],
+    [STRUCTURE.NO_STUN_ATTACK, 0.75],
     [STRUCTURE.UNCONVENTIONAL_NO_INTERACTION, 0.6],
     [STRUCTURE.WILDLY_UNCONVENTIONAL, 0.35],
 ]);
@@ -4107,7 +4229,8 @@ function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs =
             let needsTotal = 0;
             for (const key of NEED_FULFILLMENT_KEYS) {
                 if (NATURALLY_AVAILABLE_NEEDS.has(key)) continue;
-                const sw = w(scaling[key]);
+                const declaredNeed = scaling[key];
+                const sw = w(declaredNeed);
                 if (sw < 1) continue;
                 const selfProvision = Math.max(
                     w(unit.mechanics?.buffs?.[key]),
@@ -4115,7 +4238,8 @@ function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs =
                     w(unit.mechanics?.utility?.[key])
                 );
                 if (selfProvision > 0) continue;
-                needsTotal++;
+                const severity = needSeverity(declaredNeed);
+                needsTotal += severity;
                 // A disorder is a team-wide event on the target, so ANY source satisfies ANY
                 // consumer — this unit's own reaction, two OTHER teammates cycling elements
                 // without it, or a teammate generating polarity disorders solo. This used to
@@ -4126,7 +4250,7 @@ function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs =
                 // anomaly agents) but wrong, and it is the same supply the L4 need channel
                 // now prices — one measure, consulted in both places.
                 if (key === 'disorders') {
-                    if (getDisorderSupply(unit, team, twReactions) > 0) needsMet++;
+                    if (getDisorderSupply(unit, team, twReactions) > 0) needsMet += severity;
                     // Skip the generic supplier scan: it can only see annotations, never
                     // element cycling, so the supply above is the whole answer for this key.
                     continue;
@@ -4138,7 +4262,7 @@ function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs =
                         w(supplier.mechanics?.debuffs?.[key]),
                         w(supplier.mechanics?.utility?.[key])
                     );
-                    if (supplyWeight > 0) { needsMet++; break; }
+                    if (supplyWeight > 0) { needsMet += severity; break; }
                 }
             }
             // Native anomaly tag, not the effective role: this charges a unit for its own
@@ -4154,7 +4278,7 @@ function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs =
                 const unitReaction = twReactions.get(unit);
                 const hasReaction = unitReaction?.bestVortexTier > 0 || unitReaction?.hasDisorder;
                 if (!hasReaction) {
-                    needsTotal++;
+                    needsTotal += 1;
                 }
                 // Wasted vortex: subdps generates vortex but no native primary anomaly DPS
                 // benefits from it (e.g., Velina + Miyabi frost). The wind reaction is wasted
@@ -4167,11 +4291,11 @@ function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs =
                         return Math.max(best, twReactions.get(t)?.bestVortexTier ?? 0);
                     }, 0);
                     if (bestPrimaryTier < VORTEX_PRIMARY_MIN) {
-                        needsTotal++;
+                        needsTotal += 1;
                     }
                 }
             }
-            if (needsTotal > 0 && needsMet < needsTotal) {
+            if (needsTotal > 0 && needsMet < needsTotal - 1e-9) {
                 const reception = needsMet / needsTotal;
                 const receptionUtil = 0.7 + 0.3 * reception;
                 const weight = Math.min(0.5, needsTotal * 0.25);
@@ -4408,7 +4532,13 @@ export function scoreTeamForBoss(team, boss, options = {}) {
     // Layer 1.5: Team Structure (feeds into teamwork multiplier, not additive)
     if (debug) console.log('\n  LAYER 1.5: TEAM STRUCTURE');
     let structureScore = scoreTeamStructure(team, debug);
-    if (structureScore === STRUCTURE.CONVENTIONAL_BONUS) {
+    // A support whose buffs barely land is not really serving as one, so the team loses its
+    // conventional credit. Gated on FACTOR rather than on `=== CONVENTIONAL_BONUS`: when the
+    // no-stunner tiers were added, `NO_STUN_RUPTURE` (0.92) slipped through the old identity
+    // check and a stunnerless rupture team with an ill-fitting support went 0.85 -> 0.92,
+    // i.e. UP — `Yixuan/Lucia/Nicole` gained 33 points on Fiend. Take the HARSHER of the two,
+    // so this can only ever demote.
+    if ((STRUCTURE_FACTOR.get(structureScore) ?? 0.35) > STRUCTURE_FACTOR.get(STRUCTURE.UNCONVENTIONAL_VIABLE)) {
         const supLike = team.filter(u => isEffectiveSupport(u) || isEffectiveDefense(u));
         for (const sup of supLike) {
             const util = computeBuffUtilization(sup, team);

@@ -208,13 +208,33 @@ await runTest(1, 'Dialyn is allocated to Priest, not Thrall (stunless carry cove
 // ---------------------------------------------------------------------------
 // TEST 2: the same reasoning must work in the opposite direction.
 //
-// Swap Zhao for Astra and Thrall loses its competitive stunless line — the best
-// Ye Shunguong line without Dialyn drops far enough that her Thrall marginal now
-// dominates her Priest marginal, so she should be allocated to Thrall instead. This
-// guards against "always send Dialyn to Priest" passing test 1 for the wrong reason.
+// Two levers, both needed, and Dialyn must end up on Thrall:
+//
+//   Zhao -> Astra   Astra is a worse Ye Shunguong partner than Zhao (YSG declares
+//                   `scaling.veils: 2` and Zhao supplies veils; Astra does not), so the
+//                   best Dialyn-free Thrall line falls 521.2 -> 496.4 and Dialyn's Thrall
+//                   marginal rises 5.3 -> 30.1. This is what makes Thrall worth anything.
+//   + Norma         Norma is Yixuan's other near-equal stunner (engine-context 2: "Dialyn
+//                   or Norma > Ju Fufu > Astra as the stunner"). With her on the roster
+//                   Priest is covered without Dialyn — `Norma/Yixuan/Lucia` 535.1 against
+//                   `Dialyn/Yixuan/Lucia` 535.4 — so Dialyn's Priest marginal collapses to
+//                   0.3 and she is genuinely free.
+//
+// Decision: Thrall 30.1 beats Priest 0.3. This guards against "always send Dialyn to
+// Priest" passing test 1 for the wrong reason.
+//
+// NORMA WAS ADDED 2026-09-02, and the reason matters. The test used to rely on the
+// Zhao->Astra lever alone: Thrall 30.1 against Priest 29.9, a margin of 0.2. That 29.9
+// existed only because a stunnerless rupture line, `Yixuan/Pan Yinhu/Lucia`, scored 505.5
+// — the engine believed Yixuan barely needed a stunner. Owner ruling: rupture teams
+// absolutely favour stunner+support over double-support, so that line is now 465.1 and
+// Dialyn's Priest marginal is 70.3. Freeing Dialyn therefore has to come from Priest
+// having ANOTHER stunner, not from Yixuan not wanting one. Margin is now ~30 points.
+// Ju Fufu does not work here (Priest 31.1 vs Thrall 30.1 — another knife edge); Koleda
+// and Trigger do not beat Pan Yinhu for Yixuan at all.
 // ---------------------------------------------------------------------------
-await runTest(2, 'Swapping Zhao for Astra moves Dialyn to Thrall (marginal value reverses)', () => {
-    const roster = DIALYN_ROSTER.filter(n => n !== 'Zhao').concat('Astra');
+await runTest(2, 'Norma covers Priest, so Dialyn is freed for Thrall (marginal value reverses)', () => {
+    const roster = DIALYN_ROSTER.filter(n => n !== 'Zhao').concat('Astra', 'Norma');
     const { combinations } = allocate(allUnits, allBosses, roster, 'Aberrant,Thrall,Priest');
     assert(combinations.length > 0, 'No combinations found');
     const best = combinations[0];

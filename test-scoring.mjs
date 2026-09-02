@@ -23,7 +23,7 @@ import { parseTeams } from './lib/team-parser.js';
 import { buildAvailableUnits } from './lib/roster-builder.js';
 import { buildTeams } from './lib/team-pipeline.js';
 import { rankBandEpsilon } from './app/public/lib/common/team-builder.js';
-import { chargeableElementArms, getBasicDamage, getBasicDamageBaseline, getMaxBurstWeight, quickAssistCohesionWeight, scoreTeamForBoss, resolveBossVariation, resolveConditionalValue, getEffectiveScaling, effectiveDisorderSupply, effectiveDisorderWeakSupply } from './app/public/lib/common/team-scorer.js';
+import { chargeableElementArms, getBasicDamage, getBasicDamageBaseline, getMaxBurstWeight, quickAssistCohesionWeight, scoreTeamForBoss, resolveBossVariation, resolveConditionalValue, getEffectiveScaling, effectiveDisorderSupply, effectiveDisorderWeakSupply, getBossResistances } from './app/public/lib/common/team-scorer.js';
 
 // ---------------------------------------------------------------------------
 // Viability / disqualification
@@ -141,6 +141,16 @@ function withBosses(bosses, filterStr) {
 // entry to silence a regression.
 // ---------------------------------------------------------------------------
 const KNOWN_RED = new Map([
+    [113, 'Trigger/SAnby/Seed on UCC: 238.6 against a floor of 305. Seed is tagged `attack` '
+        + 'but plays support (buffs atk 3 / cd 3 / dmg 2, only ultimate:strong for damage) and '
+        + 'SAnby is codependent on exactly those buffs. The team used to keep a 0.85 tier via '
+        + 'the same-element double-attacker escape, removed on owner ruling ("same element is '
+        + 'not interaction") to fix Norma/Ellen/Sigrid, Nekomata/Ye Shunguong/Sunna and '
+        + 'Norma/Evelyn/Soldier 11. Seed is the only attack-tagged unit in the roster that '
+        + 'would qualify under the pseudosupport arm of that rule, but she declares no '
+        + 'pseudoRole so the engine cannot see it. Owner 2026-09-02: let it crash, revisit '
+        + 'later. CLEARS when Seed declares a support pseudoRole, or when the engine infers '
+        + 'pseudosupport from buff supply. Do NOT clear it by restoring the same-element escape.'],
 ]);
 
 async function main() {
@@ -224,12 +234,12 @@ async function main() {
         const tOrphie = m.get('Trigger / Orphie / SAnby');
         const tCissia = m.get('Trigger / Cissia / SAnby');
         const tAstra = m.get('Trigger / SAnby / Astra');
-        const tSeed = m.get('Trigger / SAnby / Seed');
         const tZhao = m.get('Trigger / SAnby / Zhao');
         assert(tOrphie >= 315, `Trigger+SAnby: Orphie (${tOrphie}) >= 315`);
         assert(tCissia >= 305, `Trigger+SAnby: Cissia (${tCissia}) >= 305`);
         assert(tAstra  >= 300, `Trigger+SAnby: Orphie (${tAstra }) >= 300`);
-        assert(tSeed   >= 305, `Trigger+SAnby: Seed   (${tSeed  }) >= 305`);
+        // Trigger/SAnby/Seed's floor lives in TEST 113 - it is KNOWN_RED. Split out so the
+        // rest of TEST 3 keeps guarding its five other floors and four orderings.
         assert(tZhao   >= 290, `Trigger+SAnby: Zhao   (${tZhao  }) >= 290`);
 
         assert(tOrphie > tCissia, `Trigger+SAnby: Orphie (${tOrphie}) > Cissia (${tCissia})`);
@@ -530,9 +540,14 @@ async function main() {
         const tccScore = scoreTeamForBoss(tcc.team, slugger, {});
         assert(tccScore <= 280, `Slugger Trigger/Harumasa/Caesar: got ${tccScore}, expected <= 280`);
 
+        // Ceiling 280 -> 290 on 2026-09-02. The team moved 272 -> 283.5 because YSG's unmet
+        // `scaling.veils: 2` is now charged at severity 0.44 rather than 1.0 (see needSeverity)
+        // — nothing to do with the diametric synergy this test guards. The Harumasa arm above
+        // still holds at 280, and 283.5 is 54% of Slugger's 523.4 best team, so still "mid";
+        // YSG's own line, `Ye Shunguong/Astra/Sunna`, is 102 points higher at 385.4.
         const tyc = scoreForTeamString('Trigger/Ye Shunguong/Caesar', allUnits)[0];
         const tycScore = scoreTeamForBoss(tyc.team, slugger, {});
-        assert(tycScore <= 280, `Slugger Trigger/YSG/Caesar: got ${tycScore}, expected <= 280`);
+        assert(tycScore <= 290, `Slugger Trigger/YSG/Caesar: got ${tycScore}, expected <= 290`);
     });
 
     // ========================================================================
@@ -1748,7 +1763,15 @@ async function main() {
         for (const b of withBosses(bosses, 'Typhon')) {
             const parsed = scoreForTeamString('Roxy/Harumasa/Velina', allUnits, { preview: true })[0];
             const s = scoreTeamForBoss(parsed.team, b, {});
-            assert(s >= 250, `Roxy/Harumasa/Velina on Typhon should be playable (>= 250), got ${s?.toFixed(1)}`);
+            // Floor lowered 264.7 -> 245 on 2026-09-02 (owner-adjudicated). The team has NO
+            // support or defense agent, and scoreTeamStructure now demotes every supportless
+            // team to the NO_SUPPORT tier rather than only the CONVENTIONAL-classified ones,
+            // so this monoshock line went 0.85 -> 0.80 and landed at 248.9. The assertion's
+            // intent is a VIABILITY FLOOR ("solid, playable, not top-tier"), not an ordering,
+            // and 248.9 still reads that way; 250 was calibrated when supportless teams kept
+            // 0.85. Softening NO_SUPPORT instead was rejected: TEST 101 needs it below 0.812
+            // and this team needs it at or above 0.81, a 0.002 window.
+            assert(s >= 245, `Roxy/Harumasa/Velina on Typhon should be playable (>= 245), got ${s?.toFixed(1)}`);
         }
     });
 
@@ -3050,21 +3073,37 @@ async function main() {
                 `${name} does not compete for the burst window and must be greedy 0, got ${greedOf(name)}`);
         }
 
-        // Remielle's own best teams pair her with a greedy-1 partner and must be UNTOUCHED. This
-        // is the sharpest check in the phase: a rule that penalised these would be wrong even if
-        // it fixed everything else.
-        const untouched = {
-            'Promeia/Remielle/Velina': 501.6,
-            'Burnice/Remielle/Velina': 461.5,
-            'Aria/Remielle/Velina': 401.6,
-            'Alice/Remielle/Velina': 396.9,
+        // Remielle's own best teams pair her with a greedy-1 partner and must be UNTOUCHED by
+        // burst contention. This is the sharpest check in the phase: a rule that penalised
+        // these would be wrong even if it fixed everything else.
+        //
+        // ASSERTED ON THE CONTENTION TERM ITSELF, not on absolute scores. It used to pin four
+        // exact totals, which was the wrong instrument twice over. Those numbers are not on any
+        // effectiveness scale, so they moved on nearly every engine change and had to be
+        // re-baselined for reasons that had nothing to do with contention (the Aria/Remielle L5
+        // declaration, then need severity). Worse, re-pinning them would have codified a
+        // ladder the owner rejects: the four values encode Aria > Promeia > Burnice > Alice,
+        // and the playtested order is Aria > Promeia > Alice > Burnice. Alice's position is a
+        // known-open item, so this test deliberately does NOT pin it.
+        const contentionOf = (spec) => {
+            const parsed = scoreForTeamString(spec, allUnits);
+            assert(parsed.length === 1, `fixture ${spec} did not resolve to exactly one team`);
+            const trace = {};
+            scoreTeamForBoss(parsed[0].team, boss, { trace });
+            return trace.contention;
         };
-        for (const [spec, expected] of Object.entries(untouched)) {
-            const got = scoreOf(spec);
-            assert(Math.abs(got - expected) < 0.15,
-                `${spec} is one of Remielle's best teams and must not be touched by burst ` +
-                `contention: expected ${expected}, got ${got.toFixed(1)}`);
+        for (const spec of ['Promeia/Remielle/Velina', 'Burnice/Remielle/Velina',
+                            'Aria/Remielle/Velina', 'Alice/Remielle/Velina']) {
+            assert(contentionOf(spec) === 0,
+                `${spec} pairs Remielle with a greedy-1 partner and must take NO burst ` +
+                `contention charge, got ${contentionOf(spec)}`);
         }
+        // Anti-vacuity: the charge must actually reach a dual-greedy team, or the loop above
+        // is asserting that a dead rule is dead.
+        const contendedCharge = contentionOf('Miyabi/Remielle/Vivian');
+        assert(contendedCharge < 0,
+            `Miyabi beside Remielle is two greedy-3 carries and must be charged for burst ` +
+            `contention, got ${contendedCharge}`);
 
         // Miyabi beside Remielle is two greedy carries, and must cost.
         const contended = scoreOf('Miyabi/Remielle/Vivian');
@@ -3190,6 +3229,291 @@ async function main() {
         assert(violations.length === 0,
             `${violations.length} non-triple-anomaly Remielle team(s) crack the ladder:\n      - `
             + violations.join('\n      - '));
+    });
+
+    // ========================================================================
+    // TEST 110: a supportless team is never rewarded for being unconventional
+    // ========================================================================
+    // The Nangong/Alice/Sunna case. `scoreTeamStructure` used to apply the NO_SUPPORT
+    // demotion only to teams that had already classified CONVENTIONAL_BONUS, so a team with
+    // no support that also classified UNCONVENTIONAL_VIABLE kept 0.85 and never reached the
+    // 0.80 no-support tier. On Fiend that let `Nangong/Alice/Miyabi` (456.9) edge out
+    // `Nangong/Alice/Sunna` (456.5) — a team beating its own supported counterpart because
+    // it was ALSO unconventional. Filed in rankings-open-issues.txt under Alice and Jane.
+    //
+    // PART 1 is asserted on Fiend only, because that is the boss the complaints were filed
+    // against and the ordering is genuinely boss-conditional: on the anomaly-shill bosses
+    // (Butcher, Marionettes, Girtablullu) Miyabi's on-element L3 edge is large enough that
+    // she still beats Sunna as the third body, which is the same ruling recorded for
+    // TEST 101. Do not widen part 1 to every boss; it will fail, and correctly.
+    //
+    // PART 2 is corpus-wide because it compares the SAME two carries: swapping the
+    // supportless third for Yuzuha must win on every boss, with no elemental confound.
+    run('TEST 110: a supportless team never beats its supported counterpart (Fiend)', () => {
+        const fiend = withBosses(bosses, 'Fiend');
+        assert(fiend.length === 1, `expected exactly one Fiend boss, got ${fiend.length}`);
+
+        const pairs = [
+            ['Nangong/Alice/Sunna', 'Nangong/Alice/Miyabi'],
+            ['Jane Doe/Vivian/Yuzuha', 'Nangong/Aria/Jane Doe'],
+        ];
+        for (const [supported, supportless] of pairs) {
+            const a = scoreSpec(supported, fiend[0]);
+            const b = scoreSpec(supportless, fiend[0]);
+            assert(a.score > b.score,
+                `Fiend: ${a.label} (${a.score.toFixed(1)}) must beat the supportless ` +
+                `${b.label} (${b.score.toFixed(1)})`);
+        }
+
+        // Part 2 — same carries, third slot swapped, every boss.
+        let checked = 0;
+        for (const boss of bosses) {
+            const sup = scoreSpec('Nangong/Miyabi/Yuzuha', boss);
+            const nos = scoreSpec('Nangong/Aria/Miyabi', boss);
+            if (sup.score <= 0 && nos.score <= 0) continue;
+            checked++;
+            assert(sup.score > nos.score,
+                `${boss.name}: Nangong/Miyabi/Yuzuha (${sup.score.toFixed(1)}) must beat the ` +
+                `supportless Nangong/Aria/Miyabi (${nos.score.toFixed(1)})`);
+        }
+        assert(checked >= 8,
+            `only ${checked} boss(es) were live for part 2 — this test has gone vacuous.`);
+    });
+
+    // ========================================================================
+    // TEST 111: a carry with no stunner loses real ground
+    // ========================================================================
+    // The Starlight Billy / Pan Yinhu case. `Billy/Pan Yinhu/Lucia` and
+    // `Dialyn/Billy/Lucia` both classified CONVENTIONAL at factor 1.0, so two supports and
+    // no stunner earned the identical structural credit as stunner-plus-support, and Pan
+    // then won on raw supply (366.1 to 365.8 on Priest). engine-context.md 2 states the
+    // rupture archetype as *stunner + rupture DPS + Lucia or Pan Yinhu* — Pan is the SUPPORT
+    // slot. Owner ruling: rupture teams absolutely favour stunner+support over
+    // double-support. Filed under Banyue, Starlight Billy and Yidhari in
+    // rankings-open-issues.txt.
+    //
+    // Bosses are chosen per carry so the carry is not resisted, and the stunners compared are
+    // not resisted either — the owner's rule carries an explicit "except when the stunner is
+    // resisted" carve-out, and Priest resists ice while Hunter resists physical.
+    run('TEST 111: a rupture carry prefers a stunner over a second support', () => {
+        // Part 1 — the filed cases, each on the boss it was filed against.
+        const cases = [
+            ['Priest', 'Dialyn/Starlight Billy/Lucia', 'Starlight Billy/Pan Yinhu/Lucia'],
+            ['Priest', 'Dialyn/Banyue/Lucia', 'Banyue/Pan Yinhu/Lucia'],
+            ['Priest', 'Dialyn/Yixuan/Lucia', 'Yixuan/Pan Yinhu/Lucia'],
+        ];
+        for (const [bossName, withStun, noStun] of cases) {
+            const bs = withBosses(bosses, bossName);
+            assert(bs.length === 1, `expected one ${bossName}, got ${bs.length}`);
+            const a = scoreSpec(withStun, bs[0]);
+            const b = scoreSpec(noStun, bs[0]);
+            assert(a.score > b.score,
+                `${bs[0].name}: ${a.label} (${a.score.toFixed(1)}) must beat the stunnerless ` +
+                `${b.label} (${b.score.toFixed(1)})`);
+        }
+
+        // Part 2 — the Yidhari/Lucia stunner ladder on Butcher, which has NO resistances, so
+        // every stunner below is judged on merit rather than on being resisted. Owner: with
+        // Yidhari/Lucia, Pan Yinhu must never beat Norma, Dialyn, Ju Fufu or Lycaon.
+        const butcher = withBosses(bosses, 'Butcher').filter(b => !/raging/i.test(b.name));
+        assert(butcher.length === 1, `expected one plain Butcher, got ${butcher.length}`);
+        const pan = scoreSpec('Yidhari/Pan Yinhu/Lucia', butcher[0]);
+        for (const spec of ['Norma/Yidhari/Lucia', 'Dialyn/Yidhari/Lucia',
+                            'Ju Fufu/Yidhari/Lucia', 'Lycaon/Yidhari/Lucia']) {
+            const st = scoreSpec(spec, butcher[0]);
+            assert(st.score > pan.score,
+                `Butcher: ${st.label} (${st.score.toFixed(1)}) must beat the stunnerless ` +
+                `${pan.label} (${pan.score.toFixed(1)})`);
+        }
+        // Owner: Lycaon/Yidhari/Lucia should consistently beat Astra/Yidhari/Lucia.
+        const lycaon = scoreSpec('Lycaon/Yidhari/Lucia', butcher[0]);
+        const astra = scoreSpec('Astra/Yidhari/Lucia', butcher[0]);
+        assert(lycaon.score > astra.score,
+            `Butcher: ${lycaon.label} (${lycaon.score.toFixed(1)}) must beat ` +
+            `${astra.label} (${astra.score.toFixed(1)})`);
+    });
+
+    // ========================================================================
+    // TEST 112: a resisted subdps is disqualified; a resisted pure stunner is not
+    // ========================================================================
+    // The Norma-against-Fiend case. Norma is tagged `stun` with an active `subdps`
+    // pseudo-role, so isDPS(Norma) is false and the L1 resistance check never saw her: on
+    // Miasmic Fiend, which resists fire, she survived on nothing but the flat -80 stunner
+    // penalty and kept appearing in Yixuan's rankings. Owner: "As a subdps, her value
+    // craters when she can't fully fulfill that. So whereas Koleda or Ju Fufu might get
+    // heavily penalized (since their job is really just stunning), Norma would likely be
+    // disqualified."
+    //
+    // The fix is `isDamageDealer` (isDPS || hasSubDPSRole) used ONLY by the resistance check,
+    // NOT a widening of DPS_ROLES — see the note above isBurstDPS. This test pins all three
+    // arms of the distinction, because the middle one is what makes the change correct rather
+    // than merely harsh.
+    run('TEST 112: resisted subdps is DQd, resisted pure stunner is only penalised', () => {
+        const fireResisting = bosses.filter(b => getBossResistances(b).includes('fire'));
+        assert(fireResisting.length >= 4,
+            `expected at least 4 fire-resisting bosses, got ${fireResisting.length}`);
+
+        // Harumasa is the carry rather than a rupture unit on purpose: Sanguine Sweeper and
+        // Discordant Solo both carry `anti: ["rupture"]`, which kills every rupture team
+        // outright and would leave only two live bosses to compare on.
+        let checked = 0;
+        for (const boss of fireResisting) {
+            // CONTROL: same team, non-fire stunner. If the control is dead the boss rejects
+            // the composition for an unrelated reason and the comparison says nothing.
+            const control = scoreSpec('Dialyn/Harumasa/Astra', boss);
+            if (control.score <= 0) continue;
+            checked++;
+
+            // Norma is a fire SUBDPS -> disqualified outright.
+            const norma = scoreSpec('Norma/Harumasa/Astra', boss);
+            assert(norma.score <= 0,
+                `${boss.name} resists fire: ${norma.label} must be disqualified, got ${norma.score.toFixed(1)}`);
+
+            // Ju Fufu is a fire PURE stunner -> penalised (-80 in L3) but still playable.
+            // This arm is what makes the change correct rather than merely harsh: the owner's
+            // ruling distinguishes a subdps, whose damage IS her value, from a stunner whose
+            // job is the window and survives a resisted element.
+            const juFufu = scoreSpec('Ju Fufu/Harumasa/Astra', boss);
+            assert(juFufu.score > 0,
+                `${boss.name}: ${juFufu.label} is a PURE stunner and must stay viable despite ` +
+                `the resisted element, got ${juFufu.score.toFixed(1)}`);
+
+            // Orphie is fire AND carries a subdps pseudo-role, but plays as an effective
+            // support — the isEffectiveSupport exemption must keep her out of the DQ entirely.
+            const orphie = scoreSpec('Orphie/Harumasa/Astra', boss);
+            assert(orphie.score > 0,
+                `${boss.name}: ${orphie.label} plays support and must not be disqualified, ` +
+                `got ${orphie.score.toFixed(1)}`);
+        }
+        assert(checked >= 4,
+            `only ${checked} fire-resisting boss(es) gave a live comparison — this test has ` +
+            `gone vacuous.`);
+
+        // Koleda cannot join Harumasa/Astra (join legality, not resistance), so her arm of the
+        // pure-stunner rule is checked on the rupture team, on the one fire-resisting boss
+        // that does not also carry `anti: rupture`.
+        const fiend = withBosses(bosses, 'Fiend');
+        assert(fiend.length === 1, `expected one Fiend, got ${fiend.length}`);
+        const koleda = scoreSpec('Koleda/Yixuan/Lucia', fiend[0]);
+        assert(koleda.score > 0,
+            `Fiend: ${koleda.label} is a PURE stunner and must stay viable despite the ` +
+            `resisted element, got ${koleda.score.toFixed(1)}`);
+    });
+
+    // ========================================================================
+    // TEST 113: Trigger/SAnby/Seed floor on UCC  - KNOWN_RED
+    // ========================================================================
+    // Split out of TEST 3 on 2026-09-02 so that test keeps guarding its other five floors
+    // and four orderings while this one disagreement stays visible.
+    //
+    // The game situation: SAnby is the aftershock carry and Seed is the body next to her.
+    // Seed is TAGGED `attack`, but she plays support - `buffs: {atk: 3, cd: 3, dmg: 2}` with
+    // `ultimate:strong` as her only damage instrument - and SAnby declares
+    // `scaling.codependent: true`, so Seed's ATK and CD are exactly what SAnby runs on.
+    //
+    // Why it is red: the double-attacker branch used to hand out a 0.85 tier to any two
+    // attackers of the SAME ELEMENT, and SAnby and Seed are both electric. Owner ruling:
+    // same element is not interaction - two carries of one element cannot disorder with each
+    // other and still cannot both hold the field - so a second attacker now only counts when
+    // it is explicitly a subdps or a pseudosupport. Removing that escape is what fixed
+    // `Norma/Ellen/Sigrid`, `Nekomata/Ye Shunguong/Sunna` and `Norma/Evelyn/Soldier 11`,
+    // all filed in rankings-open-issues.txt. It also took this team from 338.0 to 238.6.
+    //
+    // Seed is the ONE attacker in the roster who would qualify under the pseudosupport arm of
+    // that rule - she is the only attack-tagged unit supplying two or more baseline buffs at
+    // weight 3 or above - but she declares no `pseudoRole`, so the engine cannot see it.
+    // Owner: let it crash, note it as worth revisiting. Do NOT rescue it by restoring the
+    // same-element escape; that would re-break the three teams above.
+    run('TEST 113: Trigger/SAnby/Seed stays playable on UCC (>= 305)', () => {
+        const b = withBosses(bosses, 'Corruption').find(Boolean);
+        const seed = scoreSpec('Trigger/SAnby/Seed', b);
+        assert(seed.score >= 305,
+            `${b.name}: ${seed.label} (${seed.score.toFixed(1)}) >= 305 - Seed plays support ` +
+            `(atk 3 / cd 3 / dmg 2) but declares no pseudoRole, so the team reads as two carries`);
+    });
+
+    // ========================================================================
+    // TEST 114: two attack carries of one element are not a team
+    // ========================================================================
+    // The Norma/Ellen/Sigrid case. `classifyTeamStructure` used to grant the 0.85
+    // unconventional-viable tier to any two attackers who shared an element, on the theory
+    // that they share buffs. They do not share anything that matters: same-element carries
+    // cannot disorder with each other, and they still cannot both hold the field. Owner
+    // ruling - a second attacker counts only when it is explicitly a subdps or a
+    // pseudosupport; anomaly is the role that genuinely wants two bodies, attack is not.
+    // Filed under Ellen, Nekomata and Soldier 11 in rankings-open-issues.txt.
+    //
+    // Each pair swaps the second carry for a support and keeps everything else fixed, so the
+    // comparison isolates the second-carry question. Asserted per boss, corpus-wide.
+    run('TEST 114: a second same-element attack carry loses to a support', () => {
+        const pairs = [
+            ['Norma/Ellen/Astra', 'Norma/Ellen/Sigrid'],                  // both ice
+            ['Ye Shunguong/Sunna/Astra', 'Nekomata/Ye Shunguong/Sunna'],  // both physical
+            ['Norma/Evelyn/Astra', 'Norma/Evelyn/Soldier 11'],            // both fire
+        ];
+        let checked = 0;
+        for (const [supported, dualCarry] of pairs) {
+            for (const boss of bosses) {
+                const a = scoreSpec(supported, boss);
+                const b = scoreSpec(dualCarry, boss);
+                if (a.score <= 0 && b.score <= 0) continue;
+                checked++;
+                assert(a.score > b.score,
+                    `${boss.name}: ${a.label} (${a.score.toFixed(1)}) must beat the ` +
+                    `double-carry ${b.label} (${b.score.toFixed(1)})`);
+            }
+        }
+        assert(checked >= 25,
+            `only ${checked} live boss/pair comparison(s) - this test has gone vacuous.`);
+    });
+
+    // ========================================================================
+    // TEST 115: the stunless carve-out is role-agnostic
+    // ========================================================================
+    // `classifyTeamStructure` assumed a stunless carry would be an attacker: the exemption
+    // lived inside the `attacker + double support` branch only, so a stunless RUPTURE or
+    // ARMORER carry would have been charged a no-stunner tier for a window it never wanted.
+    // Latent when found — Ye Shunguong is the only stunless unit in the data and she is
+    // `attack` — so this test synthesises the case rather than waiting for the unit that
+    // exposes it. Every other stunless read in the engine was already role-agnostic.
+    //
+    // Anomaly is deliberately excluded from the carve-out: anomaly has no no-stun tier to be
+    // exempted from, and a stunless anomaly agent would affect reaction cadence too.
+    //
+    // Asserted on the STRUCTURE KEY via the trace, not on the score, because declaring a carry
+    // stunless also zeroes its `stun-infra` baseline and gates the recovery debuff — so the
+    // score moves for several reasons and only the tier is the thing under test.
+    run('TEST 115: a stunless rupture carry is not charged a no-stunner tier', () => {
+        const boss = withBosses(bosses, 'Priest').find(Boolean);
+        const find = (n) => {
+            const u = allUnits.find(x => x.name === n);
+            assert(u, `fixture unit ${n} not found`);
+            return u;
+        };
+        const yixuan = find('Yixuan'), pan = find('Pan Yinhu'), lucia = find('Lucia');
+        const structureOf = (team) => {
+            const trace = {};
+            scoreTeamForBoss(team, boss, { trace });
+            return trace.structure;
+        };
+        // Supports that actually FIT a rupture carry, so the support-fit downgrade does not
+        // fire and mask the tier — `Yixuan/Lucia/Nicole` would read UNCONVENTIONAL_VIABLE for
+        // that unrelated reason.
+        const plain = structureOf([yixuan, pan, lucia]);
+        assert(plain === -2,
+            `rupture + double support with no stunner must classify NO_STUN_RUPTURE (-2), got ${plain}`);
+
+        const stunlessYixuan = {
+            ...yixuan,
+            mechanics: {
+                ...yixuan.mechanics,
+                utility: { ...(yixuan.mechanics?.utility || {}), stunless: true },
+            },
+        };
+        const exempt = structureOf([stunlessYixuan, pan, lucia]);
+        assert(exempt === 35,
+            `a STUNLESS rupture carry does not need the window, so the same shape must classify ` +
+            `CONVENTIONAL (35), got ${exempt}`);
     });
 
     // ------------------------------------------------------------------------

@@ -60,10 +60,10 @@
         "tier": 0.5,
         "tags": ["anomaly", "ether", "assist:defensive"],
         "join": ["stun", "support", "anomaly"],
-        "synergy": { "units": ["Sunna", "Nangong"], "tags": [], "avoid": [] },
+        "synergy": { "units": ["Sunna", "Nangong", "Remielle"], "tags": [], "avoid": [] },
         "mechanics": {
             "damage": { "enhanced": 2, "abloom": 2 },
-            "scaling": { "veils": 2, "greedy": 1 }
+            "scaling": { "veils": 1, "greedy": 1 }
         },
         "faction": "Angels of Delusion",
         "displayText": "Intelligent construct masquerading as a human, Aria is top-tier primary ether anomaly DPS.",
@@ -809,7 +809,7 @@
         "tier": 0,
         "tags": ["anomaly", "lumen", "title", "assist:defensive"],
         "join": ["anomaly", "faction"],
-        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "synergy": { "units": ["Aria"], "tags": [], "avoid": [] },
         "mechanics": {
             "pseudoRole": ["subdps", "support"],
             "archetypes" : { "intended" : ["anomaly"], "avoid": ["attack", "rupture", "armorer"] },

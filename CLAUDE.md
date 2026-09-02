@@ -60,11 +60,16 @@ involves:
 
 ## Verification loop
 
-After any change to `team-scorer.js`, `pull-engine.js`, or the data files:
+After any change to `team-scorer.js`, `pull-engine.js`, or the data files, run **all four**:
 
 ```bash
-node test-scoring.mjs && node test-recommendations.mjs
+node test-scoring.mjs && node test-recommendations.mjs && node test-bucketing.mjs && node cohesion-fixture.mjs
 ```
+
+The last two are not optional extras. `test-bucketing.mjs` caught a structural change that had
+inverted a Deadly Assault allocation, and `cohesion-fixture.mjs` is the objective function for
+support fit — a cohesion change that leaves it green is the only kind worth keeping. `test-scoring.mjs`
+exits 0 when its failing set is exactly `KNOWN_RED`, so check the exit code, not the word "failed".
 
 For a targeted look at one change, use `--debug` on a narrow team/boss set
 before widening (see `engine-context.md` §7 for the full CLI flag reference

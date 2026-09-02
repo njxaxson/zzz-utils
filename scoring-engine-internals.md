@@ -616,6 +616,322 @@ output — the method that produced the Evelyn ladder later reversed against pla
 
 ---
 
+## R. The rankings pass (2026-09-02)
+
+`rankings.js` produced a per-agent CSV of top teams per favoured boss, and reading those files
+surfaced ~25 complaints (`rankings-open-issues.txt`). The suite was green with an empty `KNOWN_RED`
+at the time, which is the whole point: every complaint was a case no test pinned, so the engine was
+free to be wrong there.
+
+Five changes. Each was landed with a prediction written down **before** the change and checked with
+`score-delta.mjs`; all five ended with zero exceptions. Two of those predictions failed on the first
+attempt, and each failure caught a real defect the green suite did not — those are §Rc and §Rg, and
+they are the most useful part of this record.
+
+### §Ra. The Nangong/Alice/Sunna case — a missing support cost nothing
+
+On Miasmic Fiend the team with **no support at all** beat the same team with Sunna in the third slot:
+
+| team | support | structure | cohesion | teamwork | final |
+|----|----|----|----|----|----|
+| `Nangong / Alice / Miyabi` | none | 0.85 | 1.00 | 0.850 | **456.9** |
+| `Nangong / Alice / Sunna` | Sunna | 1.00 | 0.98 | 0.985 | 456.5 |
+
+The `NO_SUPPORT` tier existed, but the demotion in `scoreTeamStructure` was gated on the team
+*already* having classified `CONVENTIONAL_BONUS`. `Nangong/Alice/Miyabi` classifies as
+double-anomaly-plus-stunner, so it kept `UNCONVENTIONAL_VIABLE` and never reached the no-support
+tier. **A supportless team was scored better for also being unconventional.**
+
+Fix: drop the gate, apply the demotion to every classification, and take the **harsher** of the two
+factors rather than overriding — otherwise a supportless `WILDLY_UNCONVENTIONAL` team gets
+*promoted* up to the no-support tier.
+
+Prediction: every mover is a team with no effective support or defense agent, and all move down.
+Result: 7,575 movers, all down, zero viability flips, **0 exceptions**. One imprecision worth
+recording — the prediction said the changed-layer signature would be `teamwork` alone; it is
+`structure+teamwork`, because the structure *key* is itself a dumped column and necessarily moves
+with the tier. No unexplained layer moved.
+
+Reconciliation note: `score-delta.mjs` reported 7,164 and the property check 7,575. The difference
+is 411 rows that were already non-viable, which the delta excludes from "scores moved". Expect that
+gap on every structural change; it is not a discrepancy.
+
+Closed: Alice (Fiend, Girta), Jane (Fiend), Miyabi (Butcher, Marionettes).
+
+### §Rb. The Starlight Billy / Pan Yinhu case — no stunner was free
+
+On Miasma Priest, two supports and no stunner earned the identical structural credit as
+stunner-plus-support:
+
+| team | classification | factor | final |
+|----|----|----|----|
+| `Starlight Billy / Pan Yinhu / Lucia` | rupture + double support | 1.00 | **366.1** |
+| `Dialyn / Starlight Billy / Lucia` | rupture + stunner + support | 1.00 | 365.8 |
+
+Pan then won on raw supply: his `sheer: 2` lands on a rupture consumer baseline of 3, and his
+`dmg: 3` debuff and `quick-assists` are channels that structurally cannot miss. §2 of
+`engine-context.md` already stated the rupture archetype as *stunner + rupture DPS + Lucia or Pan
+Yinhu* — Pan is the **support** slot.
+
+Owner ruling, graded rather than blanket: an attacker without a stunner is badly off, because an
+attacker's damage lives inside the window; a rupture carry without one is worse off than with one
+but not as badly, so rupture-plus-double-support still outranks a stunnerless attacker; anomaly
+needs no such tier at all, because anomaly teams lean on reactions rather than burst and need
+supports more than stunners. Two new tiers, `NO_STUN_RUPTURE` and `NO_STUN_ATTACK`. A `stunless`
+carry never reaches them.
+
+Also in this change: both rupture branches used `nRup >= 1`, so **two** rupture carries plus a
+stunner plus a support scored a full `CONVENTIONAL` 1.0. Owner: rupture never accepts a second
+carry. Now `nRup === 1`.
+
+Prediction: movers are exactly (a) one-rupture teams with two support-like bodies and no stunner,
+(b) one-attacker teams with two support-like bodies, no stunner, not `stunless`, (c) teams with two
+or more rupture carries. Result after §Rc: 2,564 movers, all in those three buckets (512 / 2,042 /
+10), **0 exceptions**.
+
+Closed: Banyue (Priest), Starlight Billy, Yidhari (both lines). The Yidhari ladder on Butcher is now
+Norma > Dialyn > Ju Fufu > Lycaon > Pan > Astra, matching the owner's rule including its "except
+when the stunner is resisted" carve-out — on physical-resistant Wandering Hunter, Dialyn correctly
+falls below Pan.
+
+### §Rc. FAILED PREDICTION — a new tier slipped past an identity check and sent teams UP
+
+The §Rb prediction said every mover would go down. The first measurement returned **574 movers up**
+and 8 teams becoming viable, led by `Yixuan/Lucia/Nicole` at +33.4 on Fiend.
+
+Cause: the support-fit override in `scoreTeamForBoss` read
+`if (structureScore === STRUCTURE.CONVENTIONAL_BONUS)`. The new `NO_STUN_RUPTURE` tier sits
+*between* conventional and unconventional-viable, so a stunnerless rupture team with an ill-fitting
+support no longer matched the identity test, escaped the downgrade, and went **0.85 to 0.92**.
+
+Fix: gate on the **factor**, not the tier's identity, and take the harsher of the two — the same
+shape as §Ra. After it: 2,411 scores moved, all down, one signature, zero viability flips.
+
+**The lesson.** Adding a structure tier is never local. Every `=== STRUCTURE.X` comparison in the
+file is a place where a new tier changes behaviour by *not* matching, and "did not match" fails
+silently and upward. Grep the identity comparisons before adding a tier, and prefer comparing
+factors. A green suite did not catch this; a one-line prediction did.
+
+### §Rd. Norma against fire-resistant Fiend
+
+`checkDisqualifications` looped `dpsUnits`, and `isDPS` tests `DPS_ROLES`
+(`attack | anomaly | rupture | armorer`). Norma is tagged `stun` with an active `subdps`
+pseudo-role, so she never entered the loop and survived a fire-resistant boss on nothing but the
+flat −80 stunner penalty — which is why she kept appearing in Yixuan's Fiend rankings.
+
+The doc was already right and the code was not: `engine-context.md` said "Standard subdps units
+**are** disqualified when resisted." This change made the code match the doc.
+
+Fix: `isDamageDealer = isDPS || hasSubDPSRole`, used **only** by the resistance check. `DPS_ROLES`
+deliberately does not absorb `subdps` — ultimate provision is limited to one primary carry and would
+break. The three-way outcome on a fire-resistant boss is the thing to preserve:
+
+| unit | role shape | outcome on Fiend |
+|----|----|----|
+| Norma | `stun` + active `subdps` | **disqualified** |
+| Koleda, Ju Fufu | pure stunners | −80, still viable (387.9 / 428.3) |
+| Orphie | fire, `subdps` pseudo-role, but plays support | untouched (364.6) |
+
+Prediction: the only newly-affected units are the two stun-tagged subdps, Norma and Roxy, and Roxy
+is preview-only so absent from the default corpus. Result: **HOLDS, 0 exceptions.** 953 rows flipped
+to non-viable, no score moved otherwise, and the affected bosses were exactly the four that resist
+fire — Typhon, Fiend, `vesper` (Discordant Solo; note the id, the name does not contain "solo") and
+Sanguine Sweeper.
+
+### §Re. The Norma/Ellen/Sigrid case — two attack carries
+
+Two attackers kept the 0.85 tier purely for sharing an element:
+
+| team | attackers | escape used | factor |
+|----|----|----|----|
+| `Norma / Ellen / Sigrid` | Ellen, Sigrid — both ice | `sameElement` | 0.85 |
+| `Nekomata / Ye Shunguong / Sunna` | both physical | `sameElement` | 0.85 |
+| `Norma / Evelyn / Soldier 11` | both **fire** | `sameElement` | 0.85 |
+
+Owner ruling: **same element is not interaction.** Two carries of one element cannot disorder with
+each other and still cannot both hold the field; a second attacker counts only when it is explicitly
+a subdps or a pseudosupport. Anomaly is the role that genuinely wants two bodies — do **not**
+generalise this to anomaly, and do not collapse the two concepts. A pseudo-support attacker needs no
+clause: the `attackers` filter already excludes any unit with an active support or defense role.
+
+(Evelyn is **fire**. An earlier note in this pass called her ice, which is why
+`Norma/Evelyn/Soldier 11` looked as though it should already have been at 0.60.)
+
+Also in this change: the monoshock predicate accepted
+`scaling.anomaly || scaling.am || scaling.ap`. Owner: `am`/`ap` are **stats, not mechanics**, and
+must never be read as evidence a kit runs on anomaly. Only `scaling.anomaly` qualifies — Harumasa
+and Sigrid. Predicted delta for that sub-change: **exactly zero movers**, since no current attacker
+qualified on `am`/`ap` alone. Measured: zero.
+
+Prediction for the `sameElement` removal: movers are exactly teams with two or more same-element
+attackers and no subdps among them. Result: 2,171 movers, all down, **0 exceptions**.
+`Norma/Ellen/Sigrid` 279.9 to 209.9, `Nekomata/Ye Shunguong/Sunna` 300.4 to 212.1,
+`Norma/Evelyn/Soldier 11` 223.8 to 167.9. Closes tracked issue 11.
+
+Casualty: `Trigger/SAnby/Seed`, now `KNOWN_RED` TEST 113. See the parked entry in
+`scoring-engine-open-issues.md` — Seed plays support but declares no `pseudoRole`.
+
+### §Rf. Aria's veils — a design gate and a bonus were charged the same
+
+`Aria/Remielle/Velina` is one of the strongest teams in the game per playtest, and the engine had it
+at 467.8 on Stagnant Aberrant against `Promeia/Remielle/Velina` at 575.6. The gap decomposed as:
+
+| | `Aria/R/V` | `Promeia/R/V` |
+|----|----|----|
+| headline L4 channel | vortex 30 + 30 (ether tier **2**) | vortex 67.5 + 67.5 (ice tier **4.5**) |
+| L4 raw, then after soft cap | 157.0 to 146.4 | 262.8 to 198.6 |
+| cohesion | **0.87** | 1.00 |
+| final | 467.8 | 575.6 |
+
+The cohesion figure reproduces by hand exactly, and it is **one term**: Aria declares
+`scaling.veils: 2`, and neither Remielle nor Velina supplies veils. Charge weight
+`min(0.5, 1 x 0.25)` = 0.25 at `log(0.7^2)` = −0.1783, against a total weight of 1.25, so
+`exp(−0.1783/1.25)` = **0.8670**. Promeia declares no need keys at all, so her team accumulates
+nothing. `Nangong/Aria/Sunna` reads 0.98 precisely because Nangong supplies `veils: 1`.
+
+**Ruled out first, and the arithmetic is worth keeping.** The owner's stated reason Aria beats
+Promeia beside Remielle is anomaly-buildup specifics, deliberately not modelled, expressed instead
+as a declared bidirectional L5 pair. That pays `2 x (15 + 25) = 80`. It closed the Discordant Solo
+complaint but could not close Girta/Aberrant, and **no L5 value can**:
+
+| requirement | needs Aria's L5 to be |
+|----|----|
+| `Aria/R/V` above `Promeia/R/V` on Aberrant | **> 120.4** |
+| `Promeia/R/V` above `Nangong/Aria/Sunna` on Horizon | **< 115.0** |
+
+Aria is on both teams, so no uniform L5 value, per-pair rule or cap satisfies both. Also ruled out:
+paying the vortex bonus once per reaction instead of once per reacting unit — the L4 soft cap absorbs
+most of it (Aria 146.4 to 124.4, Promeia 198.6 to 169.0), narrowing 36.4 to 26.3.
+
+**The owner's diagnosis was the data model, not the arithmetic.** Ether veils are a design gimmick
+used to gate certain units into boundaries. For Ye Shunguong that is literal: without Sunna or Zhao
+she is severely hamstrung, and `veils: 2` earning the full charge is correct. Aria's veil scaling was
+designed as a **bonus** for pairing her with Nangong or Sunna, better with both. Her weight was 2
+only to keep Lucia from being a weird mix-in. Two approaches, evaluated:
+
+**Approach 1 — Aria's `scaling.veils` 2 to 1.** Measured alone: 916 movers, single signature
+`l4raw+l4`, **no teamwork movement whatsoever**, and `Aria/Remielle/Velina` unchanged at 539.2. The
+reason is worth knowing: the cohesion charge is **presence-based, not weight-based** — the weight
+gates entry (`if (sw < 1) continue`) and supply matching only tests `supplyWeight > 0`. Only the L4
+*payout* is weight-scaled. So approach 1 alone cannot help a team that has no supplier at any weight.
+
+It did two useful things anyway. `Nangong/Aria/Sunna` fell 19.5, taking the corpus ceiling with it
+(722.8 to 703.3). And the feared weird compositions did not appear: every one of the 133 Aria+Lucia
+rows moved by at most **+2.4** and they remain 86–156 absolute, because reducing the need weight
+*lowers* the maximum payout, and Lucia already declares
+`archetypes.avoid: [attack, anomaly, armorer]` so she eats the −40 avoid penalty on an anomaly carry
+regardless. The archetype lever was already handling it; no new lever was needed.
+
+**Approach 2 — make the unmet-need charge scale with the declared weight, convexly.**
+`needSeverity`: weight 3 to 1.00, weight 2 to 0.44, weight 1 to 0.11, feeding **both** sides of the
+reception ratio. Measured alone: `Aria/R/V` 570.2, still 5.4 under Promeia on Aberrant and 1.8 under
+on Girta.
+
+**Both together is the answer, and they are complementary rather than alternatives.** Aria at weight
+1 gives severity 0.11, effectively free, which is the bonus semantics; Ye Shunguong stays at weight 2
+and severity 0.44, still a real gate — her no-veils lines sit 84–102 points below her Sunna lines,
+having risen only ~12.
+
+Prediction: every mover contains one of the four units whose severity changed — Aria, Alice, Banyue,
+Ye Shunguong. Miyabi (`disorders: 3`) and Anton stay at severity 1.00. Result after §Rg: 6,262
+movers, **0 exceptions**.
+
+Outcome against the playtested targets: Aria #1 on Girta and Aberrant, above Promeia *and* above
+`Miyabi/Vivian/Remielle`; `Aria/Remielle/Velina` #2 on Discordant Solo, right under
+`Nangong/Aria/Sunna`; Alice lifted 26 by her own `scaling.disorders: 2` softening. Still open: Alice
+should be third rather than last, and `Promeia/Remielle/Velina` should top Horizon.
+
+### §Rg. FAILED PREDICTION — `w(true)` is 1, not 3
+
+The §Rf prediction failed with **800 exceptions, every one containing Anton.**
+
+`needSeverity` keyed off the coerced weight, and `w(true)` returns **1**. Anton declares
+`scaling['quick-assists']: true`, which the convex curve read as the weakest possible need and
+nearly zeroed. But `true` in the data means "this unit depends on this" without grading, and the
+engine's own comment calls Anton's a real need, so grading it as minimal inverts what the author
+wrote.
+
+Fix: `needSeverity` reads the **declared value**, not its weight. `true` gives full severity; only
+an explicit number is graded.
+
+**Unresolved tension, filed as issue 15.** `engine-context.md` §3 states the weight convention as
+`true`/`1` = minor, `2` = strong, `3` = defining — under which `true` *is* weight 1 and Anton's need
+*should* be discounted. The fix above contradicts the documented convention. The practical stake is
+about ±5 points on sub-100 teams, so it is not urgent, but it should be settled rather than left as
+two rules that disagree. Note also that a failed prediction proves the *prediction* wrong, not
+necessarily the behaviour — that conflation is what produced this entry.
+
+### §Rh. Tests changed, and why each was legitimate
+
+Four adjudications, all owner-ruled. Recorded because "the test went red so I moved the number" is
+how a suite stops meaning anything.
+
+* **TEST 77** — `Roxy/Harumasa/Velina` floor 250 to 245. The team genuinely has no support, so §Ra
+  correctly demoted it to 248.9. The assertion's intent is a viability floor ("solid, playable, not
+  top-tier"), not an ordering, and 250 was calibrated when supportless teams kept 0.85. Softening
+  `NO_SUPPORT` instead was rejected on arithmetic: TEST 101 needs it below 0.812 and this team needs
+  it at or above 0.81 — a 0.002 window.
+* **Bucketing TEST 2** — rebuilt around Norma. It asserted that swapping Zhao for Astra moves Dialyn
+  from Priest to Thrall, and it was passing on a **0.2-point** margin: Thrall 30.1 against Priest
+  29.9. That 29.9 existed only because the stunnerless `Yixuan/Pan Yinhu/Lucia` scored 505.5 — the
+  engine believed Yixuan barely needed a stunner, which is exactly what §Rb overruled. With Priest's
+  marginal now 70.3, no factor above 0.9996 keeps the test green, so it was not tunable. Adding Norma
+  to the roster makes Priest covered without Dialyn (`Norma/Yixuan/Lucia` 535.1 against
+  `Dialyn/Yixuan/Lucia` 535.4, so a marginal of 0.3), which frees Dialyn for Thrall for a real game
+  reason and makes the deciding margin ~30 points instead of 0.2. Ju Fufu does not work in that slot
+  — Priest 31.1 against Thrall 30.1, another knife edge.
+* **TEST 107** — **rewritten, not re-baselined.** It pinned four absolute totals to assert that burst
+  contention does not touch Remielle's greedy-1 teams. Those numbers are on no effectiveness scale,
+  so they moved twice in one day for reasons unrelated to contention, and re-pinning them would have
+  codified a ladder the owner rejects: the four values encode Aria > Promeia > **Burnice** > Alice,
+  and the playtested order is Aria > Promeia > **Alice** > Burnice. It now reads `trace.contention`
+  off `scoreTeamForBoss(team, boss, { trace })` and asserts 0 for the four greedy-1 teams and below 0
+  for `Miyabi/Remielle/Vivian` as an anti-vacuity check. Alice's position is deliberately not pinned.
+* **TEST 11** — `Trigger/Ye Shunguong/Caesar` ceiling 280 to 290. The test guards *diametric synergy*
+  not hyperinflating; the movement to 283.5 came from Ye Shunguong's veils severity, and the
+  `Trigger/Harumasa/Caesar` arm still holds at 280. 283.5 is 54% of Slugger's 523.4 best team and 102
+  points below Ye Shunguong's own line, so still "mid".
+
+### §Ri. The stunless carve-out assumed attackers (latent)
+
+Owner-spotted while reviewing the regenerated rankings. `classifyTeamStructure` kept the stunless
+exemption *inside* the `attacker + double support` branch, so a stunless **rupture** or **armorer**
+carry would have been charged a no-stunner tier for a window it never wanted. Every other stunless
+read in the engine was already role-agnostic — the `stun-infra` consumer baseline, the
+recovery-debuff gate, and the L3 stun-shill exemption — so the classifier was the only place that
+assumed a role.
+
+Fixed by hoisting `stunlessCarry` to read the attack, rupture and armorer carry lists. Anomaly is
+deliberately excluded: it has no no-stun tier to be exempted from, and a stunless anomaly agent
+would affect reaction cadence in ways that want their own decision.
+
+Latent when found — Ye Shunguong is the only stunless unit in the data and she is `attack` — so the
+prediction was **exactly zero movers**, and the measured corpus delta was zero. TEST 115 synthesises
+the case by cloning Yixuan with `utility.stunless` rather than waiting for the unit that exposes it,
+and asserts the **structure key via the trace** rather than the score: declaring a carry stunless
+also zeroes its `stun-infra` baseline and gates the recovery debuff, so the score moves for several
+reasons and only the tier is under test.
+
+| team | structure key | score |
+|----|----|----|
+| `Yixuan / Pan Yinhu / Lucia` — rupture, no stunner | −2 (`NO_STUN_RUPTURE`) | 465.1 |
+| same, carry declared `stunless` | 35 (`CONVENTIONAL`) | 505.5 |
+| `Dialyn / Yixuan / Lucia` — real stunner | 35 | 535.4 |
+
+The residual ordering is right: a stunless carry with two supports (505.5) still sits below the same
+carry with a real stunner (535.4), because it forgoes Dialyn's stun infrastructure and recovery
+debuff in L4. The exemption removes the *structural* charge, not the supply a stunner brings.
+
+Note the fixture needs supports that actually FIT the carry. `Yixuan/Lucia/Nicole` reads
+`UNCONVENTIONAL_VIABLE` for an unrelated reason — the support-fit downgrade fires on Nicole — which
+masks the tier under test.
+
+Also fixed in passing: a leftover `console.log` in `lib/cli.js` that printed
+`depth : [object Object]` for every long-form flag, corrupting stdout for
+`node score-dump.mjs > file`.
+
+---
+
 ## Codependency in the scorer (`scaling.codependent`)
 
 Previously honoured only by the pull engine. Now also scales a codependent unit's contributions

@@ -292,6 +292,22 @@ output looks like.
   `<DPS>/Vivian/Yuzuha`. Both still exist — Promeia sometimes prefers Vivian for abloom volume.
 * **Anomaly (triple)** — three primary-anomaly units, enabled by Remielle. Traditional anomaly
   wheelchairs are strongly *sub*optimal for her.
+
+  **Remielle has two tracks, and they trade on different mechanics.** Vivian and Velina are the only
+  *fully dedicated* anomaly subdps in the game (the others are conditional), so each anchors one:
+
+  | Track | Trades on |
+  |----|----|
+  | **Remielle + Velina** | vortex and abloom |
+  | **Remielle + Vivian** | disorders |
+
+  These are not interchangeable, and the engine prices the two axes through very different channels
+  — `disorders` has a dedicated team-wide need computation, while vortex and abloom go through the
+  ordinary buff and damage-need channels. Playtested ordering for the Velina track's third slot:
+  **Aria, Promeia, Alice, Burnice, Jane** (the last two close). `Miyabi/Vivian/Remielle` generally
+  sits below the top two or three Velina-track teams. Aria's edge over Promeia here comes from
+  anomaly-buildup specifics that the engine deliberately does **not** model — buildup rate is too
+  granular — so it is expressed as a declared L5 pair instead.
 * **Rupture** — Stunner + Rupture DPS + Lucia or Pan Yinhu. Defense shred is useless here. Dialyn or Norma > Ju Fufu > Astra as the stunner; Norma is strong because she converts sheer buffs into personal ATK.
 * **Totalize (Hugo)** — DPS + double stunner. Hugo converts accumulated stun *time* into damage,
   so a second low-tier stunner beats a good support. He's `onfield: false` — he enters for chains
@@ -351,6 +367,10 @@ mechanically (hard DQ in strict mode, large penalty in lenient mode) — current
 
 The `mechanics` object describes what is **distinctive** about a unit beyond its role baseline.
 Units with nothing distinctive have `mechanics: {}` — and that's a complete, valid kit.
+An empty block means **"no unique mechanics, inherit the role defaults"**, never "data still to be
+written". Ellen, Nekomata and Soldier 11 are all `mechanics: {}` and are scored entirely off their
+role baselines (`getEffectiveScaling`, `BASIC_DAMAGE_BY_ROLE`, `resolveBaselineWeight`); do not
+"fill them in" to make a ranking move.
 
 Weights throughout: `true`/`1` = minor, `2` = strong, `3` = defining. (Values above 3 exist where a unit is deliberately off the conventional scale, e.g. Remielle's `atk: 4`.)
 
@@ -884,8 +904,8 @@ the team, then runs:
 
 | Layer | What it does |
 |----|----|
-| **L1 Disqualifications** | Hard failures returning −1. Deliberately narrow: illegal `join` arrangement, no DPS, three *pure* DPS, a DPS whose tag matches boss `anti`, a DPS whose element is resisted, too few reliable defensive assists. `synergy.avoid` is checked alongside. |
-| **L1.5 Structure** | Classifies the composition (anomaly hypercarry, double armorer, rupture + stun + support, …) into conventional / unconventional-viable / no-interaction / wildly-unconventional. Feeds the teamwork multiplier — **it is not added to the score**, so a demotion is a pure multiplier effect. Also scores field-time economy. **CONVENTIONAL requires a support** — see below. |
+| **L1 Disqualifications** | Hard failures returning −1. Deliberately narrow: illegal `join` arrangement, no DPS, three *pure* DPS, a DPS whose tag matches boss `anti`, a **damage dealer** whose element is resisted, too few reliable defensive assists. `synergy.avoid` is checked alongside. |
+| **L1.5 Structure** | Classifies the composition (anomaly hypercarry, double armorer, rupture + stun + support, …) into conventional / unconventional-viable / no-stunner / no-interaction / wildly-unconventional. Feeds the teamwork multiplier — **it is not added to the score**, so a demotion is a pure multiplier effect. Also scores field-time economy. **A supported team and a stunnered team are different requirements** — see below. |
 | **L2 Inherent Quality** | Individual power independent of team context: tier and rank. DPS at full weight; support/defense/stun at reduced weight **gated by buff utilization**. Titled bonus. Totalize stun-demand penalty. Wasted-DPS-buff penalty. |
 | **L3 Boss Matchup** | Shill, favored units, `weak` mechanics, element weakness/resistance, boss debuffs, assist bonus. Also where a **missing non-DPS shill disqualifies** (a stunless DPS exempts a stunnerless team from the stun shill). |
 | **L4 Mechanical Synergy** | The core. Directional pairwise evaluation of every ordered teammate pair, plus team-level reaction bonuses. |
@@ -896,13 +916,51 @@ Final score = `raw × teamworkMultiplier`.
 **Field-time economy:** one on-field agent is a bonus (efficient solo carry), two is neutral, three
 or more is a penalty (field competition), zero is a penalty (no primary damage dealer).
 
-**No support or defense means not CONVENTIONAL.** A team with no `isEffectiveSupport` and no
+**No support or defense gets its own tier.** A team with no `isEffectiveSupport` and no
 `isEffectiveDefense` — pseudo-roles included, so Orphie, Remielle and Cissia-alongside-Seed all
-count — is demoted to `UNCONVENTIONAL_VIABLE` regardless of how sound the rest of its shape is.
-Supports exist because buffs matter, and forgoing one is a genuine teambuilding failure rather than
-a stylistic choice; the resulting −15% is meant to be a large number. Before this rule L1.5 rated
-`Nangong/Miyabi/Vivian` and `Nangong/Miyabi/Yuzuha` identically, which is why triple-anomaly lines
-outranked the wheelchairs they should lose to (issue 7).
+count — is demoted to the dedicated `NO_SUPPORT` tier. Supports exist because buffs matter, and
+forgoing one is a genuine teambuilding failure rather than a stylistic choice; the hit is meant to
+be a large number. Before this rule L1.5 rated `Nangong/Miyabi/Vivian` and `Nangong/Miyabi/Yuzuha`
+identically, which is why triple-anomaly lines outranked the wheelchairs they should lose to
+(issue 7).
+
+The demotion applies to **every** classification and takes the **harsher** of the two factors. It
+used to fire only on teams that had already classified `CONVENTIONAL`, which meant a supportless
+team was scored *better* for also being unconventional: `Nangong/Alice/Miyabi` classifies as
+double-anomaly-plus-stunner, kept the unconventional-viable factor, never reached the no-support
+tier, and beat its own supported counterpart `Nangong/Alice/Sunna` on Miasmic Fiend. Taking the
+harsher of the two rather than overriding is what stops a supportless *wildly*-unconventional team
+being promoted up to the no-support tier.
+
+**No stunner is also its own tier, graded by what the carry loses without a window.** Two tiers,
+not one:
+
+* an **attacker** with no stunner is badly off — an attacker's damage lives inside the stun window;
+* a **rupture** carry with no stunner is worse off than with one but not as badly, so
+  rupture-plus-double-support still ranks above a stunnerless attacker;
+* **anomaly** has no such tier at all. Anomaly teams lean on reactions rather than burst, so they
+  need supports more than stunners, and their existing tiers are already right.
+
+A `stunless` carry never reaches these — such a unit receives its stun multiplier whether or not the
+enemy is stunned. **The exemption is role-agnostic**: it reads the attack, rupture *and* armorer
+carry lists, because nothing stops a rupture or armorer carry being stunless and such a team must
+not be charged for a window it never wanted. Anomaly is deliberately excluded — it has no no-stun
+tier to be exempted from, and a stunless anomaly agent would affect reaction cadence too.
+Ye Shunguong is the only stunless unit in the data today and she is `attack`, so this is currently
+latent; TEST 115 synthesises the rupture case rather than waiting for the unit that exposes it. Before this, `Starlight Billy/Pan Yinhu/Lucia` and
+`Dialyn/Starlight Billy/Lucia` both classified `CONVENTIONAL` at full credit, so two supports and no
+stunner earned exactly the same structural credit as stunner-plus-support and Pan won on raw supply.
+Pan Yinhu is the *support* slot in the rupture archetype, not the stunner slot.
+
+**Which compositions accept a second carry** — these differ by role and must not be collapsed:
+
+| Shape | Second carry allowed? |
+|----|----|
+| **Anomaly** | Yes, unconditionally. Most anomaly teams *want* two anomaly bodies, ideally with one a subdps or a pseudostunner — that is the baseline assumption, because the team is built to produce reactions. |
+| **Rupture** | **Never.** One rupture carry only. |
+| **Attack** | Only when the second attacker is explicitly a **subdps** or a **pseudosupport**. Sharing an element is *not* interaction: two carries of one element cannot disorder with each other and still cannot both hold the field. |
+| **Attack + anomaly** ("monoshock") | Only when the attacker declares `scaling.anomaly` — Harumasa and Sigrid. `scaling.am` / `scaling.ap` are **stats, not mechanics**, and must never be read as evidence that a kit runs on anomaly. |
+| **Armorer** | Two armorers are conventional — Maim is the shared-resource payoff. |
 
 **One exemption: totalize + double stun.** There the second stunner *is* the support — totalize
 damage *is* stun uptime, so a second stunner feeds the carry the way a support otherwise would.
@@ -1070,9 +1128,12 @@ where the debuff can't be fully exploited.
 `structureFactor × f(cohesion)`, where `f` maps cohesion onto a floored range so a bad team is
 crushed but never zeroed.
 
-**Structure factor** comes from the L1.5 classification. One important override: a team classified
-*conventional* is **downgraded** if any support-like member's buff utilization falls below half — a
-conventional shape staffed by a mismatched support isn't really conventional.
+**Structure factor** comes from the L1.5 classification. One important override: a team whose
+factor is better than unconventional-viable is **downgraded** to it if any support-like member's
+buff utilization falls below half — a conventional shape staffed by a mismatched support isn't
+really conventional. The test is on the **factor**, not on the tier's identity; when the no-stunner
+tiers were added, a tier sitting between conventional and unconventional-viable slipped through an
+identity check and teams with an ill-fitting support went *up*.
 
 **Cohesion** is a weighted geometric mean of per-unit buff utilization. Non-DPS units enter squared
 and at full weight; DPS enter unsquared at half weight. The geometric mean is the point: one badly
@@ -1093,8 +1154,17 @@ What feeds utilization (`computeBuffUtilization`):
   actually use (CR and Laceration primary; PEN and defense shred secondary, and shred stacks across
   suppliers). A team supplying none of them takes a dedicated hit. Applies to every armorer, whether
   or not they carry buffs of their own.
-* **DPS reception** — a DPS with no buff contributions of its own is instead checked on what fraction
-  of its scaling needs the team meets. This is what penalizes "duo + deadweight" teams.
+* **DPS reception** — every unit is checked on what fraction of its declared `scaling` needs the
+  team meets. This is what penalizes "duo + deadweight" teams.
+
+  **An unmet need costs in proportion to the weight the unit declared, on a convex curve**
+  (`needSeverity`): weight 3 costs the full charge, weight 2 well under half of it, weight 1 almost
+  nothing. The charge used to be a headcount — any weight at all counted as one whole unmet need —
+  which flattened two very different statements. Ye Shunguong's `veils: 2` is a **design gate**:
+  without Sunna or Zhao she is severely hamstrung, and the full charge is right. Aria's ether-veil
+  scaling is a **bonus** for pairing her with Nangong or Sunna, better with both, and charging her
+  like Ye Shunguong cost `Aria/Remielle/Velina` — a top-tier team — 13% of its cohesion for a
+  missing bonus. The weight is what separates them, so it has to be read.
 * **Wasted vortex** — a wind anomaly subdps whose vortex generation has no beneficiary (no native
   primary anomaly DPS with a meaningful vortex tier) counts as an unmet need. Velina + Miyabi is
   penalized because frost gains nothing; Velina + Promeia is not. This deliberately ignores
@@ -1132,6 +1202,15 @@ inherent quality, disqualification and the teamwork multiplier all use the effec
 * Any support/defense unit with meaningful `damage` still takes a damage-proportional penalty when
   resisted.
 * Standard subdps units **are** disqualified when resisted, like any DPS. Only pseudosupports bypass it.
+  The check reads `isDamageDealer` (`isDPS || hasSubDPSRole`), which is deliberately **narrow** —
+  it is used by the resistance disqualification and nothing else. `DPS_ROLES` must not absorb
+  `subdps`: ultimate provision is limited to one primary carry and would break. Norma is the case
+  — tagged `stun` with an active `subdps` pseudo-role, she used to survive a fire-resistant boss on
+  nothing but the flat stunner penalty and kept appearing in Yixuan's rankings on Miasmic Fiend.
+  A **pure** stunner keeps that flat penalty and stays viable; her job is the window, and a resisted
+  element does not take it away. So on a fire-resistant boss Norma is disqualified while Koleda and
+  Ju Fufu are merely penalised, and Orphie — fire, subdps pseudo-role, but playing support — is
+  untouched.
 
 ### Lenient mode
 
@@ -1295,9 +1374,14 @@ enable a subset).
 | `teams.js` | Valid team enumeration (join conditions only, no scoring) |
 | `pull-debug.js` | Runs the pull recommendation engine from the CLI |
 | `pulled.js` / `tiers.js` | Roster by mindscape/weapon; units by tier |
-| `scoring-diff.js` | Diffs two saved score dumps and highlights what actually changed |
+| `rankings.js` | Per-agent CSV of top teams, **one column per boss that agent cares about** (element-weak, shill match, or explicitly favored). Writes `matchups/<agent>.csv`; no scores, so it diffs as a pure ordering artifact |
+| `score-dump.mjs` | Full-corpus TSV: one row per (boss, team) with the score **and all 13 layer columns**. Corpus is fixed and takes no roster flags on purpose — a baseline you can accidentally narrow is not a baseline |
+| `score-delta.mjs` | Compares two dumps, groups movers by which layer moved, and checks a stated `--predict` (exits 1 when it fails) |
+| `cohesion-fixture.mjs` | The objective function for support fit: owner judgements as ordered pairs and bands, from `cohesion-fixture.json` |
+| `scoring-diff.js` | Diffs two saved *ranking* outputs. **Do not use it to detect whether a change did anything** — it hides shuffles inside tie groups and reports "no material changes" for a change that moved every score in the corpus |
 | `test-scoring.mjs` | Scorer assertion suite |
 | `test-recommendations.mjs` | Pull engine assertion suite |
+| `test-bucketing.mjs` | Deadly-assault allocation suite (marginal value, rank bands) |
 | `reformat-units.mjs` | Normalizes `units.json` formatting |
 
 **Typical debugging loop:**
@@ -1321,14 +1405,49 @@ node test-scoring.mjs && node test-recommendations.mjs
 > score for a lumen team matches its real score and the `Lumen morph:` line names the target that
 > won. (Before issue 6 the debug path skipped morphing entirely and the two scores disagreed.)
 
-For a full-landscape review, dump scores to a file and diff against a previous dump with
-`scoring-diff.js`. (There is no committed baseline file — generate one before a change and compare after.)
+**For a full-landscape review, use the dump/delta pair, and state a prediction first.** A green
+suite is not evidence; a prediction with zero exceptions is. Write down which teams are *allowed* to
+move, then make `score-delta.mjs` list the exceptions:
+
+```bash
+node score-dump.mjs > matchups/before.txt
+# ...make the change...
+node score-dump.mjs > matchups/after.txt
+node score-delta.mjs matchups/before.txt matchups/after.txt --predict Norma,Roxy
+```
+
+`--predict` takes a **comma-separated** list and treats a team as predicted if it contains *any* of
+those units; it exits 1 on failure. For a structural change the prediction is usually a *property*
+of the movers rather than a unit list ("every mover is a supportless team, and all of them moved
+down") — read that off the changed-layer grouping and, where the property needs it, a throwaway
+script over the two dumps. `matchups/` is gitignored.
+
+Two failed predictions in this repo each caught a real over-reach that the test suite did not:
+a new structure tier slipping past an identity check and sending teams *up*, and a severity curve
+that nearly zeroed a need Anton genuinely declares. Neither would have been found by reading a green
+suite.
 
 **Test conventions:** each case is a `run('TEST N: description', () => { … })` block; build teams with
 `scoreForTeamString`, filter bosses with `withBosses`, look up scores with `scoreMapForBoss`, and assert
 with `assert(condition, message)`. Failure messages should embed actual scores — that's what makes a
 regression diagnosable. Test numbers are sequential; when engine retuning forces a threshold change,
 update it and note why in the comment block.
+
+**Assert the mechanism, not the total, wherever you can.** An absolute score is not on any
+effectiveness scale, so it moves on nearly every engine change and has to be re-baselined for
+reasons unrelated to what the test is guarding — and re-pinning it silently codifies whatever the
+engine currently does, including orderings the owner rejects. TEST 107 guards burst contention and
+used to pin four exact totals; it now reads `trace.contention` off
+`scoreTeamForBoss(team, boss, { trace })` and asserts it is zero for greedy-1 teams and negative for
+a dual-greedy one. Sweeping tests should carry an anti-vacuity count (`assert(checked > 50, …)`), and
+comparisons must be **siloed per boss** — never by best-score-across-bosses.
+
+`KNOWN_RED` is a `Map<testNumber, reason>` for assertions that encode an ordering the owner believes
+correct but the engine does not yet produce. The suite exits 0 when the failing set is *exactly*
+that map, and 1 when anything else fails **or** when a listed test starts passing (a stale list
+stops meaning anything). Every entry needs the reason and what would clear it. **Never add an entry
+to silence a regression.** If only one assertion in a multi-assertion test is red, split it into its
+own test number so the rest keeps guarding.
 
 
 ## 8. Known Issues and Dead Mechanics
