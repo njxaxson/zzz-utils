@@ -8,7 +8,7 @@
         "tier": 1,
         "tags": ["anomaly", "physical", "assist:defensive"],
         "join": ["anomaly", "support"],
-        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "synergy": { "units": ["Remielle+Velina"], "tags": [], "avoid": [] },
         "mechanics": {
             "damage": { "enhanced": 2 },
             "utility": { "anomaly:physical": 2 },
@@ -809,7 +809,7 @@
         "tier": 0,
         "tags": ["anomaly", "lumen", "title", "assist:defensive"],
         "join": ["anomaly", "faction"],
-        "synergy": { "units": ["Aria"], "tags": [], "avoid": [] },
+        "synergy": { "units": ["Aria", "Velina"], "tags": [], "avoid": [] },
         "mechanics": {
             "pseudoRole": ["subdps", "support"],
             "archetypes" : { "intended" : ["anomaly"], "avoid": ["attack", "rupture", "armorer"] },
@@ -1051,7 +1051,7 @@
         "tier": 0,
         "tags": ["anomaly", "wind", "assist:defensive"],
         "join": ["anomaly", "wind"],
-        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "synergy": { "units": ["Remielle"], "tags": [], "avoid": [] },
         "mechanics": {
             "pseudoRole": ["subdps"],
             "damage": { "abloom": 2 },

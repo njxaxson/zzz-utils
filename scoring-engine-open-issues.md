@@ -10,7 +10,7 @@ Last reviewed 2026-09-02. Branch `wide-blast-radius-recovery` — not merged to 
 
 | suite | state |
 |----|----|
-| scoring | **114 pass, exits 0.** One `KNOWN_RED`: TEST 113 |
+| scoring | **116 pass, exits 0.** One `KNOWN_RED`: TEST 113 |
 | cohesion fixture | **11/11** — owner judgements on support fit (`node cohesion-fixture.mjs`) |
 | bucketing | **6/6** |
 | recommendations | 43/44. TEST 43 red on purpose (issue 9) |
@@ -25,11 +25,7 @@ exceptions.
 
 | # | issue | example / status |
 |----|----|----|
-| 12 | **Miyabi is still the best third on a Remielle base for several carries** | One root, four filed complaints. The RemViv/disorders track still outranks the RemVel/vortex track wherever the carry is not Aria or Promeia, because Miyabi's `scaling.disorders: 3` collects the engine's richest L4 channel while vortex and abloom go through ordinary ones. Measured on the bosses each was filed against: `Grace/Miyabi/Remielle` 504.1 over `Grace/Remielle/Velina` 471.9 (Aberrant); `Burnice/Miyabi/Remielle` 558.4 over `Burnice/Remielle/Velina` 535.5 (Aberrant); `Miyabi/Remielle/Vivian` 504.8 over `Alice/Remielle/Vivian` 504.4 (Fiend, by 0.4); and `Alice/Remielle/Velina` last at 489.6, 46 behind Burnice, where the playtested third-slot order is Aria, Promeia, **Alice**, Burnice, Jane. Alice's own unmet `scaling.disorders: 2` softening lifted her 26; her need is genuinely unmet beside Remielle/Velina (physical + wind is a vortex, not a disorder, and lumen cannot react at all). |
-| 13 | **`Promeia/Remielle/Velina` should be #1 on Scorched Horizon** | It is #2 at 525.1 behind `Nangong/Aria/Sunna` 557.4. Gap was 44.4, now 32.3. Aria sits on both sides of every L5 lever, so raising L5 for the Velina track inflates this team too — see the arithmetic in internals §Rf. |
-| 14 | **One score above 700** | `Nangong/Aria/Sunna` on Discordant Solo, 703.3, against a corpus second place of 621.6. It carries **two** mutual `synergy.units` pairs, and the `+25` mutual bonus is added once per *direction*, so each pair pays `2 × (15+25) = 80` rather than `2 × 15 + 25 = 55`. Owner: leave L5 alone for now. Owner concern: scores this high distort cross-archetype comparison. |
-| 15 | **`true` vs `1` in need severity** | `needSeverity` treats a declared `true` as full severity, but `engine-context.md` §3 states the weight convention as `true`/`1` = minor, `2` = strong, `3` = defining. Under the documented convention Anton's `scaling['quick-assists']: true` is a *minor* need and should be discounted like weight 1. Owner call; the practical effect is ±5 points on sub-100 teams. |
-| 3 | **Remielle ceiling** | `Nangong/Promeia/Remielle` is **288.8** on ice-weak Scorched Horizon. Owner: "240 isn't necessarily the hard cap, but this isn't close to even 270, even on Horizon." Not a cap mechanism — the raw 450.0 is what needs explaining. Its structure is already demoted (Remielle's own support utilization is under 0.5) with cohesion 0.69. |
+| 16 | **Sub-DPS tier is halved beside a same-type carry — a double count** | Velina is T0 *because she is an outstanding sub-DPS*, so her tier already prices the role; halving it re-prices her as "half of a T0 primary carry", which is not what her T0 means. She banks +20 where Miyabi banks +55, which is why the Miyabi track outranked the Velina track for every carry. Fires only when a sub-DPS stands beside another same-type carry (`isSecondaryAttacker` / `isSecondaryAnomaly`); the separate `isForcedSecondaryDPS` halving is a genuine role-collision charge and is **correct** — do not conflate them. Not fixed here because un-halving lifts Vivian too (+9 against Velina's +20, so only ~11 net in the Velina track's favour), does nothing for the Alice ordering, and has a wide blast radius: Velina, Vivian, Norma, Roxy, Burnice, Grace, Cissia, Orphie. Post-release correctness item. |
 | 5 | **Disorder supply — one loose end** — minor | For an under-met need the appetite term cancels, so a supplier earns the same whether the consumer wanted a little or a lot. Investigate per need-key before changing (internals §5). |
 | 9 | **Pull engine can't see partner quality** — feature, not blocking | Remielle's ceiling depends on having Velina; the pull engine never calls the scorer, so it rates her the same either way. Recommendations TEST 43 pins this, red on purpose. |
 
@@ -67,6 +63,17 @@ this pass's complaints.
 
 ## Parked / adjudicated (don't re-open)
 
+* **Issue 3 (Remielle ceiling) and issue 14 (scores above 700)** — **parked:
+  resolved-by-way-of-future-feature.** Owner has a solution that sits *outside* the scoring
+  engine's mechanics and addresses both perfectly. Do not chase either inside the scorer. For the
+  record: `Nangong/Promeia/Remielle` reads 288.8 on ice-weak Scorched Horizon where the owner
+  wants it well under 270; and the corpus top band is 655–703 (`Nangong/Aria/Sunna` on Discordant
+  Solo at 703.3), populated rather than the single outlier it used to be.
+* **Issue 15 (`true` vs `1` in need severity)** — closed 2026-09-02 in favour of the documented
+  convention. `needSeverity` reads the coerced weight, so `true` behaves as weight 1 ("minor") per
+  `engine-context.md` §3. If a unit's need is genuinely defining the data should say `3`, not
+  `true`. Moved 859 rows, all Anton teams; owner: "any team containing Anton is dogwater."
+
 * **Miyabi ladder (TEST 101)** — closed. Below the top two the order is **boss-conditional**: the
   full ladder is asserted only on Butcher/Marionettes, because `NMSunna > MVYuzuha` rests on a
   ~21-point elemental L3 edge (82 vs 61) that is absent on neutral bosses. On *every* boss the test
@@ -101,6 +108,22 @@ Complaints closed: Alice (Fiend, Girta), Jane (Fiend), Miyabi (Butcher, Marionet
 (Priest), Starlight Billy, Yidhari (both lines), Yixuan (Fiend), Ellen, Nekomata, Soldier 11,
 Aria/Velina (Discordant Solo), Aria-over-Promeia (Girta, Aberrant), `Miyabi/Vivian/Remielle` placed
 below the top Velina-track teams.
+
+**2026-09-02** — **issues 12 and 13, the Remielle/Velina track.** Two declared L5 relationships,
+each landed with a zero-exception prediction: a **mutual Remielle↔Velina pair** (198 movers, all
+up, single `l5` signature) and a new **conjunctive `synergy.units` form** — a `"+"`-joined group
+that pays only when every named unit is present — declared by Alice as `"Remielle+Velina"` (11
+movers, every one an Alice+Remielle+Velina team). The playtested ladder now holds exactly on both
+element-neutral bosses: Aria > Promeia > Alice > Burnice > Jane, with `Miyabi/Remielle/Vivian`
+below all five. Issue 13 fell out of the same change — `Promeia/Remielle/Velina` is now #1 on
+Scorched Horizon at 596.6 against `Nangong/Aria/Sunna` 557.4. TESTs 116 and 117 pin it.
+Internals §Rj.
+
+Closed with it: Grace/Aberrant (551.9 over 504.1), Burnice/Aberrant (615.5 over 558.4), the
+Miyabi/Vivian/Remielle placement, and Alice's position. Grace needed no declaration of her own —
+the mutual pair alone put her 48 clear. Still open at 0.4: `Miyabi/Remielle/Vivian` 504.8 over
+`Alice/Remielle/Vivian` 504.4 on Fiend, which is a *disorders* comparison (Miyabi's need of 3 pays
++79.1, Alice's need of 2 pays +43.4) and involves no Velina at all.
 
 **2026-09-02** — TEST 101 (Miyabi ladder). A dedicated `NO_SUPPORT` structure tier closed the four
 `Nangong/Miyabi/Vivian` rungs; the ladder was corrected and made boss-conditional for the rest.

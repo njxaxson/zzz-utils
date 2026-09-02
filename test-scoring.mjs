@@ -3516,6 +3516,108 @@ async function main() {
             `CONVENTIONAL (35), got ${exempt}`);
     });
 
+    // ========================================================================
+    // TEST 116: the Remielle/Velina third-slot ladder (owner playtest)
+    // ========================================================================
+    // Owner: "general strongest Rem team is Remielle/Velina with the following thirds in
+    // order: Aria, Promeia, Alice, Burnice, Jane" and "Miyabi/Vivian/Remielle generally not as
+    // good as RV teams with the top 2 options here, likely not better than top 3 and maybe even
+    // top 4". Remielle has two tracks - Velina anchors vortex/abloom, Vivian anchors disorders
+    // - and the engine used to rank the Vivian/Miyabi track above the Velina track for every
+    // carry except Aria and Promeia. See engine-context.md 2 and internals section R.
+    //
+    // What makes this hold is two DECLARED L5 relationships, both deliberate exceptions to
+    // emergent scoring:
+    //   * Remielle <-> Velina, mutual, so the whole Velina track rises together. Velina's value
+    //     IS making Remielle work, and L2 cannot express that - it prices her as a half-tier
+    //     secondary sub-DPS (see issue on the subdps tier discount).
+    //   * Alice declares the CONJUNCTIVE group "Remielle+Velina", which pays only when BOTH are
+    //     present. Alice's partner is the pair, not either unit.
+    //
+    // BOSS-CONDITIONAL, and deliberately asserted narrowly. Elemental L3 legitimately reorders
+    // the lower rungs, exactly as TEST 101 records for the Miyabi ladder:
+    //   * Notorious Pompey is fire-weak, so Burnice jumps the ladder.
+    //   * Scorched Horizon is ice-weak, so Promeia tops Aria - which is what the owner WANTS
+    //     there (Promeia/Remielle/Velina must be #1 on Horizon).
+    //   * Butcher and Marionettes are ice+ether weak, so frost Miyabi outranks the RV teams.
+    // Girtablullu and Stagnant Aberrant are the two anomaly-shill bosses that are effectively
+    // element-neutral to every unit involved, so they are where the ladder is a statement about
+    // the units rather than about the matchup. DO NOT widen this to every boss; it will fail,
+    // and correctly.
+    run('TEST 116: Remielle/Velina third-slot ladder on element-neutral bosses', () => {
+        const LADDER = [
+            'Aria/Remielle/Velina',
+            'Promeia/Remielle/Velina',
+            'Alice/Remielle/Velina',
+            'Burnice/Remielle/Velina',
+            'Jane Doe/Remielle/Velina',
+        ];
+        const NEUTRAL_TO_THESE = ['Girtablullu', 'Aberrant'];
+
+        let checked = 0;
+        for (const bossName of NEUTRAL_TO_THESE) {
+            const bs = withBosses(bosses, bossName);
+            assert(bs.length === 1, `expected exactly one ${bossName}, got ${bs.length}`);
+            const boss = bs[0];
+            const scored = LADDER.map(spec => scoreSpec(spec, boss));
+            if (scored.some(x => x.score <= 0)) continue;
+            checked++;
+
+            for (let i = 1; i < scored.length; i++) {
+                assert(scored[i - 1].score > scored[i].score,
+                    `${boss.name}: ${scored[i - 1].label} (${scored[i - 1].score.toFixed(1)}) must ` +
+                    `outrank ${scored[i].label} (${scored[i].score.toFixed(1)})`);
+            }
+
+            // The Vivian/Miyabi track must sit below the whole Velina track here.
+            const mvr = scoreSpec('Miyabi/Remielle/Vivian', boss);
+            const worstRV = Math.min(...scored.map(x => x.score));
+            assert(mvr.score < worstRV,
+                `${boss.name}: ${mvr.label} (${mvr.score.toFixed(1)}) must sit below every ` +
+                `Remielle/Velina team (worst is ${worstRV.toFixed(1)})`);
+        }
+        assert(checked === 2,
+            `only ${checked} of the 2 element-neutral bosses were live - this test has gone vacuous.`);
+    });
+
+    // ========================================================================
+    // TEST 117: a conjunctive synergy group pays only when the WHOLE group is present
+    // ========================================================================
+    // `synergy.units` entries joined with "+" require every named unit on the team. This is the
+    // mechanism behind Alice's placement in TEST 116, and the gating IS the point: a group that
+    // paid out on a partial match would be indistinguishable from two single-name declarations
+    // and would lift teams the owner never asked to lift.
+    run('TEST 117: conjunctive synergy requires the whole group', () => {
+        const boss = withBosses(bosses, 'Aberrant').find(Boolean);
+        const alice = allUnits.find(u => u.name === 'Alice');
+        assert(alice, 'fixture unit Alice not found');
+        const group = (alice.synergy?.units || []).find(e => typeof e === 'string' && e.includes('+'));
+        assert(group === 'Remielle+Velina',
+            `Alice should declare the conjunctive group "Remielle+Velina", got ${JSON.stringify(group)}`);
+
+        const l5Of = (spec) => {
+            const trace = {};
+            const parsed = scoreForTeamString(spec, allUnits);
+            assert(parsed.length === 1, `fixture ${spec} did not resolve to one team`);
+            scoreTeamForBoss(parsed[0].team, boss, { trace });
+            return trace.l5;
+        };
+
+        // Both present: Alice's 55 plus the Remielle<->Velina mutual pair.
+        const both = l5Of('Alice/Remielle/Velina');
+        assert(both >= 55,
+            `with both group members present Alice's group must pay: L5 was ${both}`);
+
+        // Only ONE member present: the group pays nothing. Neither partial team carries any
+        // other L5 relationship, so these must be exactly 0.
+        const onlyRemielle = l5Of('Alice/Remielle/Vivian');
+        assert(onlyRemielle === 0,
+            `Remielle without Velina must not trigger Alice's group: L5 was ${onlyRemielle}`);
+        const onlyVelina = l5Of('Nangong/Alice/Velina');
+        assert(onlyVelina === 0,
+            `Velina without Remielle must not trigger Alice's group: L5 was ${onlyVelina}`);
+    });
+
     // ------------------------------------------------------------------------
     // Summary
     // ------------------------------------------------------------------------

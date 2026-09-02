@@ -304,10 +304,18 @@ output looks like.
   These are not interchangeable, and the engine prices the two axes through very different channels
   — `disorders` has a dedicated team-wide need computation, while vortex and abloom go through the
   ordinary buff and damage-need channels. Playtested ordering for the Velina track's third slot:
-  **Aria, Promeia, Alice, Burnice, Jane** (the last two close). `Miyabi/Vivian/Remielle` generally
-  sits below the top two or three Velina-track teams. Aria's edge over Promeia here comes from
-  anomaly-buildup specifics that the engine deliberately does **not** model — buildup rate is too
-  granular — so it is expressed as a declared L5 pair instead.
+  **Aria, Promeia, Alice, Burnice, Jane** (the last two close). `Miyabi/Vivian/Remielle` sits below
+  the whole Velina track.
+
+  **Miyabi is one of Remielle's *weakest* natural partners and Velina one of her strongest** — the
+  Miyabi lines survive purely because both units are individually enormous, not because they fit.
+  The engine measures individual power well (L2) and could not see Velina's contribution at all,
+  because Velina's whole value is making Remielle work and L2 prices her as a half-tier secondary
+  sub-DPS. Left alone, that ranked the Miyabi track above the Velina track for every carry except
+  Aria and Promeia. It is corrected by two **declared** L5 relationships — a mutual Remielle↔Velina
+  pair, and Alice's conjunctive `"Remielle+Velina"` group — rather than by modelling buildup
+  cadence. TEST 116 pins the ladder; it is boss-conditional and asserted only on the two
+  element-neutral bosses, because elemental L3 legitimately reorders the lower rungs.
 * **Rupture** — Stunner + Rupture DPS + Lucia or Pan Yinhu. Defense shred is useless here. Dialyn or Norma > Ju Fufu > Astra as the stunner; Norma is strong because she converts sheer buffs into personal ATK.
 * **Totalize (Hugo)** — DPS + double stunner. Hugo converts accumulated stun *time* into damage,
   so a second low-tier stunner beats a good support. He's `onfield: false` — he enters for chains
@@ -358,8 +366,20 @@ This is the contract a human edits by hand. Everything below is read from `units
 * `aliases` — used for CLI fuzzy matching ("S11", "YSG").
 
 `synergy` is largely retired — mechanics express nearly everything now.
-`synergy.units` is a named-pair bonus (L5), currently only the Angels of Delusion trio and a
-couple of one-way entries. `synergy.tags` survives only on Ju Fufu (`["rupture"]`) as a stopgap.
+`synergy.units` is a named-partner bonus (L5) and takes two forms:
+
+* **a bare name** (`"Velina"`) — pays when that unit is on the team. Declared by both sides of a
+  pair, it also earns a mutual bonus, which makes a reciprocal declaration worth far more than a
+  one-way one.
+* **a `"+"`-joined group** (`"Remielle+Velina"`) — a **conjunctive** declaration that pays only
+  when *every* unit named in it is present, and nothing at all on a partial match. For a carry
+  whose real partner is a **pair** rather than a unit: Alice wants Remielle *and* Velina together
+  and neither alone is what makes her work. Worth more than a bare name, because satisfying it
+  costs both remaining slots.
+
+Both are deliberate exceptions to emergent scoring, in the same spirit as `mechanics.archetypes`.
+They exist for relationships whose real cause is too granular to model — Aria's and Alice's edge
+beside Remielle/Velina is anomaly-buildup cadence, which this engine does not simulate. `synergy.tags` survives only on Ju Fufu (`["rupture"]`) as a stopgap.
 `synergy.avoid` is a near-disqualification for anti-synergy that's too awkward to model
 mechanically (hard DQ in strict mode, large penalty in lenient mode) — currently unused.
 

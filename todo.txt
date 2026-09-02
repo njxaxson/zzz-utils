@@ -1,6 +1,6 @@
 Scoring engine issues; documented in detail in scoring-engine-open-issues.md
 
-Consider revisiting anomaly score ceiling calibration by post-facto reducing bottom baseline bonus for top-scoring anomaly DPS teams
+Use raw scores as inputs to generate calibration-bands-per-archetype in order to normalize scores
 
 Consider availability accepting true/false/date
 

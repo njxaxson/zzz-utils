@@ -932,6 +932,81 @@ Also fixed in passing: a leftover `console.log` in `lib/cli.js` that printed
 
 ---
 
+### §Rj. The Remielle/Velina track — the engine could not see an enabler
+
+Owner framing, and it is the whole diagnosis: **Miyabi is one of Remielle's weakest natural
+partners and Velina one of her strongest. The Miyabi lines survive purely because both units are
+individually enormous, not because they fit.** The engine measures individual power well and
+measures "this unit is the reason the carry works" not at all, so it had the ranking inverted for
+every carry except Aria and Promeia.
+
+The arithmetic, on Stagnant Aberrant, is entirely in L2 — L4 is nearly flat across all of these
+teams (123–158 after the soft cap):
+
+| | with Velina | with Miyabi |
+|----|----|----|
+| the carry (Burnice) | T1 → +18 | T1 → **+9** (subdps ×0.5) |
+| the other body | Velina T0 → **+20** (subdps ×0.5) | Miyabi T0 → **+40, +15 titled** |
+| L2 total | 111 | **152** |
+| final | 535.5 | **558.4** |
+
+Two compounding effects. Velina's tier bonus is halved because she is a sub-DPS standing beside
+another anomaly agent; and swapping Miyabi in *demotes the carry* — Burnice's `pseudoRole` is
+`{subdps, when notPresent velina}`, so next to Miyabi she becomes the sub-DPS and her own bonus
+halves too. Miyabi brings +45 more raw quality than Velina, which pays for Burnice's lost 9 and
+still wins by 23.
+
+**The sub-DPS tier halving is a double count**, and it is filed as issue 16 rather than fixed here.
+Velina is T0 *because she is an outstanding sub-DPS* — the tier already prices the role — so
+halving it re-prices her as half of a T0 primary carry, which is not what her T0 means. It was not
+the fix because un-halving lifts Vivian as well (+9 against Velina's +20, so only ~11 net in the
+Velina track's favour), it does nothing for the Alice ordering since every Velina-track team gains
+equally, and its blast radius is every team with a sub-DPS beside a same-type carry. Note the
+separate `isForcedSecondaryDPS` halving is a genuine role-collision charge and is correct; do not
+conflate the two.
+
+**What fixed it: two declared L5 relationships.**
+
+*Remielle ↔ Velina, mutual.* Pays `2 × (15 + 25) = 80` to the whole Velina track at once, which is
+exactly the point — the track rises together because the pair is what all of these teams are built
+on. 198 movers, all up, single `l5` signature, zero prediction exceptions, zero test breakage.
+Worth knowing this was tried once before and rejected: the note on recommendations TEST 43 records
+that it "does not move the recommendation and it lifts Promeia/Remielle/Velina by 80 points in the
+scorer". That was a *pull-engine* verdict, not a scorer one, and the 80 points turned out to be the
+desired effect rather than the objection.
+
+*Alice's conjunctive group.* A new `synergy.units` form: a `"+"`-joined entry
+(`"Remielle+Velina"`) pays `CONJUNCTIVE_SYNERGY_BONUS` only when **every** unit named in it is
+present, and nothing on a partial match. Alice's partner is the *pair*, not either unit, and the
+gating is the point — a group that paid out partially would be indistinguishable from two bare
+names and would lift teams nobody asked to lift. 11 movers, every one an Alice+Remielle+Velina
+team. Implemented as a general mechanism rather than an Alice special case, so the next carry in
+this position needs data only.
+
+Grace needed no declaration of her own — the mutual pair alone put `Grace/Remielle/Velina` 48
+points clear of `Grace/Miyabi/Remielle`, so the conjunctive group the owner originally proposed for
+her was dropped. One fewer exception to emergence.
+
+**Issue 13 fell out of the same change.** `Promeia/Remielle/Velina` is now #1 on Scorched Horizon
+at 596.6 against `Nangong/Aria/Sunna` 557.4 — previously #2 by 32.3. This is the requirement that
+§Rf proved *no uniform L5 value could satisfy* alongside Aria-over-Promeia; declaring the pair
+rather than tuning the constant satisfies both, because it lifts the Velina track without touching
+`Nangong/Aria/Sunna`.
+
+**The ladder is boss-conditional, and TEST 116 asserts it narrowly on purpose.** All five rungs
+hold, with `Miyabi/Remielle/Vivian` below every one of them, on Girtablullu and Stagnant Aberrant —
+the two anomaly-shill bosses that are effectively element-neutral to every unit involved. It breaks
+elsewhere for legitimate reasons, exactly as TEST 101 records for the Miyabi ladder: Notorious
+Pompey is fire-weak so Burnice jumps the ladder; Scorched Horizon is ice-weak so Promeia tops Aria,
+which is what the owner *wants* there; and Butcher and Marionettes are ice+ether weak so frost
+Miyabi outranks the Velina track. Do not widen the test.
+
+**What is still open.** `Miyabi/Remielle/Vivian` 504.8 over `Alice/Remielle/Vivian` 504.4 on
+Miasmic Fiend, by 0.4. That comparison contains no Velina and is not about this track at all — it
+is a disorders comparison, Miyabi's need of 3 paying +79.1 against Alice's need of 2 paying +43.4.
+An earlier suggestion to adjust the physical vortex tier cannot reach it: a vortex requires exactly
+one wind unit and `Alice/Remielle/Vivian` is physical + ether + lumen, so it generates no vortex.
+
 ## Codependency in the scorer (`scaling.codependent`)
 
 Previously honoured only by the pull engine. Now also scales a codependent unit's contributions

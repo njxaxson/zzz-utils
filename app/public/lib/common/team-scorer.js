@@ -310,15 +310,15 @@ const NATURALLY_AVAILABLE_NEEDS = new Set(['ultimates', 'chains']);
 //
 // Feeds BOTH sides of the reception ratio, so a unit with several needs of differing weight is
 // judged on how much of its declared dependence is covered rather than on a headcount.
-// Reads the DECLARED VALUE, not its coerced weight. `w(true)` is 1, but `true` in the data
-// means "this unit depends on this" with no grading — Anton's `scaling['quick-assists']: true`
-// is a real dependency — so grading it as the weakest possible need inverts what the author
-// wrote. Only an explicit number is graded.
+// Reads the COERCED WEIGHT, so `true` behaves as weight 1. That is the data model's own
+// convention — `engine-context.md` §3: `true`/`1` = minor, `2` = strong, `3` = defining — and
+// the contract wins. An interim version special-cased `true` to full severity on the theory
+// that a boolean means "depends on this" without grading; that contradicted the documented
+// scale and is the reason issue 15 existed. If a unit's need is genuinely defining, the data
+// should say `3`, not `true`.
 const NEED_SEVERITY_EXPONENT = 2;
-function needSeverity(declared) {
-    if (declared === true) return 1;
-    if (typeof declared !== 'number') return 1;
-    return Math.min(1, Math.pow(declared / 3, NEED_SEVERITY_EXPONENT));
+function needSeverity(weight) {
+    return Math.min(1, Math.pow(weight / 3, NEED_SEVERITY_EXPONENT));
 }
 // What one quick assist is worth to a unit that does nothing special with it — which is
 // almost everyone. Every unit in the game benefits from a quick assist; most just take the
@@ -4122,10 +4122,35 @@ function scoreMechanicalSynergy(team, debug, options = {}) {
 // LAYER 5: ADDITIONAL SYNERGIES
 // ============================================================================
 
+// A "+"-joined `synergy.units` entry is a CONJUNCTIVE group: it pays only when EVERY unit named
+// in it is on the team, and nothing when only part of the group shows up. It exists for carries
+// whose real partner is a PAIR rather than a unit - Alice wants Remielle *and* Velina together,
+// and neither alone is the thing that makes her work. Worth more than a single-name declaration
+// because satisfying it costs both remaining slots.
+//
+// Deliberately a data declaration rather than an emergent result, like `mechanics.archetypes`
+// and the single-name pairs already are. The alternative was pricing anomaly-buildup cadence,
+// which is far too granular for this engine.
+const CONJUNCTIVE_SYNERGY_BONUS = 55;
+
 function scoreAdditionalSynergies(team, debug) {
     let score = 0;
 
     if (debug) console.log('\n  LAYER 5: ADDITIONAL SYNERGIES');
+
+    // Conjunctive group declarations. Checked before the single-name loop below, which cannot
+    // match a "+"-joined entry (it compares whole strings against one teammate name).
+    for (const unit of team) {
+        for (const entry of (unit.synergy?.units || [])) {
+            if (typeof entry !== 'string' || !entry.includes('+')) continue;
+            const names = entry.split('+').map(n => n.trim()).filter(Boolean);
+            if (names.length < 2) continue;
+            const allPresent = names.every(n => team.some(t => t !== unit && t.name === n));
+            if (!allPresent) continue;
+            score += CONJUNCTIVE_SYNERGY_BONUS;
+            if (debug) console.log(`    ${unit.name} + [${names.join(', ')}]: +${CONJUNCTIVE_SYNERGY_BONUS} (conjunctive group synergy)`);
+        }
+    }
 
     // Unit synergy (currently AoD only)
     for (const unit of team) {
@@ -4229,8 +4254,7 @@ function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs =
             let needsTotal = 0;
             for (const key of NEED_FULFILLMENT_KEYS) {
                 if (NATURALLY_AVAILABLE_NEEDS.has(key)) continue;
-                const declaredNeed = scaling[key];
-                const sw = w(declaredNeed);
+                const sw = w(scaling[key]);
                 if (sw < 1) continue;
                 const selfProvision = Math.max(
                     w(unit.mechanics?.buffs?.[key]),
@@ -4238,7 +4262,7 @@ function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs =
                     w(unit.mechanics?.utility?.[key])
                 );
                 if (selfProvision > 0) continue;
-                const severity = needSeverity(declaredNeed);
+                const severity = needSeverity(sw);
                 needsTotal += severity;
                 // A disorder is a team-wide event on the target, so ANY source satisfies ANY
                 // consumer — this unit's own reaction, two OTHER teammates cycling elements
