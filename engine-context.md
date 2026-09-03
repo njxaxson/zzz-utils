@@ -14,6 +14,8 @@ teams you can build", so they reason over the same mechanics vocabulary the scor
 | Unit data, tiers, mechanics | `app/public/data/units.json` |
 | Boss data | `app/public/data/bosses.json` |
 | Elements / DPS roles | `app/public/lib/common/constants.js` |
+| Archetype calibration (transform) | `lib/calibration.js` (node) · `app/public/lib/common/calibration.js` (browser) |
+| Calibration anchors (generated data) | `app/public/data/calibration.json` |
 
 **This document deliberately contains no tuning constants, thresholds, or formulas.**
 Those live in the code, which is densely commented with its own rationale. What lives here
@@ -1355,6 +1357,43 @@ promoted, on the theory that broad usefulness beats a single narrow fit.
 
 ## 6. Reading Scores
 
+### There are two scales: raw and calibrated
+
+`scoreTeamForBoss` returns a **raw** score and always has. Raw scores are not comparable across
+archetypes: anomaly has more mechanics than attack or rupture, so an anomaly team accumulates more
+scoring events and ceilings far higher — a difference in how much there is to score, not in how
+good the team is. Getting anomaly's *internal* ordering right is what let those totals run.
+
+**Archetype calibration** divides that out. Each archetype gets one multiplier, fitted so that
+every archetype's best teams land near the same ceiling, and it is applied *outside* the engine by
+the tools that put different archetypes on one ladder. The engine is untouched and knows nothing
+about it.
+
+Two consequences worth holding onto:
+
+* **A single multiplier per archetype cannot reorder anything within that archetype.** A per-agent
+  ladder — Alice's best teams, say — is usually one archetype all the way down, so it reads
+  identically on both scales. Calibration only changes an ordering where the ladder *mixes*
+  archetypes.
+* **Boss-matchup signal survives it.** The multiplier is global, not per-boss, so an anomaly team
+  still climbs on an anomaly-shill boss. Per-boss calibration would erase exactly the L3 signal the
+  engine exists to produce, and is not on the table.
+
+Which scale a tool speaks is a deliberate choice per tool, not an accident:
+
+| calibrated — compares archetypes | raw — same-unit or same-archetype only |
+|----|----|
+| `matchups.js`, `deadly-assault.js` | `rankings.js`, `compositions.js` |
+| Deadly Assault allocation and DPS bucketing | every test suite |
+| the web pages and `strength-rating.js` | `pull-engine.js` (never calls the scorer) |
+
+`rankings.js` staying raw is the load-bearing case: it compares variations of the *same* carry, and
+raw is what resolves the fine ordering between them.
+
+Regenerate `calibration.json` (`generate-calibration.mjs`) after any change to the scorer or to the
+unit/boss data, then re-certify (`calibration-check.mjs`) — the anchors are fitted to the corpus
+those inputs produce, so an engine change silently invalidates them. §7.
+
 ### Scores are only comparable WITHIN a boss
 
 A score is a team's fit against **one** matchup, not a portable rating. Different bosses contribute
@@ -1374,12 +1413,19 @@ involved) and the **synthetic neutral** control. An ordering that survives all f
 artifact of shill or of element weakness. Remember that viability differs per boss too — a rung that
 is disqualified on one matchup has to be skipped there, not counted as a failure.
 
-The app's authoritative bands live in `strength-rating.js` (`STRENGTH_TIERS`): **Excellent → Good →
-Fair → Tough → Risky**, descending. A team containing an A-rank DPS is capped at *Good* regardless of score.
+The app's authoritative bands live in `strength-rating.js` (`STRENGTH_TIERS`): **Excellent → Great →
+Good → OK → Tough → Risky → Bad**, descending. A team containing an A-rank DPS is demoted exactly
+one tier from the top band regardless of score.
 
-Interpretively: the top band is a near-optimal matchup; *Good* clears comfortably; *Fair* clears with
-skill; *Tough* is difficult even played well; *Risky* is not viable for endgame content. Thresholds
-shift whenever the engine is retuned — read them from the file, don't memorize them.
+Interpretively: the top band is a near-optimal matchup; *Great* and *Good* clear comfortably; *OK*
+clears with skill; *Tough* is difficult even played well; *Risky* and *Bad* are not viable for
+endgame content.
+
+These cutoffs are on the **calibrated** scale, and they were re-derived there rather than translated
+from the old raw ones — the previous five bands were fitted to a corpus that topped out far higher
+and handed the top label to anomaly teams on the strength of their bigger numbers rather than their
+merit. Thresholds shift whenever the engine is retuned or calibration is regenerated — read them
+from the file, don't memorize them.
 
 **DPS bucketing** (`dps-buckets.js`) sits downstream of scoring. When optimizing three Deadly Assault
 teams, raw top scores cluster around the same DPS with interchangeable supports, so five "options"
@@ -1405,7 +1451,7 @@ enable a subset).
 | `--units` / `--exclude` | `-u` / `-x` | Unit whitelist / blacklist |
 | `--flex` | `-f` | Universal units that may join any team |
 | `--rank` / `--element` | `-R` / `-e` | Filter by rank (S/A) or element |
-| `--score` / `--range` | `-s` / `-r` | Minimum raw score / inclusive raw score range |
+| `--score` / `--range` | `-s` / `-r` | Minimum score / inclusive score range. **Scale is per-script** — calibrated in `matchups.js` and `deadly-assault.js`, raw elsewhere (§6) |
 | `--omit` | `-o` | Suppress headers and context (terse output) |
 | `--flat` |    | Emit teams in condensed form, suitable as a `-t` value |
 | `--query` | `-q` | Share-URL query string for roster/bosses |
@@ -1417,14 +1463,16 @@ enable a subset).
 
 | Script | Purpose |
 |----|----|
-| `matchups.js` | Top teams per boss. The main diagnostic. Adds a synthetic neutral boss for baseline comparison. |
+| `matchups.js` | Top teams per boss. The main diagnostic. Adds a synthetic neutral boss for baseline comparison. Displays **calibrated** score, with raw and the archetype alongside it |
 | `compositions.js` | Pivot of matchups: top teams per *agent*, with the bosses they excel against |
 | `deadly-assault.js` | Three-boss allocation with no unit overlap |
 | `teams.js` | Valid team enumeration (join conditions only, no scoring) |
 | `pull-debug.js` | Runs the pull recommendation engine from the CLI |
 | `pulled.js` / `tiers.js` | Roster by mindscape/weapon; units by tier |
 | `rankings.js` | Per-agent CSV of top teams, **one column per boss that agent cares about** (element-weak, shill match, or explicitly favored). Writes `matchups/<agent>.csv`; no scores, so it diffs as a pure ordering artifact |
-| `score-dump.mjs` | Full-corpus TSV: one row per (boss, team) with the score **and all 13 layer columns**. Corpus is fixed and takes no roster flags on purpose — a baseline you can accidentally narrow is not a baseline |
+| `score-dump.mjs` | Full-corpus TSV: one row per (boss, team) with the raw score, **all 13 layer columns**, and the team's archetype. Corpus is fixed and takes no roster flags on purpose — a baseline you can accidentally narrow is not a baseline |
+| `generate-calibration.mjs` | Regenerates `calibration.json` — the per-archetype anchors. `--check` exits 1 when the committed file no longer matches the engine/data it was fitted to; `-p` writes the preview-corpus file instead |
+| `calibration-check.mjs` | The certification gate. Proves calibration reorders nothing *within* an archetype, and separately reports what it reordered *across* archetypes (`--mix`), the alignment check (`--alignment`), and calibrated ladders (`--top`) |
 | `score-delta.mjs` | Compares two dumps, groups movers by which layer moved, and checks a stated `--predict` (exits 1 when it fails) |
 | `cohesion-fixture.mjs` | The objective function for support fit: owner judgements as ordered pairs and bands, from `cohesion-fixture.json` |
 | `scoring-diff.js` | Diffs two saved *ranking* outputs. **Do not use it to detect whether a change did anything** — it hides shuffles inside tie groups and reports "no material changes" for a change that moved every score in the corpus |
@@ -1565,10 +1613,18 @@ Two mechanics guard this:
   equivalence classes, not raw list indices. Teams scoring within a band of each other share a
   rank. This exists because `priority = maxRank * 100 + rankSum` weights `maxRank` so heavily
   that a single extra rank step outranks *any* total-score advantage — so without banding, a
-  fractional score difference (well inside the engine's calibration precision) could bury a
-  strictly better allocation below a worse one. The band is ratio-based with an absolute floor,
-  so it keeps its meaning as scores drift upward across patches and stays meaningful on
-  low-scoring matchups. Constants live in `team-builder.js`.
+  fractional score difference (well inside the engine's precision) could bury a strictly better
+  allocation below a worse one. The band is ratio-based with an absolute floor, so it keeps its
+  meaning as scores drift upward across patches and stays meaningful on low-scoring matchups.
+  Constants live in `team-builder.js`.
+
+  The band width is **derived from a real allocation, not chosen in the abstract**, and should be
+  re-derived the same way if it ever moves: find the case where the best team on a boss and the
+  best team *without the contended unit* are close enough that giving the unit up ought to be
+  free, and make sure that gap fits inside one band. Widen it past that and genuinely different
+  teams start sharing a rank; narrow it and the solver refuses to release a unit it should.
+  The band operates on the calibrated scale, so regenerating calibration can change what it means
+  — re-check the case, not just the tests.
 * **Scorer parity for genuinely-equal archetypes.** Banding only absorbs *noise*. If two teams
   the game treats as equivalent score tens of points apart, that is a scoring error and no
   allocation tolerance can paper over it — the fix belongs in the scorer. The stunless

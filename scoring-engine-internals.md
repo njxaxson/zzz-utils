@@ -12,6 +12,198 @@ first; each one records reasoning that looked obviously correct and was not.
 Sections are ordered by issue number, then by resolution date. Anything marked **Resolved** is
 kept for the reasoning, not the status.
 
+> **Every score quoted below this line is a RAW score.** Archetype calibration (§C) added a second
+> scale in 2026-09-03, and the tools that compare archetypes against each other now display the
+> calibrated one. The engine itself is unchanged, so the raw numbers in these post-mortems are all
+> still reproducible — but if you compare one against something you read off `matchups.js` today,
+> you are comparing two different scales. §C first.
+
+---
+
+## C. Archetype calibration (2026-09-03)
+
+### C.1 The complaint
+
+On Fiend, three teams the owner plays as near-equivalent scored:
+
+| team | archetype | raw |
+|----|----|----|
+| Aria / Remielle / Velina | anomaly | 671.4 |
+| Dialyn / Yixuan / Lucia | rupture | 554.4 |
+| Dialyn / Ye Shunguong / Sunna | attack | 530.5 |
+
+141 points apart. Anomaly has more mechanics than attack or rupture, so an anomaly team
+accumulates more scoring events; getting anomaly's *internal* ordering right has meant letting
+those totals run. The spread measures mechanic count, not team strength — and Deadly Assault
+allocation, the ladders and the strength labels all compared those numbers directly, so anomaly
+won boss assignments it should not have.
+
+This is issues 3 and 14 from the status doc, which were parked for a year as
+"resolved-by-way-of-future-feature". This is that feature.
+
+**What shipped:** `calibrated = raw × factor[archetype]`, applied at the boundary. The engine
+returns raw and knows nothing about any of this. That is not stylistic — if calibration lived
+inside the scorer, regenerating the anchors from a dump would be a fixed-point problem, because
+the anchors are fitted to scores that the anchors change. It also keeps the ~40 absolute
+thresholds in `test-scoring.mjs` valid.
+
+### C.2 The wrong diagnosis: anchoring on each archetype's global ceiling
+
+The obvious first move — divide each archetype by its own best score — **suppressed anomaly on
+exactly the bosses that favour anomaly.** Eight of seventeen bosses declare `shill: anomaly`, so
+anomaly's ceiling is built mostly from those bosses; dividing by it applies the boss's own
+favouritism as a *penalty* where anomaly should be winning.
+
+The tell came from the owner reading a per-boss table and flagging four results as wrong. Every
+one of them was a `shill: anomaly` boss. Marionettes, the one flagged as looking right, declares
+no shill.
+
+| anchor rule | anomaly anchor | Fiend #1 | butcher | vesper | sweeper | horizon |
+|----|----|----|----|----|----|----|
+| global top-10 | 690.1 | rupture ✗ | 3/0/7 ✗ | 5/5/0 ✗ | 3/7/0 ✗ | 3/1/6 ✗ |
+| excl. `shillIntensity > 3` | 664.6 | rupture ✗ | 4/0/6 | 6/4/0 | 4/6/0 | 3/1/6 ✗ |
+| **excl. any `favored` team** | **633.5** | **anomaly ✓** | 6/0/4 ✓ | 7/3/0 ✓ | 6/4/0 ✓ | 4/1/5 ✓ |
+
+**The rule that works: exclude any team containing one of that boss's `favored` units from anchor
+determination.** It generalises the owner's observation that Miyabi's 713.5 on Bringer is *forced*
+by `shillIntensity: 6` rather than earned. Excluding only `shillIntensity > 3` (Bringer alone,
+183 rows) is not enough — anomaly still loses Fiend. Excluding every favored team is 1,463 rows
+and moves only anomaly's anchor, because every `favored` list happens to sit on an anomaly boss.
+
+Girta and Aberrant stay 10/0/0 anomaly under every rule, correctly: no attack or rupture team is
+viable on either. **Bringer is not a control** — attack has 2,055 viable teams there and rupture
+780. It stays a sweep purely because of the shill fudge.
+
+### C.3 The second wrong diagnosis: "the L4 cap is compounding, so anchor on pre-cap scores"
+
+The concern was real and correctly reasoned. The anchor is a mean of an archetype's top ten
+teams; those are exactly the teams the L4 soft cap bites hardest; so the anchor is measured on
+already-compressed scores, and every uncapped team is then divided by a number that capping
+pushed down. Measured on the favored-excluded top tens:
+
+| archetype | post-cap anchor | pre-cap anchor | distortion |
+|----|----|----|----|
+| anomaly | 633.5 | 671.8 | 3.83% |
+| attack | 514.5 | 521.3 | 1.33% |
+| rupture | 535.1 | 561.9 | 5.02% |
+
+Against a Fiend margin of 2.3%, that is decisive, and it says plainly: anchor on pre-cap scores.
+
+**Doing so made things worse, and in the direction opposite to the argument.** Anomaly's own top
+teams sit deepest in cap territory (`l4raw` up to 268.7), so removing the cap's effect inflates
+anomaly's anchor *more* than attack's or rupture's — which, run back through `factor = T/anchor`,
+*shrinks* anomaly's factor:
+
+| | Fiend #1 | sweeper | vesper |
+|----|----|----|----|
+| post-cap anchors | anomaly ✓ | 6/4 ano-favoured | 7/3 ano-favoured |
+| pre-cap anchors | attack ✗ | 4/6 attack-favoured | 6/4 |
+
+Pre-cap anchoring undoes the favored-exclusion fix on the exact cases it was built for. **Decision:
+keep post-cap anchors.** The compounding is real as an isolated mechanism; "correcting" it here
+means applying the cap's own top-end suppression more heavily to the archetype that already has
+the most of it. Do not revisit this on the distortion table alone — the two tables above have to
+be read together.
+
+The L4 cap itself is untouched, and calibration does not replace it: the cap does within-archetype,
+non-linear work on ~150 anomaly outliers that a per-archetype linear rescale cannot substitute for.
+
+### C.4 The third wrong diagnosis: rupture's mid-range is broken
+
+The linear form leaves this alignment profile (1.000 = the two archetypes agree at that depth):
+
+| quantile | p99.9 | p99 | p95 | p90 | p75 | p50 | p25 | p10 |
+|----|----|----|----|----|----|----|----|----|
+| anomaly ÷ attack | 1.173 | 1.099 | 1.043 | 1.032 | 1.009 | 0.952 | 0.964 | 0.920 |
+| rupture ÷ attack | 1.101 | 1.101 | 1.056 | 1.029 | 0.858 | **0.715** | 0.836 | 0.851 |
+
+A median rupture team rated 28% below a median attack team looks like a serious defect. It is not.
+Pulling the actual teams at each depth shows the two medians are not comparable objects:
+
+| | median team | carries | archetypes |
+|----|----|----|----|
+| attack | Lighter / Ellen / Sigrid (154.3) | 2 | attack + attack |
+| rupture | Koleda / Vivian / Yixuan (105.1) | 2 | **anomaly + rupture** |
+| rupture | Trigger / Yanagi / Banyue (105.4) | 2 | **anomaly + rupture** |
+
+There are only five rupture units, so most "rupture teams" in the corpus have to borrow a second
+carry from another archetype. Rupture's mid-distribution measures mixed teams while attack's
+measures cohesive ones, and the gap is the engine correctly punishing the mixture.
+
+**Owner ruling:** those rupture teams genuinely are worse than the attack teams beside them, and
+the corpus median is not a meaningful object anyway — it ranks every legal team, including ones no
+player would build (`Trigger/Yanagi/Banyue` is strictly dominated by `Trigger/Yanagi/Nicole`, and
+Nicole is a guaranteed starter). **Ship linear. Do not add a per-archetype curve to chase this.**
+
+Surfaced by this work and left open: mixed anomaly/rupture teams exist at all, despite rupture
+being meant to accept one carry. That is an engine question, not a calibration one.
+
+### C.5 The objective function, corrected
+
+The pooled quantile table in §C.4 is the *wrong* thing to tune against. It confounds two problems:
+it pools all bosses together, so anomaly-shill bosses inflate anomaly's own baseline, and below
+about p90 it measures teams nobody would build.
+
+**Use p85 on the synthetic neutral boss instead.** High enough that the teams are pure
+single-archetype and plausible; low enough that it is not just the ceiling being re-measured; and
+no boss shill to confound it.
+
+| | calibrated p85 | example teams at that depth |
+|----|----|----|
+| anomaly | **192.8** | Grace / Miyabi / Caesar · Aria / Burnice / Nicole |
+| attack | **197.6** | Sigrid / Zhao / Astra · Dialyn / Norma / Soldier 11 |
+| rupture | **191.1** | Koleda / Norma / Yidhari · Ju Fufu / Banyue / Nicole |
+
+A 3.7% spread on teams that are recognisably comparable in quality. And the boss-matchup signal
+survives — the same measurement on Fiend, which shills anomaly, gives anomaly 209.8 against attack
+180.0 and rupture 183.9. Anomaly leads by 15% on a boss that favours anomaly. That pair —
+neutral-boss p85 for alignment, shill-boss p85 to confirm matchup signal survives — is what
+`calibration-check.mjs --alignment` reports.
+
+### C.6 Two shapes tried and rejected
+
+**A piecewise curve fitted on the neutral boss.** The neutral boss tops out at 484 for rupture,
+but most interesting scores are higher because boss matchup pushes them there — so the curve has
+to extrapolate exactly where it matters. `Dialyn/Yixuan/Lucia` came out at **931.3** on a 400
+scale, and the per-boss archetype mixes got worse across the board.
+
+**A per-archetype power curve**, `calibrated = T × (raw ÷ anchor)^γ`, fitted so the medians align.
+It fixes anomaly almost perfectly — within 7% at every depth — and breaks rupture, over-rating
+weak rupture teams by 48% at p10. One dial cannot serve both, and §C.4 says the rupture end was
+never the thing to fit.
+
+### C.7 Certification, and why it is worth asserting the obvious
+
+`calibration-check.mjs` asserts that within any one archetype, on any one boss, the calibrated
+ranking is identical to the raw ranking. This is true by construction — multiplying a group by a
+positive constant cannot reorder it — which is exactly what makes it a good trap. It fails on a
+clamp, on a factor that leaked a per-boss term, on rounding applied to the result instead of the
+factor, and on an archetype mislabelled. Current state: **0 inversions across 44 (boss ×
+archetype) groups and 61,423 teams.**
+
+The corollary that surprised the owner and is worth stating plainly: **a per-agent ladder does not
+move under calibration.** Alice's top 15 on Fiend are all anomaly-carried, so all 15 take the same
+factor and the order is untouched, position for position. Calibration only reorders a ladder where
+it *mixes* archetypes — for Alice on Fiend, the first change is at rank 85, where
+`Alice/Harumasa/Yuzuha` (attack, raw 269.8) rises to rank 50. This is why `rankings.js` stays raw.
+
+### C.8 Anchors, and the one that is a guess
+
+| archetype | anchor | factor | n | notes |
+|----|----|----|----|----|
+| anomaly | 633.5 | ×0.631433 | 17,412 | 1,204 favored teams excluded |
+| attack | 514.5 | ×0.777514 | 32,196 | includes the 78 monoshock teams |
+| rupture | 535.1 | ×0.747552 | 11,815 | |
+| armorer | 417.3 | ×0.958635 | 2,317 | **preview corpus only** — Claret is the only armorer |
+
+Anchor = mean of the archetype's global top 10, favored-excluded. Top-10 mean rather than the bare
+max because the file is regenerated after every engine change, and a max anchor lets one team drag
+an entire archetype's scale; the ratios agree to 0.3% either way.
+
+Armorer exists only under `--preview` until Claret releases. `generate-calibration.mjs -p` writes
+a separate `calibration.preview.json` for the diagnostic CLIs; production pages never see preview
+units and always read the released file.
+
 ---
 
 ## Adjudication log

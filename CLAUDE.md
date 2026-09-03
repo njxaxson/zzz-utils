@@ -15,6 +15,8 @@ share one mechanics vocabulary (`app/public/lib/common/team-scorer.js` and
 | `app/public/lib/common/team-builder.js` | Team legality (`join`) |
 | `app/public/data/units.json` | Unit data, tiers, mechanics |
 | `app/public/data/bosses.json` | Boss data |
+| `lib/calibration.js` · `app/public/lib/common/calibration.js` | Archetype calibration transform (node / browser copies) |
+| `app/public/data/calibration.json` | Generated per-archetype anchors — regenerate, don't hand-edit |
 | `*.js` / `*.mjs` at repo root | CLI scripts (`matchups.js`, `compositions.js`, `test-scoring.mjs`, …) |
 | `engine-context.md` | Game-domain knowledge and design intent — see below |
 | `scoring-engine-open-issues.md` | **Short.** What is open, current test status, what to do next |
@@ -70,6 +72,19 @@ The last two are not optional extras. `test-bucketing.mjs` caught a structural c
 inverted a Deadly Assault allocation, and `cohesion-fixture.mjs` is the objective function for
 support fit — a cohesion change that leaves it green is the only kind worth keeping. `test-scoring.mjs`
 exits 0 when its failing set is exactly `KNOWN_RED`, so check the exit code, not the word "failed".
+
+**Then regenerate and re-certify calibration**, because a change to `team-scorer.js`, `units.json`
+or `bosses.json` invalidates the per-archetype anchors those files were fitted to. The suites will
+not catch this — they all assert against raw scores, which is exactly why a stale
+`calibration.json` fails silently and only shows up as wrong-looking ladders:
+
+```bash
+node generate-calibration.mjs        # rewrites app/public/data/calibration.json (add -p for preview)
+node calibration-check.mjs           # must report 0 within-archetype rank inversions
+```
+
+`generate-calibration.mjs --check` exits 1 when the committed file is stale, so it is the cheap
+guard if you only want to know *whether* regeneration is needed.
 
 For a targeted look at one change, use `--debug` on a narrow team/boss set
 before widening (see `engine-context.md` §7 for the full CLI flag reference
