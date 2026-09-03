@@ -1341,6 +1341,50 @@ function carryArchetypes(carry) {
     return DPS_ROLES.filter(r => carry.tags.includes(r));
 }
 
+// MONOSHOCK OVERRIDE. `getPrimaryCarry` picks by tier, so a team built around a quirky attacker
+// that scales off anomaly procs — not a team built around anomaly reactions — can still label
+// `anomaly` whenever its anomaly unit happens to outrank the attacker. That is wrong for
+// calibration: monoshock teams belong on attack's scale, because the attacker is genuinely the
+// hub. Uses the same definition as the monoshock branch of `scoreTeamStructure` (:2760, "Anomaly +
+// Attacker + (Stun|Support)"), but on raw tags rather than activated roles, matching how
+// `carryArchetypes` itself reads tags — self-contained and auditable without depending on
+// `_activatedRoles` having been populated for this call.
+//
+// Measured against the full released corpus: 78 teams meet this definition, all 78 currently
+// label `anomaly`. Teams that merely CONTAIN an anomaly unit and an attack unit without meeting
+// the full predicate (1,103 of them) are ordinary anomaly teams with an attacker along and must
+// NOT be overridden — only 78 of those 1,103 qualify here.
+function isMonoshockTeam(team) {
+    const hasAnomaly = team.some(u => u.tags.includes('anomaly'));
+    const hasRupture = team.some(u => u.tags.includes('rupture'));
+    if (!hasAnomaly || hasRupture) return false;
+    const hasStunOrSupport = team.some(u => u.tags.includes('stun') || u.tags.includes('support'));
+    if (!hasStunOrSupport) return false;
+    return team.some(u => u.tags.includes('attack') && !!(u.mechanics?.scaling || {}).anomaly);
+}
+
+// The team's archetype for CALIBRATION purposes — one of DPS_ROLES, or null when there is no
+// primary carry. This is deliberately separate from `carryArchetypes` (which feeds
+// `scoreArchetypeFit` and must keep reading the carry's own tags unmodified): calibration needs
+// the monoshock override, archetype fit does not, and conflating the two would change what
+// `scoreArchetypeFit` charges a monoshock team's supports for.
+//
+// No unit in the current data carries more than one DPS-role tag, so `carryArchs[0]` is safe;
+// the guard below exists so a future data entry that violates this fails loudly instead of
+// silently picking whichever tag happens to sort first.
+export function getTeamArchetype(team) {
+    const carry = getPrimaryCarry(team);
+    if (!carry) return null;
+    const carryArchs = carryArchetypes(carry);
+    if (carryArchs.length === 0) return null;
+    if (carryArchs.length > 1) {
+        console.warn(`getTeamArchetype: ${carry.name} carries multiple DPS-role tags ` +
+            `(${carryArchs.join(', ')}) — this breaks the calibration archetype assumption.`);
+    }
+    if (carryArchs[0] === 'anomaly' && isMonoshockTeam(team)) return 'attack';
+    return carryArchs[0];
+}
+
 // intended / neutral / avoided. `avoid` wins ties (they should never overlap in the data, but a
 // mismatch is the more important claim). A unit with no annotation is always neutral.
 function getArchetypeFit(unit, carryArchs) {
@@ -4725,6 +4769,7 @@ export function scoreTeamForBoss(team, boss, options = {}) {
         trace.l4 = adjustedL4;
         trace.l5 = l5;
         trace.archetype = archetype;
+        trace.carryArchetype = getTeamArchetype(team);
         trace.raw = rawScore;
         trace.teamwork = teamwork;
         trace.final = score;

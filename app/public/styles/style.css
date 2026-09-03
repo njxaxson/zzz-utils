@@ -2725,10 +2725,12 @@ button#simulate-btn:disabled,
 }
 
 .strength-excellent { color: #00e676; background: rgba(0, 230, 118, 0.12); }
+.strength-great      { color: #64dd17; background: rgba(100, 221, 23, 0.12); }
 .strength-good      { color: #00d4aa; background: rgba(0, 212, 170, 0.12); }
-.strength-fair  { color: #ffca28; background: rgba(255, 202, 40, 0.12); }
+.strength-ok    { color: #ffca28; background: rgba(255, 202, 40, 0.12); }
 .strength-tough { color: #ff9800; background: rgba(255, 152, 0, 0.12); }
 .strength-risky { color: #ff5252; background: rgba(255, 82, 82, 0.12); }
+.strength-bad   { color: #b71c1c; background: rgba(183, 28, 28, 0.12); }
 
 /* Strength label in recommendation rows */
 .recommendation-strength {

@@ -9,12 +9,13 @@ import {
 } from '../common/team-builder.js';
 import { scoreTeamForBoss, getBossWeaknesses, getBossShill, resolveBossVariation } from '../common/team-scorer.js';
 import { createStrengthLabelHtml } from '../common/strength-rating.js';
+import { calibrate } from '../common/calibration.js';
 import {
     decodeBosses, getBossesFromUrl, generateShareUrlWithBosses,
     encodeBossVariations, decodeBossVariations, getBossVariationsFromUrl
 } from '../common/roster-share.js';
 import {
-    initRoster, getUnitStates, getAllUnits,
+    initRoster, getUnitStates, getAllUnits, getCalibration,
     getInitials, getUnitElement, getCharacterImageUrl, getUniversalUnitNames
 } from '../common/roster-ui.js';
 import { isPrimaryDps, unitFingerprint, teamDpsFingerprint } from '../common/dps-buckets.js';
@@ -520,9 +521,26 @@ function runOptimization() {
     }, 50);
 }
 
+// Deadly Assault allocates across 3 bosses at once and compares teams of DIFFERENT archetypes
+// against each other (findExclusiveCombinations' banding, dps-buckets' totalScore sum and
+// perBossFloor cut) — the sharpest cross-archetype comparison in the app. So every `.score`
+// created here is CALIBRATED, not raw. Same helper as the CLI (deadly-assault.js at repo root)
+// and team-recommendations.js. Returns null for a non-viable team.
+function scoreCalibrated(team, boss, scoreOptions, calibration) {
+    const trace = {};
+    const raw = scoreTeamForBoss(team, boss, { ...scoreOptions, trace });
+    if (raw <= 0 || trace.disqualified) return null;
+    return { raw, score: calibrate(raw, trace.carryArchetype, calibration), archetype: trace.carryArchetype };
+}
+
 function calculateOptimalTeams() {
     const availableUnits = getAvailableUnits();
     const universalUnitNames = getUniversalUnitNames();
+    const calibration = getCalibration();
+    if (!calibration) {
+        throw new Error('Calibration data failed to load — refresh the page. If this persists, ' +
+            'calibration.json may be missing (run: node generate-calibration.mjs).');
+    }
     // Resolve selected bosses to their active variations
     const selectedBossObjects = selectedBosses
         .map(id => {
@@ -597,12 +615,12 @@ function calculateOptimalTeams() {
         // First pass: normal scoring
         for (const label of teamLabels) {
             const team = threeCharTeams[label];
-            const score = scoreTeamForBoss(team, boss);
-            
-            if (score > 0) {
-                viableTeamsByBoss[boss.name].push({ label, team, score });
+            const scored = scoreCalibrated(team, boss, {}, calibration);
+
+            if (scored) {
+                viableTeamsByBoss[boss.name].push({ label, team, ...scored });
             } else {
-                disqualifiedTeams.push({ label, score, team });
+                disqualifiedTeams.push({ label, score: 0, team });
             }
         }
         
@@ -624,7 +642,7 @@ function calculateOptimalTeams() {
             const topViable = [...viableTeamsByBoss[boss.name]]
                 .sort((a, b) => b.score - a.score)
                 .slice(0, 5);
-            console.table(topViable.map(t => ({ label: t.label, score: t.score })));
+            console.table(topViable.map(t => ({ label: t.label, score: t.score.toFixed(1), raw: t.raw.toFixed(1), archetype: t.archetype })));
         }
         
         if (disqualifiedTeams.length > 0 && viableTeamsByBoss[boss.name].length === 0) {
@@ -638,10 +656,10 @@ function calculateOptimalTeams() {
             
             for (const label of teamLabels) {
                 const team = threeCharTeams[label];
-                const score = scoreTeamForBoss(team, boss, { lenient: true });
-                
-                if (score > 0) {
-                    viableTeamsByBoss[boss.name].push({ label, team, score, lenient: true });
+                const scored = scoreCalibrated(team, boss, { lenient: true }, calibration);
+
+                if (scored) {
+                    viableTeamsByBoss[boss.name].push({ label, team, ...scored, lenient: true });
                 }
             }
             
@@ -663,8 +681,10 @@ function calculateOptimalTeams() {
         teamLabels,
         threeCharTeams,
         scoreLenient: (team, boss) => {
-            const score = scoreTeamForBoss(team, boss, { lenient: true });
-            return score > 0 ? score : null;
+            // Contract kept as a bare number — matches the CLI's implementation of this same
+            // callback against the same shared solver (deadly-assault-solver.js).
+            const scored = scoreCalibrated(team, boss, { lenient: true }, calibration);
+            return scored ? scored.score : null;
         },
         diverseLimit: DISPLAY_LIMIT,
         log: console.log

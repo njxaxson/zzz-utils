@@ -5,8 +5,9 @@
 
 import { getTeams, sortTeamByRole, getTeamLabel } from '../common/team-builder.js';
 import { scoreTeamForBoss, isDPS, isStun, isSupport, isDefense, getElement, hasSubDPSRole } from '../common/team-scorer.js';
-import { 
-    initRoster, getUnitStates, getAllUnits,
+import { calibrate } from '../common/calibration.js';
+import {
+    initRoster, getUnitStates, getAllUnits, getCalibration,
     getInitials, getUnitElement, getCharacterImageUrl
 } from '../common/roster-ui.js';
 import { ELEMENTS, DPS_ROLES } from '../common/constants.js';
@@ -520,36 +521,42 @@ function clearFilters() {
 
 function buildTeams() {
     hideValidationErrors();
-    
+
     // Get available units
     const availableUnits = getAvailableUnits();
-    
+
     if (availableUnits.length < 3) {
         showValidationErrors(['Need at least 3 units in your roster to build teams.']);
         return;
     }
-    
+
+    const calibration = getCalibration();
+    if (!calibration) {
+        showValidationErrors(['Calibration data failed to load — refresh the page.']);
+        return;
+    }
+
     // Disable button while processing
     const btn = document.getElementById('build-btn');
     btn.disabled = true;
     btn.textContent = 'BUILDING...';
-    
+
     setTimeout(() => {
         try {
             // Generate all valid teams
             const allTeams = getTeams(availableUnits);
-            
+
             // Convert to array and filter to 3-person teams only
             let teams = Object.entries(allTeams)
                 .filter(([label, team]) => team.length === 3)
                 .map(([label, team]) => ({ label, team }));
-            
+
             // Apply user filters first
             teams = applyUserFilters(teams);
-            
+
             // Select best teams using synthetic boss scoring
-            filteredTeams = selectBestTeams(teams, availableUnits);
-            
+            filteredTeams = selectBestTeams(teams, availableUnits, calibration);
+
             // Reset pagination and display
             currentPage = 0;
             displayResults();
@@ -633,9 +640,9 @@ function applyUserFilters(teams) {
 }
 
 
-function selectBestTeams(teams, availableUnits) {
+function selectBestTeams(teams, availableUnits, calibration) {
     if (teams.length === 0) return [];
-    
+
     // Determine available elements and DPS types based on filters and roster
     const availableElements = getAvailableElements(availableUnits);
     const availableDpsTypes = getAvailableDpsTypes(availableUnits);
@@ -650,12 +657,22 @@ function selectBestTeams(teams, availableUnits) {
         favored: [],
         assists: 0
     };
-    
-    // Step 1: Score all teams globally with consistent scoring
+
+    // Step 1: Score all teams globally with consistent scoring. This one `scoredTeams` list
+    // spans every archetype (element x DPS-type grid cell), and while ranking WITHIN a cell is
+    // unaffected by a monotonic per-archetype transform, two places downstream compare ACROSS
+    // archetypes using this same sorted order: the third-pass empty-cell backfill, and step 4's
+    // "pad up to MIN_TEAMS_TO_SHOW" walk, which picks whichever team is next in this list
+    // regardless of archetype. Both need CALIBRATED order, or an archetype with more scoring
+    // events (anomaly) fills empty cells and padding slots ahead of an equally-good team from a
+    // smaller archetype — the same cross-archetype distortion calibration exists to fix
+    // elsewhere. See scoring-engine-open-issues.md.
     const scoredTeams = teams.map(({ label, team }) => {
-        const score = scoreTeamForBoss(team, neutralBoss, { lenient: true });
-        return { label, team, score };
-    }).filter(t => t.score > 0)
+        const trace = {};
+        const raw = scoreTeamForBoss(team, neutralBoss, { lenient: true, trace });
+        const score = raw > 0 ? calibrate(raw, trace.carryArchetype, calibration) : raw;
+        return { label, team, score, raw, archetype: trace.carryArchetype };
+    }).filter(t => t.raw > 0)
       .sort((a, b) => b.score - a.score);
     
     // Step 2: Build grid by finding highest-ranked teams for each archetype

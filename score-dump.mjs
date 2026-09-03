@@ -45,9 +45,13 @@ const NEUTRAL_BOSS = {
     }
 };
 
-// The columns after `score`. Kept in one place because score-delta.mjs reads the header
-// rather than hard-coding them, so adding a layer here needs no change over there.
+// The numeric columns after `score`. Kept in one place because score-delta.mjs reads the
+// header rather than hard-coding them, so adding a layer here needs no change over there.
 const LAYERS = ['base', 'avoid', 'structure', 'fieldTime', 'contention', 'l2', 'l3', 'l4raw', 'l4', 'l5', 'archetype', 'raw', 'teamwork'];
+
+// Non-numeric columns, kept separate from LAYERS so score-delta.mjs's numeric diffing (which
+// auto-derives its layer list from the header) does not have to special-case them.
+const TEXT_COLUMNS = ['carryArchetype'];
 
 function num(v) {
     // 4dp is well below any threshold the engine cares about but enough that a rounding
@@ -78,7 +82,7 @@ async function main() {
 
     process.stdout.write(`# score-dump corpus: ${teamLabels.length} teams x ${corpus.length} bosses` +
         `${INCLUDE_PREVIEW ? ' (preview units included)' : ''}\n`);
-    process.stdout.write(['boss', 'team', 'score', ...LAYERS].join('\t') + '\n');
+    process.stdout.write(['boss', 'team', 'score', ...LAYERS, ...TEXT_COLUMNS].join('\t') + '\n');
 
     // Buffered in chunks — 130k individual stdout writes is measurably slower than
     // assembling and flushing, and this script runs twice per phase.
@@ -93,9 +97,10 @@ async function main() {
                 // Disqualified/non-viable teams are still emitted, so a team that becomes
                 // viable (or stops being) is a visible row change rather than a silent
                 // absence that score-delta would have to guess about.
-                buf.push([bl, label, num(score), ...LAYERS.map(() => '')].join('\t'));
+                buf.push([bl, label, num(score), ...LAYERS.map(() => ''), ...TEXT_COLUMNS.map(() => '')].join('\t'));
             } else {
-                buf.push([bl, label, num(score), ...LAYERS.map(k => num(trace[k]))].join('\t'));
+                buf.push([bl, label, num(score), ...LAYERS.map(k => num(trace[k])),
+                    ...TEXT_COLUMNS.map(k => trace[k] ?? '')].join('\t'));
             }
             if (buf.length >= 4096) { process.stdout.write(buf.join('\n') + '\n'); buf = []; }
         }

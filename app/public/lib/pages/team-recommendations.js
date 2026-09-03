@@ -13,8 +13,9 @@ import {
 import { scoreTeamForBoss } from '../common/team-scorer.js';
 import { isSubdps } from '../common/pull-engine.js';
 import { createStrengthLabelHtml } from '../common/strength-rating.js';
-import { 
-    initRoster, getUnitStates, getAllUnits,
+import { calibrate } from '../common/calibration.js';
+import {
+    initRoster, getUnitStates, getAllUnits, getCalibration,
     getInitials, getUnitElement, getCharacterImageUrl, getUniversalUnitNames
 } from '../common/roster-ui.js';
 import { ELEMENTS, DPS_ROLES } from '../common/constants.js';
@@ -341,11 +342,28 @@ function runRecommendations() {
     }, 50);
 }
 
+// This page ranks teams of every archetype against ONE custom boss, so the ranking/filtering/
+// display score is CALIBRATED — same reasoning as matchups.js and deadly-assault.js. Returns
+// null for a non-viable team so callers can `if (!scored) continue` without a separate raw<=0
+// check.
+function scoreCalibrated(team, boss, scoreOptions, calibration) {
+    const trace = {};
+    const raw = scoreTeamForBoss(team, boss, { ...scoreOptions, trace });
+    if (raw <= 0 || trace.disqualified) return null;
+    return { raw, score: calibrate(raw, trace.carryArchetype, calibration), archetype: trace.carryArchetype };
+}
+
 function calculateRecommendations() {
     const availableUnits = getAvailableUnits();
     const universalUnitNames = getUniversalUnitNames();
     const boss = buildCustomBoss();
-    
+
+    const calibration = getCalibration();
+    if (!calibration) {
+        throw new Error('Calibration data failed to load — refresh the page. If this persists, ' +
+            'calibration.json may be missing (run: node generate-calibration.mjs).');
+    }
+
     console.group('Custom Boss Recommendations');
     console.log('Boss config:', boss);
     console.log('Available units:', availableUnits.length);
@@ -375,36 +393,36 @@ function calculateRecommendations() {
     // Score teams
     let viableTeams = [];
     let usedLenient = false;
-    
+
     for (const label of teamLabels) {
         const team = threeCharTeams[label];
-        const score = scoreTeamForBoss(team, boss);
-        if (score > 0) {
-            viableTeams.push({ label, team, score });
+        const scored = scoreCalibrated(team, boss, {}, calibration);
+        if (scored) {
+            viableTeams.push({ label, team, ...scored });
         }
     }
-    
+
     console.log('Viable teams (strict):', viableTeams.length);
-    
+
     // Fallback to lenient mode
     if (viableTeams.length === 0) {
         console.log('No strict results, trying lenient mode...');
         usedLenient = true;
-        
+
         for (const label of teamLabels) {
             const team = threeCharTeams[label];
-            const score = scoreTeamForBoss(team, boss, { lenient: true });
-            if (score > 0) {
-                viableTeams.push({ label, team, score });
+            const scored = scoreCalibrated(team, boss, { lenient: true }, calibration);
+            if (scored) {
+                viableTeams.push({ label, team, ...scored });
             }
         }
-        
+
         console.log('Viable teams (lenient):', viableTeams.length);
     }
     
     viableTeams.sort((a, b) => b.score - a.score);
     
-    console.log('Top teams:', viableTeams.slice(0, 5).map(t => `${t.label} (${t.score})`));
+    console.log('Top teams:', viableTeams.slice(0, 5).map(t => `${t.label} (${t.score.toFixed(1)}, raw ${t.raw.toFixed(1)}, ${t.archetype ?? 'none'})`));
     console.groupEnd();
     
     return {

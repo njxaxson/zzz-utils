@@ -153,8 +153,19 @@ export function extendTeamsWithUniversalUnits(twoCharTeams, threeCharTeams, univ
 // evict a strictly better allocation from the results entirely. Ratio-based so it keeps
 // its meaning as scores drift upward across patches; the floor keeps it from collapsing
 // to nothing on low-scoring matchups.
-export const RANK_BAND_RATIO = 0.02;
-export const RANK_BAND_FLOOR = 5;
+//
+// Re-derived for the CALIBRATED scale (see lib/calibration.js) from a real case rather than
+// picked in the abstract: on Thrall & Sobek, `Dialyn/Ye Shunguong/Sunna` (409.4) is the #1
+// allocation and `Ye Shunguong/Zhao/Sunna` (405.2) — the best non-Dialyn alternative, freeing
+// Dialyn for a boss that needs her more (e.g. pairing with Yixuan/Lucia) — sits 4.2 points
+// behind. That gap has to fall inside one band, or the solver refuses to give Dialyn up even
+// when the total allocation across all three bosses would be better. 0.011 x 409.4 = 4.50, the
+// smallest ratio that clears 4.2 at this score; 4.5 is the matching floor (was 5, tuned to the
+// old 0.02 ratio) so a low-scoring matchup doesn't get a disproportionately wide band relative
+// to the new ratio. Owner-verified case, not a formula picked in the abstract — if this ever
+// needs re-tuning, re-check this exact Thrall pair, not just TEST 3's shape assertions.
+export const RANK_BAND_RATIO = 0.011;
+export const RANK_BAND_FLOOR = 4.5;
 
 export function rankBandEpsilon(score) {
     return Math.max(Math.abs(score) * RANK_BAND_RATIO, RANK_BAND_FLOOR);

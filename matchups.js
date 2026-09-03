@@ -6,7 +6,7 @@
  */
 
 import { parseArgs } from './lib/cli.js';
-import { loadAllData } from './lib/data.js';
+import { loadAllData, loadCalibration } from './lib/data.js';
 import { applyShareUrl } from './lib/share-url.js';
 import { resolveOptions } from './lib/unit-resolver.js';
 import { buildAvailableUnits } from './lib/roster-builder.js';
@@ -15,6 +15,7 @@ import { buildTeams } from './lib/team-pipeline.js';
 import { parseTeams } from './lib/team-parser.js';
 import { scoreTeamForBoss, getBossWeaknesses, getBossResistances, getBossShill, getBossAnti, getBossAssists } from './app/public/lib/common/team-scorer.js';
 import { rawScorePassesFilter } from './lib/score-filter.js';
+import { calibrate } from './lib/calibration.js';
 
 const options = parseArgs({
     name: 'matchups.js',
@@ -26,13 +27,28 @@ const options = parseArgs({
         '  node matchups.js -m -10                   Personal roster, top 10',
         '  node matchups.js -q "?roster=eJwN..."     From share URL',
         '  node matchups.js -i Miyabi                Teams must include Miyabi',
-        '  node matchups.js -s 500                   Only teams scoring >= 500 vs each boss',
-        '  node matchups.js -r 20 120                Raw scores between 20 and 120 (inclusive)'
+        '  node matchups.js -s 300                   Only teams CALIBRATED >= 300 vs each boss',
+        '  node matchups.js -r 20 120                Calibrated scores between 20 and 120 (inclusive)'
     ].join('\n')
 });
 
+// Scores here compare teams ACROSS archetypes (one ladder per boss, anomaly/attack/rupture
+// mixed together), so -s/-r and every printed number are the CALIBRATED score, not raw — see
+// scoring-engine-open-issues.md and lib/calibration.js. Raw is still shown alongside each team
+// for reference, since raw is what the four-suite verification loop and the engine's own debug
+// output are anchored to.
 async function main() {
     const { units: allUnits, bosses, roster } = await loadAllData();
+    // --preview (-p) can put armorer/Claret teams on the board, and armorer only has an anchor
+    // in calibration.preview.json (the released corpus has zero armorer teams to fit one from —
+    // see generate-calibration.mjs). Match generate-calibration.mjs's own --preview convention
+    // rather than loadAllData()'s default (always the released file).
+    const calibration = await loadCalibration({ preview: options.preview, required: false });
+    if (!calibration) {
+        console.error(`No ${options.preview ? 'calibration.preview.json' : 'calibration.json'} found — ` +
+            `run: node generate-calibration.mjs${options.preview ? ' --preview' : ''}`);
+        process.exit(1);
+    }
     applyShareUrl(options, allUnits);
     resolveOptions(options, allUnits);
 
@@ -119,13 +135,17 @@ async function main() {
                 }
             }
 
-            const score = scoreTeamForBoss(team, boss, { debug: options.debug });
-            if (score > 0 && rawScorePassesFilter(score, options)) {
-                viableTeams.push({ label, team, score });
+            const trace = {};
+            const raw = scoreTeamForBoss(team, boss, { debug: options.debug, trace });
+            if (raw <= 0 || trace.disqualified) continue;
+            const archetype = trace.carryArchetype;
+            const score = calibrate(raw, archetype, calibration);
+            if (rawScorePassesFilter(score, options)) {
+                viableTeams.push({ label, team, score, raw, archetype });
             }
         }
         if(viableTeams.length == 0 && options.omit) continue; //do not display
-        
+
         console.log(boss.name);
         if(!options.omit) console.log(`  Weak: ${weakStr} | Resist: ${resistStr} | Shill: ${shillStr} | Anti: ${antiStr} | Assists: ${getBossAssists(boss)}`);
         viableTeams.sort((a, b) => b.score - a.score);
@@ -144,7 +164,8 @@ async function main() {
             const hasPreview = t.team.some(unit => unit.available === false);
             const rosterIndicator = allInRoster ? '✓' : hasPreview ? '★' : ' ';
             const teamNum = String(currentRank).padStart(2, ' ');
-            console.log(`    #${teamNum}: ${rosterIndicator} ${t.label} (${t.score.toFixed(1)})`);
+            const archStr = t.archetype ?? 'none';
+            console.log(`    #${teamNum}: ${rosterIndicator} ${t.label} (${t.score.toFixed(1)}, raw ${t.raw.toFixed(1)}, ${archStr})`);
         });
 
         console.log();

@@ -6,7 +6,7 @@
  */
 
 import { parseArgs } from './lib/cli.js';
-import { loadAllData } from './lib/data.js';
+import { loadAllData, loadCalibration } from './lib/data.js';
 import { applyShareUrl } from './lib/share-url.js';
 import { resolveOptions } from './lib/unit-resolver.js';
 import { buildAvailableUnits } from './lib/roster-builder.js';
@@ -18,8 +18,25 @@ import { teamsOverlap } from './app/public/lib/common/team-builder.js';
 import { isPrimaryDps, unitFingerprint, getTeamDpsBuckets } from './app/public/lib/common/dps-buckets.js';
 import { solveDeadlyAssault } from './app/public/lib/common/deadly-assault-solver.js';
 import { rawScorePassesFilter } from './lib/score-filter.js';
+import { calibrate } from './lib/calibration.js';
 
 const DISPLAY_LIMIT = 5;
+
+// Deadly Assault allocates across all three bosses at once, and the whole point of the exercise
+// (findExclusiveCombinations' banding, dps-buckets' totalScore sum and perBossFloor cut) is
+// comparing teams of DIFFERENT archetypes against each other — the sharpest cross-archetype
+// comparison in the app. So every score that becomes a `.score` field from here on is
+// CALIBRATED, not raw. -s/-r filter on calibrated too. `raw` is kept alongside for --debug
+// output and is never itself compared across teams.
+//
+// Returns null (not 0) for a non-viable team so callers can `if (!scored) continue/return null`
+// without also having to re-check `raw <= 0` themselves.
+function scoreCalibrated(team, boss, scoreOptions, calibration) {
+    const trace = {};
+    const raw = scoreTeamForBoss(team, boss, { ...scoreOptions, trace });
+    if (raw <= 0 || trace.disqualified) return null;
+    return { raw, score: calibrate(raw, trace.carryArchetype, calibration), archetype: trace.carryArchetype };
+}
 
 // Debug-only: DPS-archetype bucket breakdown per boss.
 function printDpsBucketDiagnostics(boss, viableTeams) {
@@ -50,7 +67,7 @@ const options = parseArgs({
         '  node deadly-assault.js -b defiler,hunter,solo   Another combo',
         '  node deadly-assault.js -m -b butch,ucc,pomp     Personal roster',
         '  node deadly-assault.js -q "?roster=..." -10     Share URL, top 10',
-        '  node deadly-assault.js -b butch,ucc,pomp -s 400 Teams per boss must score >= 400',
+        '  node deadly-assault.js -b butch,ucc,pomp -s 300 Teams per boss must CALIBRATE >= 300',
         '  node deadly-assault.js -b butch,ucc,pomp -d     Debug: top teams, DPS buckets, missing-DPS check'
     ].join('\n')
 });
@@ -58,16 +75,16 @@ const options = parseArgs({
 /**
  * Score explicit teams against bosses and try all C(N,3)*3! arrangements.
  */
-function evaluateExplicitTeams(teamEntries, selectedBossObjects, options) {
+function evaluateExplicitTeams(teamEntries, selectedBossObjects, options, calibration) {
     const bossNames = selectedBossObjects.map(b => b.name);
 
     const scoredByBoss = {};
     for (const boss of selectedBossObjects) {
         scoredByBoss[boss.name] = [];
         for (const { label, team } of teamEntries) {
-            const score = scoreTeamForBoss(team, boss, { debug: options.debug });
-            if (score > 0 && rawScorePassesFilter(score, options)) {
-                scoredByBoss[boss.name].push({ label, team, score });
+            const scored = scoreCalibrated(team, boss, { debug: options.debug }, calibration);
+            if (scored && rawScorePassesFilter(scored.score, options)) {
+                scoredByBoss[boss.name].push({ label, team, ...scored });
             }
         }
         scoredByBoss[boss.name].sort((a, b) => b.score - a.score);
@@ -106,12 +123,14 @@ function evaluateExplicitTeams(teamEntries, selectedBossObjects, options) {
                 const entry = three[teamIdx];
                 const boss = selectedBossObjects[bossIdx];
                 const bossScored = scoredByBoss[boss.name].find(s => s.label === entry.label);
-                const score = bossScored ? bossScored.score : scoreTeamForBoss(entry.team, boss, { debug: options.debug });
+                const scored = bossScored ?? scoreCalibrated(entry.team, boss, { debug: options.debug }, calibration);
                 return {
                     boss: boss.name,
                     team: entry.team,
                     label: entry.label,
-                    score,
+                    score: scored ? scored.score : 0,
+                    raw: scored ? scored.raw : 0,
+                    archetype: scored ? scored.archetype : null,
                     rank: 0,
                     lenient: false
                 };
@@ -136,6 +155,14 @@ function evaluateExplicitTeams(teamEntries, selectedBossObjects, options) {
 
 async function main() {
     const { units: allUnits, bosses, roster } = await loadAllData();
+    // Match generate-calibration.mjs's own --preview convention (armorer/Claret only has an
+    // anchor in the preview file) rather than loadAllData()'s default (always the released one).
+    const calibration = await loadCalibration({ preview: options.preview, required: false });
+    if (!calibration) {
+        console.error(`No ${options.preview ? 'calibration.preview.json' : 'calibration.json'} found — ` +
+            `run: node generate-calibration.mjs${options.preview ? ' --preview' : ''}`);
+        process.exit(1);
+    }
     applyShareUrl(options, allUnits);
     resolveOptions(options, allUnits);
 
@@ -189,7 +216,7 @@ async function main() {
         for (const { label } of parsedTeams) console.log(`  - ${label}`);
         console.log();
 
-        const combinations = evaluateExplicitTeams(parsedTeams, selectedBossObjects, options);
+        const combinations = evaluateExplicitTeams(parsedTeams, selectedBossObjects, options, calibration);
 
         if (combinations.length === 0) {
             console.log('No valid non-overlapping assignments found for the given teams.');
@@ -204,7 +231,7 @@ async function main() {
             console.log(`Combination #${i + 1} (Total: ${combo.totalScore.toFixed(0)})`);
             for (const assignment of combo.assignments) {
                 const shortBoss = assignment.boss.replace("Notorious ", "").substring(0, 20).padEnd(20);
-                console.log(`  ${shortBoss}: ${assignment.label} (${assignment.score})`);
+                console.log(`  ${shortBoss}: ${assignment.label} (${assignment.score.toFixed(1)}, raw ${assignment.raw.toFixed(1)}, ${assignment.archetype ?? 'none'})`);
             }
             console.log();
         }
@@ -268,9 +295,9 @@ async function main() {
 
         for (const label of teamLabels) {
             const team = threeCharTeams[label];
-            const score = scoreTeamForBoss(team, boss, { debug: options.debug });
-            if (score > 0 && rawScorePassesFilter(score, options)) {
-                viableTeamsByBoss[boss.name].push({ label, team, score });
+            const scored = scoreCalibrated(team, boss, { debug: options.debug }, calibration);
+            if (scored && rawScorePassesFilter(scored.score, options)) {
+                viableTeamsByBoss[boss.name].push({ label, team, ...scored });
             }
         }
 
@@ -278,9 +305,9 @@ async function main() {
             lenientBosses.push(boss.name);
             for (const label of teamLabels) {
                 const team = threeCharTeams[label];
-                const score = scoreTeamForBoss(team, boss, { lenient: true, debug: options.debug });
-                if (score > 0 && rawScorePassesFilter(score, options)) {
-                    viableTeamsByBoss[boss.name].push({ label, team, score, lenient: true });
+                const scored = scoreCalibrated(team, boss, { lenient: true, debug: options.debug }, calibration);
+                if (scored && rawScorePassesFilter(scored.score, options)) {
+                    viableTeamsByBoss[boss.name].push({ label, team, ...scored, lenient: true });
                 }
             }
         }
@@ -305,7 +332,7 @@ async function main() {
             console.log(`${boss.name}:`);
             const topTeams = viableTeamsByBoss[boss.name].slice(0, TOP_DISPLAY);
             topTeams.forEach((t, i) => {
-                console.log(`  #${i + 1}: ${t.label} (${t.score.toFixed(1)})`);
+                console.log(`  #${i + 1}: ${t.label} (${t.score.toFixed(1)}, raw ${t.raw.toFixed(1)}, ${t.archetype ?? 'none'})`);
             });
             console.log();
         }
@@ -319,8 +346,11 @@ async function main() {
         teamLabels,
         threeCharTeams,
         scoreLenient: (team, boss) => {
-            const score = scoreTeamForBoss(team, boss, { lenient: true, debug: options.debug });
-            return (score > 0 && rawScorePassesFilter(score, options)) ? score : null;
+            // Contract kept exactly as before (returns a bare number, or null): this callback
+            // is also implemented by the web page against the same shared solver, and changing
+            // the shape here without touching the page would silently break it.
+            const scored = scoreCalibrated(team, boss, { lenient: true, debug: options.debug }, calibration);
+            return (scored && rawScorePassesFilter(scored.score, options)) ? scored.score : null;
         },
         diverseLimit: DISPLAY_LIMIT,
         log: DEBUG ? console.log : () => {}
@@ -362,7 +392,7 @@ async function main() {
 
         for (const assignment of combo.assignments) {
             const shortBoss = assignment.boss.replace("Notorious ", "").substring(0, 20).padEnd(20);
-            console.log(`  ${shortBoss}: [#${assignment.rank}] ${assignment.label} (${assignment.score})`);
+            console.log(`  ${shortBoss}: [#${assignment.rank}] ${assignment.label} (${assignment.score.toFixed(1)})`);
         }
 
         console.log();

@@ -79,9 +79,13 @@ function load(path) {
 const before = load(beforePath);
 const after = load(afterPath);
 
-// Layer columns are read from the header rather than hard-coded, so adding a layer to
-// score-dump.mjs needs no change here.
-const LAYERS = after.header.filter(h => h !== 'boss' && h !== 'team' && h !== 'score');
+// Layer columns are read from the header rather than hard-coded, so adding a NUMERIC layer to
+// score-dump.mjs needs no change here. Non-numeric columns (team-level labels, not per-layer
+// point contributions) are excluded explicitly — parseFloat on a label string is NaN, and NaN
+// comparisons silently never register as "changed", which would hide a real label flip instead
+// of reporting it.
+const TEXT_COLUMNS = new Set(['carryArchetype']);
+const LAYERS = after.header.filter(h => h !== 'boss' && h !== 'team' && h !== 'score' && !TEXT_COLUMNS.has(h));
 
 const n = v => (v === '' || v === undefined ? null : parseFloat(v));
 

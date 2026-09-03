@@ -18,6 +18,7 @@ let allUnits = [];
 let unitStates = {};
 let rosterOpen = true;
 let sharedRosterMode = false;
+let calibration = null;
 
 let _options = {
     containerSelector: '#roster-container',
@@ -44,12 +45,20 @@ let _options = {
 export async function initRoster(opts = {}) {
     _options = { ..._options, ...opts };
 
-    const [unitsResponse, templateResponse] = await Promise.all([
+    const [unitsResponse, templateResponse, calibrationResponse] = await Promise.all([
         fetch('./data/units.json'),
-        fetch('components/roster.html')
+        fetch('components/roster.html'),
+        // Production pages never enable preview units, so this is always the released
+        // calibration set — never calibration.preview.json (that file is CLI/--preview only).
+        fetch('./data/calibration.json')
     ]);
 
     allUnits = await unitsResponse.json();
+    calibration = calibrationResponse.ok ? await calibrationResponse.json() : null;
+    if (!calibration) {
+        console.error('calibration.json failed to load — cross-archetype scores (Deadly Assault, ' +
+            'team recommendations) will be wrong until this is fixed. Run: node generate-calibration.mjs');
+    }
 
     const container = document.querySelector(_options.containerSelector);
     if (!container) {
@@ -80,6 +89,7 @@ export async function initRoster(opts = {}) {
 
 export function getUnitStates() { return unitStates; }
 export function getAllUnits() { return allUnits; }
+export function getCalibration() { return calibration; }
 export function isSharedMode() { return sharedRosterMode; }
 
 export function getOwnedUnits() {
