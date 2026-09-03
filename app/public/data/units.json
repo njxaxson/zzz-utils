@@ -889,7 +889,7 @@
         "tier": 1.5,
         "tags": ["attack", "electric", "assist:defensive"],
         "join": ["stun", "support"],
-        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "synergy": { "units": ["Trigger+Seed"], "tags": [], "avoid": [] },
         "mechanics": {
             "damage": { "aftershock": 2 },
             "buffs": { "aftershock": 3 },
@@ -910,7 +910,7 @@
         "tier": 0.5,
         "tags": ["attack", "electric", "assist:defensive"],
         "join": ["attack"],
-        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "synergy": { "units": ["Trigger+SAnby"], "tags": [], "avoid": [] },
         "mechanics": {
             "damage": { "ultimate:strong": 3 },
             "buffs": { "atk": 3, "cd": 3, "dmg": 2 }

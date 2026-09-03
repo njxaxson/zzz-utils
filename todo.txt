@@ -7,4 +7,9 @@ Consider availability accepting true/false/date
 Some test cases in test-scoring and test-bucketing (and maybe test-recommendations) are UNIT tests, not real scoring or bucketing or recommendation tests. 
 They should be moved into a test-fundamentals.mjs script instead. 
 
-investigate Lighter/Promeia/Burnice on Horizon - scores 380+, probably inflated there; needs diagnosis
+investigate Lighter/Promeia/Burnice on Horizon - scores 380+, probably inflated there; needs diagnosis (banding by archetype will solve)
+
+Reorganize all the disparate tooling and documentation, it's getting insane
+
+
+

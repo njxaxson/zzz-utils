@@ -375,7 +375,10 @@ This is the contract a human edits by hand. Everything below is read from `units
   when *every* unit named in it is present, and nothing at all on a partial match. For a carry
   whose real partner is a **pair** rather than a unit: Alice wants Remielle *and* Velina together
   and neither alone is what makes her work. Worth more than a bare name, because satisfying it
-  costs both remaining slots.
+  costs both remaining slots. Two uses today — Alice's `"Remielle+Velina"`, and the
+  Trigger/SAnby/Seed trio, where SAnby and Seed each name the other two. The second is frankly a
+  stopgap for a shape the engine misclassifies (Seed plays support but is tagged `attack` and
+  declares no `pseudoRole`); see internals §Rk before adding a third.
 
 Both are deliberate exceptions to emergent scoring, in the same spirit as `mechanics.archetypes`.
 They exist for relationships whose real cause is too granular to model — Aria's and Alice's edge
@@ -393,6 +396,25 @@ role baselines (`getEffectiveScaling`, `BASIC_DAMAGE_BY_ROLE`, `resolveBaselineW
 "fill them in" to make a ranking move.
 
 Weights throughout: `true`/`1` = minor, `2` = strong, `3` = defining. (Values above 3 exist where a unit is deliberately off the conventional scale, e.g. Remielle's `atk: 4`.)
+
+**Provision keys and damage keys are separate namespaces, and the block a key sits in decides which
+one it is.** The provision keys are plural, the damage keys singular, and they are related but not
+interchangeable:
+
+| declaration | means |
+|----|----|
+| `utility.chains: 2` | **provision** — "I hand this carry extra chain attacks" (Astra, Norma) |
+| `scaling.chains: 3` | the matching **need** — "I get something beyond the chain's own damage" (Evelyn, Sigrid) |
+| `damage.chain: 2` | the **damage type** this unit deals (Starlight Billy, Evelyn, Norma, Pyrois) |
+| `buffs.chains: 1` | a **buff on that damage** — "I multiply the chains you already throw" (Koleda) |
+
+A buff is therefore *not* a provision, even when it shares the word. Koleda's `buffs.chains` was
+read as provision supply for a while, which paid her a fraction of a `chains` need she cannot
+satisfy while never crediting the buff at all; `PROVISION_KEYS_BUFFED_AS_DAMAGE` now keeps the two
+apart. The engine already drew the same line for `buffs.disorders` (a polarity-damage buff) versus
+`utility.disorders` (forced occurrences). If you add a mechanic in this shape, put the provision in
+`utility` and the multiplier in `buffs`, and expect the singular/plural pair to trip somebody —
+see also the `ablooms`/`abloom` note above `NEED_FULFILLMENT_KEYS`.
 
 | Key | Meaning |
 |----|----|
@@ -1126,6 +1148,13 @@ attack badly — so the value does reach her, just indirectly. Modelling that me
 provisions through an intermediary, which is a lot of machinery for a difference this small.
 Revisit only if this hair genuinely needs splitting.
 
+* **Field hunger** — how much a carry wants the field *to itself*, as distinct from
+  `scaling.greedy`, which is about needing the **stun window** to itself. Banyue is field-hungry
+  without being greedy: an off-field stunner such as Ju Fufu suits her better than an on-field one,
+  which is part of why Ju Fufu edges Dialyn for her on fire-weak Pompey. This is correct output
+  arrived at without the mechanic, and the mechanic is **not going to be added** — owner ruling.
+  Do not reach for `scaling.greedy` to express it; they are different questions.
+
 ### Diametric synergy
 
 When two *different* suppliers contribute through complementary dimensions, the in-game effect is
@@ -1461,6 +1490,20 @@ used to pin four exact totals; it now reads `trace.contention` off
 `scoreTeamForBoss(team, boss, { trace })` and asserts it is zero for greedy-1 teams and negative for
 a dual-greedy one. Sweeping tests should carry an anti-vacuity count (`assert(checked > 50, …)`), and
 comparisons must be **siloed per boss** — never by best-score-across-bosses.
+
+**Compare pairs that differ in exactly ONE unit.** A complaint is usually filed as "team A should
+beat team B", and A and B often differ in two slots — that phrasing is fine for a bug report and
+useless as a test, because a failure cannot tell you which swap caused it. Restate it as a
+single-factor pair before pinning it. TEST 110 was written straight from a complaint reading
+"Jane/Viv/Yuzuha should be better than Nangong/Aria/Jane", which swaps Vivian→Aria *and*
+Yuzuha→Nangong; it became `Jane/Vivian/Yuzuha` against `Nangong/Jane/Vivian`, isolating the
+Yuzuha→Nangong swap that the complaint was actually about.
+
+**Favour correct ORDERING over MARGINS.** Owner's standing position. Where a margin assertion and
+an ordering pull against the same constant, relax the margin and keep the ordering — the margins in
+this suite are almost never calibrated, they are "comfortably ahead" written down as a number. Note
+the reason in the test comment when you move one. TEST 62's Dialyn-over-Koleda margin went 20 → 15
+so that `MULT.CHAINS_BUFF` could reach the value Koleda needed to outrank Pan Yinhu.
 
 `KNOWN_RED` is a `Map<testNumber, reason>` for assertions that encode an ordering the owner believes
 correct but the engine does not yet produce. The suite exits 0 when the failing set is *exactly*

@@ -96,14 +96,16 @@
         "name": "Sacrifice Bringer",
         "shortName": "Sacrifice Bringer",
         "image": "./assets/bosses/bringer.webp",
-        "favored": [],
+        "favored": ["Miyabi"],
         "mechanics": {
             "weaknesses": ["ice"],
             "resistances": ["physical"],
             "shill": "anomaly",
             "anti": [],
             "assists": 0,
-            "freezable": true
+            "freezable": true,
+            "shillIntensity": 6
+
         }
     },
     {
@@ -125,7 +127,7 @@
         "name": "Miasmic Fiend Unfathomable",
         "shortName": "Miasmic Fiend",
         "image": "./assets/bosses/fiend.webp",
-        "favored": [],
+        "favored": ["Alice","Aria"],
         "mechanics": {
             "weaknesses": ["ether", "physical"],
             "resistances": ["fire"],

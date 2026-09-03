@@ -768,8 +768,8 @@ attackers and no subdps among them. Result: 2,171 movers, all down, **0 exceptio
 `Norma/Ellen/Sigrid` 279.9 to 209.9, `Nekomata/Ye Shunguong/Sunna` 300.4 to 212.1,
 `Norma/Evelyn/Soldier 11` 223.8 to 167.9. Closes tracked issue 11.
 
-Casualty: `Trigger/SAnby/Seed`, now `KNOWN_RED` TEST 113. See the parked entry in
-`scoring-engine-open-issues.md` — Seed plays support but declares no `pseudoRole`.
+Casualty: `Trigger/SAnby/Seed`, 338.0 → 238.6. It was `KNOWN_RED` for a day and is now settled
+by declaration — see §Rk.
 
 ### §Rf. Aria's veils — a design gate and a bonus were charged the same
 
@@ -1006,6 +1006,323 @@ Miasmic Fiend, by 0.4. That comparison contains no Velina and is not about this 
 is a disorders comparison, Miyabi's need of 3 paying +79.1 against Alice's need of 2 paying +43.4.
 An earlier suggestion to adjust the physical vortex tier cannot reach it: a vortex requires exactly
 one wind unit and `Alice/Remielle/Vivian` is physical + ether + lumen, so it generates no vortex.
+
+### §Rk. Trigger/SAnby/Seed — settled by declaration, not by inference
+
+The one casualty of §Re, and worth recording because of *how* it was closed rather than what it
+scored.
+
+Seed is tagged `attack` but plays support: `buffs: {atk: 3, cd: 3, dmg: 2}` with `ultimate:strong`
+as her only damage instrument, and SAnby declares `scaling.codependent: true`, so Seed's ATK and CD
+are precisely what SAnby runs on. She is the **only** attack-tagged unit in the roster supplying two
+or more baseline buffs at weight 3 or above, which makes her the sole unit that would qualify under
+the *pseudosupport* arm of the double-attacker rule. She declares no `pseudoRole`, so the engine
+cannot see any of that, and removing the same-element escape took the team 338.0 → 238.6 against a
+floor of 305.
+
+An engine-side screen was measured and rejected in favour of something cheaper. Rather than teach
+`classifyTeamStructure` to infer "this attacker is really a support" from buff supply, **SAnby and
+Seed each declare a conjunctive synergy group** — `"Trigger+Seed"` and `"Trigger+SAnby"` — paying
+55 apiece only when the whole trio is present, and the floor came down 305 → 300. The team reads
+302.1. Owner: "good enough."
+
+State that plainly, because it is the kind of thing that gets misread later as a modelling result:
+
+* It is a **declared carve-out, not an emergent outcome.** The engine still classifies the shape as
+  two attack carries with no interaction; the two L5 groups are the entire reason it clears the
+  floor. Nothing was learned about Seed's role.
+* The margin is **2.1 points**. Treat that floor as a viability statement, not a calibrated number.
+* It uses the conjunctive mechanism built for Alice in §Rj, which is fine — that is why it was
+  built general rather than as an Alice special case — but it is now carrying two unrelated jobs,
+  and a third use should prompt a look at whether the underlying inference is worth doing properly.
+* The principled fixes remain open and unblocked: give Seed a support `pseudoRole`, or infer
+  pseudosupport from buff supply (the discriminator is clean — every attacker in the filed
+  complaints supplies zero baseline buffs, Seed supplies two at weight 3).
+* **Do not** close it instead by restoring the same-element escape. That re-breaks
+  `Norma/Ellen/Sigrid`, `Nekomata/Ye Shunguong/Sunna` and `Norma/Evelyn/Soldier 11`, all of which
+  TEST 114 now pins.
+* [Handwritten note by owner:] The real solution likely involves a team composition carve-out that
+  would uniquely land on Seed. Because Seed mandates that a second attacker be present - her only 
+  join is on attack agents with no alternatives - then she has many compositions where a support 
+  unit just doesn't fit over the stunner. The correct solution is that for any attack/rupture/armorer
+  agent that explicitly and only has a single join on the same role - i.e. Seed is an attack agent who
+  only joins with another attack agent - then they are EXEMPT from the NO_SUPPORT penalty, similar to 
+  the same way a totalize team with two stunners is exempt from the NO_SUPPORT penalty. To be addressed
+  as an engine expansion in a future release; not for now. 
+
+`KNOWN_RED` is empty again as a result. That is the desired end state — a stale entry stops the map
+meaning anything — but the map earned its keep here: it held the disagreement visible for exactly
+as long as the disagreement existed, and the suite kept distinguishing "still broken as expected"
+from "something else changed" throughout.
+
+### §Rl. Koleda's chain buff was priced as a chain provision
+
+Owner-found from a debug trace, and the cleanest bug of the pass: run
+`node matchups -b pompey -t koleda/evelyn/astra -o --debug` and Koleda showed
+`need(chains): 4.2 (covers 33%)` beside Astra's `need(chains): 16.8 (covers 67%)`. Koleda does not
+*provision* chain attacks at all — she buffs them.
+
+The `chains` / `chain` split is two namespaces sharing a word:
+
+| declaration | means | who |
+|----|----|----|
+| `utility.chains` | provision: hands the carry extra chain attacks | Astra 2, Norma 2 |
+| `scaling.chains` | the matching need: gets something beyond the chain's own damage | Evelyn 3, Sigrid 3 |
+| `damage.chain` | the damage type dealt | Starlight Billy 2, Evelyn 3, Norma 3, Pyrois 3 |
+| `buffs.chains` | a buff on that damage | **Koleda 1 — the only one** |
+
+`scoreNeedFulfillment` computed provision supply as `max(buffs[key], debuffs[key], utility[key])`,
+so the buff form was read as a provision. Two consequences, both wrong in the same direction:
+Koleda was paid a fraction of a need she cannot satisfy, and the buff itself was credited nowhere.
+Because she is the only unit declaring `buffs.chains`, she was the only unit affected — which is
+also why it survived this long.
+
+**The fix.** `PROVISION_KEYS_BUFFED_AS_DAMAGE` excludes the buff form from provision supply, and the
+buff is priced in `scoreBaselineAffinity` next to the provision it was being confused with. It is
+rated off the consumer's chain **magnitude**, which is what makes it land on every DPS:
+`getChainMagnitude` returns a 1.0 baseline for an unannotated DPS *because every DPS has a chain
+attack*, rises to 1.3 for Starlight Billy and 1.45 for Evelyn, and returns 0 for an unannotated
+support — so buffing Sunna's chains is correctly worth nothing.
+
+**The rate is the part worth arguing about, so here is the reasoning.** It is `MULT.DAMAGE_TYPE_BUFF`
+(3), the engine's existing rate for "supplier buffs a damage type the consumer deals" — **not**
+`MULT.CHAINS_PROVISION`, which is deliberately **0.4** because gifting one extra chain is a small
+thing. Pricing the buff at the provision rate would have paid Koleda about 0.5 where the bug paid
+her 4.2, i.e. it would have left her *worse* than the bug did. Measured on the neutral boss, the
+buff is worth exactly `1 x getChainMagnitude x 3`:
+
+| Koleda beside | `damage.chain` | magnitude | buff value |
+|----|----|----|----|
+| Yixuan (unannotated DPS) | — | 1.00 | 3.00 |
+| Starlight Billy | 2 | 1.30 | 3.90 |
+| Evelyn | 3 | 1.45 | 4.35 |
+
+Prediction and result: movers are exactly Koleda teams, mostly up — 3,665 rows with an
+`l4raw+l4` signature, **zero exceptions**, plus 10 viability flips that are all Koleda junk teams
+crossing zero (−0.4 → 0.4 and similar). Ten `l5` rows in the same delta were the owner's
+`Trigger+SAnby`/`Trigger+Seed` declarations landing in a baseline that had never been dumped — a
+reminder to re-dump after someone else edits the data, not a fault in the change.
+
+**Measure deltas like this on the NEUTRAL boss.** The L4 element modifier (x1.15 on-element, x0.85
+off) multiplies the pair total, so on a real boss the same three numbers come out scaled and the
+Evelyn/Billy ordering inverts: on The Defiler (physical-weak) Billy reads 4.48 and Evelyn 3.70. That
+is the element modifier, not chains, and it cost a few minutes to see.
+
+**Then the rate was raised, and hit a wall worth recording.** The owner authorised increasing the
+chain buff so Koleda would beat Pan Yinhu for Starlight Billy on The Defiler, on the grounds that
+Koleda is the only chain buffer so the tweak is narrow. It is narrow — and it still cannot get
+there. `MULT.CHAINS_BUFF` became its own constant (rather than borrowing `DAMAGE_TYPE_BUFF`) precisely
+so it could be tuned against an owner ordering, and the sweep says the ordering is unreachable:
+
+| rate | Defiler: Koleda vs Pan 428.3 | TEST 62 `Dialyn > Koleda + 20` | TEST 76 `Roxy > Koleda + 40` |
+|----|----|----|----|
+| 3 | 423.0 no | gap 24.7 ok | gap 48.7 ok |
+| 6 | 426.7 no | 21.3 ok | 44.3 ok |
+| **7** | **428.0 no, short by 0.3** | **20.1 ok, by 0.1** | 42.9 ok |
+| 8 | 429.2 **ok** | 19.0 **no** | 41.4 ok |
+| 10 | 431.5 ok | 16.7 **no** | 38.5 **no** |
+
+Defiler needs 8 or above; TEST 62 needs 7 or below. **Sigrid declares `scaling.chains: 3`**, so she
+is chain-relevant too, and TEST 62 pins *Dialyn beats Koleda by more than 20* for her — the owner's
+own "tier still matters" assertion. Every point this constant gives Koleda beside Billy also gives
+her points beside Sigrid, so the two requirements pull against each other through the same dial.
+
+**Resolved at 8, by relaxing the margin rather than the ordering.** Owner ruling, and it is a
+standing position worth quoting: *favour correct ordering over margins.* TEST 62's
+Dialyn-over-Koleda margin went 20 → 15, the rate went to 8, and the Defiler ladder is now
+Dialyn > Norma > Ju Fufu > Koleda > Pan — all four stunners named in the owner's rule clear Pan.
+
+The reasoning behind the position: 20 was never a calibrated figure. It was "Dialyn is comfortably
+ahead of a low-tier stunner, because tier still matters" written down as a number, and that claim
+is entirely intact at 15. Trading it for a wrong ranking row would have been the worse deal. Sigrid
+declares `scaling.chains: 3`, so she is chain-relevant and her margin moves with the same dial as
+Billy's ordering; there was no rate that satisfied both, so one of them had to give.
+
+**The alternative, if this ever needs revisiting**, is a lever on **Pan's** side rather than
+Koleda's. He wins these comparisons on `sheer: 2` landing against a rupture consumer baseline of 3,
+plus `dmg` and `quick-assists` channels that structurally cannot miss — the same over-supply shape
+§Rb addressed structurally for the other three stunners. That would not touch Sigrid at all. TEST 118 pins the mechanism, including a purity
+check: the buff's value must be chain magnitude and nothing else, asserted as a ratio against
+`getChainMagnitude` so that Evelyn's `scaling.chains` appetite cannot leak back in.
+
+### §Rm. Diagnoses for the two remaining undiagnosed complaints (2026-09-02)
+
+Measured, not fixed. Both need an owner ruling on the mechanism before anything moves, and both
+have a candidate lever named so the ruling has something concrete to accept or reject.
+
+---
+
+#### §Rm.1 Harumasa: Orphie outranks Sunna
+
+**The complaint only manifests with Trigger.** That was not in the original note and it is the
+first useful fact — with Dialyn as the stunner the engine already gets it right:
+
+| stunner | boss | Sunna | Orphie | verdict |
+|----|----|----|----|----|
+| Dialyn | UCC | **335.1** | 329.3 | correct |
+| Dialyn | The Defiler | **361.1** | 355.3 | correct |
+| Trigger | UCC | 337.1 | **344.8** | wrong by 7.7 |
+| Trigger | The Defiler | 348.1 | **355.8** | wrong by 7.7 |
+
+Sunna carries +15 of L2 in every case — she is the better unit and the engine knows it. What
+changes is Orphie's L4: **+9.2 beside Dialyn, +22.7 beside Trigger.**
+
+**The mechanism, straight off the trace.** Orphie declares `buffs.aftershock: 2`. On UCC:
+
+```
+Orphie → Trigger:   need(damage:aftershock): 18.0     <-- the stunner
+Orphie → Harumasa:  need(damage:aftershock):  6.0     <-- the actual carry
+```
+
+Trigger declares `damage.aftershock: 3`, Harumasa only `1`. So **Orphie is paid three times more
+for buffing the stunner's damage than the carry's**, and the whole complaint is that 18. Dialyn
+declares no aftershock at all, which is precisely why Sunna wins there.
+
+**First, what this is NOT.** The owner's first read of the trace was that `need(damage:aftershock)`
+smelled like the Koleda chain bug — a buff being handled as a provision. Checked, and it is not:
+this channel reads `supplierBuffs[damageType]` on the supply side and `consumerDamage[damageType]`
+on the consumer side, so it is a buff landing on a damage type the consumer genuinely deals. No
+`scaling.<type>` is consulted anywhere, and `aftershock` is not in `NEED_FULFILLMENT_KEYS`, so it
+never touches the provision channel at all. Contrast §Rl, where `buffs.chains` really was being read
+as provision supply against `scaling.chains`.
+
+It was **pure mislabelling**, and bad enough to have drawn the same suspicion twice: the constant was
+`MULT.DAMAGE_NEED`, the debug line said `need(damage:...)`, and the comment above it described the
+consumer's damage types as creating "implicit scaling". All three now say buff —
+`MULT.DAMAGE_TYPE_BUFF`, `buff(damage:aftershock): 18.0`, and a comment that states outright this is
+not a need or provision channel. Zero behaviour change; the constant kept its value of 3.
+
+**Why the 18.0 happens.** The damage-type buff channel is
+`buffWeight x consumerDamageWeight x MULT.DAMAGE_TYPE_BUFF` with **no role weighting at all**.
+Compare the generic `atk` buff, which scales by `getBasicDamage(consumer)/3` — a stunner reads 0.67,
+a support 0.00 — precisely so that buffing a non-carry is worth less. Damage-type buffs never got
+that treatment. The asymmetry is the defect; whether Trigger's aftershock deserves *nothing* or
+merely *less* is the owner's call.
+
+**RESOLVED (owner ruling, 2026-09-03): lever 1, and the ORDERING WAS ALREADY RIGHT.** The owner's
+call is worth quoting because it separates the two questions cleanly — *"there is a bug here, but the
+result is correct. Orphie's aftershock buff correctly makes her the better support here because she
+buffs Trigger, who does meaningful damage output. That being said, Trigger's benefit for receiving
+the buff should be scaled to her damage weight (2 instead of the full 3 because she is a stunner,
+not a dps)."*
+
+So Orphie beating Sunna was never the defect; the defect was pricing a stunner's damage share as a
+carry's. The damage-type buff is now multiplied by `getBasicDamage(consumer)/3`, exactly as the
+generic `atk` buff already was — a stunner reads 0.67, a support 0.00, and a declared `damage.basic`
+override still wins so Sunna and Yuzuha read 0.33 rather than 0.
+
+Measured: Orphie → Trigger goes 18.0 → **12.0**, Orphie → Harumasa stays 6.0, and Orphie still wins
+(338.8 vs 337.1 on UCC, 349.8 vs 348.1 on Defiler) — though the margin tightens from 7.7 to 1.7.
+
+Prediction and result: movers are teams pairing a damage-type buff supplier with a consumer whose
+`getBasicDamage` is under 3. The whole surface is six units — Ju Fufu, Lucia, Pulchra, Rina, Trigger,
+Yuzuha — and only two suppliers exist for the keys they declare (Orphie and SAnby, both aftershock);
+Rina's `ultimate:strong` has no supplier at all, and no affected consumer declares laceration or
+abloom. **2,756 movers, zero outside the predicted set.**
+
+Owner's stated concern was that Trigger rankings should not move much. Measured: 896 Trigger rows,
+**mean −4.9, worst −14.5** (`Trigger/Orphie/SAnby`, which stacks two aftershock buffers), and **no
+boss's corpus-wide top-3 changed on Trigger's account.** Because the reduction is near-uniform
+across Trigger-plus-aftershock-buffer teams, their order among themselves is preserved.
+
+One casualty, adjudicated: `Trigger/SAnby/Seed` fell 302.1 → 296.9 because SAnby's
+`buffs.aftershock: 3` on Trigger went 27.0 → 18.0. TEST 113's floor moved 300 → 295. That is the
+third adjustment to that number and the margin was 2.1 before this, which is the standing argument
+that the floor is the wrong instrument there — see §Rk.
+
+---
+
+#### §Rm.2 Miyabi on Sacrifice Bringer: no Miyabi/Promeia line appears
+
+Bringer is **ice-weak, physical-resistant, anomaly-shill**. Miyabi is `ice:frost` and Promeia is
+`ice`, so the owner's expectation is that this base should be excellent there. The engine disagrees:
+Miyabi/Promeia lines score 417–493 against a top twelve that starts at 528.
+
+Best of them is `Miyabi/Promeia/Remielle` at 492.6 — the same team flagged separately under the
+Remielle complaint. Against `Miyabi/Remielle/Vivian` at 581.5:
+
+| | Miyabi/Promeia/Rem | Miyabi/Rem/Vivian |
+|----|----|----|
+| L2 | 149.5 | 152.0 |
+| **L3** | **126.0** | 83.0 |
+| **L4 raw** | **144.8** | 188.7 |
+| L4 after cap | 138.0 | 165.5 |
+| contention | −9.0 | −9.0 |
+| **teamwork** | **0.850** | **1.000** |
+| **final** | **492.6** | **581.5** |
+
+The owner's intuition is confirmed on the axis they were thinking of: **Promeia's line earns +43 of
+L3**, exactly the two-ice-units-on-an-ice-weak-boss bonus. It loses anyway, on two other axes, and
+**both trace to the same single difference between Promeia and Vivian.**
+
+**Difference 1 — structure, worth 15% of the whole score.**
+
+```
+Miyabi/Promeia/Remielle:  UNCONVENTIONAL viable (double anomaly + support, no subdps)  -> 0.85
+Miyabi/Remielle/Vivian:   CONVENTIONAL        (double anomaly + support, has subdps)   -> 1.00
+```
+
+Vivian declares `pseudoRole: ["subdps"]` and Promeia does not, and the double-anomaly branch keys
+its CONVENTIONAL escape on exactly that. Note this *is* current owner doctrine — "most anomaly
+compositions have two anomaly members, ideally with one being a pseudostunner or a subdps" — so the
+question is whether "ideally" should be worth a full 15% when both carries are on-element.
+
+**Difference 2 — disorder supply, worth 42.7 points.**
+
+```
+Miyabi/Promeia/Remielle:  Disorder need: Miyabi +36.4 (supply 2 -> 2.00 effective, need 3, undersupplied x0.87)
+Miyabi/Remielle/Vivian:   Disorder need: Miyabi +79.1 (supply 4 -> 3.77 effective, need 3)
+```
+
+Vivian is `onfield: false`; Promeia is on-field. `getDisorderSupply` **doubles** the per-element
+figure (`DISORDER_PARALLEL_MULT`) unless consumer and contributor are *both* on field, because an
+off-field agent fills its gauge while the carry attacks, so procs land simultaneously. Promeia
+forfeits that doubling purely for being on-field, which drops Miyabi's disorder supply from 4 to 2
+and leaves his `disorders: 3` need undersupplied.
+
+**So Promeia is charged twice for being an on-field primary carry rather than an off-field
+sub-DPS** — once structurally, once through disorder cadence — and the +43 of elemental L3 does not
+cover it.
+
+**RESOLVED (owner, 2026-09-03) in the BOSS DATA, not the engine.** None of the three levers below
+was taken. The owner's report: *"I checked the scoring on Bringer, and it required severe
+adjustments. I added Bringer.favored = Miyabi and shillIntensity = 6 (sheesh) to have the ranks
+properly favor Miyabi alongside the hyperinflated Vel/Rem teams."*
+
+Two things worth keeping from that. The `shillIntensity: 6` is an admission that the fix had to be
+blunt — the field multiplies the favored bonus, and 6 is far above the default of 1. And the phrase
+"alongside the hyperinflated Vel/Rem teams" names the real pressure: the declared Remielle↔Velina
+pair from §Rj lifted that whole track by 80, so anything competing with it on an ice-weak boss needs
+a large counterweight. Issue 14 (top-of-corpus inflation) is parked as resolved-by-future-feature,
+and this is one of the places where the inflation is doing visible work.
+
+The mechanisms below were not wrong, and they are the reason the boss data had to be turned up this
+far. Recorded for whoever revisits:
+
+1. **Accept the mechanisms.** Both are defensible: Miyabi genuinely prefers an off-field partner,
+   and the owner's ice-on-ice expectation was reasoning about L3 while the engine reasons about
+   cadence. This is effectively what happened, with the boss data compensating.
+2. **Soften the no-subdps structure gap for double anomaly** — 0.85 → ~0.92, worth ~+35 to this team.
+   Touches every double-anomaly-no-subdps team, so it needs its own prediction and dump/delta.
+3. **Revisit the parallel-buildup doubling.** Riskiest: load-bearing for the whole Vivian/Miyabi
+   relationship and for issue-5-era disorder work.
+
+Related and worth deciding together: this is the *same* structure tier that issue 16 (the sub-DPS
+tier double count) touches from the other side. If the sub-DPS tier bonus is ever un-halved, Vivian
+gains ~+9 and this gap widens rather than narrows.
+
+**Side effect, and the owner's ruling on it.** The same session added
+`Fiend.favored = ["Alice","Aria"]`, which closed the Remielle-on-Fiend complaint
+(`Alice/Remielle/Vivian` 526.4 over `Miyabi/Remielle/Vivian` 504.8) and also flipped the
+Jane-on-Fiend pair: Aria's +22 lifts the supportless `Nangong/Aria/Jane Doe` to 430.6 over the
+supported `Jane/Vivian/Yuzuha` at 423.9. That was the original Jane complaint, and on review the
+owner **withdrew it** — "NAJ > JVY is very valid. My original complaint was not correct."
+
+Keep the structural lesson anyway, because it is general: **favored is additive and lands
+pre-multiplier, while the no-support demotion is multiplicative.** +22 of favored survives the 0.80
+tier as 17.6, which is more than enough to cover a 6.7-point gap. So boss `favored` and
+`shillIntensity` are strong enough levers to mask a structural verdict — that is by design, and it
+is why they should be changed deliberately rather than reached for to move one row.
 
 ## Codependency in the scorer (`scaling.codependent`)
 
@@ -1811,20 +2128,39 @@ the only disorder-weak boss, so it is one matchup — but it is the last place t
 does this team make" question is answered by a second, disagreeing convention. Note it would move
 Butcher scores, so it wants its own measured pass rather than being folded in.
 
-### Still open: the same collapse affects every other need key
+### CLOSED as a nonissue (2026-09-02): the collapse survives but has nowhere left to bite
 
-Not fixed, and recorded here rather than as its own issue because it is the general form of D2.
-In `scoreNeedFulfillment` the undersupplied branch computes
-`supply x scaling x keyMult x (supply/scaling) x UNDERSUPPLY_FACTOR`, and the `scaling` term
-cancels — so for `veils`, `ablooms`, `quick-assists`, `interrupt-resistance` and `vortex`, every
-undersupplied consumer collects a flat `keyMult x supply^2 x 0.6` regardless of appetite. Lucia's
-`veils:1` earns the same 4.2 from a `veils:2` consumer as from a hypothetical `veils:3` one.
+The arithmetic is still there and is still wrong in principle. In `scoreNeedFulfillment` the
+undersupplied branch initialises `fulfillment = coverage` and then multiplies by
+`UNDERSUPPLY_FACTOR`, giving `supply x scaling x keyMult x (supply/scaling) x 0.6` — the `scaling`
+term cancels, so an undersupplied consumer collects a flat `keyMult x supply^2 x 0.6` regardless of
+appetite.
 
-`ultimates` escaped via `FRACTIONAL_COVERAGE_KEYS` (issue 2) and `disorders` now escapes by being
-priced team-wide against a measured supply. The rest have neither. Issue 2's post-mortem parked
-generalising the shape on the grounds that it would move all 17 remaining undersupplied pairs by
-10–20 points with direct TEST 62 exposure, and that judgement stands — this note exists so the
-gap is on the register rather than rediscovered from the arithmetic a third time.
+**What changed is the surface, not the formula.** When this was written it was reported as affecting
+17 undersupplied pairs across `veils`, `ablooms`, `quick-assists`, `interrupt-resistance` and
+`vortex`, with direct TEST 62 exposure. That figure is now stale — the data moved underneath it.
+Enumerating who actually declares an affected need key today:
+
+| key | declared by | reachable undersupplied? |
+|----|----|----|
+| `veils` | Aria (1), Ye Shunguong (2) | Aria **no** — every veils supplier is weight ≥1. YSG **yes** |
+| `quick-assists` | Anton (1) | **no** — every supplier is ≥1 |
+| `interrupt-resistance` | Banyue (2) | **no** — Caesar, the only supplier, is weight 2 |
+| `ablooms`, `vortex` | **nobody** | n/a |
+
+`ultimates` escapes via `FRACTIONAL_COVERAGE_KEYS` (issue 2); `disorders` escapes by being priced
+team-wide against a measured supply. So exactly **one** pair type remains live: Ye Shunguong's
+`veils: 2` beside a weight-1 veils supplier (Cissia, Lucia, Nangong, Yidhari), measured at
+`need(veils): 4.2 (covers 50%)` where appetite-respecting arithmetic would give 8.4. It makes YSG
+slightly **worse**, not better.
+
+Owner closed it after checking the one affected team across every boss: `Nangong/Ye Shunguong/Astra`
+scores in [225, 285], which is where it belongs. A 4-point under-payment on a single unit does not
+justify touching a formula shared by every need key.
+
+**If you do ever fix it**, the change is one line — do not initialise `fulfillment` from `coverage`
+in the non-fractional branch — and the predicted delta is that one pair type and nothing else.
+Do not re-derive the "17 pairs" objection from this section; it was true of a different roster.
 
 ---
 

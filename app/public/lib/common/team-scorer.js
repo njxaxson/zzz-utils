@@ -24,7 +24,13 @@ const MULT = {
     // Per point by which a unit's `damage.basic` exceeds what its role already implies.
     // Only the excess is paid; see the L2 block that reads it.
     BASIC_DAMAGE_CREDIT: 5,
-    DAMAGE_NEED: 3,
+    // Rate for a supplier BUFFING a damage type the consumer deals — Orphie's
+    // `buffs.aftershock` landing on Trigger's `damage.aftershock`. This is a BUFF channel, not a
+    // provision or need channel: the supplier side reads `buffs`, the consumer side reads `damage`,
+    // and no `scaling.<type>` is involved anywhere. It was called DAMAGE_NEED, and that name plus
+    // the `need(damage:...)` debug label made it read like the provision channel twice over — do
+    // not rename it back.
+    DAMAGE_TYPE_BUFF: 3,
     TOTALIZE_QTY: 5,
     STUN_EMERGENCE: 1.0,
     ELEMENT_BUFF: 2,
@@ -52,6 +58,12 @@ const MULT = {
     // than ULTIMATES_PROVISION because a chain attack is a fraction of an ultimate, and
     // because chains are unlimited rather than one-per-window.
     CHAINS_PROVISION: 0.4,
+    // Rate for a chain-damage BUFF (`buffs.chains`), as opposed to the provision above.
+    // Deliberately its own dial rather than borrowing DAMAGE_TYPE_BUFF: Koleda is the only unit in
+    // the roster that buffs chain attacks, so this constant moves her and nobody else, which is
+    // what makes it safe to tune directly against an owner ordering. See CHAIN buff pricing in
+    // scoreBaselineAffinity and internals §Rl.
+    CHAINS_BUFF: 8,
     STUN_MULT_BUFF: 2,
     TOTALIZE_PENALTY: 38,
     DISORDER_BONUS: 6,
@@ -294,6 +306,9 @@ const POLARITY_VORTEX_DISCOUNT = 0.35;
 // it for something almost no teammate could supply. Reward the upside, do not bill the absence.
 // See engine-context.md, "The ultimates two-channel model", before changing this.
 const NATURALLY_AVAILABLE_NEEDS = new Set(['ultimates', 'chains']);
+// Provision keys whose `buffs.<key>` form means "multiply this damage", NOT "provide this".
+// Only the buff form is redirected; `utility.<key>` and `debuffs.<key>` stay provisions.
+const PROVISION_KEYS_BUFFED_AS_DAMAGE = new Set(['chains']);
 // HOW MUCH AN UNMET NEED COSTS, as a function of the weight the unit declared.
 //
 // `scaling.<key>: N` says how much the unit DEPENDS on that key, and the cohesion charge used
@@ -3626,6 +3641,27 @@ function scoreBaselineAffinity(supplier, consumer, debug, options = {}) {
         }
     }
 
+    // Chain damage BUFF -> any DPS, priced by the consumer's chain MAGNITUDE. Koleda's
+    // `buffs.chains: 1` multiplies the chains a carry already has, so unlike the provision above
+    // it lands on EVERY dps: getChainMagnitude's unannotated baseline is 1.0 because every DPS
+    // has a chain attack, and it rises to 1.45 for a carry whose chains hit hardest (Evelyn,
+    // Norma, Pyrois) and 1.3 for Starlight Billy. It still returns 0 for an unannotated support,
+    // so buffing Sunna's chains is correctly worth nothing.
+    //
+    // Rated at MULT.DAMAGE_TYPE_BUFF, the engine's existing rate for "supplier buffs a damage type
+    // the consumer deals", NOT at MULT.CHAINS_PROVISION. The provision rate is deliberately tiny
+    // (0.4) because gifting one extra chain is a small thing; multiplying every chain the carry
+    // throws is not the same statement, and pricing the buff at the provision rate would have
+    // made Koleda WORSE than the bug did.
+    const chainBuffWeight = w(supplierBuffs.chains);
+    if (chainBuffWeight > 0) {
+        const val = chainBuffWeight * getChainMagnitude(consumer) * MULT.CHAINS_BUFF;
+        if (val > 0) {
+            score += val;
+            dbg('chain-buff', val);
+        }
+    }
+
     return { score, firedCategories };
 }
 
@@ -3654,8 +3690,18 @@ function scoreNeedFulfillment(supplier, consumer, debug, options = {}) {
         // (No unit `converts` or `replaces` disorders, so those branches lose nothing.)
         if (key === 'disorders') continue;
 
+        // A BUFF NAMED AFTER A PROVISION KEY IS NOT A PROVISION. You hand a carry extra chain
+        // attacks through `utility.chains` (Astra, Norma); you multiply the damage of the chains
+        // it already has through `buffs.chains` (Koleda). The two share a word and nothing else.
+        // Reading the buff as a provision paid Koleda a fraction of a `chains` NEED she cannot
+        // satisfy — `need(chains): 4.2 (covers 33%)` beside Evelyn — while never crediting the
+        // buff itself at all. The buff is priced in scoreBaselineAffinity instead; see
+        // CHAIN_BUFF_KEY there. Same distinction the engine already draws for
+        // `buffs.disorders` (a polarity-damage buff) versus `utility.disorders` (forced
+        // occurrences).
+        const buffIsDamageBuff = PROVISION_KEYS_BUFFED_AS_DAMAGE.has(key);
         let supplyWeight = Math.max(
-            w(supplierBuffs[key]),
+            buffIsDamageBuff ? 0 : w(supplierBuffs[key]),
             w(supplierDebuffs[key]),
             w(supplierUtility[key])
         );
@@ -3719,9 +3765,17 @@ function scoreNeedFulfillment(supplier, consumer, debug, options = {}) {
         }
     }
 
-    // Damage-type need fulfillment: consumer's damage types create implicit scaling
-    // for matching supplier buffs (aftershock buff → aftershock dealer, etc.)
-    // Polarity is a subclass of disorders: buffs.disorders also satisfies damage.polarity
+    // DAMAGE-TYPE BUFFS. The supplier buffs a damage type the consumer actually deals:
+    // Orphie's `buffs.aftershock` onto Trigger's `damage.aftershock`, Promeia's `buffs.abloom`
+    // onto Velina's `damage.abloom`.
+    //
+    // THIS IS NOT A NEED OR PROVISION CHANNEL, whatever the old naming suggested. Supplier side
+    // reads `buffs`, consumer side reads `damage`, and no `scaling.<type>` is consulted at all —
+    // these keys are not in NEED_FULFILLMENT_KEYS. Contrast the genuine cross-namespace bug that
+    // `PROVISION_KEYS_BUFFED_AS_DAMAGE` fixes, where `buffs.chains` WAS being read as provision
+    // supply against `scaling.chains`.
+    //
+    // Polarity is a subclass of disorders: buffs.disorders also satisfies damage.polarity.
     const consumerDamage = consumer._resolvedDamage || consumer.mechanics?.damage || {};
     for (const [damageType, damageWeight] of Object.entries(consumerDamage)) {
         const dw = w(damageWeight);
@@ -3744,12 +3798,24 @@ function scoreNeedFulfillment(supplier, consumer, debug, options = {}) {
             }
         }
         if (buffWeight > 0) {
-            let val = buffWeight * dw * MULT.DAMAGE_NEED;
+            // ROLE-WEIGHTED by how much damage the consumer actually deals, the same way the
+            // generic `atk` buff is (`resolveBaselineWeight('atk')` returns `getBasicDamage/3`).
+            // Without it a support was paid the same for buffing a STUNNER's damage type as a
+            // carry's, and paid more when the stunner's annotation happened to be larger: Orphie's
+            // `buffs.aftershock: 2` earned 18.0 on Trigger (`damage.aftershock: 3`) against 6.0 on
+            // Harumasa, the actual carry (`damage.aftershock: 1`). Owner: the benefit should scale
+            // to the consumer's damage weight — a stunner reads 2 rather than a DPS's 3.
+            //
+            // A support reads 0 and so gains nothing here, which is consistent: the `atk` channel
+            // already zeroes Astra for the same reason. A declared `damage.basic` override still
+            // wins, so Sunna and Yuzuha read 0.33 rather than 0.
+            const damageShare = Math.min(1, getBasicDamage(consumer) / 3);
+            let val = buffWeight * dw * MULT.DAMAGE_TYPE_BUFF * damageShare;
             if (damageType === 'polarity' && isVortexBoss(options?.boss)) {
                 val *= POLARITY_VORTEX_DISCOUNT;
             }
             score += val;
-            if (debug) console.log(`        need(damage:${damageType}): ${val.toFixed(1)}${damageType === 'polarity' && isVortexBoss(options?.boss) ? ' (vortex discount)' : ''}`);
+            if (debug) console.log(`        buff(damage:${damageType}): ${val.toFixed(1)}${damageType === 'polarity' && isVortexBoss(options?.boss) ? ' (vortex discount)' : ''}`);
         }
     }
 

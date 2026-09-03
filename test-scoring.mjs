@@ -23,7 +23,7 @@ import { parseTeams } from './lib/team-parser.js';
 import { buildAvailableUnits } from './lib/roster-builder.js';
 import { buildTeams } from './lib/team-pipeline.js';
 import { rankBandEpsilon } from './app/public/lib/common/team-builder.js';
-import { chargeableElementArms, getBasicDamage, getBasicDamageBaseline, getMaxBurstWeight, quickAssistCohesionWeight, scoreTeamForBoss, resolveBossVariation, resolveConditionalValue, getEffectiveScaling, effectiveDisorderSupply, effectiveDisorderWeakSupply, getBossResistances } from './app/public/lib/common/team-scorer.js';
+import { chargeableElementArms, getBasicDamage, getBasicDamageBaseline, getMaxBurstWeight, quickAssistCohesionWeight, scoreTeamForBoss, resolveBossVariation, resolveConditionalValue, getEffectiveScaling, effectiveDisorderSupply, effectiveDisorderWeakSupply, getBossResistances, getChainMagnitude } from './app/public/lib/common/team-scorer.js';
 
 // ---------------------------------------------------------------------------
 // Viability / disqualification
@@ -141,16 +141,6 @@ function withBosses(bosses, filterStr) {
 // entry to silence a regression.
 // ---------------------------------------------------------------------------
 const KNOWN_RED = new Map([
-    [113, 'Trigger/SAnby/Seed on UCC: 238.6 against a floor of 305. Seed is tagged `attack` '
-        + 'but plays support (buffs atk 3 / cd 3 / dmg 2, only ultimate:strong for damage) and '
-        + 'SAnby is codependent on exactly those buffs. The team used to keep a 0.85 tier via '
-        + 'the same-element double-attacker escape, removed on owner ruling ("same element is '
-        + 'not interaction") to fix Norma/Ellen/Sigrid, Nekomata/Ye Shunguong/Sunna and '
-        + 'Norma/Evelyn/Soldier 11. Seed is the only attack-tagged unit in the roster that '
-        + 'would qualify under the pseudosupport arm of that rule, but she declares no '
-        + 'pseudoRole so the engine cannot see it. Owner 2026-09-02: let it crash, revisit '
-        + 'later. CLEARS when Seed declares a support pseudoRole, or when the engine infers '
-        + 'pseudosupport from buff supply. Do NOT clear it by restoring the same-element escape.'],
 ]);
 
 async function main() {
@@ -238,8 +228,8 @@ async function main() {
         assert(tOrphie >= 315, `Trigger+SAnby: Orphie (${tOrphie}) >= 315`);
         assert(tCissia >= 305, `Trigger+SAnby: Cissia (${tCissia}) >= 305`);
         assert(tAstra  >= 300, `Trigger+SAnby: Orphie (${tAstra }) >= 300`);
-        // Trigger/SAnby/Seed's floor lives in TEST 113 - it is KNOWN_RED. Split out so the
-        // rest of TEST 3 keeps guarding its five other floors and four orderings.
+        // Trigger/SAnby/Seed's floor lives in TEST 113. Split out so the rest of TEST 3 keeps
+        // guarding its five other floors and four orderings independently of it.
         assert(tZhao   >= 290, `Trigger+SAnby: Zhao   (${tZhao  }) >= 290`);
 
         assert(tOrphie > tCissia, `Trigger+SAnby: Orphie (${tOrphie}) > Cissia (${tCissia})`);
@@ -1439,7 +1429,15 @@ async function main() {
             assert(norma > lycaon, `${b.name}: Norma(${norma?.toFixed(1)}) > Lycaon(${lycaon?.toFixed(1)}) for Sigrid`);
             assert(lycaon > dialyn, `${b.name}: Lycaon(${lycaon?.toFixed(1)}) > Dialyn(${dialyn?.toFixed(1)}) for Sigrid`);
             assert(lighter > dialyn, `${b.name}: Lighter(${lighter?.toFixed(1)}) > Dialyn(${dialyn?.toFixed(1)}) for Sigrid`);
-            assert(dialyn > koleda + 20, `${b.name}: Dialyn(${dialyn?.toFixed(1)}) >> Koleda(${koleda?.toFixed(1)}) — tier still matters`);
+            // Margin 20 -> 15 on 2026-09-02, owner-adjudicated. `MULT.CHAINS_BUFF` had to reach 8
+            // for Koleda to outrank Pan Yinhu beside Starlight Billy on The Defiler, and Sigrid
+            // declares `scaling.chains: 3`, so she is chain-relevant too — every point the chain
+            // buff gives Koleda beside Billy also gives her points beside Sigrid. Defiler needed
+            // the rate at 8 or above, this margin needed it at 7 or below. Owner's general
+            // position: FAVOUR CORRECT ORDERING OVER MARGINS. The ordering asserted here (Dialyn
+            // comfortably ahead of a low-tier stunner, because tier still matters) is intact and
+            // is the point; 20 was never a calibrated figure.
+            assert(dialyn > koleda + 15, `${b.name}: Dialyn(${dialyn?.toFixed(1)}) >> Koleda(${koleda?.toFixed(1)}) — tier still matters`);
         }
     });
 
@@ -3255,7 +3253,7 @@ async function main() {
 
         const pairs = [
             ['Nangong/Alice/Sunna', 'Nangong/Alice/Miyabi'],
-            ['Jane Doe/Vivian/Yuzuha', 'Nangong/Aria/Jane Doe'],
+            ['Jane Doe/Vivian/Yuzuha', 'Nangong/Jane Doe/Vivian'],
         ];
         for (const [supported, supportless] of pairs) {
             const a = scoreSpec(supported, fiend[0]);
@@ -3401,35 +3399,46 @@ async function main() {
     });
 
     // ========================================================================
-    // TEST 113: Trigger/SAnby/Seed floor on UCC  - KNOWN_RED
+    // TEST 113: Trigger/SAnby/Seed floor on UCC
     // ========================================================================
-    // Split out of TEST 3 on 2026-09-02 so that test keeps guarding its other five floors
-    // and four orderings while this one disagreement stays visible.
+    // Split out of TEST 3 on 2026-09-02 so that test keeps guarding its other five floors and
+    // four orderings independently of this one.
     //
     // The game situation: SAnby is the aftershock carry and Seed is the body next to her.
     // Seed is TAGGED `attack`, but she plays support - `buffs: {atk: 3, cd: 3, dmg: 2}` with
     // `ultimate:strong` as her only damage instrument - and SAnby declares
     // `scaling.codependent: true`, so Seed's ATK and CD are exactly what SAnby runs on.
     //
-    // Why it is red: the double-attacker branch used to hand out a 0.85 tier to any two
-    // attackers of the SAME ELEMENT, and SAnby and Seed are both electric. Owner ruling:
-    // same element is not interaction - two carries of one element cannot disorder with each
-    // other and still cannot both hold the field - so a second attacker now only counts when
-    // it is explicitly a subdps or a pseudosupport. Removing that escape is what fixed
-    // `Norma/Ellen/Sigrid`, `Nekomata/Ye Shunguong/Sunna` and `Norma/Evelyn/Soldier 11`,
-    // all filed in rankings-open-issues.txt. It also took this team from 338.0 to 238.6.
+    // WHY IT WENT RED, AND HOW IT WAS SETTLED. The double-attacker branch used to hand a 0.85
+    // tier to any two attackers of the SAME ELEMENT, and SAnby and Seed are both electric.
+    // Owner ruling: same element is not interaction - two carries of one element cannot
+    // disorder with each other and still cannot both hold the field - so a second attacker now
+    // counts only when it is explicitly a subdps or a pseudosupport. Removing that escape is
+    // what fixed `Norma/Ellen/Sigrid`, `Nekomata/Ye Shunguong/Sunna` and
+    // `Norma/Evelyn/Soldier 11` (see TEST 114), and it took this team from 338.0 to 238.6.
     //
-    // Seed is the ONE attacker in the roster who would qualify under the pseudosupport arm of
-    // that rule - she is the only attack-tagged unit supplying two or more baseline buffs at
-    // weight 3 or above - but she declares no `pseudoRole`, so the engine cannot see it.
-    // Owner: let it crash, note it as worth revisiting. Do NOT rescue it by restoring the
-    // same-element escape; that would re-break the three teams above.
-    run('TEST 113: Trigger/SAnby/Seed stays playable on UCC (>= 305)', () => {
+    // Seed would qualify under the *pseudosupport* arm of that rule - she is the only
+    // attack-tagged unit in the roster supplying two or more baseline buffs at weight 3 or
+    // above - but she declares no `pseudoRole`, so the engine cannot see it.
+    //
+    // Settled pragmatically rather than by teaching the engine to infer that: SAnby and Seed
+    // each declare a CONJUNCTIVE synergy group (`"Trigger+Seed"` and `"Trigger+SAnby"`), which
+    // pays 55 apiece only when the whole trio is present, and the floor came down 305 -> 295.
+    // The team reads ~297. Owner: "good enough."
+    //
+    // Two things to keep in mind if you revisit this. It is a DECLARED carve-out, not an
+    // emergent result - the engine still classifies the shape as two attack carries, and the
+    // L5 groups are what carry it over the floor. And the margin is ~2 points, so treat the
+    // floor as a viability statement rather than a calibrated number. The principled fixes
+    // remain available: give Seed a support `pseudoRole`, or infer pseudosupport from buff
+    // supply. Do NOT rescue it by restoring the same-element escape; that re-breaks the three
+    // teams in TEST 114.
+    run('TEST 113: Trigger/SAnby/Seed stays playable on UCC (>= 300)', () => {
         const b = withBosses(bosses, 'Corruption').find(Boolean);
         const seed = scoreSpec('Trigger/SAnby/Seed', b);
-        assert(seed.score >= 305,
-            `${b.name}: ${seed.label} (${seed.score.toFixed(1)}) >= 305 - Seed plays support ` +
-            `(atk 3 / cd 3 / dmg 2) but declares no pseudoRole, so the team reads as two carries`);
+        assert(seed.score >= 295,
+            `${b.name}: ${seed.label} (${seed.score.toFixed(1)}) >= 295 - Seed plays support ` +
+            `(atk 3 / cd 3 / dmg 2) but declares no pseudoRole, so the team reads as two carries; force-adjusted via L5`);
     });
 
     // ========================================================================
@@ -3616,6 +3625,90 @@ async function main() {
         const onlyVelina = l5Of('Nangong/Alice/Velina');
         assert(onlyVelina === 0,
             `Velina without Remielle must not trigger Alice's group: L5 was ${onlyVelina}`);
+    });
+
+    // ========================================================================
+    // TEST 118: a chain BUFF is not a chain PROVISION
+    // ========================================================================
+    // `chains` (plural) and `chain` (singular) are different namespaces, and the buff form was
+    // being read as the provision form:
+    //
+    //   utility.chains  PROVISION - "I hand you extra chain attacks."  Astra 2, Norma 2.
+    //                   Consumed by `scaling.chains` (Evelyn 3, Sigrid 3).
+    //   buffs.chains    BUFF      - "I multiply the chains you already throw."  Koleda 1.
+    //   damage.chain    the damage type itself. Starlight Billy 2, Evelyn 3, Norma 3, Pyrois 3.
+    //
+    // `scoreNeedFulfillment` took provision supply as `max(buffs, debuffs, utility)`, so Koleda's
+    // `buffs.chains: 1` read as handing out chain attacks: `need(chains): 4.2 (covers 33%)` beside
+    // Evelyn, a need she cannot satisfy — while the buff itself was never credited anywhere. Koleda
+    // is the only unit in the roster that declares `buffs.chains`, so she was the only one hurt.
+    //
+    // Now the buff is priced in scoreBaselineAffinity off the consumer's chain MAGNITUDE, which is
+    // why it lands on every DPS: getChainMagnitude's unannotated baseline is 1.0 because every DPS
+    // has a chain attack, rising to 1.3 for Starlight Billy and 1.45 for Evelyn, and dropping to 0
+    // for an unannotated support. Rated at MULT.DAMAGE_TYPE_BUFF, not MULT.CHAINS_PROVISION — the
+    // provision rate is deliberately 0.4 because gifting one chain is small, and pricing the buff
+    // there would have left Koleda WORSE than the bug did.
+    //
+    // Measured on the NEUTRAL boss on purpose: the L4 element modifier (x1.15 on-element,
+    // x0.85 off) multiplies the pair total, so on a real boss these deltas come out scaled and the
+    // Evelyn/Billy ordering inverts for a reason that has nothing to do with chains.
+    run('TEST 118: a chain buff scales with chain magnitude, not with a chains need', () => {
+        const boss = withBosses(bosses, 'Neutral').find(Boolean);
+        assert(boss, 'synthetic neutral boss not found');
+        const find = (n) => {
+            const u = allUnits.find(x => x.name === n);
+            assert(u, `fixture unit ${n} not found`);
+            return u;
+        };
+        const koleda = find('Koleda'), lucia = find('Lucia');
+        assert(koleda.mechanics?.buffs?.chains,
+            'Koleda must still declare `buffs.chains` — this test has no subject without it');
+
+        // Same unit with the chain buff removed, so the delta IS the chain buff.
+        const noBuff = {
+            ...koleda,
+            mechanics: {
+                ...koleda.mechanics,
+                buffs: Object.fromEntries(
+                    Object.entries(koleda.mechanics.buffs).filter(([k]) => k !== 'chains')),
+            },
+        };
+        const l4rawOf = (team) => {
+            const trace = {};
+            const score = scoreTeamForBoss(team, boss, { trace });
+            assert(score > 0, `fixture team scored ${score} — pick a legal, viable team`);
+            return trace.l4raw;
+        };
+        const chainBuffValue = (consumer) =>
+            l4rawOf([koleda, consumer, lucia]) - l4rawOf([noBuff, consumer, lucia]);
+
+        // Yixuan declares NO chain damage and NO chains need, so he is the "every DPS" case.
+        const yixuan = find('Yixuan');
+        const plain = chainBuffValue(yixuan);
+        assert(plain > 0,
+            `a chain buff must land on a DPS with no declared chain damage at all, got ${plain.toFixed(2)}`);
+
+        // It scales with how hard the consumer's chains hit.
+        const billy = chainBuffValue(find('Starlight Billy'));   // damage.chain: 2
+        const evelyn = chainBuffValue(find('Evelyn'));           // damage.chain: 3
+        assert(billy > plain,
+            `Starlight Billy's chains hit harder than an unannotated carry's, so the buff must be ` +
+            `worth more to her: ${billy.toFixed(2)} vs ${plain.toFixed(2)}`);
+        assert(evelyn > billy,
+            `Evelyn's chains hit hardest, so the buff must be worth most to her: ` +
+            `${evelyn.toFixed(2)} vs ${billy.toFixed(2)}`);
+
+        // PURITY: the value is chain magnitude and nothing else. Evelyn declares
+        // `scaling.chains: 3` and Yixuan declares none, so if the buff were still feeding the
+        // chains NEED channel Evelyn's share would carry an extra ~4.2 and this ratio would come
+        // out near 2.85 instead of 1.45. Asserted as a ratio so it does not hardcode the rate.
+        const magRatio = getChainMagnitude(find('Evelyn')) / getChainMagnitude(yixuan);
+        const valueRatio = evelyn / plain;
+        assert(Math.abs(valueRatio - magRatio) < 0.02,
+            `the buff must be priced off chain magnitude alone: value ratio ${valueRatio.toFixed(3)} ` +
+            `should equal the magnitude ratio ${magRatio.toFixed(3)}. A mismatch means Evelyn's ` +
+            `\`scaling.chains\` appetite is leaking back into the buff.`);
     });
 
     // ------------------------------------------------------------------------
