@@ -879,14 +879,7 @@ await runTest(46, 'Electric DPS coverage improves when Claret is added to roster
 // entry is stale — remove it) or any other test fails. Every entry needs a reason. Never add
 // one to silence a regression.
 // ---------------------------------------------------------------------------
-const KNOWN_RED = new Map([
-    [43, 'The pull engine cannot tell a Remielle roster WITH Velina from one without. It never ' +
-         'calls scoreTeamForBoss — it reasons about scaling keys, role coverage and codependency, ' +
-         'none of which Velina changes on an already anomaly-heavy roster. Annotating ' +
-         'synergy.units on the pair was tried and rejected: it does not move the recommendation ' +
-         'and it lifts Promeia/Remielle/Velina by 80 points in the scorer. Closing this needs the ' +
-         'pull engine to consider partner QUALITY, which is a feature, not a fix.'],
-]);
+const KNOWN_RED = new Map([]);
 
 const failedNums = new Set(failures);
 const stale = [...KNOWN_RED.keys()].filter(n => ranTests.has(n) && !failedNums.has(n));

@@ -24,9 +24,17 @@ const NATURALLY_AVAILABLE_KEYS = new Set(['chains', 'ultimates']);
 const FOUNDATIONAL_STAT_KEYS = new Set([
     'cr', 'cd', 'atk', 'pen', 'hp', 'def', 'ap', 'am'
 ]);
+// `greedy` describes the unit itself — it wants the stun window to itself — so no teammate
+// can ever supply it. Left in the provider walk it produced the nameless sentence
+// "Needs  to reach full potential" on every Remielle card.
 const CODEPENDENT_SKIP_KEYS = new Set([
-    ...NATURALLY_AVAILABLE_KEYS, ...FOUNDATIONAL_STAT_KEYS, 'codependent', 'buffs'
+    ...NATURALLY_AVAILABLE_KEYS, ...FOUNDATIONAL_STAT_KEYS, 'codependent', 'buffs', 'greedy'
 ]);
+
+// `scaling.anomaly` is NOT skipped — it is a real team need (this unit deals more damage the
+// more anomaly is on the enemy) and is handled by anomalyProcSupply() below, which mirrors
+// team-scorer.js's rule instead of looking for a `buffs.anomaly` that means something else.
+const ANOMALY_SCALING_KEY = 'anomaly';
 
 // ============================================================================
 // HELPERS
@@ -320,6 +328,29 @@ function mechanicsFitScore(supplier, consumer) {
 // CODEPENDENT SCALING — TEAM DEPENDENCY CHECK
 // ============================================================================
 
+// Weighted supply for a `scaling.anomaly` need — "I deal more damage the more anomaly is on
+// the enemy". Mirrors team-scorer.js's anomaly-quantity rule so the two agree about who feeds
+// it: every non-lumen agent whose EFFECTIVE role includes anomaly is one body (a lumen agent
+// fills no gauge, so it supplies nothing, not even to itself), plus any
+// `utility["anomaly:<element>"]` proc surplus — Alice's polarity assaults, the only holder.
+//
+// Note this is deliberately LOOSER than the triple-anomaly team count used by the partner
+// ladder below: a pseudo-anomaly like Nangong does supply procs, but does not fill one of
+// Remielle's three anomaly slots.
+//
+// The previous code looked for `buffs.anomaly` instead, which is an anomaly DAMAGE buff — a
+// different mechanic entirely — so it found nobody and printed a note with no names in it.
+const ANOMALY_PROC_SUPPLY_WEIGHT = 0.5;   // matches ANOMALY_PROC_SUPPLY in team-scorer.js
+
+function anomalyProcSupply(unit) {
+    let supply = 0;
+    if (!isLumenElement(unit) && getEffectiveRoles(unit).includes('anomaly')) supply += 1;
+    for (const [key, val] of Object.entries(unit.mechanics?.utility || {})) {
+        if (key.startsWith('anomaly:')) supply += ANOMALY_PROC_SUPPLY_WEIGHT * w(val);
+    }
+    return supply;
+}
+
 /**
  * Check whether a candidate DPS unit's specialist scaling needs can be met
  * by the player's roster. Gated on mechanics.scaling.codependent.
@@ -353,12 +384,21 @@ export function checkTeamDependencies(candidate, ownedUnits, allUnits) {
         const selfSupply = Math.max(w(selfBuffs[key]), w(selfUtil[key]));
         if (selfSupply >= scalingW) continue;
 
-        const met = ownedUnits.some(u => {
-            const buf = u.mechanics?.buffs || {};
-            const debuf = u.mechanics?.debuffs || {};
-            const util = u.mechanics?.utility || {};
-            return Math.max(w(buf[key]), w(debuf[key]), w(util[key])) >= scalingW;
-        });
+        // `anomaly` is supplied by BODIES, additively across the team, not by one unit clearing
+        // a threshold — so it needs its own arithmetic. Every other key is a per-unit supply.
+        const isAnomalyQuantity = key === ANOMALY_SCALING_KEY;
+        const supplies = isAnomalyQuantity
+            ? (u => anomalyProcSupply(u) > 0)
+            : (u => {
+                const buf = u.mechanics?.buffs || {};
+                const debuf = u.mechanics?.debuffs || {};
+                const util = u.mechanics?.utility || {};
+                return Math.max(w(buf[key]), w(debuf[key]), w(util[key])) >= scalingW;
+            });
+
+        const met = isAnomalyQuantity
+            ? ownedUnits.reduce((sum, u) => sum + anomalyProcSupply(u), 0) >= scalingW
+            : ownedUnits.some(supplies);
 
         if (!met) {
             hasUnmetDependency = true;
@@ -366,15 +406,14 @@ export function checkTeamDependencies(candidate, ownedUnits, allUnits) {
                 .filter(u => {
                     if (u.id === candidate.id) return false;
                     if (!u.limited || u.rank !== 'S') return false;
-                    const buf = u.mechanics?.buffs || {};
-                    const debuf = u.mechanics?.debuffs || {};
-                    const util = u.mechanics?.utility || {};
-                    return Math.max(w(buf[key]), w(debuf[key]), w(util[key])) >= scalingW;
+                    return supplies(u);
                 })
                 .sort((a, b) => a.tier - b.tier)
                 .map(u => ({ id: u.id, name: u.name }));
+            // Cap the names: an anomaly-quantity need matches a dozen agents, and joining all
+            // of them with " or " produces an unreadable sentence.
             notes.push({
-                text: `Needs ${providers.map(p => p.name).join(' or ')} to reach full potential`,
+                text: `Needs ${providers.slice(0, 3).map(p => p.name).join(' or ')} to reach full potential`,
                 providers
             });
         }
@@ -500,6 +539,148 @@ export function checkTeamDependencies(candidate, ownedUnits, allUnits) {
     return { hasUnmetDependency, cannotFormTeam, cannotActivateBuffs, notes };
 }
 
+// ============================================================================
+// PARTNER LADDER — how good is the best partner the roster can pair this unit with?
+// ============================================================================
+//
+// THIS IS A RELEASE STOPGAP FOR ISSUE 9, and it is fitted, not derived. Read this before
+// touching the numbers.
+//
+// The problem it solves, concretely: Remielle is a titled T0 who only works inside a
+// triple-anomaly team, and how good that team is depends enormously on ONE partner.
+// Velina is the partner that takes her from "worth having" to "worth chasing"; Vivian is
+// a solid second; Burnice is the fallback; with none of the three there is no anomaly
+// sub-DPS base to build on and she should not be recommended at all. The engine could not
+// tell those four rosters apart, because it never calls the scorer — it reasons about
+// scaling keys, role coverage and codependency, and Velina changes none of them on a
+// roster that is already anomaly-heavy. Recommendations TEST 43 pinned that.
+//
+// The honest fix is for the pull engine to ask the scorer how good the resulting teams
+// actually are. This is a cheap proxy standing in its place until then.
+//
+// The ladder grows only on a CODEPENDENT unit that declares a team-scoped conditional buff
+// keyed on `countTag` — the data's own way of saying "I need N teammates of a kind".
+// Remielle is the only unit that matches today: SAnby declares no conditional buff and Ye
+// Shunguong declares no buffs at all, so neither grows a ladder.
+
+const LADDER_RUNGS = ['High', 'Medium', 'Low'];
+
+// Fitted to the owner's stated ordering (Velina > Vivian > Burnice > nothing) over the five
+// anomaly sub-DPS that exist. On today's data the scores are Velina 130, Vivian 65,
+// Burnice 55, Yanagi 40, Grace 40 — so the cutoffs are not knife-edge, but a sixth anomaly
+// sub-DPS could land anywhere and should be re-checked by hand rather than trusted.
+const LADDER_CUTOFFS = [
+    { min: 100, rung: 'High' },
+    { min:  60, rung: 'Medium' },
+    { min:  50, rung: 'Low' }
+];
+const LADDER_MUTUAL_SYNERGY = 25;   // both units name each other in synergy.units
+const LADDER_UNCONDITIONAL_SUBDPS = 10;
+
+// `synergy.units` entries can be conjunctive groups ("Remielle+Velina", Alice's entry), so
+// split before matching a name.
+function synergyNames(unit) {
+    return (unit.synergy?.units || []).flatMap(e => String(e).split('+').map(s => s.trim()));
+}
+
+function isMutualSynergyPair(a, b) {
+    return synergyNames(a).includes(b.name) && synergyNames(b).includes(a.name);
+}
+
+function hasUnconditionalSubdps(unit) {
+    return unconditionalPseudo(unit).includes('subdps');
+}
+
+function declaresSubdps(unit) {
+    const pr = unit.mechanics?.pseudoRole;
+    if (!Array.isArray(pr)) return false;
+    return pr.some(e => (typeof e === 'string' ? e : e?.role) === 'subdps');
+}
+
+function demoteRung(rung) {
+    const i = LADDER_RUNGS.indexOf(rung);
+    return i < 0 || i + 1 >= LADDER_RUNGS.length ? null : LADDER_RUNGS[i + 1];
+}
+
+// The tag this candidate needs N of, or null if it declares no such conditional buff.
+function ladderCountTag(candidate) {
+    if (!candidate.mechanics?.scaling?.codependent) return null;
+    for (const spec of Object.values(candidate.mechanics?.buffs || {})) {
+        if (!isTeamScopedConditional(spec)) continue;
+        if (maxConditionalValue(spec) <= 0) continue;
+        const tag = spec.cases.map(c => c.when?.countTag).find(Boolean);
+        if (tag) return tag;
+    }
+    return null;
+}
+
+/**
+ * Rate the best partner the owned roster offers this candidate.
+ *
+ * @returns {null} when the candidate has no ladder (the overwhelmingly common case), or
+ *          {{ rung: 'High'|'Medium'|'Low'|null, partner: unit|null,
+ *             better: Array<{id,name}>, blocked: boolean }}
+ *          where `rung: null` means "do not recommend this unit at all".
+ */
+export function getPartnerLadder(candidate, ownedUnits, allUnits = []) {
+    const tag = ladderCountTag(candidate);
+    if (!tag) return null;
+
+    const partnerScore = (partner) =>
+        tierToQuality(partner.tier)
+        + (isMutualSynergyPair(candidate, partner) ? LADDER_MUTUAL_SYNERGY : 0)
+        + (hasUnconditionalSubdps(partner) ? LADDER_UNCONDITIONAL_SUBDPS : 0);
+
+    // Eligible partners are the SUB-DPS BASES the team can be built around — tagged with the
+    // wanted role AND declaring a subdps pseudoRole. Carries are deliberately not enablers:
+    // pairing Remielle with Aria or Miyabi still leaves the team without a sub-DPS base,
+    // which is exactly the "tougher to wield" case. This holds even though Aria and Remielle
+    // are a declared mutual synergy pair.
+    const partners = ownedUnits.filter(u =>
+        u.id !== candidate.id && u.tags.includes(tag) && declaresSubdps(u)
+    );
+
+    let best = null;
+    for (const partner of partners) {
+        const score = partnerScore(partner);
+        let rung = LADDER_CUTOFFS.find(c => score >= c.min)?.rung ?? null;
+
+        // The pair is only two thirds of the team. Remielle is lumen and starts no reaction
+        // herself, so whatever the pair lives on — disorders for Vivian, vortex for Velina —
+        // needs a THIRD body of a different element to fire. Vivian beside Aria is ether on
+        // ether and disorders nothing; Velina beside another wind agent triggers no vortex.
+        // Either way the pair is worth one rung less than it looks.
+        //
+        // Counted over NATIVE tag holders only. A pseudo-anomaly like Nangong supplies procs
+        // (see anomalyProcSupply) but does not fill one of the three anomaly slots, which is
+        // also how step 1b of checkTeamDependencies counts them.
+        const partnerElement = getDisorderElement(partner);
+        const blocked = rung !== null && !ownedUnits.some(u =>
+            u.id !== candidate.id && u.id !== partner.id && u.tags.includes(tag) &&
+            getDisorderElement(u) !== partnerElement && getDisorderElement(u) !== 'unknown'
+        );
+        if (blocked) rung = demoteRung(rung);
+
+        const rank = rung === null ? -1 : LADDER_RUNGS.length - LADDER_RUNGS.indexOf(rung);
+        if (!best || rank > best.rank || (rank === best.rank && score > best.score)) {
+            best = { rung, partner, score, rank, blocked };
+        }
+    }
+
+    const floor = best ? best.score : 0;
+    // Partners that would rate above what the roster currently offers — the "you'd rather
+    // have Velina" half of the note.
+    const better = allUnits
+        .filter(u => u.id !== candidate.id && u.tags.includes(tag) && declaresSubdps(u))
+        .map(u => ({ unit: u, score: partnerScore(u) }))
+        .filter(e => e.score > floor)
+        .sort((a, b) => b.score - a.score)
+        .map(e => ({ id: e.unit.id, name: e.unit.name }));
+
+    if (!best) return { rung: null, partner: null, better, blocked: false };
+    return { rung: best.rung, partner: best.partner, better, blocked: best.blocked };
+}
+
 function sortCandidates(units, ownedDPSUnits = []) {
     const fitScores = new Map();
     for (const candidate of units) {
@@ -622,11 +803,20 @@ export function analyze(allUnits, unitStates, ownedUnits, { maxRecommendations =
     // Pre-filter: remove codependent units that cannot form viable teams or
     // cannot activate their core buffs. They shouldn't appear in recommendations
     // at all — not just with a priority drop — because the gap text doesn't apply.
+    // A unit with a partner ladder and no rung is excluded for the same reason: the roster
+    // offers nobody to build its team around, so recommending it would be advice the player
+    // cannot act on. Only that unit is removed — the rest of its gap card survives.
     const excludedIds = new Set();
+    const ladders = new Map(); // unitId → partner-ladder verdict, for units that have one
     for (const candidate of unownedLimitedS) {
         if (!candidate.mechanics?.scaling?.codependent) continue;
         const dep = checkTeamDependencies(candidate, ownedUnits, allUnits);
         if (dep.cannotFormTeam || dep.cannotActivateBuffs) excludedIds.add(candidate.id);
+        const ladder = getPartnerLadder(candidate, ownedUnits, allUnits);
+        if (ladder) {
+            ladders.set(candidate.id, ladder);
+            if (ladder.rung === null) excludedIds.add(candidate.id);
+        }
     }
     if (excludedIds.size > 0) {
         for (const gap of gaps) {
@@ -738,6 +928,75 @@ export function analyze(allUnits, unitStates, ownedUnits, { maxRecommendations =
         return pri;
     }
 
+    // ── Codependent scaling and partner ladders: the per-unit penalty ───────
+    //
+    // This used to run over finished cards and drop the WHOLE card whenever any one of its
+    // units had an unmet dependency. A card is a group of candidates sharing a gap, so on an
+    // anomaly roster Remielle's codependency was quietly demoting Aria, Jane Doe and Yanagi,
+    // who sit in the same Anomaly Depth card and have nothing wrong with them. The penalty is
+    // now computed per unit and the card is split below, so a hobbled unit carries its own
+    // verdict out with it instead of dragging its neighbours down.
+    const PRIORITY_ORDER = ['High', 'Medium', 'Low', null];
+    function dropPriority(current, levels) {
+        const idx = PRIORITY_ORDER.indexOf(current);
+        return PRIORITY_ORDER[Math.min(idx + levels, PRIORITY_ORDER.length - 1)];
+    }
+    function capPriority(current, ceiling) {
+        // A ceiling never raises a priority — a great partner does not manufacture a need.
+        return PRIORITY_ORDER.indexOf(ceiling) > PRIORITY_ORDER.indexOf(current) ? ceiling : current;
+    }
+
+    function ladderNotes(ladder) {
+        const notes = [];
+        if (ladder.rung === null) {
+            notes.push({
+                text: `Your roster has no sub-DPS to build a team around — pull ${ladder.better.slice(0, 3).map(p => p.name).join(' or ')} first`,
+                providers: ladder.better
+            });
+        } else {
+            if (ladder.blocked) {
+                // Deliberately NO providers: the UI's formatDependencyReason replaces the text
+                // with a "would be a more valuable pull with X" sentence whenever providers are
+                // present, and that sentence cannot express an element clash.
+                notes.push({
+                    text: `Your ${ladder.partner.name} is the right partner, but every other agent who could fill the third slot shares her element — nothing for her to react with`,
+                    providers: []
+                });
+            }
+            if (ladder.better.length > 0) {
+                notes.push({
+                    text: `Works with your ${ladder.partner.name}, but reaches full potential with ${ladder.better.slice(0, 2).map(p => p.name).join(' or ')}`,
+                    providers: ladder.better
+                });
+            }
+        }
+        return notes.length > 0 ? notes : null;
+    }
+
+    const penaltyCache = new Map();
+    function unitPenalty(unit, basePriority) {
+        const key = `${unit.id}:${basePriority}`;
+        if (penaltyCache.has(key)) return penaltyCache.get(key);
+
+        let result = { priority: basePriority, notes: null };
+        const ladder = ladders.get(unit.id) ?? getPartnerLadder(unit, ownedUnits, allUnits);
+        if (ladder) {
+            // A partner ladder REPLACES the generic codependency drop rather than stacking on
+            // top of it. Both answer the same question — can this roster actually run this
+            // unit — and the ladder is the better-informed answer, so charging twice would
+            // double-count.
+            result = { priority: capPriority(basePriority, ladder.rung), notes: ladderNotes(ladder) };
+        } else {
+            const dep = checkTeamDependencies(unit, ownedUnits, allUnits);
+            if (dep.hasUnmetDependency || dep.cannotFormTeam) {
+                const severe = dep.cannotFormTeam || dep.cannotActivateBuffs;
+                result = { priority: dropPriority(basePriority, severe ? 2 : 1), notes: dep.notes };
+            }
+        }
+        penaltyCache.set(key, result);
+        return result;
+    }
+
     const recommendations = [];
     for (const card of sortedCards) {
         if (recommendations.length >= maxRecommendations) break;
@@ -809,41 +1068,44 @@ export function analyze(allUnits, unitStates, ownedUnits, { maxRecommendations =
             .sort((a, b) => (GAP_PRIORITY_RANK[b.priority] ?? 0) - (GAP_PRIORITY_RANK[a.priority] ?? 0));
         additionalReasons.splice(3); // cap at 3 entries per card
 
-        recommendations.push({
-            priority: cardPriority,
-            title: displayTitle,
-            reason: displayReason,
-            additionalReasons,
-            score: card.cardScore,
-            rawScore: card.gap.rawScore ?? card.gap.score,
-            units: cardUnits
-        });
+        // Split the card by penalized priority. Units that take no penalty keep the card as
+        // it is; each penalized group is emitted as its own recommendation, titled by unit
+        // name the way mech-synergy cards already are, so the player sees "Remielle — Medium"
+        // beside "Anomaly Depth — High" instead of one card marked down for her sake.
+        const groups = new Map(); // priority (or 'null') → { priority, profiles, notes }
+        for (const profile of cardProfiles) {
+            const { priority, notes } = unitPenalty(profile.unit, cardPriority);
+            const key = String(priority);
+            if (!groups.has(key)) groups.set(key, { priority, profiles: [], notes: null });
+            const g = groups.get(key);
+            g.profiles.push(profile);
+            if (notes && !g.notes) g.notes = notes;
+        }
+
+        for (const group of groups.values()) {
+            if (group.priority === null) continue;   // dropped out of the list entirely
+            const groupUnits = group.profiles.map(p => p.unit);
+            const split = group.priority !== cardPriority;
+            const rec = {
+                priority: group.priority,
+                title: split ? groupUnits.map(u => u.name).join(', ') : displayTitle,
+                reason: displayReason,
+                additionalReasons: split ? [] : additionalReasons,
+                score: group.profiles[0].contributions[0].unitScore,
+                rawScore: card.gap.rawScore ?? card.gap.score,
+                units: groupUnits
+            };
+            if (group.notes) rec.teamDependencyNotes = group.notes;
+            recommendations.push(rec);
+        }
     }
 
-    // ── Codependent scaling: post-process recommendations ───────────────────
-    const PRIORITY_ORDER = ['High', 'Medium', 'Low', null];
-    function dropPriority(current, levels) {
-        const idx = PRIORITY_ORDER.indexOf(current);
-        return PRIORITY_ORDER[Math.min(idx + levels, PRIORITY_ORDER.length - 1)];
-    }
-    for (const rec of recommendations) {
-        // Check ALL units in the card — not just the primary. A codependent unit
-        // can appear as a non-primary in a composite card and still need the drop.
-        let worstDep = null;
-        for (const unit of rec.units) {
-            const dep = checkTeamDependencies(unit, ownedUnits, allUnits);
-            if (dep.hasUnmetDependency || dep.cannotFormTeam) {
-                if (!worstDep || dep.cannotFormTeam || dep.cannotActivateBuffs) worstDep = dep;
-            }
-        }
-        if (worstDep) {
-            rec.teamDependencyNotes = worstDep.notes;
-            const severe = worstDep.cannotFormTeam || worstDep.cannotActivateBuffs;
-            const levels = severe ? 2 : 1;
-            rec.priority = dropPriority(rec.priority, levels);
-        }
-    }
-    const filteredRecommendations = recommendations.filter(r => r.priority !== null);
+    // Splitting a card produces two entries with the same gap score, so break the tie on
+    // priority — otherwise a penalised unit can sort above the healthy card it split from.
+    const filteredRecommendations = recommendations
+        .sort((a, b) => (b.score - a.score)
+            || ((PRIORITY_VALS[b.priority] ?? 0) - (PRIORITY_VALS[a.priority] ?? 0)))
+        .slice(0, maxRecommendations);
 
     const limitedSCount = ownedUnits.filter(u => u.rank === 'S' && u.limited).length;
     const highPriorityGapCount = gaps.filter(g => g.priority === 'High').length;

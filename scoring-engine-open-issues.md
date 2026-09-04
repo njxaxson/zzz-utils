@@ -16,7 +16,7 @@ number — see *Archetype calibration* below.
 | scoring | **118 pass, exits 0.** `KNOWN_RED` is empty |
 | cohesion fixture | **11/11** — owner judgements on support fit |
 | bucketing | **6/6** |
-| recommendations | 43/44. TEST 43 red on purpose (issue 9) |
+| recommendations | **44/44, exits 0.** `KNOWN_RED` is empty |
 | calibration certification | **0 rank inversions**, 44 (boss × archetype) groups, 61,423 teams |
 
 ```bash
@@ -33,7 +33,6 @@ every complaint in `rankings-open-issues.txt`, start to finish — is internals 
 | # | issue | status |
 |----|----|----|
 | 16 | **Sub-DPS tier is halved beside a same-type carry** | A double count: a unit's tier already prices the fact that it plays sub-DPS, so halving it again rates Velina as half a primary carry. This is why the Miyabi track outranked the Velina track until it was corrected by declaration instead. Do not confuse it with the `isForcedSecondaryDPS` halving, which is a real role-collision charge and is correct. Wide blast radius; **post-release**. Internals §Rj. |
-| 9 | **Pull engine can't see partner quality** | It never calls the scorer, so it rates Remielle the same with or without Velina. A feature, not a fix — not release-blocking. Recommendations TEST 43 pins it. |
 
 ### Open per-agent rankings complaints
 
@@ -166,6 +165,46 @@ median is not a meaningful object anyway. Do not tune to it. Internals §C.4.
 
 ## Recently closed
 
+**2026-09-03 — issue 9, the pull engine and partner quality. Closed for release, with a
+stopgap.** Remielle only works inside a triple-anomaly team, and how good that team is
+depends enormously on one partner. The engine could not tell those rosters apart, so it
+rated her identically whether or not Velina was owned. Recommendations TEST 43 pinned it
+and is now green; `KNOWN_RED` is empty.
+
+What shipped, all inside `pull-engine.js` — the scorer, `units.json` and `bosses.json`
+were not touched:
+
+* **A partner ladder.** Owned partners are scored from declared data only —
+  `tierToQuality(tier)`, +25 when the two units name each other in `synergy.units`, +10
+  when the partner's `subdps` pseudoRole is unconditional. Velina 130, Vivian 65,
+  Burnice 55, Yanagi 40, Grace 40; cutoffs at 100 / 60 / 50 give High / Medium / Low and
+  no recommendation below that. Only sub-DPS *bases* are eligible (tagged anomaly AND
+  declaring a `subdps` pseudoRole), so anomaly carries like Aria and Promeia are not
+  enablers even though Aria is a declared mutual pair.
+* **A third-slot check.** The pair is two thirds of a team and Remielle starts no reaction
+  herself, so the rung drops one level unless some other *native* anomaly agent has a
+  different disorder element — Vivian beside only Aria is ether on ether, Velina beside
+  another wind agent triggers no vortex. Native only: a pseudo-anomaly such as Nangong
+  does not fill one of the three slots, matching how the conditional-buff check already
+  counts them.
+* **Cards now split by unit.** The codependency penalty used to drop the whole card, so
+  Remielle demoted Aria, Jane Doe and Yanagi beside her, and Ye Shunguong demoted Seed,
+  Cissia, Sigrid and Evelyn. A penalised unit is now emitted as its own card and its
+  neighbours keep theirs. That was a pre-existing bug, not something the ladder introduced.
+* **The nameless note is gone.** `Needs  to reach full potential` came from walking
+  Remielle's `scaling.greedy` (a self-descriptor nobody can supply — now skipped) and
+  `scaling.anomaly` (a real need, but looked up against `buffs.anomaly`, which is an
+  anomaly *damage* buff). The anomaly lookup now mirrors `team-scorer.js:4138-4176`:
+  supply is additive across the roster, one per non-lumen agent with an effective anomaly
+  role plus any `utility["anomaly:<element>"]` surplus.
+
+**The cutoffs are fitted, not derived.** They reproduce the owner's ordering over the five
+anomaly sub-DPS that exist today; a sixth should be re-checked by hand. And the engine
+still never calls the scorer — this is a proxy for partner quality, so issue 9's real
+content is deferred rather than solved. The element-scoped keys
+(`scaling["anomaly:wind"]`, `scaling["anomaly:electric"]`) still fall through the old
+lookup; nothing regresses because no unit declaring one is codependent.
+
 **2026-09-03 — archetype calibration, shipped end to end.** Closes issues 3 and 14, and the
 `Lighter/Burnice/Promeia` on Horizon complaint. Details in the section above and internals §C; the
 short version is that raw scores are untouched and every cross-archetype consumer now reads a
@@ -256,7 +295,6 @@ Remaining, all optional:
    (`node rankings.js -15`, 30 CSVs in `matchups/`), so they are current and structurally clean —
    but no person has read them since. This is the only thing standing between here and a release.
 2. Issue 16 (sub-DPS tier double count) — post-release.
-3. Issue 9 (pull engine partner quality) — a feature, not a fix.
 
 **Step 4, re-anchoring the numeric bands, is dropped** — owner's call, obviated as long as the suite
 stays green and the rankings read correctly. Issue 14 (top-of-corpus inflation) is no longer parked:
