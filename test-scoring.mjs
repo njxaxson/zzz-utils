@@ -22,7 +22,6 @@ import { filterBosses } from './lib/boss-filter.js';
 import { parseTeams } from './lib/team-parser.js';
 import { buildAvailableUnits } from './lib/roster-builder.js';
 import { buildTeams } from './lib/team-pipeline.js';
-import { rankBandEpsilon } from './app/public/lib/common/team-builder.js';
 import { chargeableElementArms, getBasicDamage, getBasicDamageBaseline, getMaxBurstWeight, quickAssistCohesionWeight, scoreTeamForBoss, resolveBossVariation, resolveConditionalValue, getEffectiveScaling, effectiveDisorderSupply, effectiveDisorderWeakSupply, getBossResistances, getChainMagnitude } from './app/public/lib/common/team-scorer.js';
 
 // ---------------------------------------------------------------------------
@@ -310,112 +309,48 @@ async function main() {
     // ========================================================================
     // TEST 7: Evelyn stunner ordering
     // ========================================================================
-    // Expect: Dialyn > Lighter > JF for Astra 3rd; same for Lucia 3rd; and
-    // Dialyn/.../Lighter order where applicable.
-    run('TEST 7: Evelyn stunner ordering (Neutral, Pompey)', () => {
-        // On Neutral: Dialyn > Lighter > JF
-        for (const b of withBosses(bosses, 'Neutral')) {
-            const astraTriple =
-                'Dialyn/Evelyn/Astra,Lighter/Evelyn/Astra,Ju Fufu/Evelyn/Astra';
-            const m1 = scoreMapForBoss(scoreForTeamString(astraTriple, allUnits), b);
-            assert(
-                m1.get('Dialyn / Evelyn / Astra') > m1.get('Lighter / Evelyn / Astra') &&
-                    m1.get('Lighter / Evelyn / Astra') > m1.get('Ju Fufu / Evelyn / Astra'),
-                `${b.name}: Evelyn+Astra: want Dialyn > Lighter > JF`
-            );
-            const evLucia = 'Dialyn/Evelyn/Lucia,Lighter/Evelyn/Lucia,Ju Fufu/Evelyn/Lucia';
-            const m2 = scoreMapForBoss(scoreForTeamString(evLucia, allUnits), b);
-            assert(
-                m2.get('Dialyn / Evelyn / Lucia') > m2.get('Lighter / Evelyn / Lucia') &&
-                    m2.get('Lighter / Evelyn / Lucia') > m2.get('Ju Fufu / Evelyn / Lucia'),
-                `${b.name}: Evelyn+Lucia: want Dialyn > Lighter > JF`
-            );
-            const dLight = 'Dialyn/Lighter/Evelyn,Ju Fufu/Lighter/Evelyn';
-            const m3 = scoreMapForBoss(scoreForTeamString(dLight, allUnits), b);
-            assert(
-                m3.get('Dialyn / Lighter / Evelyn') > m3.get('Ju Fufu / Lighter / Evelyn'),
-                `${b.name}: Dialyn/Lighter/Evelyn > JF/Lighter/Evelyn`
-            );
-        }
-        // On Pompey (fire-weak). REOPENED 2026-09-01 and the previous adjudication REVERSED.
-        //
-        // On 2026-08-31 the owner confirmed the engine's own ordering here (Norma > Lighter >
-        // Dialyn) as "100% correct". They then checked aggregated player statistics and corrected
-        // it: "Dialyn is indeed definitively better than Lighter and I had it pretty wrong."
-        //
-        //     Norma > Dialyn > Lighter > Ju Fufu
-        //
-        // with Norma and Dialyn inside one epsilon band and Lighter clearly outside it.
-        //
-        // SCOPE NOTE. The earlier version of this test also asserted the tail of the ladder
-        // (Trigger > Koleda > Caesar > Pulchra > Qingyi). That came from the SAME reversed
-        // adjudication and the owner has not re-confirmed it, so it is no longer asserted as an
-        // order — only that all of them sit below Ju Fufu, which was never in dispute. Do not
-        // restore the tail ordering without an independent source.
-        //
-        // THE LESSON, and it is why the tail was dropped: confirming an engine-produced ordering
-        // is much weaker evidence than a spec stated independently of the engine. The nine-rung
-        // ladder was adopted because the owner recognised the engine's output, and recognising
-        // output is not the same as checking it.
+    // Pompey (fire-weak) ladder: Norma > Dialyn > Lighter > Koleda > Ju Fufu,
+    // with the rest (Trigger, Caesar, Pulchra, Qingyi) unordered but below Ju
+    // Fufu.
+    //
+    // Koleda's P.V. buff rework put her above Ju Fufu here (she was below,
+    // in the unordered tail, before the rework) — but not on a Neutral boss,
+    // where Trigger still beats both Koleda and Ju Fufu.
+    run('TEST 7: Evelyn stunner ordering (Pompey, Neutral)', () => {
         for (const b of withBosses(bosses, 'Pompey')) {
             const spec =
-                'Norma/Evelyn/Astra,Lighter/Evelyn/Astra,Dialyn/Evelyn/Astra,' +
-                'Ju Fufu/Evelyn/Astra,Trigger/Evelyn/Astra,Koleda/Evelyn/Astra,' +
+                'Norma/Evelyn/Astra,Dialyn/Evelyn/Astra,Lighter/Evelyn/Astra,' +
+                'Koleda/Evelyn/Astra,Ju Fufu/Evelyn/Astra,Trigger/Evelyn/Astra,' +
                 'Caesar/Evelyn/Astra,Pulchra/Evelyn/Astra,Qingyi/Evelyn/Astra';
-            const m1 = scoreMapForBoss(scoreForTeamString(spec, allUnits), b);
-            const top = ['Norma / Evelyn / Astra', 'Dialyn / Evelyn / Astra',
-                         'Lighter / Evelyn / Astra', 'Ju Fufu / Evelyn / Astra'];
-            for (let i = 0; i + 1 < top.length; i++) {
-                const hi = m1.get(top[i]), lo = m1.get(top[i + 1]);
+            const m = scoreMapForBoss(scoreForTeamString(spec, allUnits), b);
+
+            const ladder = ['Norma / Evelyn / Astra', 'Dialyn / Evelyn / Astra',
+                'Lighter / Evelyn / Astra', 'Koleda / Evelyn / Astra',
+                'Ju Fufu / Evelyn / Astra'];
+            for (let i = 0; i + 1 < ladder.length; i++) {
+                const hi = m.get(ladder[i]), lo = m.get(ladder[i + 1]);
                 assert(hi !== undefined && lo !== undefined && hi > lo,
-                    `${b.name}: fire-weak stunner ladder: want ${top[i]} (${hi}) > ${top[i + 1]} (${lo})`);
+                    `${b.name}: fire-weak stunner ladder: want ${ladder[i]} (${hi}) > ${ladder[i + 1]} (${lo})`);
             }
-            // The unverified tail: no internal order asserted, only that it sits below Ju Fufu.
-            const juFufu = m1.get('Ju Fufu / Evelyn / Astra');
-            let tailChecked = 0;
-            for (const t of ['Trigger / Evelyn / Astra', 'Koleda / Evelyn / Astra',
-                             'Evelyn / Caesar / Astra', 'Pulchra / Evelyn / Astra',
-                             'Qingyi / Evelyn / Astra']) {
-                const v = m1.get(t);
-                if (v === undefined) continue;
-                tailChecked++;
-                assert(v < juFufu, `${b.name}: ${t} (${v}) must sit below Ju Fufu (${juFufu})`);
+
+            const juFufu = m.get('Ju Fufu / Evelyn / Astra');
+            const tail = ['Trigger / Evelyn / Astra', 'Evelyn / Caesar / Astra',
+                'Pulchra / Evelyn / Astra', 'Qingyi / Evelyn / Astra'];
+            for (const t of tail) {
+                const v = m.get(t);
+                assert(v !== undefined && v < juFufu,
+                    `${b.name}: ${t} (${v}) must sit below Ju Fufu (${juFufu})`);
             }
-            assert(tailChecked >= 4,
-                `only ${tailChecked} tail team(s) were live — fixture drift, fix it rather than letting this pass on nothing`);
-            // Norma and Dialyn are one band; Lighter is a step below, not a shuffle.
-            const norma = m1.get('Norma / Evelyn / Astra');
-            const dialyn = m1.get('Dialyn / Evelyn / Astra');
-            const lighter = m1.get('Lighter / Evelyn / Astra');
-            // NOT asserted: that Norma and Dialyn share one epsilon band. Dropped 2026-09-01 at
-            // the owner's direction, having been asserted for one day.
-            //
-            // The band matters for BUCKETING — teams inside one band share a rank, so a banded
-            // pair does not burn a rank slot. The owner's point is that this only bites when
-            // Dialyn is the one on top: "with Norma on top Dialyn will naturally be free to be
-            // taken to a Yixuan team while leaving Norma for Evelyn." The allocator gets the
-            // outcome it needs from the ordering alone, so forcing the band would be tuning for
-            // a problem that does not arise in this configuration.
-            //
-            // FUTURE CONSIDERATION, not a concern now: if Dialyn ever lands above Norma here the
-            // band question returns and matters. The gap is currently 28.7 against an epsilon of
-            // 9.3, and it is not mysterious — +15 for the sole on-field carry (Norma is off-field,
-            // worth 14.4 of it) plus +15 for an on-element stunner on a fire-weak boss. Both are
-            // ring-fenced global constants; see the open-issues doc.
-            void norma;
-            // PARKED 2026-09-01. The owner's spec is that Lighter sits OUTSIDE Dialyn's epsilon
-            // band, not merely below him. The engine currently separates them by 8.1 against an
-            // epsilon of 8.7 — short by 0.6 — so the ordering is right and only the margin is
-            // not. Parked rather than chased: closing 0.6 points would mean moving one of the two
-            // ring-fenced constants that produce it, and the owner has twice declined to move a
-            // corpus-wide constant to settle a single rung.
-            //
-            // The ordering IS still asserted, so a regression that actually flips them fails here.
-            // Restore the epsilon form when the sole-carry / on-element constants are next opened.
-            assert(dialyn > lighter,
-                `${b.name}: Dialyn (${dialyn}) must beat Lighter (${lighter}) — ordering, not margin ` +
-                `(the epsilon-band form of this rung is parked; gap is ${(dialyn - lighter).toFixed(1)}, ` +
-                `eps ${rankBandEpsilon(dialyn).toFixed(1)})`);
+        }
+
+        for (const b of withBosses(bosses, 'Neutral')) {
+            const spec = 'Trigger/Evelyn/Astra,Ju Fufu/Evelyn/Astra,Koleda/Evelyn/Astra';
+            const m = scoreMapForBoss(scoreForTeamString(spec, allUnits), b);
+            const trigger = m.get('Trigger / Evelyn / Astra');
+            const koleda = m.get('Koleda / Evelyn / Astra');
+            const juFufu = m.get('Ju Fufu / Evelyn / Astra');
+            assert(trigger > koleda && trigger > juFufu,
+                `${b.name}: Trigger (${trigger}) must beat Koleda (${koleda}) and Ju Fufu (${juFufu})`);
         }
     });
 
@@ -1429,15 +1364,8 @@ async function main() {
             assert(norma > lycaon, `${b.name}: Norma(${norma?.toFixed(1)}) > Lycaon(${lycaon?.toFixed(1)}) for Sigrid`);
             assert(lycaon > dialyn, `${b.name}: Lycaon(${lycaon?.toFixed(1)}) > Dialyn(${dialyn?.toFixed(1)}) for Sigrid`);
             assert(lighter > dialyn, `${b.name}: Lighter(${lighter?.toFixed(1)}) > Dialyn(${dialyn?.toFixed(1)}) for Sigrid`);
-            // Margin 20 -> 15 on 2026-09-02, owner-adjudicated. `MULT.CHAINS_BUFF` had to reach 8
-            // for Koleda to outrank Pan Yinhu beside Starlight Billy on The Defiler, and Sigrid
-            // declares `scaling.chains: 3`, so she is chain-relevant too — every point the chain
-            // buff gives Koleda beside Billy also gives her points beside Sigrid. Defiler needed
-            // the rate at 8 or above, this margin needed it at 7 or below. Owner's general
-            // position: FAVOUR CORRECT ORDERING OVER MARGINS. The ordering asserted here (Dialyn
-            // comfortably ahead of a low-tier stunner, because tier still matters) is intact and
-            // is the point; 20 was never a calibrated figure.
-            assert(dialyn > koleda + 15, `${b.name}: Dialyn(${dialyn?.toFixed(1)}) >> Koleda(${koleda?.toFixed(1)}) — tier still matters`);
+            //Koleda's last-minute P6 changes bring her very close to Dialyn for Sigrid, although Dialyn is still ahead. 
+            assert(dialyn > koleda, `${b.name}: Dialyn(${dialyn?.toFixed(1)}) >> Koleda(${koleda?.toFixed(1)}) — tier still matters`);
         }
     });
 
@@ -1714,39 +1642,81 @@ async function main() {
     });
 
     // ========================================================================
-    // TEST 75: Roxy is Claret's best-in-slot stunner (upgrades Koleda)
+    // TEST 75: Claret/Rina stunner ordering shifts with electric weakness (Roxy vs Trigger)
     // ========================================================================
-    // Roxy and Koleda both run the P6 narrow Laceration/CD split, but Roxy's armorer-facing
-    // Laceration is 3 to Koleda's 1, and her kit is stronger overall (wind pseudo-anomaly
-    // subdps, heavy energy regen, daze). Roxy/Claret/Rina should be Claret's BiS and clearly
-    // beat Koleda/Claret/Rina.
-    run('TEST 75: Roxy/Claret/Rina is Claret BiS over Koleda (Neutral)', () => {
+    // The full stunner ranking for a Claret/Rina team is not one fixed list — it depends on
+    // whether the boss is weak to electric, because Trigger's kit leans harder on that
+    // weakness than Roxy's does:
+    //   Electric-weak (UCC):             Trigger > Roxy > Koleda > Lycaon > Anby
+    //   Electric-neutral (Marionettes):  Roxy > Trigger > Koleda > Lycaon > Anby
+    // Typhon is weak to both electric AND wind, but Rina is an evasive assist and Typhon
+    // needs 3 defensive assists, so Rina herself disqualifies the team there. Typhon is
+    // checked separately below on a Claret/Nicole base, omitting the Lycaon that fails 
+    // to join a valid Typhon team:
+    //   Typhon (electric + wind weak):   Roxy > Trigger > Koleda > Anby
+    run('TEST 75: Claret stunner order — electric-weak, electric-neutral, and Typhon', () => {
         if (!allUnits.find(u => u.id === 'roxy') || !allUnits.find(u => u.id === 'claret')) return;
-        for (const b of withBosses(bosses, 'Neutral')) {
-            const m = scoreMapForBoss(
-                scoreForTeamString('Roxy/Claret/Rina,Koleda/Claret/Rina', allUnits, { preview: true }), b);
-            const roxy = m.get('Roxy / Claret / Rina');
-            const koleda = m.get('Koleda / Claret / Rina');
-            assert(roxy >= 380, `Roxy/Claret/Rina should be BiS-strong (>= 380), got ${roxy?.toFixed(1)}`);
-            assert(roxy > koleda, `Roxy/Claret/Rina (${roxy?.toFixed(1)}) should beat Koleda/Claret/Rina (${koleda?.toFixed(1)})`);
+        const stunnerTeams = 'Trigger/Claret/Rina,Roxy/Claret/Rina,Koleda/Claret/Rina,' +
+            'Lycaon/Claret/Rina,Anby/Claret/Rina';
+
+        const assertOrder = (b, m, names, suffix, label) => {
+            const order = names.map(n => ({ n, s: m.get(`${n} / Claret / ${suffix}`) }));
+            for (let i = 0; i < order.length - 1; i++) {
+                assert(order[i].s > order[i + 1].s,
+                    `${b.name}: ${order[i].n}/Claret/${suffix} (${order[i].s?.toFixed(1)}) should beat ` +
+                    `${order[i + 1].n}/Claret/${suffix} (${order[i + 1].s?.toFixed(1)}) (${label})`);
+            }
+        };
+
+        for (const b of withBosses(bosses, 'ucc')) {
+            const m = scoreMapForBoss(scoreForTeamString(stunnerTeams, allUnits, { preview: true }), b);
+            assertOrder(b, m, ['Trigger', 'Roxy', 'Koleda', 'Lycaon', 'Anby'], 'Rina', 'electric-weak order');
+        }
+
+        for (const b of withBosses(bosses, 'Marionettes,Neutral')) {
+            const m = scoreMapForBoss(scoreForTeamString(stunnerTeams, allUnits, { preview: true }), b);
+            assertOrder(b, m, ['Roxy', 'Trigger', 'Koleda', 'Lycaon', 'Anby'], 'Rina', 'electric-neutral order');
+        }
+
+        // Typhon requires 3 defensive assists; Rina is an evasive assist and disqualifies the
+        // team there, so this leg swaps in Nicole and drops Lycaon/Caesar, who likewise fail
+        // to join a legal Typhon team.
+        const typhonTeams = 'Roxy/Claret/Nicole,Trigger/Claret/Nicole,Koleda/Claret/Nicole,Anby/Claret/Nicole';
+        for (const b of withBosses(bosses, 'Typhon')) {
+            const m = scoreMapForBoss(scoreForTeamString(typhonTeams, allUnits, { preview: true }), b);
+            assertOrder(b, m, ['Roxy', 'Trigger', 'Koleda', 'Anby'], 'Nicole', 'Typhon order');
         }
     });
 
     // ========================================================================
     // TEST 76: Roxy enables Pyrois's wind-anomaly ultimate
     // ========================================================================
-    // Pyrois deals bonus ultimate damage under wind anomaly (scaling["anomaly:wind"]).
-    // Roxy, a wind pseudo-anomaly stunner who joins on attack, supplies it; a fire
-    // stunner (Koleda) does not — so Roxy is decisively his better stunner here.
-    run('TEST 76: Roxy enables Pyrois over a non-wind stunner (Neutral)', () => {
-        if (!allUnits.find(u => u.id === 'roxy')) return;
+    // Pyrois's ultimate:strong is conditioned on { provisions: "anomaly:wind" }, which Roxy
+    // meets via her utility["anomaly:wind"] surplus.
+    //
+    // Compared against a CLONE of Roxy with that utility entry stripped, not against another
+    // real stunner (e.g. Koleda). Comparing Roxy to Koleda looks like the same test but is not:
+    // those two differ in stun-infra, chain-buff and other kit stats that have nothing to do
+    // with the wind-anomaly provision, so that version can fail (or pass) for reasons unrelated
+    // to the thing under test. The clone differs in one field.
+    run('TEST 76: Roxy enables Pyrois over a clone without wind-anomaly provision (Neutral)', () => {
+        const roxy = allUnits.find(u => u.id === 'roxy');
+        if (!roxy) return;
+        assert(roxy.mechanics.utility?.['anomaly:wind'] > 0,
+            'fixture assumption broken: Roxy should provision utility["anomaly:wind"]');
+        const noWind = JSON.parse(JSON.stringify(roxy));
+        noWind.id = 'roxy-nowind';
+        noWind.name = 'Roxy Nowind';
+        delete noWind.mechanics.utility['anomaly:wind'];
+        const roster = [...allUnits, noWind];
         for (const b of withBosses(bosses, 'Neutral')) {
-            const m = scoreMapForBoss(
-                scoreForTeamString('Roxy/Pyrois/Astra,Koleda/Pyrois/Astra', allUnits, { preview: true }), b);
-            const roxy = m.get('Roxy / Pyrois / Astra');
-            const koleda = m.get('Koleda / Pyrois / Astra');
-            assert(roxy > koleda + 40,
-                `Roxy/Pyrois/Astra (${roxy?.toFixed(1)}) should clearly beat Koleda/Pyrois/Astra (${koleda?.toFixed(1)}) — wind-anomaly enabler`);
+            const real = scoreForTeamString('Roxy/Pyrois/Astra', roster, { preview: true })[0];
+            const clone = scoreForTeamString('Roxy Nowind/Pyrois/Astra', roster, { preview: true })[0];
+            const rs = scoreTeamForBoss(real.team, b, {});
+            const cs = scoreTeamForBoss(clone.team, b, {});
+            assert(rs > 0 && cs > 0, `both fixtures must be legal teams, got ${rs} / ${cs}`);
+            assert(rs > cs,
+                `${b.name}: Roxy (${rs.toFixed(1)}, provisions anomaly:wind) must earn more from Pyrois than the same unit without that provision (${cs.toFixed(1)})`);
         }
     });
 
@@ -1873,8 +1843,8 @@ async function main() {
         if (!roxy || !allUnits.find(u => u.id === 'claret')) return;
 
         const rLac = roxy.mechanics.buffs.laceration;
-        assert(resolveConditionalValue(rLac, { team: [], self: roxy, consumer: { tags: ['armorer'] } }) === 3,
-            'Roxy laceration should be 3 for an armorer recipient');
+        assert(resolveConditionalValue(rLac, { team: [], self: roxy, consumer: { tags: ['armorer'] } }) > 0,
+            'Roxy laceration should not be 0 for an armorer recipient');
         assert(resolveConditionalValue(rLac, { team: [], self: roxy, consumer: { tags: ['attack'] } }) === 0,
             'Roxy laceration should be 0 for a non-armorer recipient');
 

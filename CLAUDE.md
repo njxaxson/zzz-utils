@@ -29,35 +29,35 @@ It exists to hold what the code *can't* tell you: game-domain semantics and
 it's long, don't load the whole thing for a narrow question) when the task
 involves:
 
-- Adding, editing, or debugging a unit/boss `mechanics` entry in
+* Adding, editing, or debugging a unit/boss `mechanics` entry in
   `units.json` / `bosses.json` — the field vocabulary (`pseudoRole`,
   `scaling`, `buffs`, `join`, conditional `when` predicates, etc.) is defined
   there, not in comments on the data file.
-- Changing scoring logic in `team-scorer.js` or `pull-engine.js` — you need
+* Changing scoring logic in `team-scorer.js` or `pull-engine.js` — you need
   the design premise (mechanics-emergent scoring, not template matching — with one deliberate
   exception, `mechanics.archetypes`, which declares support-by-carry fit directly) and
   the L1–L5 layer responsibilities to know where a change belongs and what
   it might ripple into (role activation effects, cohesion, teamwork
   multiplier).
-- Explaining or sanity-checking *why* a team/boss scores the way it does —
+* Explaining or sanity-checking *why* a team/boss scores the way it does —
   archetypes, diametric synergy, anomaly reactions, element mutation, etc.
-- Deciding whether new behavior is consistent with existing design intent
+* Deciding whether new behavior is consistent with existing design intent
   (e.g. "should this new unit's buff count toward cohesion?").
-- Working on the pull engine's gap detection, coverage, or codependency
+* Working on the pull engine's gap detection, coverage, or codependency
   gating logic.
 
 ## When *not* to read it
 
-- Pure UI/CLI/plumbing work with no game-semantics content: flag parsing,
+* Pure UI/CLI/plumbing work with no game-semantics content: flag parsing,
   output formatting, `roster-ui.js` / `custom-dropdown.js` styling, build
   config, dependency bumps.
-- Anything about a **specific number** — tiers, thresholds, weights,
+* Anything about a **specific number** — tiers, thresholds, weights,
   constants. The doc explicitly refuses to duplicate these; they live in the
   code (which is densely commented with rationale) and go stale in prose.
   Read the source directly.
-- Mechanical refactors, renames, or type-level cleanup that don't touch
+* Mechanical refactors, renames, or type-level cleanup that don't touch
   behavior.
-- Straightforward bug fixes where the bug is a code error (typo, off-by-one,
+* Straightforward bug fixes where the bug is a code error (typo, off-by-one,
   wrong variable) rather than a misunderstanding of game mechanics.
 
 ## Verification loop
@@ -97,6 +97,7 @@ unreadable and two real errors in it turned out to have been *hidden by the
 prose*. They apply to plans, issue write-ups, commit messages, and PR
 descriptions — anywhere the engine is explained to a human.
 
+
 1. **Name a problem after a concrete instance, not after its mechanism.**
    "The Sunna/Yixuan case" beats "partial buffs land badly", because the
    reader can hold two real units in their head and check the claim.
@@ -135,8 +136,8 @@ node score-delta.mjs matchups/before.txt matchups/after.txt --predict Lighter
 
 `score-delta.mjs` exits 1 when the prediction fails. `matchups/` is gitignored.
 
-`test-scoring.mjs` keeps a `KNOWN_RED` map of tests that are red on purpose.
-The suite exits 0 when the failing set is exactly that set, and 1 when
-something else fails **or** when a listed test starts passing (remove the entry
-— a stale list stops meaning anything). Never add an entry to silence a
-regression.
+`test-scoring.mjs` keeps a `KNOWN_RED` map of tests that are red on purpose. The suite exits 0 when the failing set is exactly that set, and 1 when something else fails **or** when a listed test starts passing (remove the entry — a stale list stops meaning anything). Never add an entry to silence a regression.
+
+## Updating Test Cases
+
+Don’t split existing tests into multiples, it causes havoc. A single test case is allowed to have multiple parts. 

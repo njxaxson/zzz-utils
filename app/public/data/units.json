@@ -440,7 +440,7 @@
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "buffs": {
-                "chains": 1,
+                "chains": 3,
                 "dmg": 4,
                 "laceration": { "cases": [ { "when": { "role": "armorer" }, "value": 1 }, { "value": 0 } ] },
                 "cd":         { "cases": [ { "when": { "role": "armorer" }, "value": 0 }, { "value": 3 } ] }
@@ -773,7 +773,7 @@
                 "totalize": 1,
                 "ultimate:double": 1,
                 "ultimate:weak": 1,
-                "ultimate:strong": { "cases": [ { "when": { "hasUnit": "anomaly:wind" }, "value": 1 }, { "value": 0 } ] }
+                "ultimate:strong": { "cases": [ { "when": { "provisions": "anomaly:wind" }, "value": 1 }, { "value": 0 } ] }
             }
         },
         "faction": "Phaethon",
@@ -865,14 +865,15 @@
         "join": ["attack", "armorer", "rupture"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
-            "pseudoRole": ["anomaly", "subdps"],
+            "pseudoRole": ["subdps"],
             "buffs": {
                 "stun-multiplier": 2,
-                "laceration": { "cases": [ { "when": { "role": "armorer" }, "value": 3 }, { "value": 0 } ] },
+                "laceration": { "cases": [ { "when": { "role": "armorer" }, "value": 2 }, { "value": 0 } ] },
                 "cd":         { "cases": [ { "when": { "role": "armorer" }, "value": 0 }, { "value": 3 } ] }
             },
             "debuffs": { "recovery": 2 },
-            "scaling": { "er": 4, "anomaly:wind": 1, "am" : 1, "ap" : 0 }
+            "utility": { "anomaly:wind": 1 },
+            "scaling": { "er": 4, "anomaly:wind": 1 }
         },
         "faction": "Flint Workshop",
         "available": false,

@@ -575,6 +575,10 @@ function w(value) {
 //   { hasUnit }             a unit is on the team — a plain id ("velina"), OR a colon-qualified
 //                           "<role>:<element>" type ("anomaly:wind" = any effective wind-anomaly unit)
 //   { notPresent }          same identifier forms, negated
+//   { provisions }          same identifier forms as `hasUnit`, but also satisfied by a unit
+//                           that merely PROVISIONS the need rather than embodying it — a
+//                           `utility["<role>:<element>"]` surplus (e.g. Roxy's wind-anomaly
+//                           procs) counts alongside an actual effective-role match (Velina)
 //   { role }                the RECIPIENT's (consumer's) effective roles include role
 //
 // A mechanic value is either a scalar (number/true) or { cases: [{ when?, value }, …] };
@@ -591,10 +595,19 @@ function unitMatchesIdentifier(u, ident) {
     return u.id === ident;
 }
 
+// Like `unitMatchesIdentifier`, but also satisfied by a unit that merely PROVISIONS the
+// identifier as a `utility["<role>:<element>"]` surplus, without embodying the role itself
+// (e.g. Roxy provisions "anomaly:wind" via utility while being a stunner, not an anomaly agent).
+function unitProvidesIdentifier(u, ident) {
+    if (unitMatchesIdentifier(u, ident)) return true;
+    return w(u.mechanics?.utility?.[ident]) > 0;
+}
+
 function evaluatePredicate(when, ctx) {
     if (!when) return true;
     if (when.hasUnit !== undefined) return (ctx.team || []).some(u => unitMatchesIdentifier(u, when.hasUnit));
     if (when.notPresent !== undefined) return !(ctx.team || []).some(u => unitMatchesIdentifier(u, when.notPresent));
+    if (when.provisions !== undefined) return (ctx.team || []).some(u => unitProvidesIdentifier(u, when.provisions));
     if (when.role !== undefined) {
         // Recipient-scoped: needs a consumer. Team-global reads (no consumer) fall through
         // to the default case by treating role predicates as unmet.
@@ -618,6 +631,7 @@ export function isTeamScopedConditional(spec) {
     if (!isConditionalSpec(spec)) return false;
     return spec.cases.some(c => c.when && (
         c.when.countTag !== undefined || c.when.hasUnit !== undefined || c.when.notPresent !== undefined
+        || c.when.provisions !== undefined
     ));
 }
 
