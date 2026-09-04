@@ -246,7 +246,6 @@
             "scaling": { "buffs" : 0, "cd" : 1 }
         },
         "faction": "Flint Workshop",
-        "available": false,
         "displayText": "Goth Barbie is the first armorer unit and craves crit rate and defense. Her favorite support is Rina P6.",
         "gender": "female",
         "species": "human"
