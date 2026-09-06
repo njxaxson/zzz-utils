@@ -41,8 +41,12 @@ node test-scoring.mjs && node test-recommendations.mjs && node test-bucketing.mj
 
 The last two are not optional extras. `test-bucketing.mjs` caught a structural change that had
 inverted a Deadly Assault allocation, and `cohesion-fixture.mjs` is the objective function for
-support fit. Both suites exit 0 only when the failing set is exactly their `KNOWN_RED` map — so
-check the exit code, not the word "failed".
+support fit. Neither has a `KNOWN_RED` map — they exit non-zero on any failure at all.
+
+`KNOWN_RED` belongs to `test-scoring.mjs` and `test-recommendations.mjs`. Those two exit 0 only
+when the failing set is *exactly* their map, and exit 1 both when something unexpected fails and
+when a listed test starts passing. Either way: **check the exit code, not the word "failed".**
+Both maps are currently empty.
 
 **Then regenerate and re-certify calibration.** The suites all assert against raw scores, so a
 stale `calibration.json` fails silently and only shows up as wrong-looking ladders:

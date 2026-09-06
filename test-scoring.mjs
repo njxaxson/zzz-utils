@@ -1430,10 +1430,9 @@ async function main() {
         }
     });
 
-    // TEST 77: Roxy/Harumasa/Velina — emergent wind team is viable (Typhon)
-    // The only fully-valid Roxy+Velina composition (Harumasa joins both). Roxy+Velina
-    // stack wind anomaly + daze; on Typhon (electric + wind weak) it should be a solid,
-    // playable team even with Harumasa at T2.5. (Not top-tier until Harumasa is buffed.)
+    // TEST 77: the only fully-valid Roxy+Velina composition (Harumasa joins both), stacking wind
+    // anomaly + daze — should be a solid, playable team on wind-weak Typhon, though not top-tier
+    // until Harumasa is buffed.
     run('TEST 77: Roxy/Harumasa/Velina viable on Typhon', () => {
         if (!allUnits.find(u => u.id === 'roxy')) return;
         for (const b of withBosses(bosses, 'Typhon')) {
@@ -1450,11 +1449,9 @@ async function main() {
         }
     });
 
-    // TEST 78: hasUnit qualified identifier "anomaly:wind" (Pyrois conditional ultimate)
-    // Pyrois's damage["ultimate:strong"] activates only when a wind-anomaly unit is on the
-    // team, expressed as { when: { hasUnit: "anomaly:wind" } }. A colon-qualified hasUnit
-    // matches by effective role + element, so Roxy (wind pseudo-anomaly) triggers it but
-    // Vivian (ether anomaly) does not.
+    // TEST 78: Pyrois's damage["ultimate:strong"] activates only with a wind-anomaly teammate,
+    // `{ when: { hasUnit: "anomaly:wind" } }` — a colon-qualified hasUnit matches by effective
+    // role + element, so Roxy (wind pseudo-anomaly) triggers it but ether-anomaly Vivian does not.
     run('TEST 78: hasUnit "anomaly:wind" predicate (Pyrois ultimate)', () => {
         if (!allUnits.find(u => u.id === 'roxy')) return;
         const pyrois = allUnits.find(u => u.id === 'pyrois');
@@ -1469,10 +1466,8 @@ async function main() {
             'Pyrois ultimate:strong should be 0 with no wind anomaly on the team');
     });
 
-    // TEST 79: wind anomaly lets Pyrois receive Dialyn's free ultimates fully
-    // Pyrois's ultimate:weak normally suppresses ultimate-provision (Dialyn's free ults are
-    // wasted on him). With a wind-anomaly unit present, his conditional ultimate:strong
-    // overrides that, so Dialyn's provision lands — a large swing.
+    // TEST 79: Pyrois's ultimate:weak normally suppresses ultimate provision (Dialyn's free
+    // ults wasted on him); a wind-anomaly teammate's conditional ultimate:strong overrides that.
     run('TEST 79: wind anomaly un-suppresses Dialyn provision for Pyrois (Neutral)', () => {
         if (!allUnits.find(u => u.id === 'roxy')) return;
         for (const b of withBosses(bosses, 'Neutral')) { 
@@ -1485,10 +1480,8 @@ async function main() {
         }
     });
 
-    // TEST 80: Sigrid's wind-anomaly passive is a bonus, never a penalty
-    // Sigrid has scaling["anomaly:wind"]:1 (passive: extra damage under wind anomaly). It must
-    // NOT inhibit her when no wind source is present — a wind-less team (Lighter/Sigrid/Astra)
-    // must still be strong. A wind source (Roxy) adds a mild bonus.
+    // TEST 80: Sigrid's scaling["anomaly:wind"]:1 passive must NOT inhibit her with no wind
+    // source present — a wind-less team must still be strong, with a wind source only a bonus.
     run('TEST 80: Sigrid not penalized without wind anomaly (Neutral)', () => {
         if (!allUnits.find(u => u.id === 'sigrid')) return;
         for (const b of withBosses(bosses, 'Neutral')) {
@@ -1503,12 +1496,10 @@ async function main() {
         }
     });
 
-    // TEST 81: a stunless DPS satisfies a stun shill on its own (Thrall & Sobek)
-    // Thrall's `shill: stun` is a hard requirement because damage only lands inside
-    // stun windows. A stunless DPS (YSG) carries that multiplier permanently and never
-    // needs a window opened, so YSG/Sunna/Zhao must be viable — and strong — without a
-    // stunner. The requirement still holds for everyone else: an equally stunnerless
-    // team with a window-dependent DPS (Evelyn) stays disqualified.
+    // TEST 81: Thrall's `shill: stun` is a hard requirement because damage only lands inside
+    // stun windows — but a stunless DPS (YSG) carries that multiplier permanently, so
+    // YSG/Sunna/Zhao must stay viable without a stunner while a window-dependent DPS (Evelyn)
+    // in the same shape stays disqualified.
     run('TEST 81: stunless DPS satisfies the stun shill on Thrall', () => {
         if (!allUnits.find(u => u.id === 'ysg')) return;
         for (const b of withBosses(bosses, 'Thrall')) {
@@ -1525,16 +1516,11 @@ async function main() {
     });
 
 
-    // TEST 82: Laceration buffs land on armorers and nobody else (Neutral)
-    // Laceration is the armorer's damage type — the class analogue of rupture's Sheer.
-    // Isolated by A/B-ing the SAME team against itself with the laceration buff stripped out,
-    // so tier, rank, element and every other kit difference cancel and the only delta is the
-    // buff. Comparing two different DPS would just measure the tier gap instead.
-    //
-    // Laceration reaches an armorer down two independent paths — baseline affinity
-    // (MULT.LACERATION_BUFF) and the damage-lever dependency (getArmorerLeverSupply) — so the
-    // assertions below pin each one separately. A test that only checks "score went down"
-    // passes even with MULT.LACERATION_BUFF at zero, because the lever path alone carries it.
+    // TEST 82: Laceration (the armorer's damage type, class analogue of rupture's Sheer) reaches
+    // an armorer down two independent paths — baseline affinity (MULT.LACERATION_BUFF) and the
+    // damage-lever dependency (getArmorerLeverSupply) — so each is pinned separately below; a
+    // test that only checks "score went down" would pass even with MULT.LACERATION_BUFF zeroed.
+    // Isolated by A/B-ing the SAME team with the buff stripped, so only the buff differs.
     run('TEST 82: laceration buffs are armorer-only', () => {
         const roxy = allUnits.find(u => u.id === 'roxy');
         if (!roxy || !allUnits.find(u => u.id === 'claret')) return;

@@ -12,9 +12,7 @@ import {
 } from '../common/roster-ui.js';
 import { ELEMENTS, DPS_ROLES } from '../common/constants.js';
 
-// ============================================================================
-// CONSTANTS
-// ============================================================================
+// Constants
 
 const FILTERS_STORAGE_KEY = 'zzz-team-builder-filters';
 const MIN_TEAMS_TO_SHOW = 6;
@@ -42,9 +40,7 @@ function teamHasMatchingDPS(team, targetElement, targetDpsType, allowSubDPS = fa
     return false;
 }
 
-// ============================================================================
-// STATE
-// ============================================================================
+// State
 
 // Section collapse states
 let filtersOpen = true;
@@ -64,9 +60,7 @@ let filters = {
 let currentPage = 0;
 let filteredTeams = [];
 
-// ============================================================================
-// DATA LOADING
-// ============================================================================
+// Data Loading
 
 async function loadData() {
     try {
@@ -83,9 +77,7 @@ async function loadData() {
     }
 }
 
-// ============================================================================
-// LOCAL STORAGE
-// ============================================================================
+// Local Storage
 
 function saveFiltersToStorage() {
     localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify({ ...filters, filtersOpen }));
@@ -107,9 +99,7 @@ function loadFiltersFromStorage() {
     }
 }
 
-// ============================================================================
-// UI RENDERING
-// ============================================================================
+// UI Rendering
 
 function renderPageUI() {
     renderMustIncludeDropdown();
@@ -165,7 +155,6 @@ function applySectionStates() {
 }
 
 function applyFilterStates() {
-    // Elements dropdown
     const elementsDropdown = document.querySelector('[data-filter="elements"]');
     if (elementsDropdown) {
         elementsDropdown.querySelectorAll('input[type="checkbox"]').forEach(cb => {
@@ -174,7 +163,6 @@ function applyFilterStates() {
         updateDropdownText(elementsDropdown, capitalizedList(filters.elements), 'Any element');
     }
     
-    // DPS roles dropdown
     const dpsDropdown = document.querySelector('[data-filter="dps-role"]');
     if (dpsDropdown) {
         dpsDropdown.querySelectorAll('input[type="checkbox"]').forEach(cb => {
@@ -183,7 +171,6 @@ function applyFilterStates() {
         updateDropdownText(dpsDropdown, filters.dpsRoles, 'Any DPS');
     }
     
-    // Min S-Rank buttons
     const minSRankGroup = document.querySelector('[data-filter="min-s-rank"]');
     if (minSRankGroup) {
         minSRankGroup.querySelectorAll('.filter-btn').forEach(btn => {
@@ -191,7 +178,6 @@ function applyFilterStates() {
         });
     }
     
-    // Max Tier buttons
     const maxTierGroup = document.querySelector('[data-filter="max-tier"]');
     if (maxTierGroup) {
         maxTierGroup.querySelectorAll('.filter-btn').forEach(btn => {
@@ -199,7 +185,6 @@ function applyFilterStates() {
         });
     }
     
-    // Teams Per Archetype buttons
     const teamsPerArchetypeGroup = document.querySelector('[data-filter="teams-per-archetype"]');
     if (teamsPerArchetypeGroup) {
         teamsPerArchetypeGroup.querySelectorAll('.filter-btn').forEach(btn => {
@@ -207,7 +192,6 @@ function applyFilterStates() {
         });
     }
     
-    // Must Include dropdown
     const mustIncludeDropdown = document.querySelector('[data-filter="must-include"]');
     if (mustIncludeDropdown) {
         const allUnits = getAllUnits();
@@ -218,7 +202,6 @@ function applyFilterStates() {
         updateDropdownText(mustIncludeDropdown, names, 'No specific units');
     }
     
-    // Exclude dropdown
     const excludeDropdown = document.querySelector('[data-filter="exclude"]');
     if (excludeDropdown) {
         const allUnits = getAllUnits();
@@ -247,9 +230,7 @@ function capitalizedList(values) {
     return values.map(capitalizeFirst);
 }
 
-// ============================================================================
-// EVENT HANDLING
-// ============================================================================
+// Event Handling
 
 function setupEventListeners() {
     const filterSection = document.getElementById('filter-section');
@@ -257,7 +238,6 @@ function setupEventListeners() {
         filterSection.addEventListener('toggle', handleFilterToggle);
     }
     
-    // Multi-select dropdowns
     document.querySelectorAll('.multi-dropdown').forEach(dropdown => {
         const toggle = dropdown.querySelector('.dropdown-toggle');
         toggle.addEventListener('click', (e) => {
@@ -273,14 +253,12 @@ function setupEventListeners() {
             }
         });
         
-        // Search input handling
         const searchInput = dropdown.querySelector('.dropdown-search-input');
         if (searchInput) {
             searchInput.addEventListener('input', () => applyDropdownFilters(dropdown));
             searchInput.addEventListener('click', (e) => e.stopPropagation());
         }
         
-        // Quick filter buttons
         dropdown.querySelectorAll('.quick-filter-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -289,7 +267,6 @@ function setupEventListeners() {
             });
         });
         
-        // Select All/None buttons
         const selectAllBtn = dropdown.querySelector('.select-all-visible');
         const selectNoneBtn = dropdown.querySelector('.select-none-visible');
         
@@ -308,14 +285,12 @@ function setupEventListeners() {
         }
     });
     
-    // Close dropdowns when clicking outside
     document.addEventListener('click', (e) => {
         if (!e.target.closest('.multi-dropdown')) {
             closeAllDropdowns();
         }
     });
     
-    // Button groups (single select)
     document.querySelectorAll('.button-group').forEach(group => {
         group.querySelectorAll('.filter-btn').forEach(btn => {
             btn.addEventListener('click', () => handleButtonGroupClick(group, btn));
@@ -339,7 +314,6 @@ function toggleDropdown(dropdown) {
     closeAllDropdowns();
     if (!wasOpen) {
         dropdown.classList.add('open');
-        // Focus search input if present
         const searchInput = dropdown.querySelector('.dropdown-search-input');
         if (searchInput) {
             setTimeout(() => searchInput.focus(), 50);
@@ -350,7 +324,6 @@ function toggleDropdown(dropdown) {
 function closeAllDropdowns() {
     document.querySelectorAll('.multi-dropdown.open').forEach(dd => {
         dd.classList.remove('open');
-        // Clear search and quick filters when closing
         const searchInput = dd.querySelector('.dropdown-search-input');
         if (searchInput) {
             searchInput.value = '';
@@ -358,7 +331,6 @@ function closeAllDropdowns() {
         dd.querySelectorAll('.quick-filter-btn.active').forEach(btn => {
             btn.classList.remove('active');
         });
-        // Show all items
         dd.querySelectorAll('.dropdown-item').forEach(item => {
             item.classList.remove('hidden');
         });
@@ -375,7 +347,6 @@ function selectVisibleItems(dropdown, selectAll) {
         }
     });
     
-    // Trigger the filter change handler
     handleDropdownChange(dropdown);
 }
 
@@ -383,7 +354,6 @@ function applyDropdownFilters(dropdown) {
     const searchInput = dropdown.querySelector('.dropdown-search-input');
     const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
     
-    // Get active quick filters
     const activeRoleFilters = [];
     const activeTierFilters = [];
     
@@ -496,7 +466,6 @@ function clearFilters() {
         exclude: []
     };
     
-    // Reset UI
     document.querySelectorAll('.multi-dropdown input[type="checkbox"]').forEach(cb => {
         cb.checked = false;
     });
@@ -511,18 +480,14 @@ function clearFilters() {
     applyFilterStates();
     saveFiltersToStorage();
     
-    // Clear results
     document.getElementById('results-section').style.display = 'none';
 }
 
-// ============================================================================
-// TEAM BUILDING
-// ============================================================================
+// Team Building
 
 function buildTeams() {
     hideValidationErrors();
 
-    // Get available units
     const availableUnits = getAvailableUnits();
 
     if (availableUnits.length < 3) {
@@ -543,21 +508,17 @@ function buildTeams() {
 
     setTimeout(() => {
         try {
-            // Generate all valid teams
             const allTeams = getTeams(availableUnits);
 
-            // Convert to array and filter to 3-person teams only
             let teams = Object.entries(allTeams)
                 .filter(([label, team]) => team.length === 3)
                 .map(([label, team]) => ({ label, team }));
 
-            // Apply user filters first
             teams = applyUserFilters(teams);
 
             // Select best teams using synthetic boss scoring
             filteredTeams = selectBestTeams(teams, availableUnits, calibration);
 
-            // Reset pagination and display
             currentPage = 0;
             displayResults();
         } catch (error) {
@@ -593,7 +554,6 @@ function applyUserFilters(teams) {
 
     // Apply all non-element filters first, then layer on the element filter
     const nonElementFiltered = teams.filter(({ label, team }) => {
-        // Filter: DPS Role (at least one unit with selected role)
         if (filters.dpsRoles.length > 0) {
             const hasDpsRole = team.some(u =>
                 filters.dpsRoles.some(role => u.tags.includes(role))
@@ -601,13 +561,11 @@ function applyUserFilters(teams) {
             if (!hasDpsRole) return false;
         }
 
-        // Filter: Minimum S-Ranks
         if (filters.minSRank > 0) {
             const sRankCount = team.filter(u => u.rank === 'S').length;
             if (sRankCount < filters.minSRank) return false;
         }
 
-        // Filter: Maximum Tier
         if (filters.maxTier < 99) {
             const hasHighTier = team.some(u => u.tier > filters.maxTier);
             if (hasHighTier) return false;
@@ -643,7 +601,6 @@ function applyUserFilters(teams) {
 function selectBestTeams(teams, availableUnits, calibration) {
     if (teams.length === 0) return [];
 
-    // Determine available elements and DPS types based on filters and roster
     const availableElements = getAvailableElements(availableUnits);
     const availableDpsTypes = getAvailableDpsTypes(availableUnits);
 
@@ -658,15 +615,10 @@ function selectBestTeams(teams, availableUnits, calibration) {
         assists: 0
     };
 
-    // Step 1: Score all teams globally with consistent scoring. This one `scoredTeams` list
-    // spans every archetype (element x DPS-type grid cell), and while ranking WITHIN a cell is
-    // unaffected by a monotonic per-archetype transform, two places downstream compare ACROSS
-    // archetypes using this same sorted order: the third-pass empty-cell backfill, and step 4's
-    // "pad up to MIN_TEAMS_TO_SHOW" walk, which picks whichever team is next in this list
-    // regardless of archetype. Both need CALIBRATED order, or an archetype with more scoring
-    // events (anomaly) fills empty cells and padding slots ahead of an equally-good team from a
-    // smaller archetype — the same cross-archetype distortion calibration exists to fix
-    // elsewhere. See documentation/engine/calibration.md.
+    // Step 1: score all teams into one calibrated `scoredTeams` list spanning every archetype.
+    // The third-pass empty-cell backfill and step 4's padding walk both compare across
+    // archetypes using this same order, so it must be calibrated — not raw — or a busier
+    // archetype crowds out an equally-good team from a smaller one. See documentation/engine/calibration.md.
     const scoredTeams = teams.map(({ label, team }) => {
         const trace = {};
         const raw = scoreTeamForBoss(team, neutralBoss, { lenient: true, trace });
@@ -690,14 +642,12 @@ function selectBestTeams(teams, availableUnits, calibration) {
     // For anomaly archetypes, use special scoring that prioritizes dual-anomaly compositions
     for (const element of availableElements) {
         for (const dpsType of availableDpsTypes) {
-            // Get all teams that match this archetype
             const matchingTeams = scoredTeams
                 .filter(teamData => !usedTeams.has(teamData.label))
                 .filter(teamData => teamHasMatchingDPS(teamData.team, element, dpsType));
             
             if (matchingTeams.length === 0) continue;
        
-            // Take up to teamsPerArchetype teams for this archetype
             const teamsToAdd = matchingTeams.slice(0, filters.teamsPerArchetype);
             
             for (const teamData of teamsToAdd) {
@@ -715,14 +665,11 @@ function selectBestTeams(teams, availableUnits, calibration) {
     for (const teamData of scoredTeams) {
         if (usedTeams.has(teamData.label)) continue;
         
-        // Find an archetype that still needs teams
         let assigned = false;
         for (const element of availableElements) {
             for (const dpsType of availableDpsTypes) {
-                // Check if this archetype needs more teams
                 if (grid[element][dpsType].length >= filters.teamsPerArchetype) continue;
                 
-                // Check if team matches this archetype's criteria
                 if (teamHasMatchingDPS(teamData.team, element, dpsType)) {
                     grid[element][dpsType].push({
                         ...teamData,
@@ -813,7 +760,6 @@ function getDpsTypeForUnit(unit) {
 }
 
 function getAvailableElements(availableUnits) {
-    // Elements available in roster (considering filters)
     const elements = new Set();
 
     // Lumen has no grid row of its own (see GRID_ELEMENTS) — a Lumen-only element
@@ -827,7 +773,6 @@ function getAvailableElements(availableUnits) {
         if (isDPS(unit)) {
             const element = getElement(unit);
             if (element && element !== 'lumen') {
-                // If a real-element filter is active, only include those elements
                 if (realElementFilters.length === 0 || realElementFilters.includes(element)) {
                     elements.add(element);
                 }
@@ -839,7 +784,6 @@ function getAvailableElements(availableUnits) {
 }
 
 function getAvailableDpsTypes(availableUnits) {
-    // DPS types available in roster (considering filters)
     const dpsTypes = new Set();
     
     for (const unit of availableUnits) {
@@ -847,7 +791,6 @@ function getAvailableDpsTypes(availableUnits) {
         
         for (const role of DPS_ROLES) {
             if (unit.tags.includes(role)) {
-                // If DPS filter is active, only include those types
                 if (filters.dpsRoles.length === 0 || filters.dpsRoles.includes(role)) {
                     // Attack+Anomaly hybrid counts as attack
                     if (role === 'anomaly' && unit.tags.includes('attack')) {
@@ -929,9 +872,7 @@ function getTeamDpsType(team) {
     return null;
 }
 
-// ============================================================================
-// RESULTS DISPLAY
-// ============================================================================
+// Results Display
 
 function displayResults() {
     const section = document.getElementById('results-section');
@@ -949,7 +890,6 @@ function displayResults() {
         countEl.innerHTML = '';
         pagination.style.display = 'none';
     } else {
-        // Build grid display: rows = elements, columns = DPS types
         grid.innerHTML = createTeamGrid(filteredTeams);
         
         countEl.innerHTML = `Showing <span class="highlight">${filteredTeams.length}</span> recommended team${filteredTeams.length !== 1 ? 's' : ''}`;
@@ -981,7 +921,6 @@ function createTeamGrid(teams) {
         teamsByCell[key].push(teamData);
     }
     
-    // Determine which elements and DPS types to display
     let displayElements;
     let displayDpsTypes;
     
@@ -990,27 +929,21 @@ function createTeamGrid(teams) {
     const realElementFilters = filters.elements.filter(el => el !== 'lumen');
 
     if (realElementFilters.length > 0) {
-        // User has selected specific real elements - show only those (maintain order)
         displayElements = GRID_ELEMENTS.filter(el => realElementFilters.includes(el));
     } else {
-        // No real-element filter - show only elements that have teams
         const elementsWithTeams = new Set(teams.map(t => t.element).filter(Boolean));
         displayElements = GRID_ELEMENTS.filter(el => elementsWithTeams.has(el));
     }
     
     if (filters.dpsRoles.length > 0) {
-        // User has selected specific DPS types - show only those (maintain order)
         displayDpsTypes = GRID_DPS_TYPES.filter(role => filters.dpsRoles.includes(role));
     } else {
-        // No filter - show only DPS types that have teams
         const dpsTypesWithTeams = new Set(teams.map(t => t.dpsType).filter(Boolean));
         displayDpsTypes = GRID_DPS_TYPES.filter(role => dpsTypesWithTeams.has(role));
     }
     
-    // Build grid HTML
     let html = '<div class="team-grid-container">';
     
-    // Header row with DPS type labels
     html += '<div class="team-grid-header">';
     html += '<div class="grid-corner"></div>'; // Empty corner cell
     for (const dpsType of displayDpsTypes) {
@@ -1018,21 +951,17 @@ function createTeamGrid(teams) {
     }
     html += '</div>';
     
-    // Data rows (one per element)
     for (const element of displayElements) {
         html += '<div class="team-grid-row">';
         
-        // Row label (element)
         html += `<div class="grid-row-label element-${element}">${capitalizeFirst(element)}</div>`;
         
-        // Cells for each DPS type
         for (const dpsType of displayDpsTypes) {
             const key = `${element}-${dpsType}`;
             const cellTeams = teamsByCell[key] || [];
             
             html += '<div class="grid-cell">';
             if (cellTeams.length > 0) {
-                // Show ALL teams in this cell
                 html += '<div class="grid-cell-teams">';
                 for (const teamData of cellTeams) {
                     html += createTeamCard(teamData.team, true);
@@ -1063,13 +992,11 @@ function createTeamCard(team, compact = false) {
     const badges = [];
     
     if (!compact) {
-        // Element badges (based on DPS units, falling back to stun, then support/defense)
         const teamElements = getTeamElements(team);
         for (const element of teamElements) {
             badges.push(`<span class="team-badge element-badge ${element}">${element}</span>`);
         }
         
-        // DPS type badge (attack+anomaly = attack)
         const dpsType = getTeamDpsType(team);
         if (dpsType) {
             badges.push(`<span class="team-badge role-badge">${dpsType}</span>`);
@@ -1111,9 +1038,7 @@ function changePage(delta) {
     displayResults();
 }
 
-// ============================================================================
-// ERROR HANDLING
-// ============================================================================
+// Error Handling
 
 function showValidationErrors(errors) {
     const container = document.getElementById('validation-errors');
@@ -1132,9 +1057,7 @@ function showError(message) {
     showValidationErrors([message]);
 }
 
-// ============================================================================
-// INITIALIZATION
-// ============================================================================
+// Initialization
 
 document.addEventListener('DOMContentLoaded', loadData);
 

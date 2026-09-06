@@ -80,5 +80,31 @@ discount can shrink the *wrong* marginal faster and move the allocation the wron
 * `test-bucketing.mjs` — the suite that guards marginal value and rank bands. It once caught a
   structural change that had inverted an allocation. See
   [the verification loop](../tooling/verification-loop.md).
+## Code notes
 
+### [BUCK-01] Why the rank band is 0.011 with a floor of 4.5
 
+`RANK_BAND_RATIO` and `RANK_BAND_FLOOR` in `team-builder.js` decide when two teams count as
+equally good for allocation. Both were derived from one real case on the **calibrated** scale,
+not picked in the abstract.
+
+On Thrall & Sobek:
+
+| Team | Calibrated | Note |
+|----|----|----|
+| `Dialyn / Ye Shunguong / Sunna` | 409.4 | The #1 allocation |
+| `Ye Shunguong / Zhao / Sunna` | 405.2 | Best line that frees Dialyn for another boss |
+
+The 4.2-point gap **has to fall inside one band**. If it does not, the solver refuses to give
+Dialyn up even when the total allocation across all three bosses would be better — and Dialyn is
+exactly the unit other bosses compete for.
+
+`0.011 x 409.4 = 4.50`, which is the smallest ratio that clears 4.2 at this score. The floor of
+4.5 matches it, so a low-scoring matchup does not get a disproportionately wide band. It was 5,
+tuned against the older 0.02 ratio.
+
+Why it matters more than it looks: `priority` weights `maxRank` by 100, so letting noise open a
+rank step can evict a strictly better allocation from the results entirely.
+
+**If this ever needs re-tuning, re-check this exact Thrall pair** — TEST 3 asserts the shape of
+the band, not this case, so it will stay green while the behaviour it protects has drifted.

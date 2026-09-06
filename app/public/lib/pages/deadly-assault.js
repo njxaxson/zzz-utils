@@ -21,9 +21,7 @@ import {
 import { isPrimaryDps, unitFingerprint, teamDpsFingerprint } from '../common/dps-buckets.js';
 import { solveDeadlyAssault } from '../common/deadly-assault-solver.js';
 
-// ============================================================================
-// CONSTANTS
-// ============================================================================
+// Constants
 
 const COMBINATION_LIMIT = 25;
 const DISPLAY_LIMIT = 5;
@@ -31,9 +29,7 @@ const MIN_UNITS_REQUIRED = 9;
 const BOSSES_REQUIRED = 3;
 const PAGE_STORAGE_KEY = 'zzz-deadly-assault';     // Page-specific settings
 
-// ============================================================================
-// STATE
-// ============================================================================
+// State
 
 let allBosses = [];
 
@@ -54,9 +50,7 @@ let bossCardTouchMode = null;
 let showCreativeOptions = false;
 let lastResults = null;
 
-// ============================================================================
-// DATA LOADING
-// ============================================================================
+// Data Loading
 
 async function loadData() {
     try {
@@ -100,9 +94,7 @@ function loadBossState() {
     }
 }
 
-// ============================================================================
-// LOCAL STORAGE
-// ============================================================================
+// Local Storage
 
 function savePageToStorage() {
     // Do NOT save to localStorage when viewing shared bosses
@@ -143,9 +135,7 @@ function loadPageFromStorage() {
     }
 }
 
-// ============================================================================
-// UI RENDERING
-// ============================================================================
+// UI Rendering
 
 function renderPageUI() {
     renderBossSection();
@@ -172,7 +162,6 @@ function renderBossSection() {
         modeBar.addEventListener('click', handleBossModeToggle);
     }
 
-    // Filter out bosses with available=false
     const availableBosses = allBosses.filter(boss => boss.available !== false);
     container.innerHTML = availableBosses.map(boss => createBossCard(boss)).join('');
 
@@ -261,9 +250,7 @@ function getWeaknessGradientClass(weaknesses) {
     return `weakness-${sorted[0]}-${sorted[1]}`;
 }
 
-// ============================================================================
-// EVENT HANDLING
-// ============================================================================
+// Event Handling
 
 function setupEventListeners() {
     const bossGrid = document.getElementById('boss-grid');
@@ -339,7 +326,6 @@ function handleBossClick(e) {
     const index = selectedBosses.indexOf(bossId);
     
     if (index >= 0) {
-        // Deselect
         selectedBosses.splice(index, 1);
         card.classList.remove('selected');
         card.setAttribute('aria-pressed', 'false');
@@ -353,7 +339,6 @@ function handleBossClick(e) {
                 oldestCard.setAttribute('aria-pressed', 'false');
             }
         }
-        // Select the new boss
         selectedBosses.push(bossId);
         card.classList.add('selected');
         card.setAttribute('aria-pressed', 'true');
@@ -438,19 +423,15 @@ function cycleBossVariation(bossId) {
     savePageToStorage();
 }
 
-// ============================================================================
-// VALIDATION
-// ============================================================================
+// Validation
 
 function validate() {
     const errors = [];
     
-    // Check boss count
     if (selectedBosses.length !== BOSSES_REQUIRED) {
         errors.push(`Please select exactly ${BOSSES_REQUIRED} bosses (currently ${selectedBosses.length} selected)`);
     }
     
-    // Check unit count
     const availableUnits = getAvailableUnits();
     if (availableUnits.length < MIN_UNITS_REQUIRED) {
         errors.push(`Need at least ${MIN_UNITS_REQUIRED} available units (currently ${availableUnits.length})`);
@@ -476,9 +457,7 @@ function showError(message) {
     showValidationErrors([message]);
 }
 
-// ============================================================================
-// OPTIMIZATION ALGORITHM
-// ============================================================================
+// Optimization Algorithm
 
 function getAvailableUnits() {
     const allUnits = getAllUnits();
@@ -493,7 +472,6 @@ function getAvailableUnits() {
 }
 
 function runOptimization() {
-    // Validate
     const errors = validate();
     if (errors.length > 0) {
         showValidationErrors(errors);
@@ -501,7 +479,6 @@ function runOptimization() {
     }
     hideValidationErrors();
     
-    // Disable button
     const btn = document.getElementById('run-btn');
     btn.disabled = true;
     btn.textContent = 'CALCULATING...';
@@ -521,11 +498,9 @@ function runOptimization() {
     }, 50);
 }
 
-// Deadly Assault allocates across 3 bosses at once and compares teams of DIFFERENT archetypes
-// against each other (findExclusiveCombinations' banding, dps-buckets' totalScore sum and
-// perBossFloor cut) — the sharpest cross-archetype comparison in the app. So every `.score`
-// created here is CALIBRATED, not raw. Same helper as the CLI (deadly-assault.js at repo root)
-// and team-recommendations.js. Returns null for a non-viable team.
+// Deadly Assault compares teams of DIFFERENT archetypes across 3 bosses at once (banding,
+// totalScore sum, perBossFloor), so every `.score` here must be CALIBRATED, not raw. Mirrors
+// the CLI's deadly-assault.js and team-recommendations.js. Returns null for a non-viable team.
 function scoreCalibrated(team, boss, scoreOptions, calibration) {
     const trace = {};
     const raw = scoreTeamForBoss(team, boss, { ...scoreOptions, trace });
@@ -541,7 +516,6 @@ function calculateOptimalTeams() {
         throw new Error('Calibration data failed to load — refresh the page. If this persists, ' +
             'calibration.json may be missing (run: node generate-calibration.mjs).');
     }
-    // Resolve selected bosses to their active variations
     const selectedBossObjects = selectedBosses
         .map(id => {
             const boss = allBosses.find(b => b.id === id);
@@ -552,7 +526,7 @@ function calculateOptimalTeams() {
         .filter(Boolean);
     const selectedBossNames = selectedBossObjects.map(b => b.name);
     
-    // DEBUG: Log available units
+    //TODO Decide if this should remain
     console.group('🎮 Deadly Assault Debug Info');
     console.log('📋 Available Units:', availableUnits.length);
     console.table(availableUnits.map(u => ({
@@ -564,10 +538,8 @@ function calculateOptimalTeams() {
     console.log('🌟 Universal Units:', universalUnitNames);
     console.log('👹 Selected Bosses:', selectedBossObjects.map(b => b.name));
     
-    // Generate all valid teams
     const allTeams = getTeams(availableUnits);
     
-    // Separate 2-person and 3-person teams
     const twoCharTeams = {};
     const threeCharTeams = {};
     for (const label in allTeams) {
@@ -579,12 +551,10 @@ function calculateOptimalTeams() {
         }
     }
     
-    // DEBUG: Log team counts before extension
     console.log('🔢 Teams before universal extension:');
     console.log(`   2-person teams: ${Object.keys(twoCharTeams).length}`);
     console.log(`   3-person teams: ${Object.keys(threeCharTeams).length}`);
     
-    // Extend 2-person teams with universal units
     const universalUnitObjects = availableUnits.filter(u => universalUnitNames.includes(u.name));
     if (universalUnitObjects.length > 0) {
         extendTeamsWithUniversalUnits(twoCharTeams, threeCharTeams, universalUnitObjects);
@@ -592,18 +562,15 @@ function calculateOptimalTeams() {
     
     const teamLabels = Object.keys(threeCharTeams);
     
-    // DEBUG: Log team counts after extension
     console.log('🔢 Teams after universal extension:');
     console.log(`   3-person teams: ${teamLabels.length}`);
     console.log('📝 All 3-person team labels:', teamLabels);
     
-    // Score teams for each boss
     const viableTeamsByBoss = {};
     
     for (const boss of selectedBossObjects) {
         viableTeamsByBoss[boss.name] = [];
         
-        // DEBUG: Log boss info
         console.group(`👹 Scoring teams for: ${boss.name}`);
         console.log('   Weaknesses:', getBossWeaknesses(boss));
         console.log('   Resistances:', boss.mechanics?.resistances ?? []);
@@ -624,11 +591,9 @@ function calculateOptimalTeams() {
             }
         }
         
-        // DEBUG: Log scoring results
         console.log(`   ✅ Viable teams: ${viableTeamsByBoss[boss.name].length}`);
         console.log(`   ❌ Disqualified teams: ${disqualifiedTeams.length}`);
         
-        // DEBUG: Run detailed debug on first few disqualified teams to understand why
         if (disqualifiedTeams.length > 0 && viableTeamsByBoss[boss.name].length === 0) {
             console.log('   🔍 Debugging disqualified teams:');
             for (const dt of disqualifiedTeams.slice(0, 5)) {
@@ -666,7 +631,6 @@ function calculateOptimalTeams() {
             console.log(`   Lenient mode viable teams: ${viableTeamsByBoss[boss.name].length}`);
         }
         
-        // Sort by score descending
         viableTeamsByBoss[boss.name].sort((a, b) => b.score - a.score);
         console.groupEnd();
     }
@@ -713,9 +677,7 @@ function calculateOptimalTeams() {
     };
 }
 
-// ============================================================================
-// RESULTS DISPLAY
-// ============================================================================
+// Results Display
 
 // Carousel state
 let currentResultIndex = 0;
@@ -726,7 +688,6 @@ function displayResults(results, scroll = true) {
     const container = document.getElementById('results-container');
     const section = document.getElementById('results-section');
 
-    // Update checkbox state
     const checkbox = document.getElementById('da-variations-checkbox');
     if (checkbox) checkbox.checked = showCreativeOptions;
 
@@ -802,25 +763,20 @@ function nextResult() {
 function goToResult(index) {
     currentResultIndex = index;
     
-    // Move the track
     const track = document.querySelector('.carousel-track');
     track.style.transform = `translateX(-${index * 100}%)`;
     
-    // Update dots
     document.querySelectorAll('.carousel-dot').forEach((dot, i) => {
         dot.classList.toggle('active', i === index);
     });
     
-    // Update counter
     document.getElementById('current-result').textContent = index + 1;
     
-    // Update button states
     document.querySelector('.carousel-prev').disabled = index === 0;
     document.querySelector('.carousel-next').disabled = index === totalResults - 1;
 }
 
 function createResultSlide(combo, index, bosses) {
-    // Create 3 columns - one per boss/team assignment
     const columnsHtml = combo.assignments.map(assignment => {
         const boss = bosses.find(b => b.name === assignment.boss);
         const weaknessClass = getWeaknessGradientClass(getBossWeaknesses(boss));
@@ -876,17 +832,13 @@ function createResultUnitCard(unit) {
     `;
 }
 
-// ============================================================================
-// GLOBAL EXPORTS (for onclick handlers)
-// ============================================================================
+// Global Exports (for onclick handlers)
 
 window.prevResult = prevResult;
 window.nextResult = nextResult;
 window.goToResult = goToResult;
 
-// ============================================================================
-// INITIALIZATION
-// ============================================================================
+// Initialization
 
 document.addEventListener('DOMContentLoaded', loadData);
 

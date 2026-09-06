@@ -4,36 +4,23 @@
  * Uses differential encoding (only stores changes from defaults) + compression
  */
 
-// We'll use pako for compression - loaded from CDN in HTML
-// If pako isn't available, we fall back to uncompressed encoding
+// Compression uses pako (loaded from CDN in HTML); falls back to uncompressed encoding
+// if pako isn't available.
 
-/**
- * Get default owned state for a unit
- * Limited S-ranks default to NOT owned, everything else defaults to owned
- */
+// Limited S-ranks default to NOT owned, everything else defaults to owned. Pyrois is
+// excluded (defaults not-owned like other limited S-ranks) since he's story-gated and
+// older shared links predate him.
 function getDefaultOwned(unit) {
-    //exclude Pyrois because he is only available for people who have sufficiently advanced the story,
-    // and to ensure backwards compatibility with older links
     return unit.rank === 'A' || (unit.rank === 'S' && !unit.limited && unit.id !== 'pyrois'); 
 }
 
-/**
- * Get default universal/flex state for a unit
- * Nicole defaults to universal (flex), all others default to false
- */
+// Nicole defaults to universal (flex); all others default to false.
 function getDefaultUniversal(unit) {
     return unit.id === 'nicole';
 }
 
-/**
- * Encode roster state to a URL-safe string
- * Format: owned_limited|not_owned_others|universal
- * Then compressed with pako and base64url encoded
- * 
- * @param {Object} unitStates - Map of unitId -> { owned, universal }
- * @param {Array} allUnits - Array of all unit objects
- * @returns {string} Encoded roster string
- */
+// Encode roster state as "owned_limited|not_owned_others|universal", pako-compressed
+// and base64url-encoded.
 export function encodeRoster(unitStates, allUnits) {
     const ownedLimited = [];      // Limited S-ranks that ARE owned (non-default)
     const notOwnedOthers = [];    // Non-limited units that are NOT owned (non-default)
@@ -87,13 +74,7 @@ export function encodeRoster(unitStates, allUnits) {
     return 'u_' + base64UrlEncode(new TextEncoder().encode(deltaString));
 }
 
-/**
- * Decode roster state from a URL parameter string
- * 
- * @param {string} encoded - The encoded roster string
- * @param {Array} allUnits - Array of all unit objects
- * @returns {Object} Map of unitId -> { owned, universal }
- */
+// Decode a roster string back into a unitId -> { owned, universal } map.
 export function decodeRoster(encoded, allUnits) {
     if (!encoded) {
         return null;
@@ -153,9 +134,7 @@ export function decodeRoster(encoded, allUnits) {
     return unitStates;
 }
 
-/**
- * Base64URL encode (URL-safe base64 without padding)
- */
+// Base64URL encode (URL-safe base64 without padding).
 function base64UrlEncode(bytes) {
     // Convert Uint8Array to regular array for btoa
     let binary = '';
@@ -168,9 +147,7 @@ function base64UrlEncode(bytes) {
         .replace(/=/g, '');
 }
 
-/**
- * Base64URL decode
- */
+// Base64URL decode.
 function base64UrlDecode(str) {
     // Restore standard base64
     let base64 = str
@@ -190,28 +167,18 @@ function base64UrlDecode(str) {
     return bytes;
 }
 
-/**
- * Get the roster parameter from the current URL
- */
+// Get the roster parameter from the current URL.
 export function getRosterFromUrl() {
     const params = new URLSearchParams(window.location.search);
     return params.get('roster');
 }
 
-/**
- * Check if we're in shared roster mode (URL has roster parameter)
- */
+// Check if we're in shared roster mode (URL has roster parameter).
 export function isSharedRosterMode() {
     return getRosterFromUrl() !== null;
 }
 
-/**
- * Generate a shareable URL with the current roster encoded
- * 
- * @param {Object} unitStates - Map of unitId -> { owned, universal }
- * @param {Array} allUnits - Array of all unit objects
- * @returns {string} Full URL with roster parameter
- */
+// Build a shareable URL with the current roster encoded as the `roster` param.
 export function generateShareUrl(unitStates, allUnits) {
     const encoded = encodeRoster(unitStates, allUnits);
     
@@ -226,17 +193,9 @@ export function generateShareUrl(unitStates, allUnits) {
     return url.toString();
 }
 
-// ============================================================================
-// BOSS SHARING (for Deadly Assault page)
-// ============================================================================
+// Boss Sharing (for Deadly Assault page)
 
-/**
- * Encode selected boss IDs for URL
- * Simple comma-separated format since boss lists are small
- * 
- * @param {Array} bossIds - Array of boss ID strings
- * @returns {string} Encoded boss string
- */
+// Comma-separated boss IDs — no compression needed since boss lists are small.
 export function encodeBosses(bossIds) {
     if (!bossIds || bossIds.length === 0) {
         return '';
@@ -244,13 +203,7 @@ export function encodeBosses(bossIds) {
     return bossIds.join(',');
 }
 
-/**
- * Decode boss IDs from URL parameter
- * 
- * @param {string} encoded - The encoded boss string
- * @param {Array} allBosses - Array of all boss objects (for validation)
- * @returns {Array|null} Array of valid boss IDs, or null if invalid
- */
+// Decode boss IDs from the URL, dropping any not in allBosses; null if none remain.
 export function decodeBosses(encoded, allBosses) {
     if (!encoded) {
         return null;
@@ -265,29 +218,18 @@ export function decodeBosses(encoded, allBosses) {
     return validatedIds.length > 0 ? validatedIds : null;
 }
 
-/**
- * Get the bosses parameter from the current URL
- */
+// Get the bosses parameter from the current URL.
 export function getBossesFromUrl() {
     const params = new URLSearchParams(window.location.search);
     return params.get('bosses');
 }
 
-/**
- * Check if we're in shared bosses mode (URL has bosses parameter)
- */
+// Check if we're in shared bosses mode (URL has bosses parameter).
 export function isSharedBossesMode() {
     return getBossesFromUrl() !== null;
 }
 
-/**
- * Generate a shareable URL with roster AND bosses encoded (for Deadly Assault)
- * 
- * @param {Object} unitStates - Map of unitId -> { owned, universal }
- * @param {Array} allUnits - Array of all unit objects
- * @param {Array} bossIds - Array of selected boss IDs
- * @returns {string} Full URL with roster and bosses parameters
- */
+// Build a shareable URL with roster, bosses, and boss variations encoded (Deadly Assault page).
 export function generateShareUrlWithBosses(unitStates, allUnits, bossIds, bossVariations) {
     const encodedRoster = encodeRoster(unitStates, allUnits);
     const encodedBosses = encodeBosses(bossIds);
@@ -312,14 +254,7 @@ export function generateShareUrlWithBosses(unitStates, allUnits, bossIds, bossVa
     return url.toString();
 }
 
-/**
- * Encode active boss variations to a URL-safe string.
- * Format: "bossId:variationId" pairs joined by commas.
- * Only non-default (non-null) variations are encoded.
- *
- * @param {Object} bossVariations - Map of bossId -> variationId
- * @returns {string} Encoded variations string, or '' if none
- */
+// Encode non-default boss variations as comma-separated "bossId:variationId" pairs.
 export function encodeBossVariations(bossVariations) {
     if (!bossVariations) return '';
     return Object.entries(bossVariations)
@@ -328,13 +263,7 @@ export function encodeBossVariations(bossVariations) {
         .join(',');
 }
 
-/**
- * Decode boss variations from a URL parameter string.
- *
- * @param {string} encoded - The encoded variations string (e.g. "butcher:raging")
- * @param {Array} allBosses - Array of all boss objects (for validation)
- * @returns {Object} Map of bossId -> variationId for valid pairs
- */
+// Decode "bossId:variationId" pairs from the URL, dropping any that fail validation.
 export function decodeBossVariations(encoded, allBosses) {
     if (!encoded) return {};
     const result = {};
@@ -352,17 +281,13 @@ export function decodeBossVariations(encoded, allBosses) {
     return result;
 }
 
-/**
- * Get the bossVariants parameter from the current URL
- */
+// Get the bossVariants parameter from the current URL.
 export function getBossVariationsFromUrl() {
     const params = new URLSearchParams(window.location.search);
     return params.get('bossVariants');
 }
 
-/**
- * Copy text to clipboard with fallback
- */
+// Copy text to clipboard with fallback.
 export async function copyToClipboard(text) {
     try {
         await navigator.clipboard.writeText(text);

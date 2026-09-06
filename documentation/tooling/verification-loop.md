@@ -51,7 +51,8 @@ It compares a SHA-256 fingerprint over exactly those three files.
 
 ## Why `KNOWN_RED` works the way it does
 
-`test-scoring.mjs` keeps `KNOWN_RED`, a map from test number to reason, for assertions that
+`test-scoring.mjs` and `test-recommendations.mjs` each keep a `KNOWN_RED` map from test number
+to reason, for assertions that
 encode an ordering the owner believes correct but the engine does not yet produce.
 
 | Failing set | Exit code |

@@ -52,7 +52,6 @@ export function cpull(state, tracker = null, useSoftPity = false) {
             state.cguaranteed = false;
             return RESULT_FEATURED_S;
         }
-        //otherwise
         state.cguaranteed = true;
         return RESULT_STANDARD_S;
     }
@@ -70,11 +69,9 @@ export function cpull(state, tracker = null, useSoftPity = false) {
             state.aguaranteed = false;
             return RESULT_FEATURED_A;
         }
-        //otherwise
         state.aguaranteed = true;
         return RESULT_STANDARD_A;
     }
-    //otherwise
     return RESULT_NOTHING;
 }
 
@@ -103,7 +100,6 @@ export function wpull(state, useSoftPity = false) {
             state.wguaranteed = false;
             return RESULT_FEATURED_S;
         }
-        //otherwise
         state.wguaranteed = true;
         return RESULT_STANDARD_S;
     }
@@ -121,11 +117,9 @@ export function wpull(state, useSoftPity = false) {
             state.eguaranteed = false;
             return RESULT_FEATURED_A;
         }
-        //otherwise
         state.eguaranteed = true;
         return RESULT_STANDARD_A;
     }
-    //otherwise
     return RESULT_NOTHING;
 }
 
@@ -275,7 +269,6 @@ export function toPercentage(n, d) {
 export function runBatchSimulation(context, iterations = SIMULATIONS) {
     const tracker = { pulls: 0, wins: 0 };
     
-    // Prepare result buckets
     const s_limited = {}, s_standard = {}, a_featured = {};
     for (let w = 0; w <= context.w; w++) {
         for (let c = 0; c <= context.c; c++) {
@@ -284,7 +277,6 @@ export function runBatchSimulation(context, iterations = SIMULATIONS) {
         }
     }
     
-    // Run simulations
     const target = toLabel(context.c, context.w);
     let totalPullsUsed = 0;
     let exhaustedPullsUsed = 0;

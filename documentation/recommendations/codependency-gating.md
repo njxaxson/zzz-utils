@@ -75,3 +75,18 @@ team-scoped conditionals (no new annotation, no per-unit special case), and `cod
 scales the unit's whole contribution toward a floor rather than gating it to zero — Remielle off
 triple-anomaly still keeps her double ultimate, aftershock and luminize. A codependent unit with
 no conditional buff (Ye Shunguong) reads 1 and is untouched.
+
+### [CODEP-02] `anomalyProcSupply` mirrors team-scorer's anomaly-quantity rule, not `buffs.anomaly`
+
+The pull engine's step-1 check (above) needs its own arithmetic for the `anomaly` scaling key,
+because it is supplied by bodies additively across the team rather than by one unit clearing a
+threshold. `anomalyProcSupply` counts every non-lumen agent whose effective role includes anomaly
+as one body (a lumen agent fills no gauge, not even for itself), plus any
+`utility["anomaly:<element>"]` proc surplus — Alice's polarity assaults, the only holder today.
+
+Earlier code searched for `buffs.anomaly` instead — a real but different mechanic (an anomaly
+*damage* buff) — so it found no providers and printed a note with no names in it.
+
+This count is deliberately looser than the [partner ladder](partner-ladder.md)'s three-native-slot
+count: a pseudo-anomaly unit like Nangong supplies procs here without filling one of Remielle's
+three anomaly slots.

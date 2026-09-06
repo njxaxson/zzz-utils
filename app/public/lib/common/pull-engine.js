@@ -24,21 +24,14 @@ const NATURALLY_AVAILABLE_KEYS = new Set(['chains', 'ultimates']);
 const FOUNDATIONAL_STAT_KEYS = new Set([
     'cr', 'cd', 'atk', 'pen', 'hp', 'def', 'ap', 'am'
 ]);
-// `greedy` describes the unit itself — it wants the stun window to itself — so no teammate
-// can ever supply it. Left in the provider walk it produced the nameless sentence
-// "Needs  to reach full potential" on every Remielle card.
+// `greedy` (wants the stun window to itself) can never be supplied by a teammate, so it's
+// skipped rather than producing a nameless "Needs  to reach full potential".
 const CODEPENDENT_SKIP_KEYS = new Set([
     ...NATURALLY_AVAILABLE_KEYS, ...FOUNDATIONAL_STAT_KEYS, 'codependent', 'buffs', 'greedy'
 ]);
 
-// `scaling.anomaly` is NOT skipped — it is a real team need (this unit deals more damage the
-// more anomaly is on the enemy) and is handled by anomalyProcSupply() below, which mirrors
-// team-scorer.js's rule instead of looking for a `buffs.anomaly` that means something else.
+// A real team need, handled by anomalyProcSupply() below rather than skipped.
 const ANOMALY_SCALING_KEY = 'anomaly';
-
-// ============================================================================
-// HELPERS
-// ============================================================================
 
 export function tierToQuality(tier) {
     if (tier <= 0) return 95;
@@ -71,19 +64,16 @@ function unconditionalPseudo(unit) {
     return pr.filter(e => typeof e === 'string');
 }
 
-// A unit is a primary DPS if either its base tags include a DPS archetype, or its
-// pseudoRole unconditionally contains both `dps` and a DPS archetype (e.g. Claret's
-// ["attack", "dps"] — she's a defense-role unit designed to function as a primary
-// attack DPS).
+// True if tags include a DPS archetype, or pseudoRole unconditionally contains both `dps`
+// and an archetype (e.g. Claret: defense-tagged but built as a primary attack DPS).
 export function hasDPSRole(unit) {
     if (DPS_ARCHETYPES.some(a => unit.tags.includes(a))) return true;
     const p = unconditionalPseudo(unit);
     return p.includes('dps') && p.some(r => DPS_ARCHETYPES.includes(r));
 }
 
-// Returns the archetype tag ('attack' | 'anomaly' | 'rupture') for a unit that
-// functions as a primary DPS, or null. Tag archetype takes precedence over
-// pseudoRole; the pseudoRole branch requires an unconditional `dps` marker.
+// The archetype tag for a primary-DPS unit, or null. Tag takes precedence over pseudoRole,
+// which requires an unconditional `dps` marker.
 export function getPrimaryDPSArchetype(unit) {
     const tagArch = DPS_ARCHETYPES.find(a => unit.tags.includes(a));
     if (tagArch) return tagArch;
@@ -100,11 +90,7 @@ export function isSubdps(unit, team = null) {
         if (role !== 'subdps') return false;
         if (typeof entry === 'string' || !entry?.when) return true;
         const when = entry.when;
-        // `notPresent` activates whenever the named unit is absent. In the
-        // recommendation engine, roster/no-team contexts are treated permissively —
-        // as long as the unit itself can be teamed without the named unit, the subdps
-        // role is considered activatable. Yanagi (`hasUnit`) defaults to primary DPS
-        // when the roster is unknown; Burnice (`notPresent`) defaults to subdps.
+        // No-team contexts default permissively (Yanagi → primary DPS, Burnice → subdps).
         if (when.notPresent !== undefined) return true;
         if (team === null) return false;
         if (when.hasUnit !== undefined) return team.some(u => u.id === when.hasUnit);
@@ -128,22 +114,12 @@ export function getUnitElement(unit) {
     return getElement(unit) || 'unknown';
 }
 
-// Disorder partnering is variant-AWARE, unlike everything else here. An elemental variant
-// tracks its own anomaly gauge, so Miyabi's frost genuinely disorders with plain ice
-// (Soukaku, Promeia). This must agree with `computeAnomalyReactions`, or the pull engine
-// gates a unit out as having no disorder partner on a team the scorer scores happily.
+// Variant-aware (Miyabi's frost disorders with plain ice) — must agree with computeAnomalyReactions.
 function getDisorderElement(unit) {
     return getElementVariant(unit) || 'unknown';
 }
 
-// ============================================================================
-// JOIN COMPATIBILITY
-// ============================================================================
-
-// Can these two units plausibly coexist on a team? True if at least one unit's
-// join is satisfied by the other's tags. Two DPS that both join on "stun" can
-// share a team (with a stunner as the third member) even though neither directly
-// satisfies the other's join — they share a common join requirement.
+// True if either unit's join is satisfied by the other's tags, or they share a join tag.
 function canJoinWith(a, b) {
     if (isValidTeam(a, b)) return true;
     const aJoin = a.join ?? [];
@@ -154,8 +130,6 @@ function canJoinWith(a, b) {
     if (b.faction) { bTags.add(b.faction); }
     const aJoinExpanded = aJoin.map(j => j === 'faction' && a.faction ? a.faction : j);
     const bJoinExpanded = bJoin.map(j => j === 'faction' && b.faction ? b.faction : j);
-    // Either one satisfies the other's join, OR they share a common join tag
-    // (meaning a third unit with that tag enables both)
     if (aJoinExpanded.some(tag => bTags.has(tag))) return true;
     if (bJoinExpanded.some(tag => aTags.has(tag))) return true;
     const aJoinSet = new Set(aJoinExpanded);
@@ -166,20 +140,13 @@ function isLumenElement(unit) {
     return getUnitElement(unit) === 'lumen';
 }
 
-// ============================================================================
-// MECHANICS EVALUATION HELPERS
-// ============================================================================
-
 function w(value) {
     if (value === true) return 1;
     if (typeof value === 'number') return value;
     return 0;
 }
 
-/**
- * Lightweight L4-style pairwise mechanical fit score.
- * Evaluates how well supplier's buffs/debuffs/utility serve consumer's needs.
- */
+// Lightweight L4-style pairwise fit: how well supplier's buffs/debuffs/utility serve consumer.
 function mechanicsFitScore(supplier, consumer) {
     let score = 0;
     const cTags = consumer.tags;
@@ -197,9 +164,7 @@ function mechanicsFitScore(supplier, consumer) {
     const isDPS = isAtkDPS || isAnoDPS || isRupDPS || isArmDPS;
     if (!isDPS) return 0;
 
-    // Resolve supplier buffs against a conservative 2-unit context (supplier + consumer).
-    // Conditional-valued buffs (e.g. Remielle's ATK curve by anomaly count, or Koleda's
-    // recipient-scoped CR/CD) resolve to what THIS consumer would actually receive.
+    // Conditional buffs resolve to what THIS consumer would receive (mechanics-fit-score.md).
     const fitCtx = { team: [supplier, consumer], self: supplier, consumer };
     const sBuf = {};
     for (const [key, spec] of Object.entries(supplier.mechanics?.buffs || {})) {
@@ -222,23 +187,18 @@ function mechanicsFitScore(supplier, consumer) {
     }
     if (w(sBuf.anomaly) > 0 && isAnoDPS) score += w(sBuf.anomaly) * 3;
     if (w(sBuf.sheer) > 0 && isRupDPS) score += w(sBuf.sheer) * 5;
-    // Laceration is to armorers what sheer is to rupture: a direct buff on the class's own
-    // damage type, supplied by almost nobody (Claret, Koleda, Roxy).
+    // Laceration is to armorers what sheer is to rupture (Claret, Koleda, Roxy supply it).
     if (w(sBuf.laceration) > 0 && isArmDPS) score += w(sBuf.laceration) * 5;
     const crW = w(sBuf.cr), cdW = w(sBuf.cd);
-    // Armorers (overcritical) value CR highly. CD is fixed for them, so it is worthless unless
-    // the unit declares explicit cd scaling (Claret converts a sliver of CD into Laceration).
+    // Armorers value CR highly; CD is worthless for them unless explicit cd scaling is declared.
     if (crW > 0) score += crW * (isAnoDPS ? 0.3 : isArmDPS ? 3 : 2);
     const cScalingCd = w(cScaling.cd);
     if (cdW > 0 && (!isArmDPS || cScalingCd > 0)) {
         score += cdW * (isArmDPS ? Math.min(1, cScalingCd / 2) : isAnoDPS ? 0.3 : 2);
     }
-    // Armorer premium on PEN and defense shred: with ATK and CD dead, these are among the few
-    // levers they have left. Mirrors the scorer's armorer weights in resolveBaselineWeight.
+    // Armorer premium on PEN/defense shred, mirroring the scorer's resolveBaselineWeight.
     if (w(sBuf.pen) > 0 && isDPS && !isRupDPS) score += w(sBuf.pen) * (isArmDPS ? 4 : 2);
-    // Generic damage (dmg) is intentionally NOT scored here: it's a broad baseline that
-    // benefits every DPS equally, so it carries no signal for ranking WHICH support best
-    // fits a given DPS, and crediting it drowns out specialist synergies (aftershock, veils).
+    // `dmg` is deliberately not scored — see mechanics-fit-score.md.
     if (w(sDebuf.defense) > 0 && isDPS && !isRupDPS) score += w(sDebuf.defense) * (isArmDPS ? 6 : 3);
     if (w(sDebuf.recovery) > 0 && isDPS) {
         const burst = Math.max(1, ...Object.values(cDamage).map(v => typeof v === 'number' ? v : 1));
@@ -269,9 +229,7 @@ function mechanicsFitScore(supplier, consumer) {
         }
     }
 
-    // Damage types that represent actual game mechanics one unit can produce for another.
-    // Generic descriptors like ultimate:strong / enhanced just describe the unit's own kit
-    // and do NOT imply the supplier is generating that mechanic for the consumer.
+    // Damage types one unit can produce for another — excludes kit descriptors like ultimate:strong.
     const MECHANIC_DAMAGE_TYPES = new Set(['aftershock', 'abloom', 'chain', 'chains', 'polarity', 'totalize']);
     const sDamage = supplier.mechanics?.damage || {};
     for (const [dmgType, dmgVal] of Object.entries(cDamage)) {
@@ -284,8 +242,7 @@ function mechanicsFitScore(supplier, consumer) {
         if (supplyDmg > 0 && MECHANIC_DAMAGE_TYPES.has(dmgType)) score += supplyDmg * dw * 2;
     }
 
-    // Vortex buff → anomaly consumers (contextual bonus; no reactions context here,
-    // so gate on consumer being anomaly as a conservative proxy).
+    // No reactions context here, so gate vortex on consumer being anomaly as a proxy.
     if (w(sBuf.vortex) > 0 && isAnoDPS) {
         score += w(sBuf.vortex) * 2;
     }
@@ -301,10 +258,9 @@ function mechanicsFitScore(supplier, consumer) {
         }
     }
 
-    // Conditional buff anti-synergy: if the consumer's value depends on teammates with a
-    // specific tag (e.g., Rem needs anomaly teammates for her ATK buff), a supplier that
-    // DOESN'T have that tag is actively taking up a team slot that should go to someone
-    // who does. Heavy discount — generic support value is mostly wasted.
+    // Conditional-buff anti-synergy: heavy discount for a supplier occupying a slot that
+    // should go to a teammate who actually activates the consumer's need. See
+    // mechanics-fit-score.md.
     if (score > 0) {
         const condBuffTags = new Set();
         for (const spec of Object.values(consumer.mechanics?.buffs || {})) {
@@ -324,22 +280,8 @@ function mechanicsFitScore(supplier, consumer) {
     return score;
 }
 
-// ============================================================================
-// CODEPENDENT SCALING — TEAM DEPENDENCY CHECK
-// ============================================================================
-
-// Weighted supply for a `scaling.anomaly` need — "I deal more damage the more anomaly is on
-// the enemy". Mirrors team-scorer.js's anomaly-quantity rule so the two agree about who feeds
-// it: every non-lumen agent whose EFFECTIVE role includes anomaly is one body (a lumen agent
-// fills no gauge, so it supplies nothing, not even to itself), plus any
-// `utility["anomaly:<element>"]` proc surplus — Alice's polarity assaults, the only holder.
-//
-// Note this is deliberately LOOSER than the triple-anomaly team count used by the partner
-// ladder below: a pseudo-anomaly like Nangong does supply procs, but does not fill one of
-// Remielle's three anomaly slots.
-//
-// The previous code looked for `buffs.anomaly` instead, which is an anomaly DAMAGE buff — a
-// different mechanic entirely — so it found nobody and printed a note with no names in it.
+// Weighted supply for a `scaling.anomaly` need, mirroring team-scorer.js's anomaly-quantity
+// rule rather than searching for a `buffs.anomaly` that means something else. [CODEP-02]
 const ANOMALY_PROC_SUPPLY_WEIGHT = 0.5;   // matches ANOMALY_PROC_SUPPLY in team-scorer.js
 
 function anomalyProcSupply(unit) {
@@ -352,11 +294,8 @@ function anomalyProcSupply(unit) {
 }
 
 /**
- * Check whether a candidate DPS unit's specialist scaling needs can be met
- * by the player's roster. Gated on mechanics.scaling.codependent.
- *
- * @returns {{ hasUnmetDependency: boolean, cannotFormTeam: boolean,
- *             notes: Array<{ text: string, providers: Array<{id,name}> }> }}
+ * Checks whether a codependent candidate's specialist scaling needs can be met by the roster.
+ * @returns {{ hasUnmetDependency, cannotFormTeam, notes: [{ text, providers }] }}
  */
 export function checkTeamDependencies(candidate, ownedUnits, allUnits) {
     const empty = { hasUnmetDependency: false, cannotFormTeam: false, notes: [] };
@@ -379,13 +318,11 @@ export function checkTeamDependencies(candidate, ownedUnits, allUnits) {
         const scalingW = w(level);
         if (scalingW === 0) continue;
 
-        // Skip self-provided needs: a unit that supplies its own scaling key (e.g. Banyue's
-        // interrupt-resistance) has no team dependency for it.
+        // Self-provided needs (e.g. Banyue's own interrupt-resistance) have no team dependency.
         const selfSupply = Math.max(w(selfBuffs[key]), w(selfUtil[key]));
         if (selfSupply >= scalingW) continue;
 
-        // `anomaly` is supplied by BODIES, additively across the team, not by one unit clearing
-        // a threshold — so it needs its own arithmetic. Every other key is a per-unit supply.
+        // `anomaly` sums additively across bodies rather than one unit clearing a threshold.
         const isAnomalyQuantity = key === ANOMALY_SCALING_KEY;
         const supplies = isAnomalyQuantity
             ? (u => anomalyProcSupply(u) > 0)
@@ -410,8 +347,7 @@ export function checkTeamDependencies(candidate, ownedUnits, allUnits) {
                 })
                 .sort((a, b) => a.tier - b.tier)
                 .map(u => ({ id: u.id, name: u.name }));
-            // Cap the names: an anomaly-quantity need matches a dozen agents, and joining all
-            // of them with " or " produces an unreadable sentence.
+            // Cap names — an anomaly-quantity need can match a dozen agents.
             notes.push({
                 text: `Needs ${providers.slice(0, 3).map(p => p.name).join(' or ')} to reach full potential`,
                 providers
@@ -419,11 +355,8 @@ export function checkTeamDependencies(candidate, ownedUnits, allUnits) {
         }
     }
 
-    // Step 1b: conditional buff activation feasibility
-    // Check whether the roster can provide enough teammates with the required tag
-    // to fully activate conditional buffs. If the roster can't reach at least half
-    // max activation, the unit is effectively non-functional — treat same as can't
-    // activate. Partial (>50%) still flags as unmet for a 1-level priority drop.
+    // Step 1b: conditional buff feasibility (codependency-gating.md check 2). At or below
+    // half max activation the unit can't function; partial still flags for a 1-level drop.
     const candBuffs = candidate.mechanics?.buffs || {};
     for (const [buffKey, spec] of Object.entries(candBuffs)) {
         if (isTeamScopedConditional(spec)) {
@@ -539,46 +472,22 @@ export function checkTeamDependencies(candidate, ownedUnits, allUnits) {
     return { hasUnmetDependency, cannotFormTeam, cannotActivateBuffs, notes };
 }
 
-// ============================================================================
-// PARTNER LADDER — how good is the best partner the roster can pair this unit with?
-// ============================================================================
-//
-// THIS IS A RELEASE STOPGAP FOR ISSUE 9, and it is fitted, not derived. Read this before
-// touching the numbers.
-//
-// The problem it solves, concretely: Remielle is a titled T0 who only works inside a
-// triple-anomaly team, and how good that team is depends enormously on ONE partner.
-// Velina is the partner that takes her from "worth having" to "worth chasing"; Vivian is
-// a solid second; Burnice is the fallback; with none of the three there is no anomaly
-// sub-DPS base to build on and she should not be recommended at all. The engine could not
-// tell those four rosters apart, because it never calls the scorer — it reasons about
-// scaling keys, role coverage and codependency, and Velina changes none of them on a
-// roster that is already anomaly-heavy. Recommendations TEST 43 pinned that.
-//
-// The honest fix is for the pull engine to ask the scorer how good the resulting teams
-// actually are. This is a cheap proxy standing in its place until then.
-//
-// The ladder grows only on a CODEPENDENT unit that declares a team-scoped conditional buff
-// keyed on `countTag` — the data's own way of saying "I need N teammates of a kind".
-// Remielle is the only unit that matches today: SAnby declares no conditional buff and Ye
-// Shunguong declares no buffs at all, so neither grows a ladder.
+// A fitted release stopgap: rates the best partner the roster offers a codependent unit, so
+// Remielle is not rated the same with and without Velina. Fitted, not derived. [PULL-01]
 
 const LADDER_RUNGS = ['High', 'Medium', 'Low'];
 
-// Fitted to the owner's stated ordering (Velina > Vivian > Burnice > nothing) over the five
-// anomaly sub-DPS that exist. On today's data the scores are Velina 130, Vivian 65,
-// Burnice 55, Yanagi 40, Grace 40 — so the cutoffs are not knife-edge, but a sixth anomaly
-// sub-DPS could land anywhere and should be re-checked by hand rather than trusted.
+// Cutoffs are fitted to today's five anomaly sub-DPS (Velina 130 down to Grace 40) — a
+// sixth could land anywhere and should be re-checked by hand. [PULL-01]
 const LADDER_CUTOFFS = [
     { min: 100, rung: 'High' },
     { min:  60, rung: 'Medium' },
     { min:  50, rung: 'Low' }
 ];
-const LADDER_MUTUAL_SYNERGY = 25;   // both units name each other in synergy.units
-const LADDER_UNCONDITIONAL_SUBDPS = 10;
+const LADDER_MUTUAL_SYNERGY = 25;         // both units name each other in synergy.units
+const LADDER_UNCONDITIONAL_SUBDPS = 10;   // partner's subdps pseudoRole is unconditional
 
-// `synergy.units` entries can be conjunctive groups ("Remielle+Velina", Alice's entry), so
-// split before matching a name.
+// `synergy.units` entries can be conjunctive groups ("Remielle+Velina"), so split before matching.
 function synergyNames(unit) {
     return (unit.synergy?.units || []).flatMap(e => String(e).split('+').map(s => s.trim()));
 }
@@ -615,12 +524,9 @@ function ladderCountTag(candidate) {
 }
 
 /**
- * Rate the best partner the owned roster offers this candidate.
- *
- * @returns {null} when the candidate has no ladder (the overwhelmingly common case), or
- *          {{ rung: 'High'|'Medium'|'Low'|null, partner: unit|null,
- *             better: Array<{id,name}>, blocked: boolean }}
- *          where `rung: null` means "do not recommend this unit at all".
+ * Rate the best partner the owned roster offers this candidate, or null if it has no ladder.
+ * @returns {{ rung: 'High'|'Medium'|'Low'|null, partner, better, blocked }} — rung: null
+ *          means don't recommend this unit at all.
  */
 export function getPartnerLadder(candidate, ownedUnits, allUnits = []) {
     const tag = ladderCountTag(candidate);
@@ -631,11 +537,8 @@ export function getPartnerLadder(candidate, ownedUnits, allUnits = []) {
         + (isMutualSynergyPair(candidate, partner) ? LADDER_MUTUAL_SYNERGY : 0)
         + (hasUnconditionalSubdps(partner) ? LADDER_UNCONDITIONAL_SUBDPS : 0);
 
-    // Eligible partners are the SUB-DPS BASES the team can be built around — tagged with the
-    // wanted role AND declaring a subdps pseudoRole. Carries are deliberately not enablers:
-    // pairing Remielle with Aria or Miyabi still leaves the team without a sub-DPS base,
-    // which is exactly the "tougher to wield" case. This holds even though Aria and Remielle
-    // are a declared mutual synergy pair.
+    // Eligible partners are sub-DPS bases only — carries are deliberately not enablers, even
+    // a mutual-synergy one like Aria. See partner-ladder.md#who-counts-as-a-partner.
     const partners = ownedUnits.filter(u =>
         u.id !== candidate.id && u.tags.includes(tag) && declaresSubdps(u)
     );
@@ -645,15 +548,9 @@ export function getPartnerLadder(candidate, ownedUnits, allUnits = []) {
         const score = partnerScore(partner);
         let rung = LADDER_CUTOFFS.find(c => score >= c.min)?.rung ?? null;
 
-        // The pair is only two thirds of the team. Remielle is lumen and starts no reaction
-        // herself, so whatever the pair lives on — disorders for Vivian, vortex for Velina —
-        // needs a THIRD body of a different element to fire. Vivian beside Aria is ether on
-        // ether and disorders nothing; Velina beside another wind agent triggers no vortex.
-        // Either way the pair is worth one rung less than it looks.
-        //
-        // Counted over NATIVE tag holders only. A pseudo-anomaly like Nangong supplies procs
-        // (see anomalyProcSupply) but does not fill one of the three anomaly slots, which is
-        // also how step 1b of checkTeamDependencies counts them.
+        // Needs a third, different-element body to fire (partner-ladder.md#the-third-slot-
+        // check); demoted a rung if not. Native tag holders only, matching
+        // checkTeamDependencies step 1b.
         const partnerElement = getDisorderElement(partner);
         const blocked = rung !== null && !ownedUnits.some(u =>
             u.id !== candidate.id && u.id !== partner.id && u.tags.includes(tag) &&
@@ -668,8 +565,7 @@ export function getPartnerLadder(candidate, ownedUnits, allUnits = []) {
     }
 
     const floor = best ? best.score : 0;
-    // Partners that would rate above what the roster currently offers — the "you'd rather
-    // have Velina" half of the note.
+    // Partners that would rate above what the roster currently offers.
     const better = allUnits
         .filter(u => u.id !== candidate.id && u.tags.includes(tag) && declaresSubdps(u))
         .map(u => ({ unit: u, score: partnerScore(u) }))
@@ -702,17 +598,8 @@ function sortCandidates(units, ownedDPSUnits = []) {
 
 const SUPPORT_GOOD_FIT = 15;
 
-// ============================================================================
-// MAIN ANALYSIS
-// ============================================================================
-
 /**
  * Run the full pull recommendation analysis.
- * @param {Array} allUnits
- * @param {Object} unitStates - { unitId: { owned: boolean } }
- * @param {Array} ownedUnits
- * @param {Object} [options]
- * @param {number} [options.maxRecommendations=5]
  * @returns {{ assessment, recommendations, coverage, allGaps, compositeScore, calibration }}
  */
 export function analyze(allUnits, unitStates, ownedUnits, { maxRecommendations = 5 } = {}) {
@@ -800,12 +687,9 @@ export function analyze(allUnits, unitStates, ownedUnits, { maxRecommendations =
     detectMechanicalSynergies(gaps, ownedUnits, unownedLimitedS, dpsQuality, elementQuality, unitGapScoreOverrides);
     detectDepthGap(gaps, ownedDPS, dpsQuality, unownedLimitedS, sortWithDPS);
 
-    // Pre-filter: remove codependent units that cannot form viable teams or
-    // cannot activate their core buffs. They shouldn't appear in recommendations
-    // at all — not just with a priority drop — because the gap text doesn't apply.
-    // A unit with a partner ladder and no rung is excluded for the same reason: the roster
-    // offers nobody to build its team around, so recommending it would be advice the player
-    // cannot act on. Only that unit is removed — the rest of its gap card survives.
+    // Remove (not just deprioritize) codependent units that can't form a team or activate
+    // their buffs, and laddered units with no rung — see codependency-gating.md and
+    // partner-ladder.md. Only the affected unit is dropped; the rest of its gap card survives.
     const excludedIds = new Set();
     const ladders = new Map(); // unitId → partner-ladder verdict, for units that have one
     for (const candidate of unownedLimitedS) {
@@ -834,10 +718,8 @@ export function analyze(allUnits, unitStates, ownedUnits, { maxRecommendations =
 
     gaps.sort((a, b) => b.score - a.score);
 
-    // For loaded rosters where calibration compresses everything below absolute thresholds,
-    // use relative priority: the top remaining gap becomes High, comparable ones Medium.
-    // gap.priority is stored on each gap so external consumers (e.g. banner tile verdicts)
-    // use the same logic rather than re-deriving from raw scores with absolute thresholds.
+    // Relative priority for a loaded roster (see cards-and-priority.md#priority). Stored on
+    // gap.priority so external consumers reuse this logic rather than re-deriving it.
     const maxCalScore = gaps.length > 0 ? gaps[0].score : 0;
     const useRelativePriority = compositeScore > 75 && maxCalScore > 0 && maxCalScore < 70;
 
@@ -855,15 +737,9 @@ export function analyze(allUnits, unitStates, ownedUnits, { maxRecommendations =
         gap.priority = assignPriority(gap.score, gap.rawScore);
     }
 
-    // ── Unit-centric aggregation ─────────────────────────────────────────────
-    // Each unowned candidate collects all the gaps it appears in, with a per-unit
-    // contribution score (individual mech-fit for mech-synergy gaps; gap.score for
-    // everything else, both calibrated for apples-to-apples comparison).
-    //
-    // Each unit's PRIMARY GAP is the gap where it scores highest — that is the one
-    // display card it belongs to. Secondary gaps surface as "Also:" reasons on that card.
-    // This eliminates all dedup complexity: a unit lives in exactly one card.
-
+    // Invert gaps into unit-centric cards: each candidate's highest-scoring (primary) gap
+    // decides its one display card, and the rest surface as "Also:" reasons. See
+    // cards-and-priority.md#the-inversion.
     const GAP_PRIORITY_RANK = { 'High': 2, 'Medium': 1, 'Low': 0 };
     const PRIORITY_VALS = { High: 2, Medium: 1, Low: 0 };
 
@@ -902,9 +778,7 @@ export function analyze(allUnits, unitStates, ownedUnits, { maxRecommendations =
         card.cardScore = card.profiles[0].contributions[0].unitScore;
     }
 
-    // Update mech-synergy gap reasons to match the units that actually ended up in each card.
-    // Without this, a gap's stored reason reflects the full detection-phase group (which may include
-    // units that migrated to other cards as their primary), causing stale names in "Also:" text.
+    // Refresh reasons to the units that ended up in each card, not the full detection group.
     for (const card of cardsByGapId.values()) {
         if (card.gap.id.startsWith('mech-synergy-') && card.gap.bestPairName) {
             const cardUnits = card.profiles.map(p => p.unit);
@@ -928,14 +802,8 @@ export function analyze(allUnits, unitStates, ownedUnits, { maxRecommendations =
         return pri;
     }
 
-    // ── Codependent scaling and partner ladders: the per-unit penalty ───────
-    //
-    // This used to run over finished cards and drop the WHOLE card whenever any one of its
-    // units had an unmet dependency. A card is a group of candidates sharing a gap, so on an
-    // anomaly roster Remielle's codependency was quietly demoting Aria, Jane Doe and Yanagi,
-    // who sit in the same Anomaly Depth card and have nothing wrong with them. The penalty is
-    // now computed per unit and the card is split below, so a hobbled unit carries its own
-    // verdict out with it instead of dragging its neighbours down.
+    // Codependency/ladder penalty is computed per unit, not per card, then the card is split
+    // below. [PULL-02]
     const PRIORITY_ORDER = ['High', 'Medium', 'Low', null];
     function dropPriority(current, levels) {
         const idx = PRIORITY_ORDER.indexOf(current);
@@ -955,9 +823,9 @@ export function analyze(allUnits, unitStates, ownedUnits, { maxRecommendations =
             });
         } else {
             if (ladder.blocked) {
-                // Deliberately NO providers: the UI's formatDependencyReason replaces the text
-                // with a "would be a more valuable pull with X" sentence whenever providers are
-                // present, and that sentence cannot express an element clash.
+                // No providers, deliberately: formatDependencyReason substitutes a "more
+                // valuable pull with X" sentence whenever providers are present, which
+                // cannot express an element clash.
                 notes.push({
                     text: `Your ${ladder.partner.name} is the right partner, but every other agent who could fill the third slot shares her element — nothing for her to react with`,
                     providers: []
@@ -981,10 +849,8 @@ export function analyze(allUnits, unitStates, ownedUnits, { maxRecommendations =
         let result = { priority: basePriority, notes: null };
         const ladder = ladders.get(unit.id) ?? getPartnerLadder(unit, ownedUnits, allUnits);
         if (ladder) {
-            // A partner ladder REPLACES the generic codependency drop rather than stacking on
-            // top of it. Both answer the same question — can this roster actually run this
-            // unit — and the ladder is the better-informed answer, so charging twice would
-            // double-count.
+            // Ladder replaces the generic codependency drop rather than stacking with it —
+            // see partner-ladder.md#it-replaces-codependency-gating-it-does-not-stack.
             result = { priority: capPriority(basePriority, ladder.rung), notes: ladderNotes(ladder) };
         } else {
             const dep = checkTeamDependencies(unit, ownedUnits, allUnits);
@@ -1012,25 +878,17 @@ export function analyze(allUnits, unitStates, ownedUnits, { maxRecommendations =
 
         const isMechSynergyCard = card.gap.id.startsWith('mech-synergy-') && card.gap.bestPairName;
 
-        // For mech-synergy cards, use the actual recommended agent name(s) as the title —
-        // "Lighter, Norma" is clearer than "Synergy with Evelyn" since the framing is
-        // who to pull, not who they pair with (the reason covers that).
+        // Mech-synergy cards title on the recommended name(s) — "Lighter, Norma" over "Synergy with Evelyn".
         const displayTitle = isMechSynergyCard
             ? cardUnits.map(u => u.name).join(', ')
             : card.gap.title;
 
-        // Mech-synergy reason reflects the actual units in this card (which may differ
-        // from the original gap's full unit list once each unit picks its own primary)
         let displayReason = card.gap.reason;
         if (isMechSynergyCard) {
             displayReason = buildMechSynergyReason(cardUnits, card.gap.bestPairName);
         }
 
-        // Additional reasons: union of secondary-gap reasons from all card units,
-        // Collect secondary reasons in two buckets:
-        //  • mechSynergyByUnit — groups all owned-pair names per recommended unit so multiple
-        //    pairs for the same unit collapse into one sentence ("X has synergy with Y and Z")
-        //  • structuralReasons — structural gaps (stunner, element, depth), deduped by gap ID
+        // mechSynergyByUnit collapses multiple pairs per unit into one sentence; structuralReasons dedupes by gap ID.
         const mechSynergyByUnit = new Map(); // unitName → { pairs: Set, priority }
         const structuralReasons  = new Map(); // gapId    → { reason, priority }
 
@@ -1068,10 +926,7 @@ export function analyze(allUnits, unitStates, ownedUnits, { maxRecommendations =
             .sort((a, b) => (GAP_PRIORITY_RANK[b.priority] ?? 0) - (GAP_PRIORITY_RANK[a.priority] ?? 0));
         additionalReasons.splice(3); // cap at 3 entries per card
 
-        // Split the card by penalized priority. Units that take no penalty keep the card as
-        // it is; each penalized group is emitted as its own recommendation, titled by unit
-        // name the way mech-synergy cards already are, so the player sees "Remielle — Medium"
-        // beside "Anomaly Depth — High" instead of one card marked down for her sake.
+        // Each penalized group splits off as its own unit-titled recommendation.
         const groups = new Map(); // priority (or 'null') → { priority, profiles, notes }
         for (const profile of cardProfiles) {
             const { priority, notes } = unitPenalty(profile.unit, cardPriority);
@@ -1100,8 +955,7 @@ export function analyze(allUnits, unitStates, ownedUnits, { maxRecommendations =
         }
     }
 
-    // Splitting a card produces two entries with the same gap score, so break the tie on
-    // priority — otherwise a penalised unit can sort above the healthy card it split from.
+    // A split card's two entries share a gap score, so break the tie on priority.
     const filteredRecommendations = recommendations
         .sort((a, b) => (b.score - a.score)
             || ((PRIORITY_VALS[b.priority] ?? 0) - (PRIORITY_VALS[a.priority] ?? 0)))
@@ -1128,10 +982,6 @@ export function analyze(allUnits, unitStates, ownedUnits, { maxRecommendations =
         calibration
     };
 }
-
-// ============================================================================
-// GAP DETECTORS
-// ============================================================================
 
 function detectDPSGaps(gaps, dpsQuality, ownedDPS, unownedLimitedS, sortCandidatesFn) {
     for (const arch of DPS_ARCHETYPES) {
@@ -1189,9 +1039,8 @@ function detectSupportGaps(gaps, ownedSupports, ownedDPS, dpsQuality, unownedLim
         return;
     }
 
-    // Per-archetype holistic support evaluation —
-    // Only premium (limited S) supports count toward coverage. A-rank supports
-    // are stopgaps and should not mask the need for a proper premium support.
+    // Per-archetype: only premium (limited S) supports count toward coverage — A-ranks are
+    // stopgaps and shouldn't mask the need for a real one.
     const hasFewPremiumSupports = ownedLimitedSupports.length <= 1;
     const DPS_ARCH_SET = new Set(DPS_ARCHETYPES);
 
@@ -1609,9 +1458,8 @@ function detectMechanicalSynergies(gaps, ownedUnits, unownedLimitedS, dpsQuality
         (u.tags.includes('support') || u.tags.includes('defense') || u.tags.includes('stun'))
     );
 
-    // Precompute the best existing fit an owned non-DPS provides per (DPS id, team slot).
-    // Used to suppress non-DPS candidates whose role+synergy is already covered by an owned unit.
-    // Slot is 'stun' for stunners, 'support' for everything else (support/defense).
+    // Best existing fit an owned non-DPS provides per (DPS id, slot) — suppresses candidates
+    // already covered by an owned unit. Slot is 'stun' or 'support'.
     const ownedStunUnits = ownedUnits.filter(u => u.tags.includes('stun'));
     const ownedSupportDefUnits = ownedUnits.filter(u =>
         !hasDPSRole(u) && (u.tags.includes('support') || u.tags.includes('defense'))
@@ -1630,17 +1478,15 @@ function detectMechanicalSynergies(gaps, ownedUnits, unownedLimitedS, dpsQuality
         });
     }
 
-    // First pass: score every qualifying candidate against ALL of their owned pairings,
-    // not just the best — so a stunner like Dialyn can register synergy with both YSG
-    // and Yixuan independently, even if one pair scores slightly higher than the other.
+    // Score every candidate against ALL owned pairings, not just the best — a stunner like
+    // Dialyn can register synergy with both YSG and Yixuan independently.
     const scoredCandidates = [];
     for (const candidate of unownedLimitedS) {
         const isDPSCandidate = hasDPSRole(candidate) && !isSubdps(candidate);
         const el = getUnitElement(candidate);
 
-        // DPS candidates that also supply buffs (a conditional-valued buff or a
-        // conditional support pseudo-role) are hybrid units like Remielle — they should
-        // be evaluated both as consumers of owned non-DPS AND as suppliers to owned DPS.
+        // Hybrid units like Remielle both consume owned non-DPS support AND supply buffs
+        // to owned DPS, so they're evaluated as both consumer and supplier.
         const isHybridSupplier = isDPSCandidate && (
             Object.values(candidate.mechanics?.buffs || {}).some(isConditionalSpec) ||
             (Array.isArray(candidate.mechanics?.pseudoRole) &&
@@ -1682,11 +1528,9 @@ function detectMechanicalSynergies(gaps, ownedUnits, unownedLimitedS, dpsQuality
             qualifyingPairs.push({ name: owned.name, id: owned.id, fit, score: pairScore });
         }
 
-        // Hybrid supplier pass: also check this DPS candidate as a supplier to owned
-        // DPS units. Uses a broader pool than the standard pass — any S-rank unit with a
-        // DPS archetype tag qualifies, regardless of the MIN_PAIR_QUALITY gate, because
-        // hybrid suppliers like Remielle benefit ALL anomaly teammates equally (subdps,
-        // A-rank partners, lower-tier units) via conditional buffs and Refringe.
+        // Also check this candidate as a supplier to owned DPS, over a broader pool (no
+        // MIN_PAIR_QUALITY gate) — a hybrid supplier like Remielle benefits every anomaly
+        // teammate equally, however low-tier.
         if (isHybridSupplier) {
             const hybridTargets = ownedUnits.filter(u =>
                 u.rank === 'S' && hasDPSRole(u)
@@ -1708,9 +1552,8 @@ function detectMechanicalSynergies(gaps, ownedUnits, unownedLimitedS, dpsQuality
         qualifyingPairs.sort((a, b) => b.fit - a.fit);
         const bestFit = qualifyingPairs[0].fit;
 
-        // Include all pairs that are within 75% of the best pair — filters out generic
-        // support pairings (ATK+CD alone scores ~14) while keeping close runners-up like
-        // Dialyn→Yixuan (30) alongside Dialyn→YSG (33).
+        // Keep pairs within 75% of the best — drops generic pairings (ATK+CD alone scores
+        // ~14) while keeping close runners-up like Dialyn→Yixuan beside Dialyn→YSG.
         const PAIR_PROXIMITY = 0.75;
         for (const pair of qualifyingPairs) {
             if (pair.fit < bestFit * PAIR_PROXIMITY) break; // sorted, so we can break early
@@ -1782,9 +1625,7 @@ function detectDepthGap(gaps, ownedDPS, dpsQuality, unownedLimitedS, sortCandida
         );
         if (candidates.length === 0) continue;
 
-        // Titled T0 candidates create entirely new team archetypes (e.g., Remielle
-        // enables triple-anomaly with hybrid DPS/support). They bypass the quality and
-        // count gates — worth recommending regardless of existing archetype coverage.
+        // Titled T0s bypass the quality/count gates — see coverage-and-gaps.md#gap-detectors.
         const hasTitledT0 = candidates.some(u => isTitled(u) && u.tier === 0);
 
         if (!hasTitledT0) {
@@ -1806,10 +1647,6 @@ function detectDepthGap(gaps, ownedDPS, dpsQuality, unownedLimitedS, sortCandida
         });
     }
 }
-
-// ============================================================================
-// ROSTER ASSESSMENT
-// ============================================================================
 
 function buildAssessment(dpsQuality, supportQuality, stunnerQuality, elementQuality, compositeScore, limitedSCount, coverage, highPriorityGapCount = 0, gaps = []) {
     const totalSCount = coverage.ownedDPS.attack.concat(

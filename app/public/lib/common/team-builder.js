@@ -146,24 +146,11 @@ export function extendTeamsWithUniversalUnits(twoCharTeams, threeCharTeams, univ
     return extendedCount;
 }
 
-// Rank band tolerance. Two teams whose scores differ by less than this are treated as
-// equally good for allocation purposes. The engine is calibrated to roughly a point, not
-// to a tenth of one, so a sub-band gap is noise rather than a real preference — and
-// because `priority` below weights maxRank by 100, letting noise open a rank step can
-// evict a strictly better allocation from the results entirely. Ratio-based so it keeps
-// its meaning as scores drift upward across patches; the floor keeps it from collapsing
-// to nothing on low-scoring matchups.
-//
-// Re-derived for the CALIBRATED scale (see lib/calibration.js) from a real case rather than
-// picked in the abstract: on Thrall & Sobek, `Dialyn/Ye Shunguong/Sunna` (409.4) is the #1
-// allocation and `Ye Shunguong/Zhao/Sunna` (405.2) — the best non-Dialyn alternative, freeing
-// Dialyn for a boss that needs her more (e.g. pairing with Yixuan/Lucia) — sits 4.2 points
-// behind. That gap has to fall inside one band, or the solver refuses to give Dialyn up even
-// when the total allocation across all three bosses would be better. 0.011 x 409.4 = 4.50, the
-// smallest ratio that clears 4.2 at this score; 4.5 is the matching floor (was 5, tuned to the
-// old 0.02 ratio) so a low-scoring matchup doesn't get a disproportionately wide band relative
-// to the new ratio. Owner-verified case, not a formula picked in the abstract — if this ever
-// needs re-tuning, re-check this exact Thrall pair, not just TEST 3's shape assertions.
+// Rank band tolerance: two teams closer than this are treated as equally good for allocation,
+// because the engine is calibrated to about a point, not a tenth of one. Ratio-based so it keeps
+// its meaning as scores drift upward; the floor stops it collapsing on low-scoring matchups.
+// Calibrated-scale values, derived from a real Thrall & Sobek case — re-check that case before
+// re-tuning, not just TEST 3's shape assertions. [BUCK-01]
 export const RANK_BAND_RATIO = 0.011;
 export const RANK_BAND_FLOOR = 4.5;
 
@@ -172,14 +159,10 @@ export function rankBandEpsilon(score) {
 }
 
 /**
- * Assigns equivalence-class ranks (1 = best band) to a list already sorted by score
- * descending. Rank increments only when a score falls more than epsilon below the band
- * LEADER — the score that opened the current band. Comparing against the leader rather
- * than the previous team is what stops a long shallow gradient of near-equal scores from
- * chaining into one enormous band.
- *
- * Mutates `rank` on each entry (same contract as the index-based assignment it replaces)
- * and returns the list.
+ * Assigns equivalence-class ranks (1 = best band) to a list sorted by score descending.
+ * Rank increments only when a score falls more than epsilon below the band LEADER, not the
+ * previous team — that's what stops a long shallow gradient of near-equal scores from
+ * chaining into one band. Mutates `rank` on each entry and returns the list.
  *
  * @param {Array} teams - Array of {score, ...}, sorted by score descending
  */

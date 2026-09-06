@@ -1,14 +1,5 @@
-/**
- * test-pull-engine.mjs
- *
- * Assertion-based regression tests for the pull recommendations engine.
- *
- * Run from the repository root:
- *   node test-pull-engine.mjs
- *   node test-pull-engine.mjs -1 -11
- *
- * Exit code: 0 if all (specified) tests pass, 1 if any fail.
- */
+// test-recommendations.mjs — assertion-based regression tests for the pull recommendations engine.
+// Run: node test-recommendations.mjs [-1 -11 ...]. Exit code 0 if all (specified) tests pass.
 
 import { loadUnits } from './lib/data.js';
 import {
@@ -56,10 +47,7 @@ function unitByName(allUnits, name) {
     return allUnits.find(u => u.name.toLowerCase() === name.toLowerCase());
 }
 
-// ---------------------------------------------------------------------------
 // Parse -N test filters from argv
-// ---------------------------------------------------------------------------
-
 const testFilters = process.argv
     .slice(2)
     .filter(a => /^-\d+$/.test(a))
@@ -92,7 +80,7 @@ async function runTest(num, name, fn) {
 
 console.log('Pull Engine Tests\n');
 
-// PRE-TEST 0: unit-level sanity check for isSubdps
+// PRE-TEST 0: isSubdps unit-level sanity check
 await runTest(0, 'isSubdps correctness (pre-test)', () => {
     const subdpsNames = ['Burnice', 'Vivian', 'Grace', 'Orphie', 'Velina'];
     const primaryNames = ['Miyabi', 'Evelyn', 'SAnby'];
@@ -122,11 +110,8 @@ await runTest(0, 'isSubdps correctness (pre-test)', () => {
     }
 });
 
-// ===========================================================================
-// TESTS 1-7: Conditional subdps in pull recommendations (integration)
-// ===========================================================================
-// Verifies that the recommendation engine correctly accounts for conditional
-// subdps roles when assessing roster coverage and generating candidates.
+// TESTS 1-7: Conditional subdps in pull recommendations (integration) — the recommendation
+// engine must account for conditional subdps roles in roster coverage and candidates.
 
 await runTest(1, 'Yanagi counts as anomaly subdps when Miyabi is owned', () => {
     const { unitStates, ownedUnits } = buildSyntheticRoster(
@@ -237,9 +222,8 @@ await runTest(9, 'Attack-only roster', () => {
     assert(hasGap(result, 'dps-rupture'), 'expected rupture DPS gap');
     const anomalyGap = findGap(result, 'dps-anomaly');
     assert(anomalyGap && anomalyGap.score >= 70, 'anomaly gap should be high priority');
-    // Structural gap reasons should not hard-code specific unit names as prescriptive
-    // recommendations. Mech-synergy gaps legitimately reference owned units to explain
-    // pairings (e.g., "Sigrid has synergy with your Astra"), so exclude them.
+    // Structural gap reasons must not hard-code unit names as prescriptive recommendations.
+    // Mech-synergy gaps are excluded — they legitimately name owned units to explain a pairing.
     const structuralReasons = result.allGaps
         .filter(g => !g.id.startsWith('mech-synergy-'))
         .map(g => g.reason).join(' ');
@@ -371,16 +355,7 @@ await runTest(18, 'Same-element sub-DPS', () => {
         `expected element or tier reason, got: ${gap.reason}`);
 });
 
-// // TEST 19 - Test disabled as Grace is no longer considered weak with recent buffs, Remielle, Velina, etc. 
-// await runTest(19, 'Weak sub-DPS still fires anomaly-partner gap', () => {
-//     const { unitStates, ownedUnits } = buildSyntheticRoster(
-//         allUnits, ['Miyabi', 'Grace', 'Nicole', 'Anby', 'Billy']
-//     );
-//     const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 20 });
-//     const gap = findGap(result, 'anomaly-partner');
-//     assert(gap, 'expected anomaly-partner gap when only weak Grace as partner');
-//     assert(gap.reason.includes('low-tier'), `expected low-tier reason, got: ${gap.reason}`);
-// });
+// TEST 19 removed — Grace is no longer weak enough for this fixture (recent buffs, Remielle, Velina).
 
 // TEST 20
 await runTest(20, 'Pseudo-anomaly mitigates gap', () => {
@@ -439,14 +414,12 @@ await runTest(24, 'Candidate ranking by element match', () => {
     }
 });
 
-// TEST 25
-// Regression: exact roster from diagnostic output.
-// Bug 1 — Burnice (T1.5) is owned, so the subdps-anomaly gap should not fire and
-//          Vivian should not surface as a top-10 recommendation via that gap.
-// Bug 2 — Trigger (T0.5, electric off-field aftershock stunner) is already owned and
-//          provides strictly better mechanical fit with SAnby than Ju Fufu does.
-//          The mech-synergy-sanby gap must not exist; Ju Fufu's only remaining signal
-//          should be the lower-weight rupture-tag affinity gap, not the mechanical one.
+// TEST 25 pins two things on one loaded roster:
+// Bug 1 — Burnice (T1.5) owned means subdps-anomaly must not fire, and Vivian must not surface
+//         via that gap.
+// Bug 2 — Trigger (T0.5, electric off-field aftershock stunner) already owned means the
+//         mech-synergy-sanby gap must not exist, since he beats Ju Fufu for that role; Ju
+//         Fufu's only remaining signal is the lower-weight rupture-tag affinity gap.
 await runTest(25, 'Loaded roster: subdps-anomaly and mech-synergy-sanby bugs fixed', () => {
     const rosterNames = [
         // Limited S (18)
@@ -462,22 +435,18 @@ await runTest(25, 'Loaded roster: subdps-anomaly and mech-synergy-sanby bugs fix
     const { unitStates, ownedUnits } = buildSyntheticRoster(allUnits, rosterNames);
     const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 10 });
 
-    // Bug 1: subdps-anomaly gap should not fire — Burnice (T1.5, quality 40) meets the threshold
     assert(!hasGap(result, 'subdps-anomaly'),
         'subdps-anomaly gap should not fire when Burnice (T1.5) is owned');
 
-    // Bug 1 corollary: Vivian should not appear in top-10 recommendations via the sub-DPS gap
     const top10UnitIds = new Set(result.recommendations.flatMap(r => r.units.map(u => u.id)));
     assert(!top10UnitIds.has('vivian'),
         'Vivian should not appear in top-10 recommendations — Burnice already covers anomaly sub-DPS');
 
-    // Bug 2: the mechanical synergy gap pairing Ju Fufu with SAnby should not exist —
-    // Trigger already provides equal or better off-field aftershock stunner fit for SAnby.
     assert(!hasGap(result, 'mech-synergy-sanby'),
         'mech-synergy-sanby gap should not exist — Trigger already covers this mechanical role');
 
-    // Bug 2 corollary: if Ju Fufu still appears (e.g. via rupture-tag affinity), its score
-    // must be LOW priority only — the inflated mech-synergy score (Medium) must be gone.
+    // If Ju Fufu still appears (e.g. via rupture-tag affinity) it must be Low only — the
+    // inflated mech-synergy score must be gone.
     const juFufuRec = result.recommendations.find(r => r.units.some(u => u.id === 'ju-fufu'));
     if (juFufuRec) {
         assert(juFufuRec.priority === 'Low',
@@ -485,12 +454,10 @@ await runTest(25, 'Loaded roster: subdps-anomaly and mech-synergy-sanby bugs fix
     }
 });
 
-// ===========================================================================
-// TESTS 26-29: Codependent scaling (YSG veil dependency)
-// ===========================================================================
-//
-// Limited roster that has no adequate veil provider (Cissia has veils:1 < YSG's
-// scaling.veils:2). YSG has codependent:true; Aria does not.
+// TESTS 26-29: Codependent scaling (YSG veil dependency). See
+// documentation/recommendations/codependency-gating.md. Fixture: Cissia's veils:1 falls short
+// of YSG's scaling.veils:2, so this roster has no adequate veil provider. YSG is codependent;
+// Aria is not.
 
 const CODEPENDENT_ROSTER = [
     'Cissia', 'Lucia', 'Koleda', 'Nekomata',
@@ -511,7 +478,7 @@ await runTest(26, 'YSG codependent — unmet veil dependency drops priority', ()
     assert(providerIds.includes('sunna'), 'Sunna should be listed as a veil provider');
     assert(providerIds.includes('zhao'), 'Zhao should be listed as a veil provider');
 
-    // Priority should be one rank lower than it would be without the check
+    // One rank lower than without the check.
     assert(ysgRec.priority !== 'High',
         `YSG priority should have been downgraded, got ${ysgRec.priority}`);
 });
@@ -543,18 +510,15 @@ await runTest(28, 'YSG codependent — Zhao in roster satisfies dependency', () 
 await runTest(29, 'Aria has no codependent flag — no dependency check runs', () => {
     const { unitStates, ownedUnits } = buildSyntheticRoster(allUnits, CODEPENDENT_ROSTER);
 
-    // Verify directly that Aria's own codependent check is clean.
-    // (Card-level teamDependencyNotes may inherit from codependent co-card members,
-    // which is correct behavior — only the unit-level check matters here.)
+    // Aria's own unit-level check must be clean (card-level notes may still inherit from a
+    // codependent co-card member — that's fine, only the unit-level check matters here).
     const aria = unitByName(allUnits, 'Aria');
     const dep = checkTeamDependencies(aria, ownedUnits, allUnits);
     assert(!dep.hasUnmetDependency,
         'checkTeamDependencies should return no unmet dependency for Aria (no codependent flag)');
 });
 
-// ===========================================================================
 // TESTS 30-35: Per-archetype support coverage
-// ===========================================================================
 
 await runTest(30, 'Support coverage — Lucia alone does NOT cover attack support', () => {
     const roster = ['Evelyn', 'Lucia', 'Koleda', 'Nicole', 'Anby', 'Billy'];
@@ -595,9 +559,9 @@ await runTest(33, 'Support coverage — Sunna is a High recommendation when Luci
     const { unitStates, ownedUnits } = buildSyntheticRoster(allUnits, CODEPENDENT_ROSTER);
     const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 15 });
 
-    // A support-attack gap should fire: Lucia is a rupture specialist and
-    // provides almost nothing for attack teams. Even though attack DPS quality
-    // is low, the player has attack DPS (A-rank) and zero adequate support.
+    // Lucia is a rupture specialist and covers almost nothing for attack teams; the gap must
+    // fire even though attack DPS quality is low, since the player has A-rank attack DPS and
+    // zero adequate support.
     assert(hasGap(result, 'support-attack'),
         'support-attack gap should fire — Lucia does not cover attack support needs');
 
@@ -605,11 +569,10 @@ await runTest(33, 'Support coverage — Sunna is a High recommendation when Luci
     assert(gap.units.some(u => u.id === 'sunna'),
         'Sunna should appear as a candidate in the support-attack gap');
 
-    // With only one specialist premium support, the gap should be High priority
+    // One specialist premium support only -> gap is High priority.
     assert(gap.priority === 'High',
         `support-attack gap should be High priority, got ${gap.priority}`);
 
-    // Sunna should appear in a recommendation card independently of YSG
     const sunnaRec = result.recommendations.find(r =>
         r.units.some(u => u.id === 'sunna'));
     assert(sunnaRec, 'Sunna should appear in a recommendation card');
@@ -635,12 +598,11 @@ await runTest(34, 'Support coverage — Astra is a High recommendation when Luci
 });
 
 await runTest(35, 'Support coverage — Lucia recommended for rupture, Sunna excluded (join incompatible)', () => {
-    // Codependent roster with Lucia removed and Zhao added
+    // Codependent roster with Lucia removed and Zhao added; Zhao can't join rupture teams.
     const roster = CODEPENDENT_ROSTER.filter(n => n !== 'Lucia').concat('Zhao');
     const { unitStates, ownedUnits } = buildSyntheticRoster(allUnits, roster);
     const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 15 });
 
-    // Rupture support gap should fire — Zhao can't join rupture teams
     assert(hasGap(result, 'support-rupture'),
         'support-rupture gap should fire — Zhao does not cover rupture support');
 
@@ -648,11 +610,10 @@ await runTest(35, 'Support coverage — Lucia recommended for rupture, Sunna exc
     assert(gap.units.some(u => u.id === 'lucia'),
         'Lucia should appear as a candidate in the support-rupture gap');
 
-    // Sunna joins on ["attack", "faction"] — she cannot be on rupture teams
+    // Sunna joins on ["attack", "faction"] — incompatible with rupture teams.
     assert(!gap.units.some(u => u.id === 'sunna'),
         'Sunna should NOT appear in the support-rupture gap — her join conditions are incompatible');
 
-    // Sunna should appear independently in the support-attack gap instead
     assert(hasGap(result, 'support-attack'),
         'support-attack gap should also fire');
     const attackGap = findGap(result, 'support-attack');
@@ -660,9 +621,7 @@ await runTest(35, 'Support coverage — Lucia recommended for rupture, Sunna exc
         'Sunna should appear in the support-attack gap instead');
 });
 
-// ===========================================================================
 // TESTS 36-39: Lumen / Remielle pull recommendations
-// ===========================================================================
 
 await runTest(36, 'Remielle not recommended to synergize with join-incompatible units', () => {
     // Trigger joins on ["attack", "electric"] — no join overlap with Rem at all.
@@ -744,18 +703,9 @@ await runTest(41, 'Remielle excluded with single A-rank anomaly partner (Piper)'
 });
 
 await runTest(42, 'Remielle without Velina is Medium, not High, even on an anomaly-loaded roster', () => {
-    // Remielle is a titled T0, but her ceiling depends enormously on ONE partner. Velina is what
-    // makes a Remielle team great; without her the best available line is roughly
-    // Alice/Vivian/Remielle — Alice generating disorders and Remielle absorbing anomaly procs,
-    // which is genuinely good but is not the Rem/Velina ceiling.
-    //
-    // Two further things hold her back on this roster and both are correct. Her conditional ATK
-    // buff needs three anomaly bodies, and pairing her with Miyabi puts two greedy carries in one
-    // stun window (`scaling.greedy`, phase 5) — Remielle cannot fire her double ultimate while
-    // Miyabi is running enhanced -> ultimate -> enhanced.
-    //
-    // This test asserted High before Velina was distinguished from the rest of the roster. That
-    // was the fixture being blind to the difference, not the engine being wrong.
+    // Partner ladder (documentation/recommendations/partner-ladder.md): without Velina the best
+    // line here is Alice/Vivian/Remielle, good but not her ceiling. Also throttled by her 3-body
+    // conditional ATK buff and by sharing a stun window with Miyabi (`scaling.greedy`, phase 5).
     const roster = [
         'Miyabi', 'Alice', 'Promeia', 'Vivian', 'Nangong', 'Yuzuha',
         'Astra', 'Trigger', 'Nicole', 'Anby', 'Billy'
@@ -775,9 +725,8 @@ await runTest(42, 'Remielle without Velina is Medium, not High, even on an anoma
 });
 
 await runTest(43, 'Adding Velina to the same roster raises Remielle above her no-Velina priority', () => {
-    // The paired half of TEST 42, and the point of both: the engine must be able to tell a
-    // Rem/Velina roster from a Rem/Vivian one. Velina is the partner that takes Remielle from
-    // "worth having" to "worth chasing", so the SAME roster plus Velina must rate her higher.
+    // Paired with TEST 42: same roster, plus Velina, must rate Remielle higher — the partner
+    // ladder's top rung (see partner-ladder.md).
     const base = [
         'Miyabi', 'Alice', 'Promeia', 'Vivian', 'Nangong', 'Yuzuha',
         'Astra', 'Trigger', 'Nicole', 'Anby', 'Billy'
@@ -800,13 +749,8 @@ await runTest(43, 'Adding Velina to the same roster raises Remielle above her no
         `Remielle's priority: got ${without} without Velina and ${with_} with her`);
 });
 
-// ===========================================================================
-// TESTS 44-46: Claret — Electric Armorer (new DPS role)
-// ===========================================================================
-// Claret has tags=["armorer","electric",...] and a light kit: a Laceration buff for
-// fellow armorers plus scaling.cd:1 (her sliver of CD-to-Laceration conversion). The
-// pull engine must classify her as a primary armorer DPS, not as a supporting defense
-// unit, and credit electric-DPS coverage.
+// TESTS 44-46: Claret (armorer/electric, light kit) must classify as primary armorer DPS,
+// not a support unit, and credit electric-DPS coverage.
 
 await runTest(44, 'Claret classifies as armorer DPS', () => {
     const claret = unitByName(allUnits, 'Claret');
@@ -871,14 +815,10 @@ await runTest(46, 'Electric DPS coverage improves when Claret is added to roster
         `Electric coverage should improve when Claret is added — before: ${electric0}, after: ${electric1}`);
 });
 
-// ---------------------------------------------------------------------------
-// Tests that are red ON PURPOSE
-//
-// Same contract as the KNOWN_RED map in test-scoring.mjs: the run exits 0 when the set of
-// failing tests is EXACTLY this set, and exits 1 the moment one of these starts passing (the
-// entry is stale — remove it) or any other test fails. Every entry needs a reason. Never add
-// one to silence a regression.
-// ---------------------------------------------------------------------------
+// Tests that are red ON PURPOSE. Same contract as test-scoring.mjs's KNOWN_RED: exits 0 only
+// when the failing set is EXACTLY this map's keys — exits 1 the instant an entry starts
+// passing (stale, remove it) or anything else fails. Every entry needs a reason; never add
+// one just to silence a regression.
 const KNOWN_RED = new Map([]);
 
 const failedNums = new Set(failures);

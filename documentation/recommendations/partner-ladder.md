@@ -110,9 +110,11 @@ Shunguong declares no buffs at all, so neither grows one.
 
 * **The numbers are fitted to a stated preference, not derived from anything.** They reproduce
   one ordering over five units. They are not a model of partner quality.
-* **The honest fix is still outstanding.** It is for the pull engine to ask the scorer how good
-  a candidate's best achievable team is with and without the candidate. That is a feature, and
-  it would be the first thing to make the two engines share a model rather than a vocabulary.
+* **The honest fix is still outstanding**, and tracked as
+  [a deferred issue](../issues/deferred/medium-the-partner-ladder-is-a-fitted-stopgap.md). It is
+  for the pull engine to ask the scorer how good a candidate's best achievable team is with and
+  without the candidate. That is a feature, and it would be the first thing to make the two
+  engines share a model rather than a vocabulary.
 * **A** `synergy.units` annotation was tried instead and rejected. It did not move the
   recommendation at all, and in the scorer it lifted `Promeia/Remielle/Velina` by 80 points as a
   side effect. Do not reach for it again without measuring both halves.
@@ -123,5 +125,15 @@ Shunguong declares no buffs at all, so neither grows one.
 * [Codependency gating](codependency-gating.md) — the mechanism it replaces for laddered units
 * [Cards and priority](cards-and-priority.md) — what the rung caps
 * [Triple anomaly](../archetypes/triple-anomaly.md) — the team shape this is all about
+
+## Code notes
+
+### [PULL-01] The partner ladder block in `pull-engine.js`
+
+The `getPartnerLadder` implementation and its constants (`LADDER_RUNGS`, `LADDER_CUTOFFS`,
+`LADDER_MUTUAL_SYNERGY`, `LADDER_UNCONDITIONAL_SUBDPS`) are this whole page in code — the
+problem, the scoring formula, the cutoff table, the eligibility rule and the third-slot check
+above. Nothing in the implementation is not already covered here; read this page rather than
+reconstructing intent from the code.
 
 

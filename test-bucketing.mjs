@@ -1,22 +1,9 @@
-/**
- * test-bucketing.mjs
- *
- * Assertion-based regression tests for Deadly Assault *allocation* — deciding which
- * team goes to which boss when the three teams must not share units.
- *
- * This is a different concern from test-scoring.mjs. That suite asks "is this team's
- * score right?"; this one asks "given a set of scores, does the solver hand the scarce
- * unit to the boss that needs it most, and does it survive noise-level score wobble?"
- *
- * Assertions are on ALLOCATIONS (which unit lands on which boss) and on rank-band
- * structure, never on absolute scores, so the suite survives engine recalibration.
- *
- * Run from the repository root:
- *   node test-bucketing.mjs
- *   node test-bucketing.mjs -1 -4
- *
- * Exit code: 0 if all (specified) tests pass, 1 if any fail.
- */
+// test-bucketing.mjs — regression tests for Deadly Assault *allocation*: deciding which team
+// goes to which boss when the three teams must not share units. Different concern from
+// test-scoring.mjs (is a team's score right?) — this asks whether the solver hands the scarce
+// unit to the boss that needs it most, and survives noise-level score wobble. Assertions are on
+// ALLOCATIONS and rank-band structure, never absolute scores, so the suite survives
+// recalibration. Run: node test-bucketing.mjs [-1 -4 ...]. Exit code 0 if all (specified) pass.
 
 import { loadUnits, loadBosses } from './lib/data.js';
 import { filterBosses } from './lib/boss-filter.js';
@@ -35,10 +22,8 @@ function assert(cond, msg) {
     if (!cond) throw new Error(msg);
 }
 
-// ---------------------------------------------------------------------------
-// Real-data allocation harness — mirrors deadly-assault.js's pipeline so the
-// tests exercise the production solver rather than a reimplementation of it.
-// ---------------------------------------------------------------------------
+// Real-data allocation harness — mirrors deadly-assault.js's pipeline so tests exercise the
+// production solver rather than a reimplementation of it.
 
 function buildSyntheticRoster(allUnits, ownedNames) {
     const nameSet = new Set(ownedNames.map(n => n.toLowerCase()));
@@ -49,13 +34,8 @@ function buildSyntheticRoster(allUnits, ownedNames) {
     return owned;
 }
 
-/**
- * Allocate a synthetic roster across a boss set, returning the solver's combinations.
- * @param {Object[]} allUnits
- * @param {Object[]} allBosses
- * @param {string[]} ownedNames - Units in the synthetic roster
- * @param {string} bossFilter - Comma-separated boss filter (deadly-assault.js syntax)
- */
+// Allocate a synthetic roster across a boss set, returning the solver's combinations.
+// bossFilter is a comma-separated boss filter (deadly-assault.js syntax).
 function allocate(allUnits, allBosses, ownedNames, bossFilter) {
     const availableUnits = buildSyntheticRoster(allUnits, ownedNames);
     const bossObjects = filterBosses(allBosses, bossFilter);
@@ -118,10 +98,8 @@ function scoreTeam(allUnits, allBosses, unitNames, bossFilter) {
     return scoreTeamForBoss(units, bosses[0], {});
 }
 
-// ---------------------------------------------------------------------------
-// Synthetic-score harness — fabricated team entries for testing the allocator's
-// rank/priority behaviour in isolation, with no dependence on engine calibration.
-// ---------------------------------------------------------------------------
+// Synthetic-score harness — fabricated team entries for testing the allocator's rank/priority
+// behaviour in isolation, with no dependence on engine calibration.
 
 function fakeUnit(name) {
     return { id: name.toLowerCase(), name, tags: [], tier: 1 };
@@ -137,10 +115,7 @@ function fakeSolve(bossA, bossB, bossC) {
     return findExclusiveCombinations(viable, ['A', 'B', 'C']);
 }
 
-// ---------------------------------------------------------------------------
 // Parse -N test filters from argv
-// ---------------------------------------------------------------------------
-
 const testFilters = process.argv
     .slice(2)
     .filter(a => /^-\d+$/.test(a))
@@ -177,12 +152,8 @@ const DIALYN_ROSTER = [
     'Yixuan', 'Pan Yinhu', 'Lucia'
 ];
 
-// ---------------------------------------------------------------------------
-// TEST 1: the original regression.
-//
-// Dialyn is Yixuan's best-in-slot stunner by a wide margin, but only a marginal
+// TEST 1: Dialyn is Yixuan's best-in-slot stunner by a wide margin, but only a marginal
 // upgrade over the stunless YSG/Zhao/Sunna line on Thrall. She must go to Priest.
-// ---------------------------------------------------------------------------
 await runTest(1, 'Dialyn is allocated to Priest, not Thrall (stunless carry covers Thrall)', () => {
     const { combinations } = allocate(allUnits, allBosses, DIALYN_ROSTER, 'Aberrant,Thrall,Priest');
     assert(combinations.length > 0, 'No combinations found');
@@ -205,34 +176,12 @@ await runTest(1, 'Dialyn is allocated to Priest, not Thrall (stunless carry cove
         `Priest team should not be backfilled with Pan Yinhu — got ${priest.label}`);
 });
 
-// ---------------------------------------------------------------------------
-// TEST 2: the same reasoning must work in the opposite direction.
-//
-// Two levers, both needed, and Dialyn must end up on Thrall:
-//
-//   Zhao -> Astra   Astra is a worse Ye Shunguong partner than Zhao (YSG declares
-//                   `scaling.veils: 2` and Zhao supplies veils; Astra does not), so the
-//                   best Dialyn-free Thrall line falls 521.2 -> 496.4 and Dialyn's Thrall
-//                   marginal rises 5.3 -> 30.1. This is what makes Thrall worth anything.
-//   + Norma         Norma is Yixuan's other near-equal stunner (engine-context 2: "Dialyn
-//                   or Norma > Ju Fufu > Astra as the stunner"). With her on the roster
-//                   Priest is covered without Dialyn — `Norma/Yixuan/Lucia` 535.1 against
-//                   `Dialyn/Yixuan/Lucia` 535.4 — so Dialyn's Priest marginal collapses to
-//                   0.3 and she is genuinely free.
-//
-// Decision: Thrall 30.1 beats Priest 0.3. This guards against "always send Dialyn to
-// Priest" passing test 1 for the wrong reason.
-//
-// NORMA WAS ADDED 2026-09-02, and the reason matters. The test used to rely on the
-// Zhao->Astra lever alone: Thrall 30.1 against Priest 29.9, a margin of 0.2. That 29.9
-// existed only because a stunnerless rupture line, `Yixuan/Pan Yinhu/Lucia`, scored 505.5
-// — the engine believed Yixuan barely needed a stunner. Owner ruling: rupture teams
-// absolutely favour stunner+support over double-support, so that line is now 465.1 and
-// Dialyn's Priest marginal is 70.3. Freeing Dialyn therefore has to come from Priest
-// having ANOTHER stunner, not from Yixuan not wanting one. Margin is now ~30 points.
-// Ju Fufu does not work here (Priest 31.1 vs Thrall 30.1 — another knife edge); Koleda
-// and Trigger do not beat Pan Yinhu for Yixuan at all.
-// ---------------------------------------------------------------------------
+// TEST 2: the same reasoning in reverse — Dialyn must end up on Thrall. Two levers, both
+// needed: swapping Zhao for Astra removes Thrall's other veil provider (YSG needs
+// scaling.veils:2), raising Dialyn's Thrall marginal well clear of noise; adding Norma
+// (Yixuan's other near-equal stunner) covers Priest without Dialyn, collapsing her Priest
+// marginal to near zero. Guards against "always send Dialyn to Priest" passing TEST 1 for
+// the wrong reason.
 await runTest(2, 'Norma covers Priest, so Dialyn is freed for Thrall (marginal value reverses)', () => {
     const roster = DIALYN_ROSTER.filter(n => n !== 'Zhao').concat('Astra', 'Norma');
     const { combinations } = allocate(allUnits, allBosses, roster, 'Aberrant,Thrall,Priest');
@@ -245,9 +194,7 @@ await runTest(2, 'Norma covers Priest, so Dialyn is freed for Thrall (marginal v
         `Without a competitive stunless line, Dialyn should go to Thrall, got ${dialynBoss} — ${describe(best)}`);
 });
 
-// ---------------------------------------------------------------------------
 // TEST 3: epsilon-band rank equivalence.
-// ---------------------------------------------------------------------------
 await runTest(3, 'assignBandedRanks bands near-equal scores and separates real gaps', () => {
     assert(RANK_BAND_RATIO > 0 && RANK_BAND_FLOOR > 0, 'Band constants must be positive');
 
@@ -284,17 +231,12 @@ await runTest(3, 'assignBandedRanks bands near-equal scores and separates real g
     assert(gradient[0].rank === 1, 'First entry must be rank 1');
 });
 
-// ---------------------------------------------------------------------------
-// TEST 4: a noise-level score gap must not evict a strictly better allocation.
-//
-// This is the shape of the original bug. `priority = maxRank * 100 + rankSum` weights
-// maxRank so heavily that one extra rank step outranks any total-score advantage. With
-// raw index ranks, needing the 3rd-listed team on a boss (even when all three are
-// within noise of each other) pushed maxRank to 3 and buried the better allocation.
-// ---------------------------------------------------------------------------
+// TEST 4: a noise-level score gap must not evict a strictly better allocation. Rank bands are
+// why (documentation/bucketing/deadly-assault.md) — `priority = maxRank * 100 + rankSum`
+// weights maxRank so heavily that one extra raw-index rank step outranks any total-score gap.
 await runTest(4, 'A sub-epsilon rank step cannot evict the higher-total allocation', () => {
-    // Boss A: the top two lines both consume the scarce unit X, so avoiding X means
-    // taking the 3rd-listed line — despite all three being within a point of each other.
+    // Boss A: the top two lines both consume scarce unit X, so avoiding X means taking the
+    // 3rd-listed line — despite all three being within a point of each other.
     const bossA = [
         fakeEntry(['X', 'a1', 'a2'], 100),
         fakeEntry(['X', 'a3', 'a4'], 99.5),
@@ -327,14 +269,9 @@ await runTest(4, 'A sub-epsilon rank step cannot evict the higher-total allocati
         `Boss A's three near-equal lines should share rank 1, got ${bossA.map(t => t.rank).join('/')}`);
 });
 
-// ---------------------------------------------------------------------------
-// TEST 5: scope of the stunless stun-shill credit.
-//
-// A stun shill is a hard requirement, satisfiable either by bringing a stunner or by
-// bringing a stunless carry who holds the multiplier permanently. The stunless route
-// also keeps the team slot, which is what the credit prices. It must not leak to teams
-// that simply lack a stunner.
-// ---------------------------------------------------------------------------
+// TEST 5: scope of the stunless stun-shill credit (see documentation/archetypes/stunless.md).
+// A stunless carry clears a stun shill without spending a slot on a stunner, and the engine
+// prices that freed slot — but the credit must not leak to teams that simply lack a stunner.
 await runTest(5, 'Stunless stun-shill credit is gated on a stunless carry, not on lacking a stunner', () => {
     const stunless = scoreTeam(allUnits, allBosses, ['Ye Shunguong', 'Zhao', 'Sunna'], 'Thrall');
     const withStunner = scoreTeam(allUnits, allBosses, ['Dialyn', 'Ye Shunguong', 'Sunna'], 'Thrall');
@@ -354,9 +291,7 @@ await runTest(5, 'Stunless stun-shill credit is gated on a stunless carry, not o
         `Dialyn/YSG/Sunna (${withStunner.toFixed(1)}) should still edge out YSG/Zhao/Sunna (${stunless.toFixed(1)})`);
 });
 
-// ---------------------------------------------------------------------------
 // TEST 6: allocations must never share a unit across bosses.
-// ---------------------------------------------------------------------------
 await runTest(6, 'No unit is allocated to two bosses in the same combination', () => {
     const { combinations } = allocate(allUnits, allBosses, DIALYN_ROSTER, 'Aberrant,Thrall,Priest');
     assert(combinations.length > 0, 'No combinations found');

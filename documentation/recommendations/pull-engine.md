@@ -31,3 +31,15 @@ no notion of a raw or calibrated score.
 
 `pull-debug.js` drives it from the CLI. See the
 [CLI reference](../tooling/cli-reference.md#pull-debugjs).
+
+## Code notes
+
+### [PULL-02] The codependency/ladder penalty is per unit, not per card
+
+`analyze()`'s card-splitting step used to run over finished [cards](cards-and-priority.md) and
+drop the whole card whenever any one of its units had an unmet dependency. A card is a group of
+candidates sharing a gap, so on an anomaly roster Remielle's codependency was quietly demoting
+Aria, Jane Doe and Yanagi, who shared her Anomaly Depth card and had nothing wrong with them.
+
+The penalty is now computed per unit and the card is split afterward, so a hobbled unit carries
+its own verdict out with it instead of dragging its card-mates down.

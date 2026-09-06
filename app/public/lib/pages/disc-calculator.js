@@ -5,9 +5,7 @@
 
 import { CustomDropdown } from '../common/custom-dropdown.js';
 
-// ============================================================================
-// DISC DATA CONSTANTS
-// ============================================================================
+// Disc Data Constants
 
 const SUBSTATS = [
     "ATK",
@@ -56,9 +54,7 @@ const PLATING_AGENTS = {
     C: 100   // Molded Plating Agent
 };
 
-// ============================================================================
-// RANDOM NUMBER GENERATOR (Cryptographically secure)
-// ============================================================================
+// Random Number Generator (Cryptographically Secure)
 
 function random(until) {
     if (until <= 0 || !Number.isInteger(until)) {
@@ -81,9 +77,7 @@ function random(until) {
     return value % until;
 }
 
-// ============================================================================
-// DISC GENERATION
-// ============================================================================
+// Disc Generation
 
 /**
  * Generate a random disc for a specific slot (or random slot if not specified)
@@ -126,9 +120,7 @@ function generateDisc(slot = null, forcedMainStat = null) {
     };
 }
 
-// ============================================================================
-// MATCHING LOGIC
-// ============================================================================
+// Matching Logic
 
 /**
  * Check if a disc matches the target criteria
@@ -164,9 +156,7 @@ function discMatchesTarget(disc, target) {
     return true;
 }
 
-// ============================================================================
-// PROBABILITY HELPERS
-// ============================================================================
+// Probability Helpers
 
 function factorial(n) {
     if (n === 0 || n === 1) return 1;
@@ -200,35 +190,24 @@ function calculateProbability(rolls, needed, p = 0.25) {
  * Adapts based on whether the target REQUIRES a 4-substat start
  */
 function getBaselineProbability(target) {
-    // 1. Determine if this target forces a 4-substat start
-    // A 4-substat start is forced if:
-    // - We are looking for 4 specific substats
-    // - OR we need 5 upgrades total (can only happen with 5 rolls)
-    
+    // A 4-substat start is forced when 4 specific substats are wanted, or 5 total
+    // upgrades are needed (only reachable via a 5-roll disc).
     const numGoalStats = Object.keys(target.substatGoals).length;
     const totalUpgradesNeeded = Object.values(target.substatGoals).reduce((sum, val) => sum + val, 0);
-    
+
     const requires4Lines = (numGoalStats >= 4) || (totalUpgradesNeeded >= 5);
-    
-    // 2. Set Max Rolls based on viability requirement
-    // If 4-lines required: we only accept 4-line discs, so baseline has 5 rolls
-    // If NOT required: we accept 3-line discs (most common), so baseline is conservative (4 upgrade rolls)
+
+    // 4-line discs get 5 rolls; otherwise assume the conservative 4-roll (3-line) case.
     const maxRolls = requires4Lines ? 5 : 4;
-    
-    // 3. Estimate "p" (probability per roll)
-    // If looking for 1 specific stat: p = 0.25
-    // If looking for "any 2 stats": p = 0.5 (assuming both present)
-    // We approximate this by: num_goal_stats_present / 4
-    // For a fresh disc, we assume "best case viable scenario": all goal stats are present on the disc
-    // (Because non-viable discs are filtered out at Level 0 anyway)
+
+    // p = fraction of goal stats assumed present per roll (num_goal_stats / 4), capped
+    // at 1. Assumes the best-case fresh disc, since non-viable ones are filtered earlier.
     const p = Math.min(numGoalStats / 4.0, 1.0);
     
     return calculateProbability(maxRolls, totalUpgradesNeeded, p);
 }
 
-// ============================================================================
-// SIMULATION
-// ============================================================================
+// Simulation
 
 function getCost(startLevel, endLevel) {
     let exp = 0;
@@ -352,11 +331,9 @@ function simulateUpgradeProcess(disc, target) {
         let pCurrent = 0;
         
         if (numSubstats === 3) {
-            // First step is reveal (0 upgrades)
+            // First step is reveal (0 upgrades). 3-substat probability is complex (reveal +
+            // upgrades), so treat it as always-continue and let the reveal step decide.
             futureUpgrades = Math.max(0, pendingSteps.length - 1);
-            // Probability logic for 3-substat disc is complex (reveal + upgrades)
-            // For simplicity in this step, we'll let it pass to the reveal
-            // The probability check works best when we have 4 substats and are upgrading
             pCurrent = 1.0; 
         } else {
             // 4 substats: standard upgrades
@@ -497,7 +474,6 @@ function runSimulations(target, maxIterations = 2000, maxTimeMs = 5000) {
     let iterations = 0;
     
     while (iterations < maxIterations) {
-        // Check time limit
         if (Date.now() - startTime >= maxTimeMs) {
             console.log(`Stopped after ${iterations} iterations due to time limit`);
             break;
@@ -507,20 +483,16 @@ function runSimulations(target, maxIterations = 2000, maxTimeMs = 5000) {
         iterations++;
     }
     
-    // Extract counts for statistics
     const counts = results.map(r => r.count);
     const calibrators = results.map(r => r.calibratorsUsed);
     const exps = results.map(r => r.totalExp);
     const dennies = results.map(r => r.totalDennies);
-    
-    // Calculate statistics for counts
+
     const sum = counts.reduce((a, b) => a + b, 0);
     const average = sum / counts.length;
-    
-    // Calculate average calibrators
+
     const avgCalibrators = calibrators.reduce((a, b) => a + b, 0) / calibrators.length;
 
-    // Calculate average resources
     const avgExp = exps.reduce((a, b) => a + b, 0) / exps.length;
     const avgDennies = dennies.reduce((a, b) => a + b, 0) / dennies.length;
     
@@ -542,9 +514,7 @@ function runSimulations(target, maxIterations = 2000, maxTimeMs = 5000) {
     };
 }
 
-// ============================================================================
-// UI STATE
-// ============================================================================
+// UI State
 
 let slotDropdown = null;
 let mainstatCheckboxes = [];
@@ -559,9 +529,7 @@ let upgradeWidgets = [];
 let useCalibrators = false;
 let maxCalibrators = 0;
 
-// ============================================================================
-// UI RENDERING
-// ============================================================================
+// UI Rendering
 
 function initSlotDropdown() {
     const container = document.getElementById('slot-dropdown-container');
@@ -623,7 +591,6 @@ function renderMainStatSelector() {
         const multiDropdown = document.createElement('div');
         multiDropdown.className = 'multi-dropdown';
         
-        // Toggle button
         const toggleBtn = document.createElement('button');
         toggleBtn.type = 'button';
         toggleBtn.className = 'dropdown-toggle';
@@ -639,7 +606,6 @@ function renderMainStatSelector() {
         toggleBtn.appendChild(dropdownText);
         toggleBtn.appendChild(dropdownArrow);
         
-        // Dropdown menu
         const dropdownMenu = document.createElement('div');
         dropdownMenu.className = 'dropdown-menu';
         
@@ -676,13 +642,11 @@ function renderMainStatSelector() {
             dropdownMenu.appendChild(label);
         });
         
-        // Toggle dropdown on button click
         toggleBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             multiDropdown.classList.toggle('open');
         });
         
-        // Close dropdown when clicking outside
         document.addEventListener('click', (e) => {
             if (!multiDropdown.contains(e.target)) {
                 multiDropdown.classList.remove('open');
@@ -694,7 +658,6 @@ function renderMainStatSelector() {
         container.appendChild(multiDropdown);
     }
     
-    // Update substat dropdowns to disable conflicting stats
     renderSubstatDropdowns();
 }
 
@@ -733,7 +696,6 @@ class UpgradeWidget {
         
         this.widget.addEventListener('mousedown', e => e.preventDefault());
         
-        // Cycle on main area click
         this.display.addEventListener('click', (e) => {
              e.stopPropagation();
              if (this.isDisabled()) return;
@@ -833,12 +795,10 @@ function initSubstatDropdowns() {
         const container = document.getElementById(`substat${i + 1}-container`);
         renderSubstatDropdown(i, container);
         
-        // Init upgrade widget
         const upgradeContainer = document.getElementById(`substat${i + 1}-upgrade-container`);
         if (upgradeContainer) {
             const widget = new UpgradeWidget(upgradeContainer, i, handleUpgradeChange);
             upgradeWidgets[i] = widget;
-            // Set initial state
             widget.setDisabled(selectedSubstats[i] === '');
         }
     }
@@ -889,7 +849,6 @@ function renderSubstatDropdown(index, container) {
         }
     });
     
-    // Build options list
     const options = [{ value: '', label: 'Any', selected: selectedSubstats[index] === '' }];
     
     SUBSTATS.forEach(stat => {
@@ -910,7 +869,6 @@ function renderSubstatDropdown(index, container) {
         onChange: (value) => {
             selectedSubstats[index] = value;
             
-            // Toggle upgrade widget
             if (upgradeWidgets[index]) {
                 upgradeWidgets[index].setDisabled(value === '');
                 if (value === '' && selectedUpgrades[index] > 0) {
@@ -925,28 +883,22 @@ function renderSubstatDropdown(index, container) {
     
     substatDropdowns[index] = dropdown;
 
-    // Sync upgrade widget state if it exists
     if (upgradeWidgets[index]) {
         upgradeWidgets[index].setDisabled(selectedSubstats[index] === '');
     }
 }
 
-// ============================================================================
-// RESULTS DISPLAY
-// ============================================================================
+// Results Display
 
 function showResults(stats, target) {
     const resultsSection = document.getElementById('results-section');
     resultsSection.style.display = '';
     
-    // Build target summary
     const summaryEl = document.getElementById('target-summary');
     let summaryHTML = '<div class="target-details">';
     
-    // Slot
     summaryHTML += `<div class="target-item"><span class="target-label">Slot:</span> <span class="target-value">${target.slot ? 'Slot ' + target.slot : 'Any'}</span></div>`;
     
-    // Main stat
     if (target.slot) {
         const slotIndex = target.slot - 1;
         const mainOptions = MAINSTATS[slotIndex];
@@ -959,7 +911,6 @@ function showResults(stats, target) {
         }
     }
     
-    // Substats
     if (target.substats.length > 0) {
         const formattedSubstats = target.substats.map(stat => {
             const upgrades = target.substatGoals ? target.substatGoals[stat] : 0;
@@ -973,19 +924,16 @@ function showResults(stats, target) {
     summaryHTML += '</div>';
     summaryEl.innerHTML = summaryHTML;
     
-    // Statistics
     document.getElementById('result-average').textContent = stats.average.toFixed(1);
     document.getElementById('result-count').textContent = stats.count.toLocaleString();
     
     const statsBlock = document.getElementById('result-count').closest('.result-block');
 
-    // Clean up old median/p90 if they exist
     const oldMedian = document.getElementById('result-median');
     if (oldMedian) oldMedian.closest('.stat-line').remove();
     const oldP90 = document.getElementById('result-p90');
     if (oldP90) oldP90.closest('.stat-line').remove();
 
-    // Clean up old resource elements if they exist
     const oldResources = document.getElementById('result-resources');
     if (oldResources) {
         const row = oldResources.closest('.stat-line');
@@ -994,7 +942,6 @@ function showResults(stats, target) {
     const oldCal = document.getElementById('result-calibrators-row');
     if (oldCal) oldCal.remove();
 
-    // Add Resources Block
     let resourceContainer = document.getElementById('resource-container');
     if (!resourceContainer) {
         resourceContainer = document.createElement('div');
@@ -1008,7 +955,6 @@ function showResults(stats, target) {
     const resourceMultiplier = target.slot ? 6 : 3;
     const hifiCost = Math.round(stats.average * resourceMultiplier);
     
-    // Helper for Plating agents
     function calculatePlatingAgents(exp) {
         let remaining = Math.round(exp);
         const a = Math.floor(remaining / 2000);
@@ -1020,10 +966,8 @@ function showResults(stats, target) {
     }
     const agents = calculatePlatingAgents(stats.avgExp);
     
-    // Build Resource HTML
     let html = '';
     
-    // Hi-Fi
     html += `
         <div class="stat-line" style="font-weight: bold; border: none; padding: 0.25rem 0;">
             <span class="stat-label">Estimated Resources</span>
@@ -1034,7 +978,6 @@ function showResults(stats, target) {
         </div>
     `;
     
-    // Calibrators
     if (stats.avgCalibrators && stats.avgCalibrators > 0) {
         html += `
             <div class="stat-line" style="justify-content: flex-end; border: none; padding: 0.25rem 0;">
@@ -1046,7 +989,6 @@ function showResults(stats, target) {
         `;
     }
     
-    // Dennies
     html += `
         <div class="stat-line" style="justify-content: flex-end; border: none; padding: 0.25rem 0;">
             <span class="stat-value" style="display: flex; align-items: center; gap: 8px;">
@@ -1056,7 +998,6 @@ function showResults(stats, target) {
         </div>
     `;
     
-    // Plating Agents
     const agentInfo = [];
     if (agents.a > 0) agentInfo.push({ label: 'Ether Plating Agent', val: agents.a, icon: 'plating-a.webp' });
     if (agents.b > 0) agentInfo.push({ label: 'Crystallized Plating Agent', val: agents.b, icon: 'plating-b.webp' });
@@ -1075,72 +1016,6 @@ function showResults(stats, target) {
 
     resourceContainer.innerHTML = html;
     
-    /* REPLACED LOGIC START */
-    /* REMOVED OLD LOGIC
-    let resourcesEl = null; // document.getElementById('result-resources');
-
-    if (!resourcesEl) {
-        const resourcesLine = document.createElement('div');
-        resourcesLine.className = 'stat-line';
-        resourcesLine.style.fontWeight = 'bold';
-        resourcesLine.style.marginTop = '0.5rem';
-        
-        resourcesLine.innerHTML = `
-            <span class="stat-label">Estimated Resources</span>
-            <span class="stat-value" style="display: flex; align-items: center; gap: 6px;">
-                <img src="assets/resources/hifi.webp" alt="Hi-Fi" style="width: 20px; height: 20px; object-fit: contain;">
-                <span id="result-resources">${resourceCost.toLocaleString()}</span>
-            </span>
-        `;
-        statsBlock.appendChild(resourcesLine);
-    } else {
-        document.getElementById('result-resources').textContent = resourceCost.toLocaleString();
-    }
-
-    // Add Tuning Calibrators row
-    let calibratorsEl = document.getElementById('result-calibrators-row');
-    const resourcesRow = document.getElementById('result-resources') ? document.getElementById('result-resources').closest('.stat-line') : null;
-
-    if (stats.avgCalibrators && stats.avgCalibrators > 0) {
-        const calCost = Math.round(stats.avgCalibrators);
-        
-        // Remove border from the previous row (Resources) to merge them visually
-        if (resourcesRow) {
-            resourcesRow.style.borderBottom = 'none';
-            resourcesRow.style.paddingBottom = '0.25rem';
-        }
-
-        if (!calibratorsEl) {
-            const calLine = document.createElement('div');
-            calLine.className = 'stat-line';
-            calLine.id = 'result-calibrators-row';
-            calLine.style.justifyContent = 'flex-end';
-            calLine.style.paddingTop = '0';
-            
-            calLine.innerHTML = `
-                <span class="stat-value" style="display: flex; align-items: center; gap: 6px;">
-                    <img src="assets/resources/calibrator.webp" alt="Calibrator" style="width: 20px; height: 20px; object-fit: contain;">
-                    <span id="result-calibrators">${calCost.toLocaleString()}</span>
-                </span>
-            `;
-            statsBlock.appendChild(calLine);
-        } else {
-            calibratorsEl.style.display = 'flex';
-            calibratorsEl.style.justifyContent = 'flex-end';
-            calibratorsEl.style.paddingTop = '0';
-            document.getElementById('result-calibrators').textContent = calCost.toLocaleString();
-        }
-    } else if (calibratorsEl) {
-        calibratorsEl.style.display = 'none';
-        // Restore border of previous row
-        if (resourcesRow) {
-            resourcesRow.style.borderBottom = '';
-            resourcesRow.style.paddingBottom = '';
-        }
-    }
-    
-    */
-    // Interpretation
     const interpEl = document.getElementById('result-interpretation');
     let interpretation = '';
     
@@ -1158,7 +1033,6 @@ function showResults(stats, target) {
         interpretation = `<span class="interp-extreme">Extremely rare!</span> Highly unlikely configuration. Requires massive resources and luck.`;
     }
     
-    // Add context about 5 upgrades requirement
     let totalUpgrades = 0;
     if (target.substatGoals) {
         for (const stat in target.substatGoals) {
@@ -1171,8 +1045,6 @@ function showResults(stats, target) {
     }
     
     interpEl.innerHTML = interpretation;
-    
-    // Scroll to results
     resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
@@ -1181,15 +1053,11 @@ function showLoading(show) {
     overlay.style.display = show ? 'flex' : 'none';
 }
 
-// ============================================================================
-// MAIN CALCULATION
-// ============================================================================
+// Main Calculation
 
 function runCalculation() {
-    // Save state before running calculation
     saveState();
     
-    // Build target substats array and goals
     const targetSubstats = [];
     const substatGoals = {};
     
@@ -1200,7 +1068,6 @@ function runCalculation() {
         }
     });
     
-    // Build target object
     const target = {
         slot: selectedSlot === 'any' ? null : parseInt(selectedSlot),
         mainStats: [...selectedMainStats],
@@ -1209,7 +1076,6 @@ function runCalculation() {
         maxCalibrators: useCalibrators ? maxCalibrators : 0
     };
     
-    // Show loading
     showLoading(true);
     
     // Run simulation asynchronously to not block UI
@@ -1226,9 +1092,7 @@ function runCalculation() {
     }, 50);
 }
 
-// ============================================================================
-// STATE PERSISTENCE
-// ============================================================================
+// State Persistence
 
 function saveState() {
     const state = {
@@ -1253,7 +1117,6 @@ function loadState() {
         
         const state = JSON.parse(saved);
         
-        // Restore slot selection
         if (state.slot) {
             selectedSlot = state.slot;
             // Update the dropdown value without triggering onChange
@@ -1271,12 +1134,10 @@ function loadState() {
             }
         }
         
-        // Restore main stats selection
         if (state.mainStats && Array.isArray(state.mainStats)) {
             selectedMainStats = [...state.mainStats];
         }
         
-        // Restore substats and upgrades
         if (state.substats && Array.isArray(state.substats)) {
             selectedSubstats = [...state.substats];
         }
@@ -1284,11 +1145,9 @@ function loadState() {
             selectedUpgrades = [...state.upgrades];
         }
         
-        // Update UI components
         renderMainStatSelector();
         renderSubstatDropdowns();
         
-        // Restore upgrade widget values
         selectedUpgrades.forEach((val, i) => {
             if (upgradeWidgets[i]) {
                 upgradeWidgets[i].setValue(val);
@@ -1296,7 +1155,6 @@ function loadState() {
             }
         });
         
-        // Rebuild upgrade history based on current upgrades
         upgradeHistory = [];
         selectedUpgrades.forEach((val, i) => {
             if (val > 0) {
@@ -1304,7 +1162,6 @@ function loadState() {
             }
         });
         
-        // Restore calibrator settings
         if (typeof state.useCalibrators === 'boolean') {
             useCalibrators = state.useCalibrators;
             const cb = document.getElementById('use-calibrators');
@@ -1332,10 +1189,7 @@ function loadState() {
     }
 }
 
-// ============================================================================
-// INITIALIZATION
-// ============================================================================
-
+// Initialization
 function updateCalibratorVisibility() {
     const section = document.getElementById('calibrator-section');
     const slotInt = parseInt(selectedSlot);
@@ -1352,22 +1206,18 @@ function updateCalibratorVisibility() {
 }
 
 function resetConfiguration() {
-    // Reset Slot
     selectedSlot = 'any';
     initSlotDropdown();
     
-    // Reset Main Stats
     selectedMainStats = [];
     renderMainStatSelector();
     
-    // Reset Substats & Upgrades
     selectedSubstats = ['', '', '', ''];
     selectedUpgrades = [0, 0, 0, 0];
     upgradeHistory = [];
     upgradeWidgets.forEach(w => { if(w) w.setValue(0); });
     renderSubstatDropdowns();
     
-    // Reset Calibrators
     useCalibrators = false;
     maxCalibrators = 0;
     const calCheck = document.getElementById('use-calibrators');
@@ -1379,32 +1229,26 @@ function resetConfiguration() {
     }
     updateCalibratorVisibility();
     
-    // Hide Results
     document.getElementById('results-section').style.display = 'none';
     showLoading(false);
 }
 
 function init() {
-    // Initialize dropdowns
     initSlotDropdown();
     initSubstatDropdowns();
     
-    // Load saved state from localStorage
     loadState();
     
-    // Buttons
     const calcBtn = document.getElementById('calculate-btn');
     if (calcBtn) calcBtn.addEventListener('click', runCalculation);
     
     const resetBtn = document.getElementById('reset-btn');
     if (resetBtn) resetBtn.addEventListener('click', resetConfiguration);
     
-    // Calibrator controls
     const calibratorCheckbox = document.getElementById('use-calibrators');
     const calibratorInput = document.getElementById('calibrator-input');
     
     if (calibratorCheckbox && calibratorInput) {
-        // Sync state on load
         useCalibrators = calibratorCheckbox.checked;
         calibratorInput.disabled = !useCalibrators;
         
@@ -1417,7 +1261,6 @@ function init() {
             calibratorInput.disabled = !useCalibrators;
             
             if (useCalibrators) {
-                // Ensure valid value
                 if (!calibratorInput.value || parseInt(calibratorInput.value) < 1) {
                     calibratorInput.value = 1;
                 }
@@ -1440,7 +1283,6 @@ function init() {
         });
     }
     
-    // Initial render
     renderMainStatSelector();
     updateCalibratorVisibility();
 }
