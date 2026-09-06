@@ -1,0 +1,66 @@
+# Elements and Roles
+
+The two tags every unit carries. Element decides whether a unit is welcome against a
+particular boss; role decides what the unit is *for*.
+
+## The seven elements
+
+fire, ice, electric, ether, physical, wind, **lumen**.
+
+A boss lists weaknesses and resistances. A DPS whose element matches a weakness gets a
+bonus. A DPS whose element is resisted is **disqualified outright** — the team is not
+scored. Supports and defenders are only penalised, never disqualified, because their
+damage is not the point (see [element resistance and role](../engine/element-resistance.md)).
+
+No boss in the data has a lumen weakness or a lumen resistance. Lumen is strange enough to
+have [its own page](lumen.md).
+
+## Element variants
+
+Three units fill a *separate* anomaly gauge that still counts as their base element when a
+boss checks weakness or resistance.
+
+| Unit | Base element | Variant | Why it matters |
+|----|----|----|----|
+| Miyabi | ice | `frost` | Frost and ice are different gauges, so Miyabi disorders with Soukaku |
+| Yixuan | ether | `auricInk` | Rarely relevant |
+| Ye Shunguong | physical | `honedEdge` | Rarely relevant |
+
+The flag is `mechanics.elementalVariant`. Variants matter in two places: deciding whether
+two units [react](anomaly-reactions.md), and picking a vortex tier.
+
+A variant can be tiered deliberately differently from its base. Miyabi's frost is worth
+essentially nothing on a vortex boss, and that single fact is why Promeia — plain ice —
+outscores Miyabi against wind bosses.
+
+## The seven roles
+
+Four of them deal the damage:
+
+* **Attack** — on-field damage from basics, chains and ultimates, mostly during stun windows.
+* **Anomaly** — damage from anomaly buildup, disorders and enhanced attacks.
+* **Rupture** — deals Sheer damage, which **ignores enemy defense**. Defense shred and PEN
+  are dead weight for a rupture carry.
+* **Armorer** — deals Laceration damage and scales off DEF. See
+  [armorer, laceration, gash and maim](armorer-laceration-gash-maim.md).
+
+Three of them do not:
+
+* **Stun** — creates the damage window. Stunners also deal real damage; they are not pure
+  enablers.
+* **Support** — buffs and utility, negligible personal damage.
+* **Defense** — shields, healing and mitigation, usually with buffs attached.
+
+Despite the name, defense units are not played defensively. The game rewards aggression, so
+in practice a defender is an alternate support that happens to hit slightly harder. Ben is
+the clearest case: he converts DEF into crit damage, and the people who run him build him as
+a carry.
+
+## Pseudo-roles
+
+A unit can gain extra roles through `mechanics.pseudoRole`. Once a pseudo-role activates, it
+**is** the unit's role for scoring purposes — every role test (`isDPS`, `isSupport`, and the
+rest) reads activated roles before it reads the printed one. The activation rules and their
+knock-on effects are in [pseudoRole](../data-model/pseudorole.md) and
+[role activation ripple effects](../engine/role-activation-ripple.md).
+ctivation-ripple.md).
