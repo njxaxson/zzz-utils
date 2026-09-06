@@ -1,10 +1,10 @@
 {
-  "generated": "2026-09-06T08:56:54.701Z",
+  "generated": "2026-09-06T11:11:52.317Z",
   "method": "linear",
   "target": 400,
   "k": 10,
   "anchorRule": "top-K mean, global across all bosses, excluding teams containing a boss favored unit",
-  "engineFingerprint": "216b289d000a6ada8a2b9f89c0b43d72e621b9c28ca20d52488341e46f35995f",
+  "engineFingerprint": "4017c4ec442b2d55eddb222447377751f7363569e122f12a85fc504bf995fc17",
   "corpus": {
     "teams": 6897,
     "bosses": 19,

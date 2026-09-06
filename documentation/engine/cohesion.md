@@ -102,4 +102,58 @@ Sub-DPS units are **always** damage contributors, even with a support pseudo-rol
   leaves it green is the only kind worth keeping. See
   [the verification loop](../tooling/verification-loop.md).
 
+## Code notes
+
+### [COH-01] A unit PLAYING support is judged as one, even with a DPS tag
+
+`computeBuffUtilization` routes a supplier through the support-side measure whenever
+`isDPS(supplier) && !isSupport(supplier)` is false — i.e. whenever it either isn't tagged DPS,
+or IS tagged DPS but is also playing support. Remielle is tagged anomaly but is the support slot
+on a triple-anomaly team; the DPS-side branch discards every "generic" buff (atk, cr, cd,
+dmg...) on the grounds that a carry should not be judged on stat buffs it incidentally carries.
+Both are right for a carry and wrong for her: her conditional ATK buff is not incidental, it is
+the whole unit. Measured on the DPS-side branch her cohesion was 100% whether or not the
+triple-anomaly condition was met, so the engine never asked whether her defining buff landed.
+Owner: "for damage-dealing calcs she is a subdps... for buff relevance she is support. But
+generally speaking, support wins."
+
+`isSupport()` reads ACTIVATED roles, so a conditional support pseudo-role only counts when its
+predicate holds — Cissia routes to the support-side measure only on a team with Seed. Affects
+exactly three units: Remielle, Orphie, and Cissia-with-Seed.
+
+The same fix applies to how a team-scoped conditional buff is measured: `resolveMapForUtil`
+hands back the value the team actually unlocked, so measuring THAT value only ever asks "did
+the 2 land?" — trivially yes. Cohesion instead measures the buff at its FULL size and treats the
+shortfall as relevance that never arrived (Remielle's ATK buff is offered at 4 with half of it
+landing — owner: 1600 ATK down to 700 "is 45%, which we have rounded to 50%"). Team-scoped
+only: a recipient-scoped conditional is already routed to its best consumer and is a buff
+correctly aimed elsewhere, not a shortfall.
+
+### [COH-02] The element-buff menu, and Lighter
+
+Element buffs are a MENU, not separate offerings: a unit carries fire AND ice so that one of
+them matches whatever the team runs. `chargeableElementArms` charges only the arms that LAND,
+crediting each in full; if NONE land, the largest is charged as dead weight — a menu where
+nothing matches is a real mismatch and still deserves the hit.
+
+For a unit with a single element buff this is arithmetically identical to charging it directly
+(a lone landing arm charges itself, a lone missing arm is also the largest), which is why
+Soukaku's unmatched ice buff keeps taking the hit it takes. Lighter is the only unit in the
+roster with more than one element buff, so he is the only one this rule can move — and the only
+reason it exists. `dpsRel` (no half-credit for a non-carry teammate) is what stops Soukaku's ice
+arm scoring 0.50 through ice-elemental Lycaon and falsely passing the flagship band: buffing the
+ice STUNNER's element is not the same as buffing the carry's.
+
+### [COH-03] Delivery is priced at the square root of the L4 coefficient
+
+`MULT`'s values are L4 PAIR-TERM coefficients, not a damage scale — L4 multiplies them by a
+consumer weight and then soft-caps the whole layer at 100, so a 116x spread between sheer (81.0
+to Yixuan) and ATK (0.7) is survivable there. Cohesion has no such cap: used raw, that spread
+made every ATK support read 26-83% utilization and every sheer/ultimate support saturate.
+
+`scaleImpact` therefore uses the SQUARE ROOT of the L4 coefficient. A support's share of a
+team's damage is not linear in its pair coefficient, because L4 is one capped layer among
+several. A buff worth `IMPACT_UNIT` still maps to exactly 1.0, so the anchor is unmoved and only
+the spread compresses — sheer to 2.1x and ATK to 0.6x rather than 4.5x and 0.35x.
+
 

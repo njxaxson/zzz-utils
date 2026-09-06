@@ -150,3 +150,55 @@ fulfilment and damage-type scoring.
 
 Engine support exists; **no unit currently uses it**. See
 [deliberately unmodeled](../engine/deliberately-unmodeled.md).
+
+## Code notes
+
+### [SCAL-01] The plural need keys are not typos
+
+`NEED_FULFILLMENT_KEYS` uses `ablooms` and `vortex` as separate, currently-dormant needs —
+plural (or differently-shaped) from the live `damage`/`buffs` keys `abloom` and `vortex`.
+`ablooms` reads `scaling.ablooms`, declared by nobody; the live abloom channel is the singular
+`abloom`, a `damage` key, matched against a supplier's `buffs.abloom` in the damage-type loop of
+`scoreNeedFulfillment` (Promeia's `buffs.abloom: 3` into Velina's `damage.abloom: 2` is 18
+points). `vortex` is the same shape: `buffs.vortex` is priced via `MULT.VORTEX_BUFF`,
+`scaling.vortex` is declared by nobody.
+
+Do not "fix" the plurals to match the damage keys — renaming would not wire anything up, since
+the need side reads `scaling.*` and no unit declares `scaling.abloom` either. The real hazard
+runs the other way: a future unit declaring `scaling.abloom` intending a real need would be
+silently ignored.
+
+### [SCAL-02] needSeverity is convex, and reads the coerced weight
+
+`scaling.<key>: N` says how much a unit depends on that key. The cohesion charge used to
+ignore N entirely — any weight >= 1 counted as one whole unmet need — which flattened two very
+different statements. Ye Shunguong's `veils: 2` is a design gate (without Sunna or Zhao she is
+severely hamstrung, and the full charge is right); Aria's ether-veil scaling is a bonus for
+pairing her with Nangong or Sunna, better with both, and charging her the same as YSG cost
+`Aria/Remielle/Velina` 13% of its cohesion for a missing bonus.
+
+Convex on purpose (owner: weight 1 or 2 should not be penalised nearly as much as weight 3):
+weight 1 -> 0.11, weight 2 -> 0.44, weight 3 -> 1.00. Feeds both sides of the reception ratio,
+so a unit with several needs of differing weight is judged on how much of its declared
+dependence is covered rather than on a headcount.
+
+Reads the coerced weight, so `true` behaves as weight 1 — the data model's own convention
+(`true`/`1` = minor, `2` = strong, `3` = defining), and the contract wins. An interim version
+special-cased `true` to full severity on the theory that a boolean means "depends on this"
+without grading; that contradicted the documented scale and is the reason issue 15 existed. If
+a unit's need is genuinely defining, the data should say `3`, not `true`.
+
+### [SCAL-03] Exploiting a longer stun window needs two gates
+
+`canExploitLongWindow` (team-scorer.js) decides whether a greedy carry can actually cash in a
+recovery debuff's longer stun window. Two gates, both about whether the window is real rather
+than about the carry:
+
+1. **No contention.** If two greedy carries are fighting over the window, neither is getting
+   enough of it to exploit an extension. Paying both the extension bonus while charging
+   contention once double-counted the same claim — worth a net +27 to
+   `Nangong/Miyabi/Remielle` and put Remielle in four of Miyabi's top five teams.
+2. **Somebody has to open the window.** A recovery debuff on a team with no stunner is close to
+   comical — it lands maybe once in a fight by accident. The team still earns the BASE recovery
+   credit for that; this gate only withholds the greedy EXTRA, which is about repeatedly getting
+   a longer window.

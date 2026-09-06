@@ -102,3 +102,52 @@ team-wide figure therefore let a support "do her job" by buffing the stunner.
 **A declared conditional overrides everything.** If a buff is written as
 `buffs.<key>.cases` — Remielle's gated ATK — the designer gated it deliberately, so it is the
 unit's identity by construction. See [predicates](predicates.md).
+
+## Code notes
+
+### [BUFF-01] Supplier buffs a damage type the consumer deals
+
+`MULT.DAMAGE_TYPE_BUFF` prices a supplier buffing a damage type the consumer actually deals —
+Orphie's `buffs.aftershock` landing on Trigger's `damage.aftershock`. This is a BUFF channel,
+not a provision or need channel: the supplier side reads `buffs`, the consumer side reads
+`damage`, and no `scaling.<type>` is involved anywhere. It was called `DAMAGE_NEED`, and that
+name plus a `need(damage:...)` debug label made it read like the provision channel twice over.
+Do not rename it back.
+
+### [BUFF-02] Anomaly crit-damage efficiency is 30%, not 0%
+
+Anomaly damage does not crit, so a CD buff on an anomaly agent only reaches whatever direct
+damage they do on the side — mostly, but not entirely, wasted. Owner described it as "like ATK
+buffs on rupture," floated ~15%, then ruled the existing 30% (`ANOMALY_CRIT_DMG_EFFICIENCY`)
+should stand: the important property is that it is not zero, and the exact figure is not worth
+a corpus-wide move (recorded 2026-09-01).
+
+The exception is declared, not inferred: an anomaly agent that annotates `scaling.cd` genuinely
+wants crit damage and is caught by a short-circuit before this efficiency applies (Miyabi:
+`cr: 3, cd: 3` reads 100%). Do not special-case a unit by name; annotate the unit instead.
+Used by both `resolveBaselineWeight` (L4 pair weight) and `getBuffRelevance` (cohesion
+relevance), which independently held 0.3 and are now tied to the same constant so they cannot
+drift.
+
+### [BUFF-03] Chain damage buff is priced on its own dial, not the provision rate
+
+Koleda's `buffs.chains: 1` multiplies the chains a carry already has, so unlike a chain
+*provision* (Astra, Norma handing out extra chain attacks) it lands on EVERY DPS —
+`getChainMagnitude`'s unannotated baseline is 1.0 because every DPS has a chain attack, rising
+to 1.45 for the hardest-hitting carries.
+
+Rated at its own `MULT.CHAINS_BUFF` dial, not at `MULT.CHAINS_PROVISION`. The provision rate is
+deliberately tiny (0.4) because gifting one extra chain is a small thing; multiplying every
+chain the carry throws is not the same statement, and pricing the buff at the provision rate
+would have made Koleda worse than the bug it fixed.
+
+### [BUFF-04] BUFF_IMPACT is one table, sourced from MULT
+
+There used to be two answers to "how much damage is one point of this buff worth": the L4
+damage layer priced a buff from `MULT`, while cohesion consulted a shorter table and quietly
+fell through to `MULT.ELEMENT_BUFF` for anything it did not list. The two disagreed about
+`laceration`, which L4 pays at 6 and cohesion charged at 2 — so an armorer support like Koleda
+buffing Claret was measured as if her defining buff were worth a third of what the engine
+actually pays for it. `BUFF_IMPACT` is now one table sourced from `MULT`, so the two paths
+cannot drift again; an assertion at load fails loudly if a stat-buff key is added without a
+price rather than silently pricing it at 2.

@@ -113,3 +113,29 @@ soft cap damps the reduction unevenly, so it can move an allocation the wrong wa
 — YSG (3), Yixuan (2), Miyabi (1), and nobody else. The effective-scaling lookup now returns
 exactly that value, or nothing at all. The two used to differ, and conflating them was an active
 defect. They are the same number now, and test 87 keeps them that way.
+
+## Code notes
+
+### [ULT-01] Frequency is its own axis, and chain:extra is self-provision
+
+`ultimate:double` and `chain:extra` say how many times a unit fires an instrument in one
+window, never how hard — read only inside `getMaxBurstWeight`, never the provision or need
+channels. That leak is what fabricated an ultimate need for 26 of 60 units.
+
+`chain:extra` is Evelyn's self-provisioned chains, deliberately not `utility.chains`: provision
+is scored supplier -> consumer with `supplier !== consumer`, so a `utility` entry can never
+reach its own owner. Annotating her that way would hand Sigrid free chains and give Evelyn
+nothing.
+
+`scaling` is a need, never a frequency: `scaling.chains: 3` means Evelyn wants chains badly, not
+that she fires more of them. Same for `scaling.ultimates`. Do not conflate the three axes.
+
+### [ULT-02] getUltimateMagnitude's zeroing is load-bearing for Sigrid and Pyrois
+
+Returns 0 when the unit's ultimate is not a real burst (`ultimate:weak` with no
+`ultimate:strong`) — Sigrid, whose burst lives in her enhanced attacks, and Pyrois without a
+wind-anomaly teammate. This zeroing is what excludes Sigrid from ultimate provision entirely,
+and what implements the intentional design that Pyrois under-benefits from Dialyn (two weak
+ultimates sum to one normal one, but Dialyn supplies a single ultimate). A possibly-conditional
+`ultimate:strong` overrides `ultimate:weak`, which is exactly how Pyrois's wind condition lifts
+the penalty.

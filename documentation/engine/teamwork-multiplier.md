@@ -29,3 +29,21 @@ The other half. See [cohesion](cohesion.md) for what feeds it and why it is a ge
 The [declared-archetype](../data-model/declared-archetypes.md) `avoid` penalty is applied
 **after** the multiplier, deliberately, so a wrong-tool verdict bites the same regardless of how
 cohesive the rest of the team is. The two must never charge the same judgement twice.
+
+## Code notes
+
+### [TWM-01] Pseudo-role stat alignment, and why SAnby is not double-charged
+
+A non-DPS unit with an active pseudo-role (Nangong, Soukaku, ...) that carries big stat buffs
+(`atk`, `cr`, `cd`, ...) is checked in `computeTeamworkMultiplier` for whether those buffs
+actually align with a teammate who can use them. If the best-aligned relevance across all such
+buffs is below half, the unit's pseudo-DPS credit is discounted (×0.65) for any pseudo-role it
+has not otherwise activated — a unit whose "support" half of its kit does not land is not really
+playing support, so it should not get full credit for its DPS half either.
+
+Separately: how much a buff whiff costs is a property of the unit's kit (`scaling.buffs`), not
+its role tag — support/defense default to 3, stun to 2, DPS to 0, with explicit overrides
+(SAnby's 3) winning. A DPS that opts in via an explicit override still takes the lighter DPS
+weight (0.5) in the geometric mean; the severity of its whiff is already applied inside
+`computeBuffUtilization`, which damps by `scaling.buffs / 3`, so charging it again in the
+per-unit weight here would double-count it.

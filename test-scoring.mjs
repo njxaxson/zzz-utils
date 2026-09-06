@@ -24,12 +24,9 @@ import { buildAvailableUnits } from './lib/roster-builder.js';
 import { buildTeams } from './lib/team-pipeline.js';
 import { chargeableElementArms, getBasicDamage, getBasicDamageBaseline, getMaxBurstWeight, quickAssistCohesionWeight, scoreTeamForBoss, resolveBossVariation, resolveConditionalValue, getEffectiveScaling, effectiveDisorderSupply, effectiveDisorderWeakSupply, getBossResistances, getChainMagnitude } from './app/public/lib/common/team-scorer.js';
 
-// ---------------------------------------------------------------------------
-// Viability / disqualification
-// ---------------------------------------------------------------------------
-// `matchups.js` only *lists* teams with score > 0. A score <= 0 means the
-// comp is not viable for that boss (disqualification, anti-synergy, etc.).
-// Assertions use the raw `scoreTeamForBoss` return value unless noted.
+// Viability / disqualification: `matchups.js` only *lists* teams with score > 0. A score <= 0
+// means the comp is not viable for that boss (disqualification, anti-synergy, etc.). Assertions
+// use the raw `scoreTeamForBoss` return value unless noted.
 
 /** Neutral synthetic boss: same as `matchups.js` (full roster has no "neutral" in JSON as a real boss in some builds — appended at runtime). */
 const NEUTRAL_BOSS = {
@@ -44,9 +41,7 @@ const NEUTRAL_BOSS = {
     }
 };
 
-// ---------------------------------------------------------------------------
 // Small helpers
-// ---------------------------------------------------------------------------
 
 function assert(cond, msg) {
     if (!cond) throw new Error(msg);
@@ -120,25 +115,13 @@ function withBosses(bosses, filterStr) {
     return filterBosses(bosses, filterStr);
 }
 
-// ---------------------------------------------------------------------------
 // Test runner
-// ---------------------------------------------------------------------------
 
-// ---------------------------------------------------------------------------
-// Tests that are red ON PURPOSE
-//
-// Some assertions in this file encode an ordering the owner believes is correct but the
-// engine does not yet produce. They are kept red rather than deleted, because deleting
-// them loses the disagreement. The cost is that the suite's exit code stops being a
-// usable signal: "1" means both "you broke something" and "nothing changed".
-//
-// Listing a test number here restores the signal. The run exits 0 when the set of
-// failing tests is EXACTLY this set, and exits 1 the moment one of these starts passing
-// (the entry is stale — remove it) or any other test fails.
-//
-// Every entry needs a reason and the phase that is expected to clear it. Do not add an
-// entry to silence a regression.
-// ---------------------------------------------------------------------------
+// Tests that are red ON PURPOSE: some assertions here encode an ordering the owner believes
+// correct but the engine does not yet produce, listed rather than deleted so the disagreement
+// is not lost. See ../documentation/tooling/verification-loop.md#why-known_red-works-the-way-it-does
+// for why the exit code depends on the failing set matching this EXACTLY. Every entry needs a
+// reason and the phase expected to clear it. Do NOT add an entry to silence a regression.
 const KNOWN_RED = new Map([
 ]);
 
@@ -175,11 +158,7 @@ async function main() {
 
     console.log('--- Team scoring tests (raw scoreTeamForBoss) ---\n');
 
-    // ========================================================================
     // TEST 1 (partial): no SAnby + Yixuan together in top 25, every boss
-    // ========================================================================
-    // Batch: "No SAnby/Yixuan ... in top 25". "Conventional meta" / other
-    // incoherent comps: not checked here.
     run('TEST 1 (partial): top-25 per boss has no team with both SAnby and Yixuan', () => {
         for (const boss of bosses) {
             const top = getTopViableTeams(allTeamEntries, boss, 25, null);
@@ -194,10 +173,7 @@ async function main() {
         }
     });
 
-    // ========================================================================
     // TEST 2: SAnby/Yixuan anti-synergy
-    // ========================================================================
-    // Expect: both listed comps score "very low" — we use < 130 on each boss.
     run('TEST 2: SAnby/Yixuan teams < 100 (Butcher, Corruption, Marionettes)', () => {
         const t =
             'SAnby/Yixuan/Rina,SAnby/Yixuan/Nicole';
@@ -210,9 +186,7 @@ async function main() {
         }
     });
 
-    // ========================================================================
     // TEST 3: SAnby proper teams on UCC — ordering and floor
-    // ========================================================================
     run('TEST 3: SAnby proper teams on UCC — ordering and floor (>= 315)', () => {
         const b = withBosses(bosses, 'Corruption').find(Boolean);
         const allT =
@@ -243,11 +217,7 @@ async function main() {
         
     });
 
-    // ========================================================================
     // TEST 4: YSG + support ordering on Nightmare
-    // ========================================================================
-    // Expect: Dialyn/YSG/Sunna is #1 among the listed set. YSG/Zhao/Sunna and
-    // YSG/Astra/Sunna beat JF/YSG/Sunna. (String tokens match validate-scoring.bat.)
     run('TEST 4: YSG support ordering (Nightmare)', () => {
         const t =
             'Dialyn/Ye Shunguong/Sunna,Dialyn/Ye Shunguong/Zhao,Dialyn/Ye Shunguong/Astra,Ju Fufu/Ye Shunguong/Sunna,Ye Shunguong/Zhao/Sunna,Ye Shunguong/Astra/Sunna,Trigger/Ye Shunguong/Sunna,Qingyi/Ye Shunguong/Sunna,Ju Fufu/Ye Shunguong/Zhao,Ye Shunguong/Zhao/Astra,Trigger/Ye Shunguong/Zhao';
@@ -266,12 +236,8 @@ async function main() {
         );
     });
 
-    // ========================================================================
-    // TEST 5: Lucia on YSG (rupture-irrelevant 3rd)
-    // ========================================================================
-    // Expect: Lucia 3rds "well below" key Sunna/Zhao/Astra variants — we
-    // require each Lucia line to score strictly less than every reference
-    // support line on the same boss.
+    // TEST 5: Lucia on YSG (rupture-irrelevant 3rd) — every Lucia line must score strictly less
+    // than every reference support line on the same boss.
     run('TEST 5: Lucia on YSG below Sunna/Zhao/Astra-style lines (Nightmare, Sweeper)', () => {
         const luciaT = 'Dialyn/Ye Shunguong/Lucia,Ju Fufu/Ye Shunguong/Lucia';
         const refT =
@@ -289,10 +255,7 @@ async function main() {
         }
     });
 
-    // ========================================================================
     // TEST 6: Hugo + Sunna vs real stunners
-    // ========================================================================
-    // Expect: Dialyn+Hugo - third member Sunna will be less than Lycaon or Lighter.
     run('TEST 6: Hugo + Sunna vs stunner bands (Thrall, Marionettes)', () => {
         const low = scoreForTeamString('Dialyn/Hugo/Sunna', allUnits)[0];
         const dualStunList = scoreForTeamString('Dialyn/Lighter/Hugo,Dialyn/Lycaon/Hugo,Lighter/Lycaon/Hugo', allUnits);
@@ -306,16 +269,9 @@ async function main() {
         }
     });
 
-    // ========================================================================
-    // TEST 7: Evelyn stunner ordering
-    // ========================================================================
-    // Pompey (fire-weak) ladder: Norma > Dialyn > Lighter > Koleda > Ju Fufu,
-    // with the rest (Trigger, Caesar, Pulchra, Qingyi) unordered but below Ju
-    // Fufu.
-    //
-    // Koleda's P.V. buff rework put her above Ju Fufu here (she was below,
-    // in the unordered tail, before the rework) — but not on a Neutral boss,
-    // where Trigger still beats both Koleda and Ju Fufu.
+    // TEST 7: Evelyn stunner ordering — Pompey (fire-weak) ladder Norma > Dialyn > Lighter >
+    // Koleda > Ju Fufu, rest unordered but below Ju Fufu. Koleda's buff rework put her above Ju
+    // Fufu here, but not on Neutral, where Trigger still beats both.
     run('TEST 7: Evelyn stunner ordering (Pompey, Neutral)', () => {
         for (const b of withBosses(bosses, 'Pompey')) {
             const spec =
@@ -354,13 +310,9 @@ async function main() {
         }
     });
 
-    // ========================================================================
-    // TEST 8: Nangong/Miyabi support order + Harumasa as fake support
-    // ========================================================================
-    // Expect: Yuzuha > Astra & Sunna > Nicole & Soukaku; Harumasa far below (~190–215 in batch) — we use < 300 vs > 400 split as a hard gap.
-    // Nicole vs Soukaku can swap by boss; both sit below Astra/Sunna with Yuzuha on top.
-    // NOTE: Sacrifice (Bringer) excluded — the freezable mechanic gives Soukaku a bonus there
-    // that changes the ordering (Soukaku pseudo-anomaly freeze bonus outweighs generic supports).
+    // TEST 8: Nangong/Miyabi support ordering — Yuzuha > Astra/Sunna > Nicole/Soukaku >> Harumasa.
+    // Bringer is excluded: its freeze mechanic gives Soukaku's pseudo-anomaly a bonus that
+    // inverts the ordering.
     run('TEST 8: Nangong/Miyabi support ordering (Butcher, Marionettes)', () => {
         const t =
             'Nangong/Miyabi/Yuzuha,Nangong/Miyabi/Astra,Nangong/Miyabi/Sunna,Nangong/Miyabi/Nicole,Nangong/Miyabi/Soukaku,Nangong/Miyabi/Harumasa';
@@ -386,12 +338,8 @@ async function main() {
         }
     });
 
-    // ========================================================================
-    // TEST 9: Nangong/Aria on anomaly bosses
-    // ========================================================================
-    // Full chain: Sunna > Yuzuha > Astra > Zhao > Nicole > Vivian (on each boss).
-    // Strict "Yuzuha second to Sunna" + above middle: Sweeper, Butcher. Solo often scrambles
-    // Aria 3rds (batch already warns on ether/Zhao) — on Solo we only check Sunna best, Nicole>Vivian.
+    // TEST 9: Nangong/Aria support order — Sunna > Yuzuha > Astra > Zhao > Nicole > Vivian on
+    // Sweeper/Butcher. Solo scrambles the middle, so only Sunna-best and Nicole > Vivian hold.
     run('TEST 9: Nangong/Aria support order (Solo, Sweeper, Butcher)', () => {
         const t =
             'Nangong/Aria/Sunna,Nangong/Aria/Zhao,Nangong/Aria/Yuzuha,Nangong/Aria/Astra,Nangong/Aria/Nicole,Nangong/Aria/Vivian';
@@ -419,11 +367,7 @@ async function main() {
         }
     });
 
-    // ========================================================================
     // TEST 10: Disorder / dual-anomaly style bands
-    // ========================================================================
-    // Batch ranges: Nangong/Alice/Yuzuha ~300–350; others ~200+; Nangong/Alice/* lines.
-    // Upper bound opened: current Fiend score for this line can land ~500+ when disorder + boss align.
     run('TEST 10: Disorder / Alice bands (Fiend, Sweeper, Solo)', () => {
         for (const b of withBosses(bosses, 'Fiend,Sweeper,Solo')) {
             const a = scoreForTeamString('Nangong/Alice/Yuzuha', allUnits)[0];
@@ -448,9 +392,7 @@ async function main() {
         }
     });
 
-    // ========================================================================
     // TEST 11: Caesar quality checks
-    // ========================================================================
     // Caesar/Yixuan/Lucia is an acceptable team on Butcher (Yx/L carry, Caesar stunner).
     // Trigger/Harumasa/Caesar and Trigger/YSG/Caesar on Slugger should be mid — verifies
     // that Trigger/Caesar diametric synergy doesn't hyperinflate.
@@ -465,19 +407,15 @@ async function main() {
         const tccScore = scoreTeamForBoss(tcc.team, slugger, {});
         assert(tccScore <= 280, `Slugger Trigger/Harumasa/Caesar: got ${tccScore}, expected <= 280`);
 
-        // Ceiling 280 -> 290 on 2026-09-02. The team moved 272 -> 283.5 because YSG's unmet
-        // `scaling.veils: 2` is now charged at severity 0.44 rather than 1.0 (see needSeverity)
-        // — nothing to do with the diametric synergy this test guards. The Harumasa arm above
-        // still holds at 280, and 283.5 is 54% of Slugger's 523.4 best team, so still "mid";
-        // YSG's own line, `Ye Shunguong/Astra/Sunna`, is 102 points higher at 385.4.
+        // Ceiling is 290, not the original 280: YSG's unmet `scaling.veils: 2` is now charged at
+        // severity 0.44 rather than 1.0 (see needSeverity), unrelated to the diametric synergy
+        // this test guards. Still reads as "mid" — about 54% of Slugger's best team.
         const tyc = scoreForTeamString('Trigger/Ye Shunguong/Caesar', allUnits)[0];
         const tycScore = scoreTeamForBoss(tyc.team, slugger, {});
         assert(tycScore <= 290, `Slugger Trigger/YSG/Caesar: got ${tycScore}, expected <= 290`);
     });
 
-    // ========================================================================
     // TEST 12: Pan vs Astra (rupture) on Hunter
-    // ========================================================================
     run('TEST 12: Pan beats Astra for listed pairs (Hunter)', () => {
         const rows = [
             ['Ju Fufu / Yixuan / Pan Yinhu', 'Ju Fufu / Yixuan / Astra'],
@@ -493,10 +431,7 @@ async function main() {
         }
     });
 
-    // ========================================================================
     // TEST 13: Rupture synergy on attack team is generally useless
-    // ========================================================================
-    // Expect: every listed team scores poorly
     run('TEST 13: Pan Yinhu on attack team should be useless', () => {
         const t = 'Dialyn/Evelyn/Pan Yinhu';
         const b = withBosses(bosses, 'Neutral').find(Boolean);
@@ -506,9 +441,7 @@ async function main() {
         }
     });
 
-    // ========================================================================
     // TEST 14: Banyue fire-weak band
-    // ========================================================================
     run('TEST 14: Banyue teams >350 (Pompey, Hunter)', () => {
         const t = 'Dialyn/Banyue/Lucia,Ju Fufu/Banyue/Lucia,Banyue/Astra/Lucia,Banyue/Pan Yinhu/Lucia,Norma/Banyue/Lucia';
         for (const b of withBosses(bosses, 'Pompey,Hunter')) {
@@ -519,26 +452,14 @@ async function main() {
         }
     });
 
-    // ========================================================================
     // TEST 15: Nangong/Yixuan/Sunna — the emergent-team-building proof
-    // ========================================================================
-    // REVERSED 2026-09-01 after owner play-testing. This test used to assert the team was BAD
-    // (a "cross-archetype mix" capped first at 265, then 305). Prevalent thought agrees: Sunna is
-    // an attack/anomaly support, Yixuan is rupture, so the pairing looks like trash. The engine
-    // insisted otherwise the whole time, and the owner played ~7 matches against Butcher to check:
+    // The FLAGSHIP proof that emergent scoring beats template matching. Sunna reads as a trash
+    // pick for a rupture carry (attack/anomaly support beside rupture Yixuan), but Nangong (T0
+    // fast stunner) + Sunna's daze + their combined stun-multiplier is exactly what greedy-window
+    // Yixuan wants — confirmed by owner playtesting, not just the engine. Full story:
+    // ../notes/lessons-learned.md#the-team-that-was-supposed-to-be-the-bane.
     //
-    //   "That team actually kinda rocks... Yixuan REALLY loves the stacking stun multipliers and
-    //    her greedy stun windows rack up huge burst damage. The engine was right and prevalent
-    //    thought was wrong."
-    //
-    // So this is now the FLAGSHIP proof that emergent scoring beats template matching. The claim:
-    // Sunna, the support everyone would dismiss on a rupture carry, is at least as good as Astra,
-    // the "correct" attack support — because Nangong (T0 fast stunner) + Sunna's daze + their
-    // combined stun-multiplier is exactly what a greedy-window rupture carry wants.
-    //
-    // Sunna's rupture avoid was removed from units.json for the same reason: she can only reach a
-    // rupture carry ALONGSIDE Nangong (join rules), and Nangong+Sunna is precisely the wheelchair
-    // that makes it work. Tagging her to avoid rupture in a vacuum was wrong in practice.
+    // Sunna's rupture avoid was removed from units.json for the same reason (see TEST 106).
     run('TEST 15: Nangong/Yixuan/Sunna rises — Sunna >= Astra on rupture with Nangong', () => {
         for (const b of withBosses(bosses, 'Neutral,Marionettes,Butcher')) {
             const m = scoreMapForBoss(
@@ -551,9 +472,7 @@ async function main() {
         }
     });
 
-    // ========================================================================
     // TEST 16 (partial): Nangong on Fiend — Miyabi on top, Alice band
-    // ========================================================================
     // SKIPPED: forcing Miyabi as rank-1 — Alice/Nangong can outscore in current metascoring.
     run('TEST 16 (partial): Fiend + Nangong — high table + Alice/Yuzuha in competitive band', () => {
         const b = withBosses(bosses, 'Fiend').find(Boolean);
@@ -570,9 +489,7 @@ async function main() {
         assert(as >= 300, `Nangong/Alice/Yuzuha on Fiend: got ${as}, expected >= 300`);
     });
 
-    // ========================================================================
     // TEST 17: JF vs Astra on Yixuan/Lucia
-    // ========================================================================
     run('TEST 17: Ju Fufu/Yixuan/Lucia > Yixuan/Astra/Lucia (Hunter)', () => {
         const a = scoreForTeamString('Ju Fufu/Yixuan/Lucia', allUnits)[0];
         const b2 = scoreForTeamString('Yixuan/Astra/Lucia', allUnits)[0];
@@ -584,9 +501,7 @@ async function main() {
         }
     });
 
-    // ========================================================================
     // TEST 18: Soukaku activation
-    // ========================================================================
     // Lycaon/Yixuan/Soukaku mid; YSG/Zhao/Soukaku mid (boss-dependent); Nangong/Miyabi/Soukaku high.
     run('TEST 18: Soukaku — mid without anomaly enabler, high with Nangong/Miyabi (where viable)', () => {
         const low = scoreForTeamString('Lycaon/Yixuan/Soukaku', allUnits)[0];
@@ -618,9 +533,7 @@ async function main() {
         }
     });
 
-    // ========================================================================
     // TEST 19: Orphie fire resist vs Cissia on Slugger
-    // ========================================================================
     run('TEST 19: Trigger/Cissia/Seed > Trigger/Orphie/SAnby on Slugger', () => {
         const b = withBosses(bosses, 'Slugger').find(Boolean);
         const t = 'Trigger/Orphie/SAnby,Trigger/Cissia/Seed,Trigger/Cissia/SAnby,Ju Fufu/Orphie/SAnby';
@@ -631,11 +544,7 @@ async function main() {
         );
     });
 
-    // ========================================================================
     // TEST 20: Burnice on fire-res — disqualify (score <= 0)
-    // ========================================================================
-    // Only the Burnice teams are asserted <= 0; the batch mixes in non-Burnice
-    // control lines — we only assert rows that actually contain Burnice.
     run('TEST 20: Burnice on Solo/Sweeper — disqualified (<=0)', () => {
         for (const b of withBosses(bosses, 'Solo,Sweeper')) {
             for (const { team, label } of scoreForTeamString(
@@ -651,9 +560,7 @@ async function main() {
         }
     });
 
-    // ========================================================================
     // TEST 21: Banyue ranks well on Hunter — at least 5 teams scoring 350+
-    // ========================================================================
     run('TEST 21: at least 5 Banyue teams score 350+ on Hunter', () => {
         const b = withBosses(bosses, 'Hunter').find(Boolean);
         const top = getTopViableTeams(allTeamEntries, b, 50, ['Banyue']);
@@ -664,10 +571,7 @@ async function main() {
         );
     });
 
-    // ========================================================================
     // TEST 22: YSG + Dialyn vs other stunners
-    // ========================================================================
-    // Batch: Dialyn/YSG should run ahead of JF/YSG for Sunna and Zhao 3rds.
     run('TEST 22: Dialyn/YSG beats JF/YSG (Sunna and Zhao) on Thrall, Defiler, Neutral', () => {
         for (const b of withBosses(bosses, 'Thrall,Defiler,Neutral')) {
             const t =
@@ -684,10 +588,8 @@ async function main() {
         }
     });
 
-    // ========================================================================
-    // TEST 23: MVY below Nangong/Miyabi variants
-    // ========================================================================
-    // Solo can invert (Vivian anomaly package); Sweeper+Butcher match the batch "strictly better" story.
+    // TEST 23: MVY below Nangong/Miyabi variants — Solo can invert (Vivian's anomaly package),
+    // so only checked on Sweeper/Butcher.
     run('TEST 23: Nangong/Miyabi/Yuzuha > Miyabi/Vivian/Yuzuha (Sweeper, Butcher)', () => {
         for (const b of withBosses(bosses, 'Sweeper,Butcher')) {
             const t = 'Nangong/Miyabi/Yuzuha,Miyabi/Vivian/Yuzuha';
@@ -699,10 +601,7 @@ async function main() {
         }
     });
 
-    // ========================================================================
     // TEST 24: Qingyi flex lines
-    // ========================================================================
-    // Flex lines: "above 350" in batch; allow ~320 on worst boss in the set (e.g. Butcher + Pan).
     run('TEST 24: Qingyi/Yixuan lines strong flex (Priest, Butcher, Corruption, Marionettes)', () => {
         for (const b of withBosses(bosses, 'Priest,Butcher,Corruption,Marionettes')) {
             for (const { team, label } of scoreForTeamString(
@@ -715,10 +614,7 @@ async function main() {
         }
     });
 
-    // ========================================================================
     // TEST 25: Yuzuha on rupture (low)
-    // ========================================================================
-    // Expect: Yixuan/Lucia/Yuzuha in ~150–200 (batch); compare baselines in batch.
     run('TEST 25: Yuzuha on Yixuan/Lucia low vs baselines (Priest, Hunter)', () => {
         for (const b of withBosses(bosses, 'Priest,Hunter')) {
             const y = scoreForTeamString('Yixuan/Lucia/Yuzuha', allUnits)[0];
@@ -731,9 +627,7 @@ async function main() {
         }
     });
 
-    // ========================================================================
     // TEST 26: YSG on Slugger (Typhon) — high score
-    // ========================================================================
     run('TEST 26: YSG lines strong on Slugger (Typhon) — near 300+ titled brute', () => {
         const b = withBosses(bosses, 'Slugger').find(Boolean);
         for (const { team, label } of scoreForTeamString(
@@ -748,9 +642,7 @@ async function main() {
         }
     });
 
-    // ========================================================================
     // TEST 27: Bringer (Sacrifice) — all MV* high, Yuzu best among listed
-    // ========================================================================
     run('TEST 27: MV* on Bringer (Sacrifice) — all > 300, MVY tops Nicole/Soukaku/Astra', () => {
         const b = withBosses(bosses, 'Sacrifice').find(Boolean);
         const t =
@@ -765,11 +657,8 @@ async function main() {
         assert(best > m.get('Miyabi / Vivian / Astra'), 'MVY > MVA');
     });
 
-    // ========================================================================
-    // TEST 28: Nangong/Alice/Yuzuha competitive with Miyabi/Vivian/Yuzuha on Fiend
-    // ========================================================================
-    // Alice is T1 physical anomaly; Fiend is physical+ether weak anomaly shill.
-    // NAY (with Nangong stun + Alice on-element) should beat or be close to MVY.
+    // TEST 28: Nangong/Alice/Yuzuha competitive with Miyabi/Vivian/Yuzuha on Fiend — Alice is T1
+    // physical anomaly and Fiend is physical+ether weak, so NAY should beat or be close to MVY.
     run('TEST 28: Nangong/Alice/Yuzuha >= Miyabi/Vivian/Yuzuha on Fiend', () => {
         const b = withBosses(bosses, 'Fiend').find(Boolean);
         const t = 'Nangong/Alice/Yuzuha,Miyabi/Vivian/Yuzuha';
@@ -782,12 +671,9 @@ async function main() {
         );
     });
 
-    // ========================================================================
-    // TEST 29: Astra/Nicole "wheelchair" — 300+ on Marionettes; UCC now anti-anomaly by default
-    // ========================================================================
-    // UCC (Corruption Complex) now defaults to anti-anomaly, so Miyabi teams are
-    // disqualified there. Test Miyabi on Marionettes only, then verify UCC open
-    // variation re-enables anomaly teams.
+    // TEST 29: UCC (Corruption Complex) defaults to anti-anomaly, so Miyabi teams are
+    // disqualified there; checked on Marionettes instead, then the UCC open variation confirmed
+    // to re-enable anomaly teams.
     run('TEST 29: Miyabi/Astra/Nicole 290+ on Marionettes; UCC open variant re-enables anomaly', () => {
         const miyabi = scoreForTeamString('Miyabi/Astra/Nicole', allUnits)[0];
         const zy = scoreForTeamString('Zhu Yuan/Astra/Nicole', allUnits)[0];
@@ -811,9 +697,7 @@ async function main() {
         assert(uccOpenScore >= 290, `UCC open variation Miyabi/Astra/Nicole: got ${uccOpenScore}, want >= 290`);
     });
 
-    // ========================================================================
     // TEST 30: disorder scaling sanity — Nangong > MVY > Astra
-    // ========================================================================
     run('TEST 30: Nangong/Miyabi/Yuzuha > MVY > Miyabi/Astra/Yuzuha (Sacrifice, Fiend)', () => {
         for (const b of withBosses(bosses, 'Fiend')) {
             const t = 'Nangong/Miyabi/Yuzuha,Miyabi/Vivian/Yuzuha,Miyabi/Astra/Yuzuha';
@@ -829,9 +713,7 @@ async function main() {
         }
     });
 
-    // ========================================================================
     // TEST 31: Soukaku buff alignment — no pseudoRole penalty with ice DPS
-    // ========================================================================
     // Regression guard: Soukaku's anomaly pseudoRole penalty should NOT fire
     // when her ice buffs serve an ice DPS (buff alignment >= 0.5).
     run('TEST 31: Lycaon/Ellen/Soukaku viable on ice-weak boss (>= 180)', () => {
@@ -844,9 +726,7 @@ async function main() {
         }
     });
 
-    // ========================================================================
     // TEST 32: AoD (Nangong/Aria) beats non-AoD on Priest
-    // ========================================================================
     run('TEST 32: Nangong/Aria/Sunna > Aria/Burnice/Sunna on Priest', () => {
         const teams = scoreForTeamString(
             'Nangong/Aria/Sunna,Aria/Burnice/Sunna', allUnits);
@@ -859,10 +739,7 @@ async function main() {
         }
     });
 
-    // ========================================================================
-    // TEST 33: Lighter/Evelyn/Astra > Trigger/Evelyn/Astra on Pompey
-    // ========================================================================
-    // Lighter should beat Trigger on fire-weak bosses
+    // TEST 33: Lighter should beat Trigger on fire-weak bosses
     run('TEST 33: Lighter > Trigger for Evelyn on Pompey', () => {
         const teams = scoreForTeamString('Lighter/Evelyn/Astra,Trigger/Evelyn/Astra', allUnits);
         for (const b of withBosses(bosses, 'Pompey')) {
@@ -873,9 +750,7 @@ async function main() {
         }
     });
 
-    // ========================================================================
     // TEST 34: Promeia ice vortex dominance on Scorched Horizon
-    // ========================================================================
     run('TEST 34: Promeia teams dominate Scorched Horizon; outscore Miyabi teams', () => {
         const teams = scoreForTeamString(
             'Lycaon/Promeia/Soukaku,Nangong/Promeia/Yuzuha,Miyabi/Vivian/Yuzuha,Nangong/Miyabi/Yuzuha',
@@ -894,9 +769,7 @@ async function main() {
         }
     });
 
-    // ========================================================================
     // TEST 35: Lighter/Promeia/Burnice abloom synergy on Scorched Horizon
-    // ========================================================================
     run('TEST 35: Lighter/Promeia/Burnice competitive on Scorched Horizon (abloom + vortex)', () => {
         const teams = scoreForTeamString('Lighter/Promeia/Burnice', allUnits);
         for (const b of withBosses(bosses, 'Horizon')) {
@@ -906,9 +779,7 @@ async function main() {
         }
     });
 
-    // ========================================================================
     // TEST 36: Miyabi weakness on Horizon vs strength on Sacrifice Bringer
-    // ========================================================================
     run('TEST 36: Miyabi/Vivian/Yuzuha much stronger on Bringer than Horizon', () => {
         const teams = scoreForTeamString(
             'Miyabi/Vivian/Yuzuha', allUnits);
@@ -925,9 +796,7 @@ async function main() {
         }
     });
 
-    // ========================================================================
     // TEST 37: Polarity providers mitigate Miyabi on Horizon
-    // ========================================================================
     run('TEST 37: Nangong/Miyabi/Yuzuha > Miyabi/Vivian/Yuzuha on Horizon (polarity mitigation)', () => {
         const teams = scoreForTeamString(
             'Nangong/Miyabi/Yuzuha,Miyabi/Vivian/Yuzuha', allUnits);
@@ -940,9 +809,7 @@ async function main() {
         }
     });
 
-    // ========================================================================
     // TEST 38: Non-anomaly teams unaffected by vortex on Horizon
-    // ========================================================================
     run('TEST 38: Attack/rupture teams on Scorched Horizon — no accidental vortex bonuses', () => {
         const teams = scoreForTeamString(
             'Lighter/Evelyn/Astra,Lycaon/Zhu Yuan/Nicole', allUnits);
@@ -954,9 +821,7 @@ async function main() {
         }
     });
 
-    // ========================================================================
     // TEST 39: Regression — existing compositions unchanged on non-Horizon bosses
-    // ========================================================================
     run('TEST 39: Key compositions identical on Sacrifice Bringer (no vortex regression)', () => {
         const teams = scoreForTeamString(
             'Nangong/Miyabi/Yuzuha,Miyabi/Vivian/Yuzuha', allUnits);
@@ -970,11 +835,8 @@ async function main() {
         }
     });
 
-    // ========================================================================
-    // TEST 40: Butcher disorder weakness 
-    // ========================================================================
-    // All things considered, both Promeia and Aria are T0.5 anomaly DPS units hitting weaknesses.
-    // Promeia/Vivian generates disorders, Aria/Vivian does not. Promeia should win. 
+    // TEST 40: Promeia and Aria are both T0.5 anomaly DPS hitting the same weakness, but only
+    // Promeia/Vivian generates disorders, so Promeia should win.
     run('TEST 40: Butcher disorders — Prom/Viv > Aria/Viv (disorder bonus)', () => {
         const b = withBosses(bosses, 'Butcher').find(Boolean);
         const t = 'Promeia/Vivian/Yuzuha,Aria/Vivian/Yuzuha';
@@ -985,13 +847,8 @@ async function main() {
             `Butcher: PVY (${pvy}) should beat AVY (${avy}) — disorder weakness bonus`);
     });
 
-    // ========================================================================
-    // TEST 41: Vesper (Discordant Solo) veil weakness — veil providers rewarded
-    // ========================================================================
-    // Sunna (veils:3) contributes a larger veil bonus than non-veil supports on Solo.
-    // This should push Sunna further ahead of zero-veil alternatives.
-    // Zhao (veils:2) also gets credit; compared against Nicole (no veils) to verify
-    // that non-AoD veil providers get scoring credit as intended.
+    // TEST 41: Vesper's veil weakness rewards veil providers proportionally — Sunna (veils:3)
+    // beats zero-veil Astra, and Zhao (veils:2) beats zero-veil Nicole.
     run('TEST 41: Vesper veil weakness — Sunna > Astra; Zhao > Nicole (veil generation bonus)', () => {
         const b = withBosses(bosses, 'Solo').find(Boolean);
         const t = 'Nangong/Aria/Sunna,Nangong/Aria/Astra,Nangong/Aria/Zhao,Nangong/Aria/Nicole';
@@ -1006,12 +863,8 @@ async function main() {
             `Solo: Zhao (${zhao}) should beat Nicole (${nico}) — Zhao veils:2 vs Nicole no veils`);
     });
 
-    // ========================================================================
-    // TEST 42: Bringer (Sacrifice Bringer) freeze bonus — ice anomaly teams rewarded
-    // ========================================================================
-    // Both Miyabi (frost, ice element) and Promeia (ice anomaly) get the full freeze
-    // bonus (+60). Non-ice anomaly teams get no freeze bonus. Both ice teams should
-    // score > 400; Alice (ether anomaly) team should score clearly below both.
+    // TEST 42: both Miyabi (frost) and Promeia (ice) get Bringer's full freeze bonus (+60); Alice
+    // (ether anomaly) gets none and should score clearly below both.
     run('TEST 42: Bringer freeze — ice anomaly teams score high; non-ice anomaly does not benefit', () => {
         const b = withBosses(bosses, 'Sacrifice').find(Boolean);
         const t = 'Nangong/Promeia/Yuzuha,Nangong/Miyabi/Yuzuha,Nangong/Alice/Yuzuha';
@@ -1027,12 +880,8 @@ async function main() {
             `Bringer: NPY (${npy}) should beat NAY (${nay}) — ice freeze bonus vs no freeze bonus`);
     });
 
-    // ========================================================================
-    // TEST 43: Sweeper stun weakness — teams with a stunner get a flat bonus
-    // ========================================================================
-    // The stun weakness gives any team with a stunner +15. Since Nangong/Miyabi/Yuzuha
-    // also beats Miyabi/Vivian/Yuzuha from many other angles, the gap should be well
-    // above 15 (the stun bonus is one contributor among several here).
+    // TEST 43: Sweeper's stun weakness gives any team with a stunner +15, one of several
+    // contributors here, so the gap should be well above that floor.
     run('TEST 43: Sweeper stun weakness — stunner team outscores stunnerless team by meaningful gap', () => {
         const b = withBosses(bosses, 'Sweeper').find(Boolean);
         const t = 'Nangong/Miyabi/Yuzuha,Miyabi/Vivian/Yuzuha';
@@ -1045,14 +894,9 @@ async function main() {
             `Sweeper: gap NMY–MVY (${nmy - mvy}) should be >= stun bonus (15)`);
     });
 
-    // ========================================================================
-    // TEST 44: Scorched Horizon CD debuff — anomaly agents unpenalized; CD buffs mitigate
-    // ========================================================================
-    // Promeia has no CD scaling (cd baseline = 0), so she gets zero penalty.
-    // Miyabi has scaling.cd:3, getting a shortfall of 2 without CD buffs → penalty = 24.
-    // This makes Promeia teams clearly stronger than Miyabi teams on Horizon.
-    // Separately, Astra (buffs.cd:3) fully offsets the debuff for an attacker (cd baseline = 2),
-    // so Lighter/Evelyn/Astra should score better than Lighter/Evelyn without CD coverage.
+    // TEST 44: Promeia has no CD scaling (baseline 0) so takes zero of Horizon's CD debuff, while
+    // Miyabi's scaling.cd:3 eats a real penalty — Promeia teams should clearly beat Miyabi teams.
+    // Separately, Astra's buffs.cd:3 should fully offset the debuff for an attacker.
     run('TEST 44: Scorched Horizon CD debuff — Promeia unpenalized over Miyabi; Astra offsets for attackers', () => {
         const b = withBosses(bosses, 'Horizon').find(Boolean);
         const t1 = 'Nangong/Promeia/Yuzuha,Nangong/Miyabi/Yuzuha';
@@ -1069,12 +913,8 @@ async function main() {
             `Horizon: LEA (${lea}) should beat LEZ (${lez}) — Astra cd:3 offsets debuff for Evelyn`);
     });
 
-    // ========================================================================
-    // TEST 45: Scorched Horizon abloom weakness — abloom output rewarded proportionally
-    // ========================================================================
-    // Promeia (abloom:3) receives a larger abloom bonus (+15) than Vivian (abloom:3 same)
-    // but Promeia also has ice vortex advantage. As a combined check: Promeia-based
-    // team should outscore a Vivian-based team on Horizon where Promeia has more advantages.
+    // TEST 45: Promeia and Vivian share abloom:3, but Promeia also gets an ice vortex advantage
+    // on Horizon, so her team should outscore Vivian's.
     run('TEST 45: Scorched Horizon abloom weakness — Promeia/Nangong/Yuzuha > Vivian/Nangong/Yuzuha', () => {
         const b = withBosses(bosses, 'Horizon').find(Boolean);
         const t = 'Nangong/Promeia/Yuzuha,Nangong/Vivian/Yuzuha';
@@ -1085,12 +925,8 @@ async function main() {
             `Horizon: NPY (${npy}) should beat NVY (${nvy}) — ice vortex + abloom + favored advantages`);
     });
 
-    // ========================================================================
-    // TEST 46: Norma sheer scaling — benefits from Lucia's sheer buffs on rupture teams
-    // ========================================================================
-    // Norma's scaling.sheer:3 means Lucia's
-    // buffs.sheer:3 scores in baseline affinity for Norma just as it would for a rupture DPS.
-    // Norma/Yixuan/Lucia is a full rupture team and should score strongly on rupture bosses.
+    // TEST 46: Norma's scaling.sheer:3 means Lucia's buffs.sheer:3 scores for her just as it
+    // would for a rupture DPS.
     run('TEST 46: Norma sheer scaling — Norma/Yixuan/Lucia scores strongly on rupture bosses', () => {
         const t = 'Norma/Yixuan/Lucia';
         for (const b of withBosses(bosses, 'Hunter,Priest')) {
@@ -1102,10 +938,7 @@ async function main() {
         }
     });
 
-    // ========================================================================
-    // TEST 47: Vesper - Alice should not be overranking Aria teams
-    // ========================================================================
-    // 
+    // TEST 47: Vesper — Alice should not be overranking Aria teams
     run('TEST 47: Alice without Sunna should not do as well as Aria variants', () => {
         const vesper = withBosses(bosses, 'vesper').find(Boolean);
         const alice = scoreTeamForBoss(scoreForTeamString('Nangong/Alice/Yuzuha', allUnits)[0].team, vesper, {});
@@ -1118,11 +951,7 @@ async function main() {
         }
     });
 
-    
-    // ========================================================================
     // TEST 48: Promeia/Vivian/Yuzuha > Nangong/Vivian/Yuzuha > Nangong/Promeia/Yuzuha
-    // ========================================================================
-    // 
     run('TEST 48: Promeia/Vivian/Yuzuha > Nangong/Vivian/Yuzuha > Nangong/Promeia/Yuzuha', () => {
         const b = withBosses(bosses, 'horizon').find(Boolean);
         const t = 'Promeia/Vivian/Yuzuha,Nangong/Vivian/Yuzuha,Nangong/Promeia/Yuzuha';
@@ -1134,11 +963,7 @@ async function main() {
         assert(pvy > npy, `PVY ${pvy} should be better than NPY ${npy}`);
     });
 
-    // ========================================================================
-    // TEST 49: Jane vortex buff on Scorched Horizon
-    // ========================================================================
-    // Compares Jane against Piper on Scorched Horizon. The vortex buff effect 
-    // should create a bigger gap than on Butcher.
+    // TEST 49: Jane's vortex buff should create a bigger gap over Piper on Horizon than on Butcher.
     run('TEST 49: Jane vortex buff — Jane > Piper on Scorched Horizon', () => {
         const t = "Alice/Jane/Yuzuha,Alice/Piper/Yuzuha"
         let b = withBosses(bosses, 'Horizon').find(Boolean);
@@ -1155,9 +980,7 @@ async function main() {
         assert(hdiff > fdiff, `Difference between Jane and Piper should be more pronounced on Horizon than Butcher because of vortex buff`);
     });
 
-    // ========================================================================
     // TEST 50: resolveBossVariation — merge semantics
-    // ========================================================================
     run('TEST 50: resolveBossVariation — merge semantics', () => {
         const butcher = bosses.find(b => b.id === 'butcher');
         assert(butcher, 'Butcher must be found');
@@ -1181,9 +1004,7 @@ async function main() {
         assert('debuffs' in butcher.mechanics, 'Base Butcher debuffs must still exist');
     });
 
-    // ========================================================================
     // TEST 51: resolveBossVariation — UCC anti-anomaly + open variation
-    // ========================================================================
     run('TEST 51: UCC default has anti-anomaly; open variation erases it', () => {
         const ucc = bosses.find(b => b.id === 'ucc');
         assert(ucc, 'UCC must be found');
@@ -1195,9 +1016,7 @@ async function main() {
             'UCC open variation should have no "anti" key (erased by null)');
     });
 
-    // ========================================================================
     // TEST 52: filterBosses supports boss:variation syntax
-    // ========================================================================
     run('TEST 52: filterBosses boss:variation syntax resolves correctly', () => {
         const ragingBosses = filterBosses(bosses, 'butcher:raging');
         assert(ragingBosses.length === 1, `Expected 1 result for "butcher:raging", got ${ragingBosses.length}`);
@@ -1212,22 +1031,13 @@ async function main() {
             'Default Butcher should remain anomaly shill');
     });
 
-    // ========================================================================
-    // TEST 53: Raging Butcher scoring — stun shill, disqualifies stunnerless teams
-    // ========================================================================
-    // Notorious Butcher: anomaly-shill → pure anomaly teams (no stunner) viable,
-    //   gain anomaly shill bonus.
-    // Raging Butcher: stun-shill → teams without a stunner are DISQUALIFIED entirely.
-    // Note: teams that happen to satisfy BOTH shills (e.g. Qingyi + anomaly DPS)
-    //   receive a +15 bonus on either variation and score identically — the key
-    //   difference only emerges for teams that satisfy exactly one shill type.
+    // TEST 53: Notorious Butcher is anomaly-shill (pure anomaly teams viable); Raging Butcher is
+    // stun-shill, which DISQUALIFIES stunnerless teams outright rather than just penalising them.
     run('TEST 53: Raging Butcher — stun-shill disqualifies stunnerless anomaly teams', () => {
         const butcher = bosses.find(b => b.id === 'butcher');
         const ragingBoss = resolveBossVariation(butcher, 'raging');
 
-        // Miyabi/Vivian/Yuzuha: pure anomaly team, no stunner tag anywhere
-        // Notorious (anomaly shill): viable — Miyabi satisfies the shill requirement
-        // Raging (stun shill): disqualified — no unit has the "stun" tag
+        // Miyabi/Vivian/Yuzuha: pure anomaly team, no stunner tag anywhere.
         const anomalyOnlyTeams = scoreForTeamString('Miyabi/Vivian/Yuzuha', allUnits);
         if (anomalyOnlyTeams.length > 0) {
             const notoriousScore = scoreTeamForBoss(anomalyOnlyTeams[0].team, butcher, {});
@@ -1239,11 +1049,7 @@ async function main() {
         }
     });
 
-    // ========================================================================
-    // TEST 54: Ramiel triple-anomaly teams score 400+ on neutral
-    // ========================================================================
-    // Ramiel with 2 other primary anomaly units unlocks her max ATK buff (atk:4).
-    // Combined with vortex/disorder reactions, these teams should exceed 400.
+    // TEST 54: Remielle with 2 other primary anomaly units unlocks her max ATK buff (atk:4).
     run('TEST 54: Ramiel triple-anomaly team scores 400+ on neutral (VRP)', () => {
         const b = NEUTRAL_BOSS;
         const { team, label } = scoreForTeamString('Velina/Remielle/Promeia', allUnits, { preview: true })[0];
@@ -1251,13 +1057,8 @@ async function main() {
         assert(s >= 400, `${label}: got ${s}, expected >= 400 (triple-anomaly Ramiel team)`);
     });
 
-    // ========================================================================
-    // TEST 55: Ramiel triple-anomaly >> Ramiel wheelchair (Velina/Yuzuha)
-    // ========================================================================
-    // Triple-anomaly (Alice/Remielle/Velina) should beat the Velina+Yuzuha
-    // wheelchair (Remielle/Vivian/Yuzuha) because Remielle's conditional ATK
-    // buff is maximized (atk:4) on triple-anomaly vs only atk:2 on the wheelchair,
-    // and the underutilization penalty penalizes the wheelchair team.
+    // TEST 55: triple-anomaly maximizes Remielle's conditional ATK buff (atk:4) versus only
+    // atk:2 on the Velina+Yuzuha wheelchair, which also eats an underutilization penalty.
     run('TEST 55: Triple-anomaly Ramiel >= Ramiel/Velina/Yuzuha wheelchair', () => {
         const b = NEUTRAL_BOSS;
         const avr = scoreTeamForBoss(scoreForTeamString('Alice/Remielle/Velina', allUnits, { preview: true })[0].team, b, {});
@@ -1265,11 +1066,8 @@ async function main() {
         assert(avr >= rvy, `Triple-anomaly AVR(${avr}) should be >= wheelchair RVY(${rvy})`);
     });
 
-    // ========================================================================
-    // TEST 56: Team legality — illegal teams DQ'd, flex teams accepted
-    // ========================================================================
-    // Illegal: no unit pair on the team has mutual join satisfaction.
-    // Flex: at least one pair has mutual join satisfaction; 3rd is unconstrained.
+    // TEST 56: illegal = no unit pair has mutual join satisfaction; flex = at least one pair
+    // does, with the 3rd unconstrained.
     run('TEST 56: Team legality — illegal teams DQ, flex teams OK', () => {
         const b = NEUTRAL_BOSS;
         const ran = scoreTeamForBoss(scoreForTeamString('Remielle/Astra/Nicole', allUnits, { preview: true })[0].team, b, {});
@@ -1280,11 +1078,8 @@ async function main() {
         assert(thn > 0, `Trigger/Harumasa/Nicole is a valid flex team, got ${thn}`);
     });
 
-    // ========================================================================
-    // TEST 57: Miyabi existing teams unaffected by changes
-    // ========================================================================
-    // Regression guard: Miyabi has no conditional.buffs, so none of these changes
-    // should alter her top team scores. Wheelchair should still be CONVENTIONAL.
+    // TEST 57: regression guard — Miyabi has no conditional.buffs, so none of these changes
+    // should alter her top team scores.
     run('TEST 57: Miyabi/Astra/Nicole wheelchair still CONVENTIONAL (regression guard)', () => {
         const b = NEUTRAL_BOSS;
         const man = scoreTeamForBoss(scoreForTeamString('Miyabi/Astra/Nicole', allUnits)[0].team, b, {});
@@ -1293,12 +1088,8 @@ async function main() {
         assert(nmy > man, `NMY(${nmy}) should still beat MAN(${man})`);
     });
 
-    // ========================================================================
-    // TEST 58: Refringe cascade — multi-element > same-element triple-anomaly
-    // ========================================================================
-    // Alice/Vivian/Remielle generates disorders (physical+ether) so the Refringe
-    // cascade bonus applies. Alice/Jane/Remielle is all-physical, no reactions to
-    // cascade into. Multi-element should score higher.
+    // TEST 58: Alice/Vivian/Remielle generates disorders (physical+ether), triggering the
+    // Refringe cascade bonus; all-physical Alice/Jane/Remielle has no reaction to cascade into.
     run('TEST 58: Multi-element triple-anomaly > same-element (Refringe cascade)', () => {
         const b = NEUTRAL_BOSS;
         const avr = scoreTeamForBoss(scoreForTeamString('Alice/Vivian/Remielle', allUnits, { preview: true })[0].team, b, {});
@@ -1306,11 +1097,8 @@ async function main() {
         assert(avr > ajr, `Multi-element AVR(${avr}) should beat same-element AJR(${ajr}) due to Refringe cascade`);
     });
 
-    // ========================================================================
-    // TEST 59: Triple-anomaly Rem dominates duo-anomaly wheelchair
-    // ========================================================================
-    // The conditional buff gap between triple (buff=4, +1600 ATK) and duo (buff=2, +600)
-    // is enormous. Triple-anomaly should decisively beat wheelchair compositions.
+    // TEST 59: the conditional buff gap between triple (buff=4, +1600 ATK) and duo (buff=2, +600)
+    // is enormous, so triple-anomaly should decisively win.
     run('TEST 59: Triple-anomaly Rem >> duo-anomaly wheelchair', () => {
         const b = NEUTRAL_BOSS;
         const triple = scoreTeamForBoss(scoreForTeamString('Alice/Vivian/Remielle', allUnits, { preview: true })[0].team, b, {});
@@ -1319,22 +1107,15 @@ async function main() {
         assert(gap > 20, `Triple AVR(${triple}) should beat wheelchair VRY(${wheelchair}) by >20, gap was ${gap.toFixed(1)}`);
     });
 
-    // ========================================================================
-    // TEST 60: Miyabi/Rem triple-anomaly scores well 
-    // ========================================================================
-    // Miyabi now joins on anomaly, enabling Miyabi/Rem teams without Yanagi.
+    // TEST 60: Miyabi joins on anomaly, enabling Miyabi/Rem teams without Yanagi.
     run('TEST 60: Miyabi/Remielle/Vivian triple-anomaly scores well', () => {
         const b = NEUTRAL_BOSS;
         const mrv = scoreTeamForBoss(scoreForTeamString('Miyabi/Remielle/Vivian', allUnits, { preview: true })[0].team, b, {});
         assert(mrv >= 300, `Miyabi/Rem/Vivian should score >= 300 as triple-anomaly, got ${mrv}`);
     });
 
-    // ========================================================================
-    // TEST 61: Nangong wheelchair with Rem is severely penalized
-    // ========================================================================
-    // Nangong+Rem+Yuzuha: Rem has only 1 anomaly teammate count (Nangong is stun,
-    // Yuzuha is support), so buff resolves to 0. This should score much worse than
-    // a standard Nangong wheelchair without Rem.
+    // TEST 61: Nangong+Rem+Yuzuha counts only 1 anomaly teammate (Nangong is stun, Yuzuha is
+    // support), so Remielle's buff resolves to 0 and this should score much worse.
     run('TEST 61: Nangong/Rem/Yuzuha penalized vs Nangong/Miyabi/Yuzuha', () => {
         const b = NEUTRAL_BOSS;
         const nry = scoreTeamForBoss(scoreForTeamString('Nangong/Remielle/Yuzuha', allUnits, { preview: true })[0].team, b, {});
@@ -1342,16 +1123,10 @@ async function main() {
         assert(nmy > nry + 30, `NMY(${nmy}) should beat NRY(${nry}) by >30 — Rem buff=0 on this team`);
     });
 
-    // ========================================================================
-    // TEST 62: Sigrid stunner ordering — weak ultimate + chain replacement
-    // ========================================================================
-    // Sigrid has damage["ultimate:weak"]:2 and scaling.chains:3. On an ice-weak boss,
-    // ice stunners (Lycaon, Lighter) should beat Dialyn because:
-    //   1. Dialyn's ultimates provision gives Sigrid 0 benefit (weak ultimate)
-    //   2. Dialyn's replaces: {ultimates:chains} penalizes Sigrid's chain scaling
-    //   3. Ice stunners get on-element L3 bonus
-    // But Dialyn still comfortably beats low-tier stunners (tier advantage).
-    // Norma is the best stunner for Sigrid: chain provision + subdps damage + no replacement cost.
+    // TEST 62: Sigrid's damage["ultimate:weak"]:2 gets 0 from Dialyn's ultimate provision, and
+    // his `replaces: {ultimates:chains}` penalizes her scaling.chains:3 on top — so on an
+    // ice-weak boss, ice stunners' on-element bonus beats him, though he still beats low-tier
+    // stunners on raw tier. Norma is best: chain provision + subdps damage + no replacement cost.
     run('TEST 62: Sigrid stunner ordering — weak ultimate + chain replacement (Marionettes)', () => {
         const t = 'Norma/Sigrid/Soukaku,Lighter/Sigrid/Soukaku,Lycaon/Sigrid/Soukaku,Dialyn/Sigrid/Soukaku,Koleda/Sigrid/Soukaku';
         for (const b of withBosses(bosses, 'Marionettes')) {
@@ -1369,11 +1144,8 @@ async function main() {
         }
     });
 
-    // ========================================================================
-    // TEST 63: Norma/Astra synergy — ATK buff + chain provision value
-    // ========================================================================
-    // Norma has scaling.atk:3 and damage.chain:3. Astra's atk:3 + cd:3 + chain
-    // provision makes her significantly better than Nicole for Norma teams.
+    // TEST 63: Norma has scaling.atk:3 and damage.chain:3, so Astra's atk/cd/chain-provision
+    // suite should make her significantly better than Nicole here.
     run('TEST 63: Norma/Astra synergy — Astra significantly better than Nicole (Pompey)', () => {
         const t = 'Norma/Evelyn/Astra,Norma/Evelyn/Nicole';
         for (const b of withBosses(bosses, 'Pompey')) {
@@ -1384,13 +1156,9 @@ async function main() {
         }
     });
 
-    // ========================================================================
-    // TEST 64: Norma vs Dialyn — fire-weak favors Norma, otherwise Dialyn wins
-    // ========================================================================
-    // Norma is a fire stunner with subdps chain damage; Dialyn is physical with free
-    // ultimates. On fire-weak bosses Norma's on-element bonus + chain provision exceeds
-    // Dialyn's generic utility. On physical-weak or neutral bosses Dialyn's tier advantage
-    // and ultimate provision maintain her lead.
+    // TEST 64: Norma is a fire stunner with subdps chain damage; Dialyn is physical with free
+    // ultimates. Fire-weak bosses let Norma's on-element bonus + chain provision exceed Dialyn's
+    // generic utility; elsewhere Dialyn's tier and ultimate provision keep him ahead.
     run('TEST 64: Norma vs Dialyn — fire-weak favors Norma, otherwise Dialyn wins', () => {
         // Fire-weak: Norma > Dialyn (Pompey with Evelyn/Astra, Hunter with Lucia/Banyue)
         for (const b of withBosses(bosses, 'Pompey')) {
@@ -1421,9 +1189,7 @@ async function main() {
         }
     });
 
-    // ========================================================================
     // TEST 65: Miyabi+Velina anti-pattern — wasted vortex cohesion penalty
-    // ========================================================================
     // Velina is a wind anomaly subdps whose primary team value is vortex generation.
     // Miyabi (frost variant, vortex tier 0.001) cannot exploit vortex reactions,
     // so pairing them wastes Velina's contribution. The cohesion penalty should make
@@ -1449,12 +1215,8 @@ async function main() {
         }
     });
 
-    // ========================================================================
-    // TEST 66: Claret is a viable primary armorer DPS (Neutral)
-    // ========================================================================
-    // Claret is an Electric Armorer. Koleda/Claret/Rina should be strongly viable. 
-    // Swapping Claret for pure-defense Ben leaves the team with NO DPS (DQ),
-    // confirming Claret herself is the damage dealer.
+    // TEST 66: Claret (electric armorer) should be strongly viable; swapping her for
+    // pure-defense Ben leaves the team with NO DPS, confirming she is the damage dealer.
     run('TEST 66: Claret is a viable armorer DPS (Neutral)', () => {
         if (!allUnits.find(u => u.id === 'claret')) return; // preview-only unit
         for (const b of withBosses(bosses, 'Neutral')) {
@@ -1469,12 +1231,8 @@ async function main() {
         }
     });
 
-    // ========================================================================
-    // TEST 67: DEF buff → Claret's DEF scaling — Rina outperforms Lucy control
-    // ========================================================================
-    // Rina and Lucy both provide buffs.atk:2. Only Rina provides buffs.def:2 (+pen:3).
-    // Claret scales on DEF (scaling.def:3), so Rina's DEF/PEN should make her clearly
-    // best-in-slot over Lucy for an armorer.
+    // TEST 67: Rina and Lucy both give buffs.atk:2, but only Rina gives buffs.def:2 (+pen:3),
+    // which Claret's scaling.def:3 should reward clearly.
     run('TEST 67: Rina beats Lucy for Claret via DEF buff (Neutral)', () => {
         if (!allUnits.find(u => u.id === 'claret')) return;
         for (const b of withBosses(bosses, 'Neutral')) {
@@ -1487,13 +1245,9 @@ async function main() {
         }
     });
 
-    // ========================================================================
-    // TEST 68: Crit inversion — CD barely moves an armorer (Neutral)
-    // ========================================================================
-    // Armorer crit damage is fixed. Claret is the one exception: scaling.cd:1 converts a
-    // sliver of CD into Laceration, so Astra's cd:3 is not quite dead — but at half an
-    // attacker's weight, and her atk:3 is worth exactly nothing. Rina should still dominate
-    // Astra as Claret's support, unlike for a normal crit attacker.
+    // TEST 68: armorer crit damage is normally fixed; Claret's scaling.cd:1 is the one exception,
+    // converting a sliver of CD into Laceration — so Astra's cd:3 is not quite dead (at half an
+    // attacker's weight) but her atk:3 is worth nothing, and Rina should still dominate her.
     run('TEST 68: CD buff barely helps Claret armorer (Neutral)', () => {
         if (!allUnits.find(u => u.id === 'claret')) return;
         for (const b of withBosses(bosses, 'Neutral')) {
@@ -1506,12 +1260,8 @@ async function main() {
         }
     });
 
-    // ========================================================================
-    // TEST 69: Element resistance DQs Claret as a real DPS (Thrall & Sobek)
-    // ========================================================================
-    // Thrall resists electric. Claret (electric armorer) is a primary DPS, so an
-    // electric-resistant boss disqualifies the team — armorers get no support-unit
-    // resistance free pass.
+    // TEST 69: Claret (electric armorer) is a primary DPS, so electric-resistant Thrall must
+    // disqualify the team — armorers get no support-unit resistance free pass.
     run('TEST 69: Electric resistance DQs Claret on Thrall', () => {
         if (!allUnits.find(u => u.id === 'claret')) return;
         for (const b of withBosses(bosses, 'Thrall')) {
@@ -1523,12 +1273,8 @@ async function main() {
         }
     });
 
-    // ========================================================================
-    // TEST 70 (regression): Remielle scoring unchanged by dps-pseudorole fix
-    // ========================================================================
-    // Remielle has pseudoRole=["subdps","support"] — no `dps` marker — so none
-    // of the changes should affect her. The canonical Alice/Vivian/Remielle
-    // triple-anomaly team on Solo should remain strong.
+    // TEST 70 (regression): Remielle's pseudoRole is ["subdps","support"] with no `dps` marker,
+    // so a dps-pseudorole fix should not touch her.
     run('TEST 70: Remielle regression on Solo (Alice/Vivian/Remielle)', () => {
         if (!allUnits.find(u => u.id === 'ramiel')) return;
         for (const b of withBosses(bosses, 'Solo')) {
@@ -1539,18 +1285,10 @@ async function main() {
         }
     });
 
-    // ========================================================================
-    // TEST 71: Burnice notPresent:velina conditional subdps
-    // ========================================================================
-    // Burnice's pseudoRole is `[{ role: "subdps", when: { notPresent: "velina" } }]`
-    // — she's a subdps by default, but promotes to primary anomaly DPS when Velina
-    // is on the team. On a neutral boss:
-    //   * Burnice/Velina/Yuzuha (DPS/subDPS/support) should beat
-    //     Burnice/Vivian/Yuzuha (subDPS/subDPS/support) by a meaningful margin
-    //     because Burnice now claims the primary-DPS tier multiplier.
-    //   * Burnice/Promeia/Yuzuha (subDPS/DPS/support) should land in the same
-    //     ballpark as Burnice/Velina/Yuzuha — Burnice reverts to subdps and
-    //     Promeia carries as primary anomaly DPS.
+    // TEST 71: Burnice's pseudoRole (`subdps` by default, promoting to primary anomaly DPS when
+    // Velina is absent) means Burnice/Velina/Yuzuha (DPS/subDPS/support) should beat
+    // Burnice/Vivian/Yuzuha (subDPS/subDPS/support) by claiming the primary-DPS tier multiplier,
+    // while Burnice/Promeia/Yuzuha lands in the same ballpark (Burnice reverts, Promeia carries).
     run('TEST 71: Burnice notPresent:velina conditional subdps (Neutral)', () => {
         for (const b of withBosses(bosses, 'Neutral')) {
             const parsed = scoreForTeamString(
@@ -1568,15 +1306,9 @@ async function main() {
         }
     });
 
-    // ========================================================================
-    // TEST 72: Maim enabler + structure — armorers want a Maim trigger (Neutral)
-    // ========================================================================
-    // Stun and armorer agents build the shared Gash pool; only an armorer detonates it into
-    // a Maim, so an armorer wants gash builders alongside it. Koleda/Claret/Rina is a
-    // conventional armorer-hypercarry with a stun enabler (+Maim, +stun-emergence);
-    // Claret/Lucy/Rina is a stunless "false wheelchair" with no enabler, so it should score
-    // meaningfully lower. (Dual-armorer structure can't be exercised until a second
-    // armorer exists in the roster.)
+    // TEST 72: stun and armorer agents build a shared Gash pool that only an armorer detonates
+    // into a Maim, so Koleda/Claret/Rina (armorer + stun enabler) should score meaningfully
+    // higher than Claret/Lucy/Rina, a stunless "false wheelchair" with no enabler.
     run('TEST 72: Maim enabler + armorer structure (Neutral)', () => {
         if (!allUnits.find(u => u.id === 'claret')) return;
         for (const b of withBosses(bosses, 'Neutral')) {
@@ -1589,9 +1321,7 @@ async function main() {
         }
     });
 
-    // ========================================================================
     // TEST 73: Unified conditional framework — recipient-scoped + team-scoped
-    // ========================================================================
     // Koleda's P6 narrow buff: armorers receive Laceration, everyone else CD (recipient-scoped
     // `role` predicate). Remielle's ATK curve scales with anomaly count (team-scoped).
     run('TEST 73: conditional framework resolves per-recipient and per-team', () => {
@@ -1620,14 +1350,9 @@ async function main() {
             'Remielle ATK should be 0 with a lone anomaly');
     });
 
-    // ========================================================================
-    // TEST 74: Koleda rework lands — general damage + P6 + tier 1.5
-    // ========================================================================
-    // Koleda's 3.2 rework (dmg:4 general-damage buff, P6 narrow Laceration/CD, tier 2.5→1.5)
-    // considerably improves Koleda/Claret/Rina, and makes her a viable generalist on a
-    // conventional attack team. The Evelyn floor is 295, not 300: the P6 rework moved her
-    // armorer-facing buff from CR to Laceration, which is worth nothing to Evelyn, so the
-    // generalist line sits marginally below where the pre-rework kit put it.
+    // TEST 74: Koleda's 3.2 rework (general-damage buff, narrow P6 Laceration/CD, tier 2.5->1.5)
+    // should improve Koleda/Claret/Rina considerably. The Evelyn floor is 295, not 300, because
+    // the P6 rework moved her armorer-facing buff from CR to Laceration, worth nothing to Evelyn.
     run('TEST 74: Koleda rework improves her teams (Neutral)', () => {
         for (const b of withBosses(bosses, 'Neutral')) {
             const kcr = scoreForTeamString('Koleda/Claret/Rina', allUnits, { preview: true })[0];
@@ -1641,19 +1366,12 @@ async function main() {
         }
     });
 
-    // ========================================================================
-    // TEST 75: Claret/Rina stunner ordering shifts with electric weakness (Roxy vs Trigger)
-    // ========================================================================
-    // The full stunner ranking for a Claret/Rina team is not one fixed list — it depends on
-    // whether the boss is weak to electric, because Trigger's kit leans harder on that
-    // weakness than Roxy's does:
-    //   Electric-weak (UCC):             Trigger > Roxy > Koleda > Lycaon > Anby
-    //   Electric-neutral (Marionettes):  Roxy > Trigger > Koleda > Lycaon > Anby
-    // Typhon is weak to both electric AND wind, but Rina is an evasive assist and Typhon
-    // needs 3 defensive assists, so Rina herself disqualifies the team there. Typhon is
-    // checked separately below on a Claret/Nicole base, omitting the Lycaon that fails 
-    // to join a valid Typhon team:
-    //   Typhon (electric + wind weak):   Roxy > Trigger > Koleda > Anby
+    // TEST 75: the Claret/Rina stunner ranking depends on electric weakness, since Trigger's kit
+    // leans harder on it than Roxy's: electric-weak UCC gives Trigger > Roxy > Koleda > Lycaon >
+    // Anby, electric-neutral Marionettes gives Roxy > Trigger > Koleda > Lycaon > Anby. Typhon
+    // (electric + wind weak) is checked separately on a Claret/Nicole base, since Rina (evasive
+    // assist) can't join Typhon's 3-defensive-assist requirement and Lycaon can't join either:
+    // Roxy > Trigger > Koleda > Anby.
     run('TEST 75: Claret stunner order — electric-weak, electric-neutral, and Typhon', () => {
         if (!allUnits.find(u => u.id === 'roxy') || !allUnits.find(u => u.id === 'claret')) return;
         const stunnerTeams = 'Trigger/Claret/Rina,Roxy/Claret/Rina,Koleda/Claret/Rina,' +
@@ -1688,17 +1406,9 @@ async function main() {
         }
     });
 
-    // ========================================================================
-    // TEST 76: Roxy enables Pyrois's wind-anomaly ultimate
-    // ========================================================================
-    // Pyrois's ultimate:strong is conditioned on { provisions: "anomaly:wind" }, which Roxy
-    // meets via her utility["anomaly:wind"] surplus.
-    //
-    // Compared against a CLONE of Roxy with that utility entry stripped, not against another
-    // real stunner (e.g. Koleda). Comparing Roxy to Koleda looks like the same test but is not:
-    // those two differ in stun-infra, chain-buff and other kit stats that have nothing to do
-    // with the wind-anomaly provision, so that version can fail (or pass) for reasons unrelated
-    // to the thing under test. The clone differs in one field.
+    // TEST 76: Pyrois's ultimate:strong is conditioned on provisions:"anomaly:wind", which Roxy
+    // meets via her utility["anomaly:wind"] surplus. Compared against a CLONE of Roxy with that
+    // entry stripped, not a real stunner (e.g. Koleda) — see the TEST 89 lesson for why.
     run('TEST 76: Roxy enables Pyrois over a clone without wind-anomaly provision (Neutral)', () => {
         const roxy = allUnits.find(u => u.id === 'roxy');
         if (!roxy) return;
@@ -1720,9 +1430,7 @@ async function main() {
         }
     });
 
-    // ========================================================================
     // TEST 77: Roxy/Harumasa/Velina — emergent wind team is viable (Typhon)
-    // ========================================================================
     // The only fully-valid Roxy+Velina composition (Harumasa joins both). Roxy+Velina
     // stack wind anomaly + daze; on Typhon (electric + wind weak) it should be a solid,
     // playable team even with Harumasa at T2.5. (Not top-tier until Harumasa is buffed.)
@@ -1731,21 +1439,18 @@ async function main() {
         for (const b of withBosses(bosses, 'Typhon')) {
             const parsed = scoreForTeamString('Roxy/Harumasa/Velina', allUnits, { preview: true })[0];
             const s = scoreTeamForBoss(parsed.team, b, {});
-            // Floor lowered 264.7 -> 245 on 2026-09-02 (owner-adjudicated). The team has NO
-            // support or defense agent, and scoreTeamStructure now demotes every supportless
-            // team to the NO_SUPPORT tier rather than only the CONVENTIONAL-classified ones,
-            // so this monoshock line went 0.85 -> 0.80 and landed at 248.9. The assertion's
-            // intent is a VIABILITY FLOOR ("solid, playable, not top-tier"), not an ordering,
-            // and 248.9 still reads that way; 250 was calibrated when supportless teams kept
-            // 0.85. Softening NO_SUPPORT instead was rejected: TEST 101 needs it below 0.812
-            // and this team needs it at or above 0.81, a 0.002 window.
+            // Floor is 245, not the original 250: this team has NO support or defense agent, so
+            // scoreTeamStructure's NO_SUPPORT demotion (applied to every supportless team, not
+            // just CONVENTIONAL-classified ones — see ../engine/layers.md#no-support-or-defense-is-its-own-tier)
+            // puts it at 0.80 instead of 0.85. The assertion is a VIABILITY FLOOR ("solid,
+            // playable, not top-tier"), not an ordering. Softening NO_SUPPORT instead was
+            // rejected: TEST 101 needs it below 0.812 and this team needs it at or above 0.81 —
+            // a 0.002 window, too narrow to serve both.
             assert(s >= 245, `Roxy/Harumasa/Velina on Typhon should be playable (>= 245), got ${s?.toFixed(1)}`);
         }
     });
 
-   // ========================================================================
     // TEST 78: hasUnit qualified identifier "anomaly:wind" (Pyrois conditional ultimate)
-    // ========================================================================
     // Pyrois's damage["ultimate:strong"] activates only when a wind-anomaly unit is on the
     // team, expressed as { when: { hasUnit: "anomaly:wind" } }. A colon-qualified hasUnit
     // matches by effective role + element, so Roxy (wind pseudo-anomaly) triggers it but
@@ -1764,9 +1469,7 @@ async function main() {
             'Pyrois ultimate:strong should be 0 with no wind anomaly on the team');
     });
 
-    // ========================================================================
     // TEST 79: wind anomaly lets Pyrois receive Dialyn's free ultimates fully
-    // ========================================================================
     // Pyrois's ultimate:weak normally suppresses ultimate-provision (Dialyn's free ults are
     // wasted on him). With a wind-anomaly unit present, his conditional ultimate:strong
     // overrides that, so Dialyn's provision lands — a large swing.
@@ -1782,9 +1485,7 @@ async function main() {
         }
     });
 
-    // ========================================================================
     // TEST 80: Sigrid's wind-anomaly passive is a bonus, never a penalty
-    // ========================================================================
     // Sigrid has scaling["anomaly:wind"]:1 (passive: extra damage under wind anomaly). It must
     // NOT inhibit her when no wind source is present — a wind-less team (Lighter/Sigrid/Astra)
     // must still be strong. A wind source (Roxy) adds a mild bonus.
@@ -1802,9 +1503,7 @@ async function main() {
         }
     });
 
-    // ========================================================================
     // TEST 81: a stunless DPS satisfies a stun shill on its own (Thrall & Sobek)
-    // ========================================================================
     // Thrall's `shill: stun` is a hard requirement because damage only lands inside
     // stun windows. A stunless DPS (YSG) carries that multiplier permanently and never
     // needs a window opened, so YSG/Sunna/Zhao must be viable — and strong — without a
@@ -1826,9 +1525,7 @@ async function main() {
     });
 
 
-    // ========================================================================
     // TEST 82: Laceration buffs land on armorers and nobody else (Neutral)
-    // ========================================================================
     // Laceration is the armorer's damage type — the class analogue of rupture's Sheer.
     // Isolated by A/B-ing the SAME team against itself with the laceration buff stripped out,
     // so tier, rank, element and every other kit difference cancel and the only delta is the
@@ -1894,9 +1591,7 @@ async function main() {
         }
     });
 
-    // ========================================================================
     // TEST 83: Boss control skills — armorer quicktime intercept (synthetic)
-    // ========================================================================
     // A control skill locks the player out of everything but dodge/parry/assist. Armorers
     // intercept it and reduce it to a quicktime event, so their value rises with the count.
     // Teams without an armorer must be completely unaffected.
@@ -1917,9 +1612,7 @@ async function main() {
             `control skills must not move a team with no armorer (${n0?.toFixed(1)} vs ${n3?.toFixed(1)})`);
     });
 
-    // ========================================================================
     // TEST 84: Graded armorer damage-lever dependency (Neutral)
-    // ========================================================================
     // Armorers have few damage levers: CR, Laceration, PEN and defense shred. A team
     // supplying none of them leaves Claret unable to reach her ceiling. Both a laceration
     // line and a pure-shred line must clear a team that hands her nothing.
@@ -1939,9 +1632,7 @@ async function main() {
         }
     });
 
-    // ========================================================================
     // TEST 85: Defense shred stacks cumulatively for an armorer (Neutral)
-    // ========================================================================
     // Trigger (defense:2) + Nicole (defense:3) shred ~60% between them. Shred raises armorer
     // damage without Claret receiving a buff at all, so the double-shred line must beat the
     // same team carrying only one shredder.
@@ -1957,9 +1648,7 @@ async function main() {
         }
     });
 
-    // ========================================================================
     // TEST 86: ATK is not an armorer lever — no diametric pair off it (Neutral)
-    // ========================================================================
     // The buff × defense-shred diametric pair normally forms off ATK/CD. An armorer gets
     // nothing from ATK, so Lucy (atk:2 only) must not earn Claret a diametric floor — while
     // the same pairing still works for a conventional attacker.
@@ -1978,18 +1667,10 @@ async function main() {
         }
     });
 
-    // ========================================================================
     // TEST 87: no unit gets an ultimate need it did not declare
-    // ========================================================================
-    // The defect this suite's ultimate model was rebuilt around. getEffectiveScaling used to
-    // manufacture an `ultimates` need for every primary DPS — a floor of 1, plus bumps from
-    // magnitude and frequency — which the real annotated `scaling.ultimates` then OVERWROTE.
-    // That fabricated a need for units like Evelyn and Seed, who declare none, and made the
-    // engine pay twice for the same free ultimate: once through the provision channel
-    // (correctly) and once through the need channel (not).
-    //
-    // Ultimate value now flows through exactly two places: magnitude → provision, and
-    // `scaling.ultimates` → need. This asserts the second half stays honest.
+    // Pins that ultimate value flows through exactly two places — magnitude -> provision, and
+    // `scaling.ultimates` -> need — with no manufactured floor bleeding into the second. Full
+    // defect history: ../engine/ultimates-two-channel.md#never-fabricate-a-need.
     run('TEST 87: no unit has an ultimates need it did not declare', () => {
         const offenders = [];
         for (const u of allUnits) {
@@ -2007,15 +1688,11 @@ async function main() {
             `every unit in the need channel must annotate a positive value, got ${withNeed.join(',')}`);
     });
 
-    // ========================================================================
     // TEST 88: scaling and magnitude are independent and both count
-    // ========================================================================
-    // Two carries with the SAME big ultimate, one of which also does something extra with it.
-    // Dialyn must be worth strictly more to the one that does. Under the old override
-    // semantics these were indistinguishable — the annotated value replaced the
-    // magnitude-derived one instead of adding to it — so this case could not be expressed
-    // at all. Synthesised rather than using a real unit because no shipped unit currently
-    // pairs ultimate:strong 3 with a scaling annotation.
+    // Pins that provision (magnitude) and need (declared scaling.ultimates) ADD, rather than the
+    // old override semantics where the annotated value replaced the magnitude-derived one. See
+    // ../engine/ultimates-two-channel.md#the-channels-do-not-overlap-and-that-is-the-whole-point.
+    // Synthesised: no shipped unit currently pairs ultimate:strong 3 with a scaling annotation.
     run('TEST 88: a same-magnitude carry that also scales on ultimates is worth more to Dialyn', () => {
         const seed = allUnits.find(u => u.id === 'seed');
         assert(seed && seed.mechanics.damage['ultimate:strong'] === 3 && seed.mechanics.scaling?.ultimates === undefined,
@@ -2036,18 +1713,14 @@ async function main() {
         }
     });
 
-    // ========================================================================
     // TEST 89: ultimate magnitude is graded, not binary
-    // ========================================================================
-    // Evelyn's ultimate:strong 1 is ~4200%; an unannotated ultimate is ~3000-3600%. Neither
-    // declares a scaling.ultimates need, so this is purely the provision channel, and it must
-    // still separate them — otherwise annotating `ultimate:strong: 1` would be meaningless.
-    // Guards the 1.0 → 1.1 rung of ULTIMATE_MAGNITUDE against being collapsed.
+    // Evelyn's ultimate:strong 1 (~4200%) must score above an unannotated ultimate (~3000-3600%)
+    // through the provision channel alone, guarding the 1.0 -> 1.1 rung of ULTIMATE_MAGNITUDE.
     //
-    // Compared against a CLONE of Evelyn with the annotation stripped, not against another
-    // real unit. Comparing Evelyn to Ellen looks like the same test but is not: those two
-    // differ by ~90 points for reasons that have nothing to do with ultimates, so that version
-    // passes whatever the rung is set to and guards nothing. The clone differs in one field.
+    // Compared against a CLONE of Evelyn with the annotation stripped, not a real unit — Evelyn
+    // vs Ellen differ by ~90 points for unrelated reasons and would pass regardless (the "TEST 89
+    // lesson", reused by several tests below). See
+    // ../notes/known-pitfalls.md#a-test-that-cannot-fail-proves-nothing.
     run('TEST 89: ultimate magnitude is graded — annotating ultimate:strong 1 beats not annotating', () => {
         const evelyn = allUnits.find(u => u.id === 'evelyn');
         assert(evelyn && evelyn.mechanics.damage['ultimate:strong'] === 1,
@@ -2068,15 +1741,10 @@ async function main() {
         }
     });
 
-    // ========================================================================
     // TEST 90: a weak ultimate earns nothing through EITHER channel
-    // ========================================================================
-    // LOAD-BEARING. `ultimate:weak` with no `ultimate:strong` means the unit's ultimate is not
-    // a real burst — Sigrid's lives in her enhanced attacks, Pyrois uses his as a mode switch —
-    // so a free ultimate is worth nothing to them. This zeroing moved out of
-    // getEffectiveScaling and into ULTIMATE_MAGNITUDE during the axis restructure; this pins
-    // it in its new home. A conditional ultimate:strong must still lift it, which is exactly
-    // how Pyrois's wind case works (see also TESTs 76, 78, 79).
+    // LOAD-BEARING. `ultimate:weak` with no `ultimate:strong` means the ultimate is not a real
+    // burst, so a free one is worth nothing — see [ULT-02]. A conditional `ultimate:strong` must
+    // still lift it, which is how Pyrois's wind case works (see also TESTs 76, 78, 79).
     run('TEST 90: weak ultimates earn no provision, and a conditional strong ultimate lifts it', () => {
         const sigrid = allUnits.find(u => u.id === 'sigrid');
         const pyrois = allUnits.find(u => u.id === 'pyrois');
@@ -2106,18 +1774,13 @@ async function main() {
         }
     });
 
-    // ========================================================================
     // TEST 91: partial ultimate coverage is priced by the FRACTION of the need met
-    // ========================================================================
-    // Ju Fufu's `utility.ultimates: 1` covers half of Yixuan's `scaling.ultimates: 2` and a
-    // third of a hypothetical 3, and must earn strictly less in the second case. This used to
-    // be impossible to express: the undersupply gate multiplied by `supply/scaling`, which
-    // cancelled the `scaling` already in the need product, so EVERY undersupplied consumer
-    // collected the same flat `keyMult x supply^2` regardless of appetite — Yixuan and YSG both
-    // paid Ju Fufu exactly 1.9. The ratio is squared now; see FRACTIONAL_COVERAGE_KEYS.
+    // Ju Fufu's `utility.ultimates: 1` must earn strictly less covering a scaling.ultimates 3
+    // need than a 2 need — the "least hungry pays the most" ruling and the squared-ratio fix
+    // (FRACTIONAL_COVERAGE_KEYS):
+    // ../notes/adjudications.md#least-hungry-pays-the-most-is-correct-for-ultimates.
     //
-    // Two clones of ONE unit differing in exactly that field, per the TEST 89 lesson: comparing
-    // two real units would pass on unrelated point differences and guard nothing.
+    // Two clones of ONE unit differing in exactly that field, per the TEST 89 lesson.
     run('TEST 91: partial ultimate coverage is priced by fraction of need met', () => {
         const yixuan = allUnits.find(u => u.id === 'yixuan');
         const juFufu = allUnits.find(u => u.id === 'ju-fufu');
@@ -2144,18 +1807,11 @@ async function main() {
         }
     });
 
-    // ========================================================================
     // TEST 92: under-met ultimate scaling is a smaller bonus, never a penalty
-    // ========================================================================
-    // The principle the fraction-of-need shape exists to protect: ultimates arrive naturally
-    // and only two units in the roster provision them, so a carry who wants more of them than
-    // any teammate can supply must never end up WORSE off than a carry who never asked. Both
-    // an under-covered need and a wildly under-covered one must still beat no annotation at all.
-    //
-    // The second assertion pins the intended trailing-off past full coverage: with only 3 in
-    // the roster to supply, a need of 4 is covered by nobody and every supplier's bonus scales
-    // down proportionally. That is fraction-of-need semantics working, not the old cliff — the
-    // guard here is that it stays a bonus.
+    // Ultimates arrive naturally and only two units provision them, so wanting more than any
+    // teammate supplies must never score worse than declaring no need at all — including a need
+    // beyond what anyone in the roster covers. Full ruling:
+    // ../notes/adjudications.md#annotating-an-ultimate-need-above-the-maximum-provision-is-intended.
     run('TEST 92: under-met ultimate scaling is a smaller bonus, never a penalty', () => {
         const yixuan = allUnits.find(u => u.id === 'yixuan');
         assert(yixuan && yixuan.mechanics.scaling?.ultimates === 2,
@@ -2187,22 +1843,17 @@ async function main() {
         }
     });
 
-    // ========================================================================
     // TEST 93: disorder supply is MEASURED, not a constant
-    // ========================================================================
-    // `scaling.disorders` declares a NEED, so Miyabi's score has to track how much disorder
-    // the team actually generates. It used to be blind to that: the implicit block turned a
-    // boolean `hasDisorder` into a hardcoded supply of 2, so EVERY disorder-generating team
-    // paid her exactly 28.0 and her need of 3 sat permanently at 67% coverage, unreachable by
-    // any composition.
+    // `scaling.disorders` declares a NEED, so Miyabi's score must track how much disorder the
+    // team actually generates — it used to be a hardcoded supply of 2 behind a boolean, so every
+    // disorder-generating team paid her exactly 28.0. Full defect:
+    // ../notes/lessons-learned.md#disorder-supply-was-never-measured.
     //
-    // The load-bearing assertion is the SECOND block. The gradient alone is not decisive — the
-    // old flat model produced that ordering too, out of its separately-priced polarity channel,
-    // so a test built only on it passes against the very code it exists to guard (the TEST 89
-    // lesson). What the flat model provably cannot do is tell ONE cycling element from TWO,
-    // because `hasDisorder` was a boolean. Hence the clone: Vivian moved off Nangong's ether
-    // onto fire, which hands Miyabi a second distinct element and changes nothing else. Vivian
-    // carries no element-keyed mechanics, so on a neutral boss the tag is the only difference.
+    // The load-bearing SECOND block clones Vivian onto fire (off Nangong's ether) so Miyabi gets
+    // a second distinct cycling element with nothing else changed — the gradient alone passes
+    // against the old flat model too (see
+    // ../notes/known-pitfalls.md#a-test-that-cannot-fail-proves-nothing), since the old model's
+    // boolean can't tell ONE cycling element from TWO.
     run('TEST 93: Miyabi rises with the team disorder supply', () => {
         for (const b of withBosses(bosses, 'Fiend')) {
             const t = 'Miyabi/Astra/Yuzuha,Miyabi/Vivian/Yuzuha,Nangong/Miyabi/Yuzuha';
@@ -2236,21 +1887,13 @@ async function main() {
         }
     });
 
-    // ========================================================================
     // TEST 94: cycling and polarity supply AGGREGATE against one need
-    // ========================================================================
-    // The two sources are independent and both real, so they add. This test used to detect that
-    // via the coverage STEP: it straddled the aggregate supply of 4 with needs of 4 and 5 and
-    // asserted the covered one won. That step is deliberately gone — the credit curve is now
-    // continuous — and the old assertion is unsatisfiable in principle, because making a bigger
-    // need earn LESS at equal supply requires `supply x need x (supply/need)`, which collapses to
-    // `supply^2` and deletes the appetite term. That collapse is precisely what issue 5 removed.
-    //
-    // So aggregation is pinned directly instead: give Miyabi a polarity provider that shares her
-    // exact element, so element cycling is impossible (same variant → no reaction) and the ONLY
-    // possible disorder source is the forced-polarity provision. If polarity did not enter the
-    // aggregate, this team would have no disorder supply at all and Miyabi would be charged for
-    // an unmet need rather than credited.
+    // The two disorder sources are independent and both real, so they must add. Pinned directly
+    // via a polarity provider sharing Miyabi's exact elemental variant, so element cycling is
+    // impossible (same variant -> no reaction) and forced polarity is the ONLY possible source —
+    // if it did not enter the aggregate this team would have no disorder supply at all. See
+    // ../notes/lessons-learned.md#disorder-supply-was-never-measured for why a coverage-step
+    // formulation cannot express this (it requires supply^2, deleting the appetite term).
     //
     // Two clones differing in exactly one field, per the TEST 89 lesson.
     run('TEST 94: forced polarity feeds the disorder need with no element cycling at all', () => {
@@ -2287,18 +1930,12 @@ async function main() {
         }
     });
 
-    // ========================================================================
     // TEST 95: a disorder is a TEAM event — any source satisfies any consumer
-    // ========================================================================
-    // MUTATION TEST for issue 5's headline. The engine used to satisfy a `disorders` need only
-    // from the consumer's OWN anomaly reaction or a teammate's `utility.disorders`, so a
-    // consumer that is not itself half of the cycling pair was charged an unmet need on a team
-    // swimming in disorders. Latent on the live roster — both real `scaling.disorders` units
-    // are anomaly agents — which is precisely why it needs a synthetic consumer to be testable.
-    //
-    // Nicole is a plain non-anomaly support, so she never receives a reaction of her own, and
-    // Miyabi + Vivian cycle frost/ether while NEITHER carries `utility.disorders`. Every prior
-    // route to "met" is therefore closed and only a team-wide reading credits her.
+    // The needs side used to satisfy a `disorders` need only from the consumer's own reaction or
+    // a teammate's `utility.disorders`, so a consumer that was not itself half of the cycling
+    // pair read as unmet on a team swimming in disorders. See
+    // ../notes/lessons-learned.md#disorder-supply-was-never-measured. Latent on the live roster
+    // (both real `scaling.disorders` units are anomaly agents), hence the synthetic consumer.
     run('TEST 95: a non-anomaly disorder consumer is credited for teammates cycling without it', () => {
         const nicole = allUnits.find(u => u.id === 'nicole');
         assert(nicole && !nicole.tags.includes('anomaly') && !nicole.mechanics?.pseudoRole,
@@ -2331,17 +1968,15 @@ async function main() {
         }
     });
 
-    // ========================================================================
     // TEST 96: elemental variants disorder with their own base element
-    // ========================================================================
     // A variant tracks a SEPARATE anomaly gauge, so Miyabi's frost genuinely reacts with plain
-    // ice — `units.json` documents this on Soukaku's own entry. `computeAnomalyReactions`
-    // compared BASE elements and so read frost and ice as identical, giving Miyabi/Soukaku and
-    // Miyabi/Promeia zero disorders, while `teamHasImplicitDisorders` (variant-aware) said the
-    // opposite. Two detectors of the same thing, and the base-element one was wrong.
+    // ice (documented on Soukaku's own entry). Two detectors disagreed and the live one compared
+    // BASE elements, reading frost and ice as identical and zeroing Miyabi/Soukaku and
+    // Miyabi/Promeia disorders entirely — the largest single mover in
+    // ../notes/lessons-learned.md#disorder-supply-was-never-measured.
     //
-    // The control differs in exactly one field: a Soukaku clone handed Miyabi's own frost
-    // variant, which genuinely should NOT disorder with her.
+    // Control differs in exactly one field: a Soukaku clone handed Miyabi's own frost variant,
+    // which genuinely should NOT disorder with her.
     run('TEST 96: an elemental variant disorders with its base element (Miyabi/Soukaku)', () => {
         const miyabi = allUnits.find(u => u.id === 'miyabi');
         const soukaku = allUnits.find(u => u.id === 'soukaku');
@@ -2364,16 +1999,12 @@ async function main() {
         }
     });
 
-    // ========================================================================
     // TEST 97: an anomaly PROC source reacts even without an anomaly role
-    // ========================================================================
-    // MUTATION TEST. Reaction partners used to be enumerated as anomaly-ROLE agents only. But
-    // `utility["anomaly:<element>"]` states that an extra anomaly of that element lands on the
-    // target, and a proc is a proc whoever fires it — the anomaly-QUANTITY channel already read
-    // the key role-blind while the reaction path did not. Latent today (Alice is the only
-    // holder, and her `anomaly:physical` is an element she already supplies as an agent), hence
-    // the synthetic enabler. This is the guard that keeps a wind-style enabler working if it
-    // ever loses its `anomaly` pseudo-role while keeping the procs.
+    // MUTATION TEST. Reaction partners used to be enumerated as anomaly-ROLE agents only, so a
+    // `utility["anomaly:<element>"]` proc supplier without the role contributed nothing — see
+    // ../notes/lessons-learned.md#disorder-supply-was-never-measured. Latent today (Alice is the
+    // only holder, and her own element already supplies as an agent), hence the synthetic
+    // enabler.
     run('TEST 97: a non-anomaly unit with utility[anomaly:<el>] completes a reaction', () => {
         const nicole = allUnits.find(u => u.id === 'nicole');
         assert(nicole && !nicole.tags.includes('anomaly') && !nicole.mechanics?.pseudoRole,
@@ -2401,21 +2032,14 @@ async function main() {
         }
     });
 
-    // ========================================================================
     // TESTS 98-101: Miyabi's composition ordering — PARTIALLY RED BY DESIGN
-    // ========================================================================
-    // These encode owner-stated, game-grounded expectations. Some are committed red on purpose
-    // as the specification for issue 7; a green suite here would mean the expectations had been
-    // quietly weakened. See issue 7 for which are expected to fail and why.
+    // Encodes owner-stated, game-grounded expectations; some are committed red on purpose as a
+    // pinned specification, not a bug — a green suite here would mean the expectations had been
+    // quietly weakened.
     //
-    // SCORES ARE ONLY COMPARABLE WITHIN A BOSS. Different bosses contribute different amounts
-    // of weakness, shill, assist and debuff credit, so one team's 583 against Butcher and
-    // another's 498 against a neutral boss say nothing whatever about each other. An earlier
-    // version of these tests ranked teams by their best score across all bosses, which silently
-    // compared different matchups and made every conclusion drawn from them unsafe.
-    //
-    // The ladder is therefore evaluated per boss, in a silo, against four matchups chosen so the
-    // two axes that matter here vary independently:
+    // Scores are only comparable within one boss (see ../engine/reading-scores.md), so the
+    // ladder is evaluated per boss, in a silo, against four matchups chosen so the two axes that
+    // matter here vary independently:
     //
     //   Butcher      anomaly-shill  +  ether/ice weakness
     //   Marionettes  no shill       +  ether/ice weakness
@@ -2465,19 +2089,17 @@ async function main() {
     });
 
     // A third anomaly agent is never an upgrade over a strong support, on either of Miyabi's two
-    // viable cores. The second anomaly agent is what establishes disorder cycling; a third adds
-    // far less than a top support brings, and costs field time and buffs on top.
+    // viable cores. The second anomaly agent establishes disorder cycling; a third adds far less
+    // than a top support brings, and costs field time and buffs on top.
     //
-    // **Remielle is deliberately absent from both lists.** She is nominally an anomaly unit but
-    // functions as the support in these teams — she is a pseudo-support, carries no anomaly gauge
-    // of her own, and her value is the Luminize rebound off teammate procs. Including her would
-    // assert something the owner explicitly rejects.
+    // Remielle is deliberately absent from both lists: she is nominally anomaly but functions as
+    // the support here (pseudo-support, no anomaly gauge of her own, her value is the Luminize
+    // rebound off teammate procs), so including her would assert something the owner rejects.
     //
-    // Vacuity warning, and the reason for the `comparisons` guard below: on the `Miyabi/Vivian`
-    // core every GENUINE third anomaly agent is disqualified outright (three anomaly units with no
-    // support), so only pseudo-anomaly units — Nangong, Soukaku, Roxy — produce a real comparison
-    // there. Those are the non-vacuous cases. Without the guard this test could silently degrade
-    // into asserting nothing at all if DQ rules ever widened.
+    // Vacuity guard: on the Miyabi/Vivian core every genuine third anomaly agent is disqualified
+    // outright (three anomaly units, no support), so only pseudo-anomaly thirds (Nangong,
+    // Soukaku, Roxy) produce a live comparison there — without the guard this could silently
+    // degrade into asserting nothing if DQ rules ever widened.
     const THIRD_ANOMALY_CASES = [
         {
             core: 'Nangong/Miyabi', support: 'Yuzuha',
@@ -2513,44 +2135,25 @@ async function main() {
             + failures.join('\n      - '));
     });
 
-    // Ordering among Miyabi's TRUE anomaly partners only. Nangong is her absolute best-in-slot
-    // partner and sits ahead of all three — the `Nangong > Vivian` assertion is a guard against
-    // the fix overshooting, since raising Vivian for off-field buildup must not lift her past him.
+    // Ordering among Miyabi's TRUE anomaly partners only. Nangong is her best-in-slot partner and
+    // sits ahead of all three — `Nangong > Vivian` guards against the fix overshooting when
+    // raising Vivian for off-field buildup.
     //
-    // Burnice vs Yanagi was ADJUDICATED 2026-08-31 and turns out to DEPEND ON THE THIRD SLOT.
-    // The original expectation (Yanagi always ahead) came from thinking of Yuzuha as the default
-    // third, which is the one case where it is true.
-    //
-    // Miyabi's disorder supply is 4 with either partner, reached two different ways. Burnice is
-    // off-field, so her fire gauge fills while Miyabi applies frost and `hasParallelGaugeSource`
-    // doubles the cycling rate from 2 to 4. Yanagi shares the field, cycles serially at 2, and her
-    // `utility.disorders: 2` polarity puts back exactly the 2 she lost. So disorder supply is a
-    // wash and the rung is decided by everything else:
-    //
-    //   Burnice   +15.0   sole on-field carry (Miyabi owns the screen)
-    //   Burnice    +1.5   tier — Burnice T1, Yanagi T1.5
-    //   Yanagi     -5.5   her disorder-DAMAGE buff into Miyabi
-    //             -----
-    //   Burnice   +11.0   net, whenever the third slot is disorder-neutral
-    //
-    // Yuzuha inverts it. She buffs disorders, polarity is a subclass of disorders, and Yanagi
-    // has `damage.polarity: 2` — so Yuzuha pays 18.0 into Yanagi's own damage and Yanagi wins by
-    // 4.3. Burnice's `damage.abloom` gets nothing from her: abloom is a distinct mechanic that
-    // Yuzuha does not buff. It is not a data gap — Promeia is the abloom amplifier (`buffs.abloom`
-    // pays her 9.0 into Burnice), which is part of why Lighter/Burnice/Promeia is a real team.
-    //
-    // Owner: "Yuzuha changes the math... Yuzuha is super-dominant in anomaly team compositions and
-    // Miyabi/Yanagi/Yuzuha > Miyabi/Burnice/Yuzuha makes sense."
+    // Burnice vs Yanagi DEPENDS ON THE THIRD SLOT — Miyabi's disorder supply is 4 with either
+    // partner by different routes, so disorder is a wash and the rung is decided by everything
+    // else (Burnice wins by being the sole on-field carry and a half-tier higher; Yanagi's
+    // disorder-damage buff nearly closes it). A third that buffs disorders (Yuzuha) inverts it,
+    // since polarity is a disorder subclass and that buff pays into Yanagi's own damage. Full
+    // numbers and ruling:
+    // ../notes/adjudications.md#burnice-versus-yanagi-as-miyabis-anomaly-partner.
     //
     // Keyed off `buffs.disorders` on the third rather than off Yuzuha's name, so a newly added
-    // disorder buffer makes a real prediction here instead of silently landing in the wrong branch.
-    // Remielle is NOT a valid third here — removed 2026-08-31. A third slot has to be a CONTROL,
-    // and she is not one. She is tagged anomaly, so with Vivian, Yanagi or Burnice as the partner
-    // the team has three anomaly bodies and her conditional ATK buff pays 4; with Nangong, who is
-    // only pseudo-anomaly, it has two and pays 2. Swapping the partner changes the team's
-    // ARCHETYPE, not just its partner, so the rung was measuring composition rather than partner
-    // quality. Owner: "Any team with Rem that does NOT have a triple-anomaly team composition
-    // should be nowhere near the ladder at all." That rule is pinned by TEST 109 instead.
+    // disorder buffer makes a real prediction here instead of silently landing in the wrong
+    // branch.
+    //
+    // Remielle is NOT a valid third here: swapping her partner changes the team's ARCHETYPE (two
+    // vs three anomaly bodies feeds her conditional ATK buff differently), so the rung would be
+    // measuring composition rather than partner quality. That rule is pinned by TEST 109 instead.
     const PARTNER_THIRDS = ['Yuzuha', 'Astra', 'Nicole'];
 
     run('TEST 100: Miyabi\'s anomaly partners — Vivian first, then Burnice unless the third buffs disorders', () => {
@@ -2587,13 +2190,12 @@ async function main() {
             `${failures.length} partner ordering(s) wrong:\n      - ` + failures.join('\n      - '));
     });
 
-    // ========================================================================
     // TEST 101: the owner's Miyabi best-in-slot ladder
-    // ========================================================================
-    // The owner's stated ordering, checked per boss. Committed knowing parts of it fail: where
-    // they do, either the engine or the expectation is wrong, and that is settled by review rather
-    // than by tuning the engine until the ladder comes out. Middle entries were explicitly
-    // flagged as arguable.
+    // The owner's stated ordering, checked per boss, committed knowing parts of it fail — where
+    // they do, either the engine or the expectation is wrong, settled by review rather than by
+    // tuning the engine to match. Middle entries were explicitly flagged as arguable, and the
+    // bottom four are LOW CONFIDENCE (owner: "honestly very hard to answer") — re-derive during a
+    // correctness pass rather than treating that half as a hard spec.
     //
     // Every adjacent pair is checked and ALL violations reported together — failing on the first
     // would hide the shape of the disagreement, which is the only thing this test is for.
@@ -2603,30 +2205,15 @@ async function main() {
     // whose teams are all disqualified on a given boss is skipped for that boss, and its
     // neighbours compared directly.
     run('TEST 101: Miyabi best-in-slot ladder (owner-stated)', () => {
-        // Bottom four REORDERED 2026-09-01 by owner triage of the previous failure list.
+        // `Nangong/Miyabi/Vivian` sits last because it has NO SUPPORT (stunner + carry + anomaly
+        // subdps) and `scoreTeamStructure` demotes that from CONVENTIONAL to
+        // UNCONVENTIONAL_VIABLE. `Nangong/Miyabi/Nicole` keeps a real support and stays mid-table.
         //
-        // `Miyabi/Vivian/Astra` moved ABOVE the Nangong pair, and `Nangong/Miyabi/Vivian` moved to
-        // dead last. The reason is structural and the engine already models it: NMV has NO SUPPORT
-        // (stunner + carry + anomaly subdps), and `scoreTeamStructure` demotes a supportless team
-        // from CONVENTIONAL to UNCONVENTIONAL_VIABLE for exactly that. Owner: "NMV feels like it's
-        // lacking the necessary oomph, having no support really makes DPS seem lackluster."
-        //
-        // The old unordered rung [NMVivian, NMNicole] is dissolved — they are no longer adjacent.
-        // NMNicole keeps a real support and stays mid-table; NMVivian does not and sinks.
-        //
-        // LOW CONFIDENCE on the bottom four specifically. Owner: "Super challenging question. Not
-        // perfectly sure... honestly very hard to answer." Re-derive during the correctness pass
-        // rather than treating this half as a hard spec — and note the ladder as a whole was
-        // originally produced by confirming ENGINE OUTPUT, which is the same method that produced
-        // the Evelyn stunner ladder later reversed against player statistics.
-        // `Nangong/Miyabi/Sunna` above `Miyabi/Vivian/Yuzuha` is DEFINITIVE and play-proven —
+        // `Nangong/Miyabi/Sunna` above `Miyabi/Vivian/Yuzuha` is a hard, play-proven assertion —
         // owner: "the Nangong/Sunna wheelchair for Miyabi is very strong, only surpassed by the
-        // Nangong/Yuzuha wheelchair." That rung is a hard assertion.
-        //
-        // `Nangong/Miyabi/Astra` vs `Miyabi/Vivian/Yuzuha` is NOT. Owner: "honestly a close call...
-        // I think NMA is better, but I wouldn't be surprised if MVY was better. Conceptually very,
-        // very close." So they share an UNORDERED rung — the ladder asserts only where the pair
-        // sits relative to its neighbours, not which of the two wins.
+        // Nangong/Yuzuha wheelchair." `Nangong/Miyabi/Astra` vs `Miyabi/Vivian/Yuzuha` is NOT —
+        // owner called it a close, arguable call — so they share an UNORDERED rung: the ladder
+        // asserts only where the pair sits relative to its neighbours, not which of the two wins.
         const ladder = [
             ['Nangong/Miyabi/Yuzuha'],
             ['Miyabi/Vivian/Remielle'],
@@ -2658,18 +2245,11 @@ async function main() {
             }
         }
 
-        // PART 2 — the FULL ladder, asserted only on the element-favourable bosses.
-        //
-        // Below the top two the order is BOSS-CONDITIONAL, and that is accepted rather than a
-        // defect. Owner 2026-09-02: "I can accept that the ordering is different based on elemental
-        // weakness. Assume the laddering as I expressed is definitive for Butcher/Marionettes, and
-        // accept that it can switch for Girta/Neutral."
-        //
-        // The measurement behind that: `Nangong/Miyabi/Sunna` outranks `Miyabi/Vivian/Yuzuha` only
-        // because Nangong's teams earn ~21 more L3 on the element-weak bosses (82 vs 61). On
-        // Girtablullu and the neutral boss L3 is 0 for both and the ordering inverts. Forcing it
-        // everywhere was proven impossible with any uniform lever: on Butcher `MVRemielle` sits
-        // just 11.0 above NMSunna, so a lift big enough for Neutral (17.2+) breaks rung 2 > rung 3.
+        // PART 2 — the FULL ladder, asserted only on the element-favourable bosses. Below the
+        // top two the order is BOSS-CONDITIONAL, and that is accepted rather than a defect — full
+        // ruling: ../notes/adjudications.md#miyabis-ladder-may-reorder-on-element-neutral-bosses.
+        // No uniform lever can force it everywhere: a lift big enough for the neutral boss breaks
+        // a rung on the favourable one, and lowering the other side fails for the mirror reason.
         for (const boss of STRICT_LADDER_BOSSES) {
             const rungs = ladder
                 .map(rung => rung.map(spec => scoreSpec(spec, boss)).filter(t => t.score > 0))
@@ -2688,9 +2268,7 @@ async function main() {
             `${violations.length} ladder violation(s):\n      - ` + violations.join('\n      - '));
     });
 
-    // ========================================================================
     // TEST 102: the two disorder supply curves have the shapes they claim
-    // ========================================================================
     // Pure arithmetic, asserted directly rather than through scores — a score-level test cannot
     // reach a team supply of 7 to prove the hard cap, and these are the properties the whole
     // model rests on. The two curves are DELIBERATELY different shapes; a future reader tempted
@@ -2740,20 +2318,14 @@ async function main() {
             'the consumer curve must NOT hard-cap the way the boss-weakness curve does');
     });
 
-    // ========================================================================
     // TEST 103: Lighter's two element buffs are a menu, not two separate offerings
-    // ========================================================================
-    // Lighter buffs fire AND ice so that one of them matches whatever the team runs. He is
-    // the only unit in the roster with more than one element buff. The rule (phase 1):
-    //
-    //   - no penalty for an arm that has no target
-    //   - full credit for every arm that does land
-    //   - a penalty only when NOTHING on the menu lands, and one penalty, not one per arm
-    //
-    // "Two arms landing beats one" is paid by LAYER 4, which pays element-buff per landing
-    // pair, NOT by cohesion — cohesion correctly reads 100% in both cases, because in both
-    // cases all of the kit that could be used is being used. Both halves are asserted here,
-    // because reading only the final score cannot tell them apart.
+    // Lighter buffs fire AND ice so one of them matches whatever the team runs — he is the only
+    // unit with more than one element buff. See [COH-02] for the menu rule cohesion applies.
+    // Layer 4 has its own version: no penalty for an arm with no target, full credit for every
+    // arm that lands, one penalty only when NOTHING lands. "Two arms landing beats one" is paid
+    // by L4 per landing pair, NOT by cohesion — cohesion reads 100% in both cases, since all
+    // usable kit is being used. Both halves are asserted here since the final score alone can't
+    // tell them apart.
     run('TEST 103: Lighter element buffs are a menu — dead arms are not charged, live arms are paid', () => {
         const boss = withBosses(bosses, 'Butcher')[0];
         const scoreOf = (spec, roster = allUnits) => {
@@ -2798,8 +2370,8 @@ async function main() {
         // The cohesion side. Asserted directly against the rule rather than through a team's
         // score, because it CANNOT be observed through a score today: the absolute-supply
         // threshold in computeBuffUtilization pins Lighter's utilization at 100% whether his
-        // dead arm is charged or not (issue 3). A score-level assertion here passes with the
-        // mechanism reverted, which is worse than no test at all — it was tried.
+        // dead arm is charged or not. A score-level assertion here passes with the mechanism
+        // reverted, which is worse than no test at all — it was tried.
         const lighterMenu = [['fire', 2], ['ice', 2]];
         const unit = (name) => {
             const u = allUnits.find(x => x.name === name);
@@ -2838,18 +2410,14 @@ async function main() {
             'mismatch that must keep costing her');
     });
 
-    // ========================================================================
     // TEST 104: a quick assist is a small benefit that always lands
-    // ========================================================================
-    // Every unit in the game benefits from a quick assist. Most do nothing SPECIAL with one;
-    // a few (Anton) declare a real need and get more out of it. So offering quick assists is
-    // never a mismatch, and a support must never be recorded as wasting part of their kit on
-    // the thing every carry happily uses.
+    // Every unit benefits from a quick assist; a few (Anton) declare a real need and get more
+    // out of it. So offering quick assists is never a mismatch — a support must never be
+    // recorded as wasting kit on the thing every carry happily uses.
     //
-    // Asserted against the rule rather than through a team's score, for the same reason as
-    // TEST 103: the absolute-supply threshold in computeBuffUtilization pins these suppliers
-    // at 100% utilization either way, so a score-level assertion would pass with the
-    // mechanism reverted (issue 3).
+    // Asserted against the rule rather than through a score: computeBuffUtilization's
+    // absolute-supply threshold pins these suppliers at 100% either way, so a score-level
+    // assertion would pass even with the mechanism reverted.
     run('TEST 104: quick assists are small, always land, and pay more to a declared need', () => {
         const unit = (name) => {
             const u = allUnits.find(x => x.name === name);
@@ -2887,9 +2455,7 @@ async function main() {
 
     });
 
-    // ========================================================================
     // TEST 105: damage.basic is inherited from role, overridable, and never burst
-    // ========================================================================
     run('TEST 105: damage.basic inheritance — role baseline, max across roles, out of burst', () => {
         const unit = (name) => {
             const u = allUnits.find(x => x.name === name);
@@ -2947,18 +2513,12 @@ async function main() {
             `basic must stay out of burst throughput; Sunna reads ${getMaxBurstWeight(unit('Sunna'))}`);
     });
 
-    // ========================================================================
     // TEST 106: Sunna beats Astra on attack and anomaly carries
-    // ========================================================================
-    // Owner spec from actual play results.
-    //
-    // The rupture half was REMOVED 2026-09-01 after play-testing (see TEST 15). It used to assert
-    // Sunna "essentially never" beats Astra on rupture, enforced by a rupture avoid. That was
-    // wrong in practice: Sunna can only reach a rupture carry alongside Nangong (join rules), and
-    // Nangong+Sunna is exactly the stun wheelchair that makes rupture Yixuan sing — Yixuan loves
-    // the stacking stun multipliers in her greedy burst windows. So Sunna does beat Astra on
-    // rupture, and she SHOULD; the rupture avoid was removed from her data and this half of the
-    // test with it. What remains is the attack/anomaly claim, which is unaffected.
+    // Owner spec from actual play results. The rupture half was removed after playtesting showed
+    // Sunna beating Astra on rupture too — she can only reach a rupture carry beside Nangong
+    // (join rules), and Nangong+Sunna is the stun wheelchair Yixuan's stacking multipliers want.
+    // Full story: ../notes/lessons-learned.md#the-team-that-was-supposed-to-be-the-bane. What
+    // remains here is the attack/anomaly claim, unaffected by that removal.
     run('TEST 106: Sunna beats Astra on attack/anomaly carries', () => {
         const carryRole = (u) => {
             for (const r of ['rupture', 'anomaly', 'attack', 'armorer']) if (u.tags.includes(r)) return r;
@@ -3001,18 +2561,15 @@ async function main() {
             `${pct(tally.anomaly).toFixed(0)}% of ${tally.anomaly[1]} cores`);
     });
 
-    // ========================================================================
     // TEST 107: two greedy carries cannot both own the stun window
-    // ========================================================================
-    // Remielle cannot fire her double ultimate while Miyabi is running
-    // enhanced -> ultimate -> enhanced. `scaling.greedy` measures how much of the window a unit
-    // needs to ITSELF, and it is about execution difficulty rather than damage: Miyabi's enhanced
-    // attacks take about twice as long as Promeia's and need disorder fuel timed into the window,
-    // while Aria's are very quick. Measuring this by burst size instead would have penalised Aria
-    // and Promeia, who are two of Remielle's BEST partners.
+    // Remielle cannot fire her double ultimate while Miyabi runs enhanced -> ultimate ->
+    // enhanced. `scaling.greedy` measures how much of the window a unit needs to ITSELF — about
+    // execution difficulty, not damage: Miyabi's enhanced attacks run twice as long as Promeia's
+    // and need disorder fuel timed into the window, while Aria's are quick. Measuring by burst
+    // size instead would penalise Aria and Promeia, two of Remielle's BEST partners.
     //
-    // Only greed ABOVE 1 contends. That one rule is what separates the cases below, and it is the
-    // property most worth guarding: the penalty must reach dual-greedy teams and nothing else.
+    // Only greed ABOVE 1 contends — that is the property most worth guarding: the penalty must
+    // reach dual-greedy teams and nothing else.
     run('TEST 107: two greedy carries contend for the stun window; one greedy carry does not', () => {
         const boss = withBosses(bosses, 'Neutral')[0];
         const scoreOf = (spec) => {
@@ -3045,14 +2602,11 @@ async function main() {
         // burst contention. This is the sharpest check in the phase: a rule that penalised
         // these would be wrong even if it fixed everything else.
         //
-        // ASSERTED ON THE CONTENTION TERM ITSELF, not on absolute scores. It used to pin four
-        // exact totals, which was the wrong instrument twice over. Those numbers are not on any
-        // effectiveness scale, so they moved on nearly every engine change and had to be
-        // re-baselined for reasons that had nothing to do with contention (the Aria/Remielle L5
-        // declaration, then need severity). Worse, re-pinning them would have codified a
-        // ladder the owner rejects: the four values encode Aria > Promeia > Burnice > Alice,
-        // and the playtested order is Aria > Promeia > Alice > Burnice. Alice's position is a
-        // known-open item, so this test deliberately does NOT pin it.
+        // ASSERTED ON THE CONTENTION TERM ITSELF, not on absolute scores — those are not on any
+        // effectiveness scale and moved on nearly every engine change for unrelated reasons. See
+        // ../notes/lessons-learned.md#the-rankings-pass--what-a-green-suite-was-hiding. Alice's
+        // position in the playtested ladder is a known-open item, so this deliberately does NOT
+        // pin it.
         const contentionOf = (spec) => {
             const parsed = scoreForTeamString(spec, allUnits);
             assert(parsed.length === 1, `fixture ${spec} did not resolve to exactly one team`);
@@ -3090,9 +2644,7 @@ async function main() {
         // exists; until then the scaling is unverified by design, not by oversight.
     });
 
-    // ========================================================================
     // TEST 108: a greedy carry gets more out of a shortened enemy recovery
-    // ========================================================================
     // The other half of `scaling.greedy`, and the reverse of TEST 107's penalty. Most carries
     // have plenty of time to land their burst inside a normal stun window, so a recovery debuff
     // is a modest bonus. A GREEDY carry is the one that was actually running out of window, and
@@ -3150,24 +2702,16 @@ async function main() {
             `${atOne.toFixed(1)} at greed 1, ${atThree.toFixed(1)} at greed 3`);
     });
 
-    // ========================================================================
     // TEST 109: Remielle off triple-anomaly does not belong near the ladder
-    // ========================================================================
-    // Owner rule, stated 2026-08-31: "Any team with Rem that does NOT have a triple-anomaly
-    // team composition should be nowhere near the ladder at all, not even Nangong/Miyabi/
-    // Remielle, not even Nangong/Velina/Remielle."
+    // Pins that any non-triple-anomaly Remielle team sits below the Miyabi ladder floor. Her ATK
+    // buff is `countTag: anomaly` (4 at three bodies, 2 at two, 0 at one) and counts TAGS, not
+    // effective roles, so Nangong's pseudo-anomaly does not feed it. Full ruling:
+    // ../notes/adjudications.md#remielle-off-triple-anomaly.
     //
-    // Remielle's ATK buff is `countTag: anomaly` — 4 at three anomaly bodies, 2 at two, 0 at one.
-    // It counts TAGS, not effective roles, so Nangong's pseudo-anomaly does not feed it. Without
-    // the third anomaly body her kit does not come together and her value crashes.
-    //
-    // The floor is TEST 101's bottom rung rather than a hardcoded number, so this test tracks the
-    // ladder through a rescale instead of needing to be re-anchored after every calibration pass.
-    //
-    // NOT asserted here, deliberately: triple-anomaly Remielle teams WITHOUT Vivian
-    // (Miyabi/Burnice/Remielle, Miyabi/Yanagi/Remielle, Alice, Velina...) may legitimately land
-    // in the middle of the ladder or interleave with its lower rungs. Owner: "that can be
-    // adjudicated based on results." Only the non-triple-anomaly ones are pinned.
+    // The floor is TEST 101's bottom rung, so this tracks a rescale rather than needing
+    // re-anchoring after calibration. Deliberately NOT asserted: non-triple-anomaly Remielle
+    // teams without Vivian may legitimately interleave with the ladder's lower rungs — only the
+    // non-triple-anomaly floor violation is pinned.
     run('TEST 109: non-triple-anomaly Remielle teams sit below the Miyabi ladder', () => {
         const LADDER_FLOOR_SPEC = 'Miyabi/Vivian/Nicole';
         const violations = [];
@@ -3199,24 +2743,15 @@ async function main() {
             + violations.join('\n      - '));
     });
 
-    // ========================================================================
     // TEST 110: a supportless team is never rewarded for being unconventional
-    // ========================================================================
-    // The Nangong/Alice/Sunna case. `scoreTeamStructure` used to apply the NO_SUPPORT
-    // demotion only to teams that had already classified CONVENTIONAL_BONUS, so a team with
-    // no support that also classified UNCONVENTIONAL_VIABLE kept 0.85 and never reached the
-    // 0.80 no-support tier. On Fiend that let `Nangong/Alice/Miyabi` (456.9) edge out
-    // `Nangong/Alice/Sunna` (456.5) — a team beating its own supported counterpart because
-    // it was ALSO unconventional. Complaint closed; see documentation/notes/adjudications.md.
+    // Pins that the NO_SUPPORT demotion takes the harsher of the two classification factors, so
+    // a supportless team that also classifies UNCONVENTIONAL_VIABLE cannot escape it. See
+    // ../engine/layers.md#no-support-or-defense-is-its-own-tier for the Nangong/Alice/Sunna case
+    // this fixed.
     //
-    // PART 1 is asserted on Fiend only, because that is the boss the complaints were filed
-    // against and the ordering is genuinely boss-conditional: on the anomaly-shill bosses
-    // (Butcher, Marionettes, Girtablullu) Miyabi's on-element L3 edge is large enough that
-    // she still beats Sunna as the third body, which is the same ruling recorded for
-    // TEST 101. Do not widen part 1 to every boss; it will fail, and correctly.
-    //
-    // PART 2 is corpus-wide because it compares the SAME two carries: swapping the
-    // supportless third for Yuzuha must win on every boss, with no elemental confound.
+    // PART 1 is asserted on Fiend only — boss-conditional, since Miyabi's on-element L3 edge
+    // wins the anomaly-shill bosses instead (same ruling as TEST 101). PART 2 compares the same
+    // two carries corpus-wide with no elemental confound.
     run('TEST 110: a supportless team never beats its supported counterpart (Fiend)', () => {
         const fiend = withBosses(bosses, 'Fiend');
         assert(fiend.length === 1, `expected exactly one Fiend boss, got ${fiend.length}`);
@@ -3248,21 +2783,14 @@ async function main() {
             `only ${checked} boss(es) were live for part 2 — this test has gone vacuous.`);
     });
 
-    // ========================================================================
     // TEST 111: a carry with no stunner loses real ground
-    // ========================================================================
-    // The Starlight Billy / Pan Yinhu case. `Billy/Pan Yinhu/Lucia` and
-    // `Dialyn/Billy/Lucia` both classified CONVENTIONAL at factor 1.0, so two supports and
-    // no stunner earned the identical structural credit as stunner-plus-support, and Pan
-    // then won on raw supply (366.1 to 365.8 on Priest). documentation/archetypes/rupture.md states the
-    // rupture archetype as *stunner + rupture DPS + Lucia or Pan Yinhu* — Pan is the SUPPORT
-    // slot. Owner ruling: rupture teams absolutely favour stunner+support over
-    // double-support. Filed under Banyue, Starlight Billy and Yidhari in
-    // that ruling is recorded in documentation/notes/adjudications.md.
+    // Pins that a rupture carry with two supports and no stunner loses to stunner-plus-support,
+    // per the graded structural credit in
+    // ../notes/adjudications.md#a-missing-stunner-costs-different-amounts-to-different-archetypes.
+    // Rupture's archetype page (../archetypes/rupture.md) names Pan Yinhu as the SUPPORT slot.
     //
-    // Bosses are chosen per carry so the carry is not resisted, and the stunners compared are
-    // not resisted either — the owner's rule carries an explicit "except when the stunner is
-    // resisted" carve-out, and Priest resists ice while Hunter resists physical.
+    // Bosses are chosen per carry so neither the carry nor the compared stunners are resisted —
+    // the owner's rule carries an explicit "except when the stunner is resisted" carve-out.
     run('TEST 111: a rupture carry prefers a stunner over a second support', () => {
         // Part 1 — the filed cases, each on the boss it was filed against.
         const cases = [
@@ -3301,21 +2829,11 @@ async function main() {
             `${astra.label} (${astra.score.toFixed(1)})`);
     });
 
-    // ========================================================================
     // TEST 112: a resisted subdps is disqualified; a resisted pure stunner is not
-    // ========================================================================
-    // The Norma-against-Fiend case. Norma is tagged `stun` with an active `subdps`
-    // pseudo-role, so isDPS(Norma) is false and the L1 resistance check never saw her: on
-    // Miasmic Fiend, which resists fire, she survived on nothing but the flat -80 stunner
-    // penalty and kept appearing in Yixuan's rankings. Owner: "As a subdps, her value
-    // craters when she can't fully fulfill that. So whereas Koleda or Ju Fufu might get
-    // heavily penalized (since their job is really just stunning), Norma would likely be
-    // disqualified."
-    //
-    // The fix is `isDamageDealer` (isDPS || hasSubDPSRole) used ONLY by the resistance check,
-    // NOT a widening of DPS_ROLES — see the note above isBurstDPS. This test pins all three
-    // arms of the distinction, because the middle one is what makes the change correct rather
-    // than merely harsh.
+    // Pins `isDamageDealer` (isDPS || hasSubDPSRole), used only by the L1 resistance check, not
+    // a widening of DPS_ROLES. See [FUND-01]. All three arms matter: a resisted subdps (Norma)
+    // is disqualified outright, a resisted pure stunner (Ju Fufu, Koleda) is only penalised, and
+    // a resisted subdps who plays effective support (Orphie) is exempt from the DQ entirely.
     run('TEST 112: resisted subdps is DQd, resisted pure stunner is only penalised', () => {
         const fireResisting = bosses.filter(b => getBossResistances(b).includes('fire'));
         assert(fireResisting.length >= 4,
@@ -3368,41 +2886,19 @@ async function main() {
             `resisted element, got ${koleda.score.toFixed(1)}`);
     });
 
-    // ========================================================================
     // TEST 113: Trigger/SAnby/Seed floor on UCC
-    // ========================================================================
-    // Split out of TEST 3 on 2026-09-02 so that test keeps guarding its other five floors and
-    // four orderings independently of this one.
+    // Pins the floor at 295. Seed is tagged `attack` but plays support (buffs atk 3/cd 3/dmg 2)
+    // beside SAnby's `scaling.codependent`, and the engine can't see that — she declares no
+    // `pseudoRole`, so the team classifies as two same-element attack carries with no
+    // interaction (see TEST 114). Cleared only by two declared L5 synergy groups
+    // (`"Trigger+Seed"`, `"Trigger+SAnby"`), not emergently — a DECLARED carve-out, not a fix.
+    // Margin is ~2 points; treat the floor as a viability statement, not a calibrated number.
     //
-    // The game situation: SAnby is the aftershock carry and Seed is the body next to her.
-    // Seed is TAGGED `attack`, but she plays support - `buffs: {atk: 3, cd: 3, dmg: 2}` with
-    // `ultimate:strong` as her only damage instrument - and SAnby declares
-    // `scaling.codependent: true`, so Seed's ATK and CD are exactly what SAnby runs on.
-    //
-    // WHY IT WENT RED, AND HOW IT WAS SETTLED. The double-attacker branch used to hand a 0.85
-    // tier to any two attackers of the SAME ELEMENT, and SAnby and Seed are both electric.
-    // Owner ruling: same element is not interaction - two carries of one element cannot
-    // disorder with each other and still cannot both hold the field - so a second attacker now
-    // counts only when it is explicitly a subdps or a pseudosupport. Removing that escape is
-    // what fixed `Norma/Ellen/Sigrid`, `Nekomata/Ye Shunguong/Sunna` and
-    // `Norma/Evelyn/Soldier 11` (see TEST 114), and it took this team from 338.0 to 238.6.
-    //
-    // Seed would qualify under the *pseudosupport* arm of that rule - she is the only
-    // attack-tagged unit in the roster supplying two or more baseline buffs at weight 3 or
-    // above - but she declares no `pseudoRole`, so the engine cannot see it.
-    //
-    // Settled pragmatically rather than by teaching the engine to infer that: SAnby and Seed
-    // each declare a CONJUNCTIVE synergy group (`"Trigger+Seed"` and `"Trigger+SAnby"`), which
-    // pays 55 apiece only when the whole trio is present, and the floor came down 305 -> 295.
-    // The team reads ~297. Owner: "good enough."
-    //
-    // Two things to keep in mind if you revisit this. It is a DECLARED carve-out, not an
-    // emergent result - the engine still classifies the shape as two attack carries, and the
-    // L5 groups are what carry it over the floor. And the margin is ~2 points, so treat the
-    // floor as a viability statement rather than a calibrated number. The principled fixes
-    // remain available: give Seed a support `pseudoRole`, or infer pseudosupport from buff
-    // supply. Do NOT rescue it by restoring the same-element escape; that re-breaks the three
-    // teams in TEST 114.
+    // History, rejected fixes, and the open principled fix (give Seed a support `pseudoRole`, or
+    // infer pseudosupport from buff supply):
+    // ../notes/lessons-learned.md#when-a-carve-out-is-a-carve-out-say-so and
+    // ../issues/deferred/medium-trigger-sanby-seed-clears-its-floor-only-by-declaration.md.
+    // Do NOT rescue it by restoring the same-element escape; that re-breaks TEST 114.
     run('TEST 113: Trigger/SAnby/Seed stays playable on UCC (>= 300)', () => {
         const b = withBosses(bosses, 'Corruption').find(Boolean);
         const seed = scoreSpec('Trigger/SAnby/Seed', b);
@@ -3411,16 +2907,12 @@ async function main() {
             `(atk 3 / cd 3 / dmg 2) but declares no pseudoRole, so the team reads as two carries; force-adjusted via L5`);
     });
 
-    // ========================================================================
     // TEST 114: two attack carries of one element are not a team
-    // ========================================================================
-    // The Norma/Ellen/Sigrid case. `classifyTeamStructure` used to grant the 0.85
-    // unconventional-viable tier to any two attackers who shared an element, on the theory
-    // that they share buffs. They do not share anything that matters: same-element carries
-    // cannot disorder with each other, and they still cannot both hold the field. Owner
-    // ruling - a second attacker counts only when it is explicitly a subdps or a
-    // pseudosupport; anomaly is the role that genuinely wants two bodies, attack is not.
-    // Complaints closed; see documentation/notes/adjudications.md.
+    // Pins that `classifyTeamStructure` grants a second carry credit only when it is explicitly
+    // a subdps or pseudosupport — sharing an element alone is not interaction, since same-element
+    // carries can't disorder each other and still can't both hold the field. Anomaly is the role
+    // that genuinely wants two bodies; attack is not. See
+    // ../notes/adjudications.md#same-element-is-not-interaction.
     //
     // Each pair swaps the second carry for a support and keeps everything else fixed, so the
     // comparison isolates the second-carry question. Asserted per boss, corpus-wide.
@@ -3446,22 +2938,17 @@ async function main() {
             `only ${checked} live boss/pair comparison(s) - this test has gone vacuous.`);
     });
 
-    // ========================================================================
     // TEST 115: the stunless carve-out is role-agnostic
-    // ========================================================================
-    // `classifyTeamStructure` assumed a stunless carry would be an attacker: the exemption
-    // lived inside the `attacker + double support` branch only, so a stunless RUPTURE or
-    // ARMORER carry would have been charged a no-stunner tier for a window it never wanted.
-    // Latent when found — Ye Shunguong is the only stunless unit in the data and she is
-    // `attack` — so this test synthesises the case rather than waiting for the unit that
-    // exposes it. Every other stunless read in the engine was already role-agnostic.
+    // Pins that `classifyTeamStructure`'s stunless exemption applies regardless of role — it
+    // used to live inside the attacker branch only, so a stunless rupture/armorer carry would
+    // have been charged a no-stunner tier for a window it never wanted. Latent when found (Ye
+    // Shunguong is the only stunless unit and she is attack), so this synthesises the case. See
+    // ../notes/lessons-learned.md#reviewing-the-code-found-a-bug-the-corpus-could-not.
     //
-    // Anomaly is deliberately excluded from the carve-out: anomaly has no no-stun tier to be
-    // exempted from, and a stunless anomaly agent would affect reaction cadence too.
-    //
-    // Asserted on the STRUCTURE KEY via the trace, not on the score, because declaring a carry
-    // stunless also zeroes its `stun-infra` baseline and gates the recovery debuff — so the
-    // score moves for several reasons and only the tier is the thing under test.
+    // Anomaly is excluded from the carve-out: it has no no-stun tier to be exempt from.
+    // Asserted on the STRUCTURE KEY via the trace, not the score, since declaring a carry
+    // stunless also zeroes its baseline and gates the recovery debuff — so the score moves for
+    // several reasons and only the tier is under test.
     run('TEST 115: a stunless rupture carry is not charged a no-stunner tier', () => {
         const boss = withBosses(bosses, 'Priest').find(Boolean);
         const find = (n) => {
@@ -3495,34 +2982,20 @@ async function main() {
             `CONVENTIONAL (35), got ${exempt}`);
     });
 
-    // ========================================================================
     // TEST 116: the Remielle/Velina third-slot ladder (owner playtest)
-    // ========================================================================
-    // Owner: "general strongest Rem team is Remielle/Velina with the following thirds in
-    // order: Aria, Promeia, Alice, Burnice, Jane" and "Miyabi/Vivian/Remielle generally not as
-    // good as RV teams with the top 2 options here, likely not better than top 3 and maybe even
-    // top 4". Remielle has two tracks - Velina anchors vortex/abloom, Vivian anchors disorders
-    // - and the engine used to rank the Vivian/Miyabi track above the Velina track for every
-    // carry except Aria and Promeia. See documentation/archetypes/triple-anomaly.md.
+    // Pins the owner's playtested order (Aria > Promeia > Alice > Burnice > Jane Doe) and that
+    // the whole Velina track outranks Miyabi/Vivian/Remielle. Held up by two DECLARED L5
+    // relationships rather than emergent scoring — a mutual Remielle<->Velina pair, and Alice's
+    // CONJUNCTIVE "Remielle+Velina" group, which pays only when both are present. Full history:
+    // ../notes/lessons-learned.md#declared-relationships-fixed-what-no-constant-could.
     //
-    // What makes this hold is two DECLARED L5 relationships, both deliberate exceptions to
-    // emergent scoring:
-    //   * Remielle <-> Velina, mutual, so the whole Velina track rises together. Velina's value
-    //     IS making Remielle work, and L2 cannot express that - it prices her as a half-tier
-    //     secondary sub-DPS (see issue on the subdps tier discount).
-    //   * Alice declares the CONJUNCTIVE group "Remielle+Velina", which pays only when BOTH are
-    //     present. Alice's partner is the pair, not either unit.
-    //
-    // BOSS-CONDITIONAL, and deliberately asserted narrowly. Elemental L3 legitimately reorders
-    // the lower rungs, exactly as TEST 101 records for the Miyabi ladder:
-    //   * Notorious Pompey is fire-weak, so Burnice jumps the ladder.
-    //   * Scorched Horizon is ice-weak, so Promeia tops Aria - which is what the owner WANTS
-    //     there (Promeia/Remielle/Velina must be #1 on Horizon).
-    //   * Butcher and Marionettes are ice+ether weak, so frost Miyabi outranks the RV teams.
-    // Girtablullu and Stagnant Aberrant are the two anomaly-shill bosses that are effectively
-    // element-neutral to every unit involved, so they are where the ladder is a statement about
-    // the units rather than about the matchup. DO NOT widen this to every boss; it will fail,
-    // and correctly.
+    // BOSS-CONDITIONAL, asserted narrowly on purpose: elemental L3 legitimately reorders the
+    // lower rungs elsewhere (fire-weak Pompey lifts Burnice, ice-weak Horizon lifts Promeia
+    // above Aria, ice+ether-weak Butcher/Marionettes lift frost Miyabi above the RV teams — see
+    // TEST 101 for the same pattern on the Miyabi ladder). Girtablullu and Stagnant Aberrant are
+    // the two anomaly-shill bosses that are element-neutral to every unit here, so they are
+    // where the ladder is a statement about the units rather than the matchup. DO NOT widen this
+    // to every boss; it will fail, and correctly.
     run('TEST 116: Remielle/Velina third-slot ladder on element-neutral bosses', () => {
         const LADDER = [
             'Aria/Remielle/Velina',
@@ -3559,9 +3032,7 @@ async function main() {
             `only ${checked} of the 2 element-neutral bosses were live - this test has gone vacuous.`);
     });
 
-    // ========================================================================
     // TEST 117: a conjunctive synergy group pays only when the WHOLE group is present
-    // ========================================================================
     // `synergy.units` entries joined with "+" require every named unit on the team. This is the
     // mechanism behind Alice's placement in TEST 116, and the gating IS the point: a group that
     // paid out on a partial match would be indistinguishable from two single-name declarations
@@ -3597,32 +3068,14 @@ async function main() {
             `Velina without Remielle must not trigger Alice's group: L5 was ${onlyVelina}`);
     });
 
-    // ========================================================================
     // TEST 118: a chain BUFF is not a chain PROVISION
-    // ========================================================================
-    // `chains` (plural) and `chain` (singular) are different namespaces, and the buff form was
-    // being read as the provision form:
+    // Pins scoreBaselineAffinity's chain-buff pricing: it scales with the consumer's chain
+    // MAGNITUDE (getChainMagnitude), not with a `chains` need. Koleda is the only unit that
+    // declares `buffs.chains`. See [BUFF-03].
     //
-    //   utility.chains  PROVISION - "I hand you extra chain attacks."  Astra 2, Norma 2.
-    //                   Consumed by `scaling.chains` (Evelyn 3, Sigrid 3).
-    //   buffs.chains    BUFF      - "I multiply the chains you already throw."  Koleda 1.
-    //   damage.chain    the damage type itself. Starlight Billy 2, Evelyn 3, Norma 3, Pyrois 3.
-    //
-    // `scoreNeedFulfillment` took provision supply as `max(buffs, debuffs, utility)`, so Koleda's
-    // `buffs.chains: 1` read as handing out chain attacks: `need(chains): 4.2 (covers 33%)` beside
-    // Evelyn, a need she cannot satisfy — while the buff itself was never credited anywhere. Koleda
-    // is the only unit in the roster that declares `buffs.chains`, so she was the only one hurt.
-    //
-    // Now the buff is priced in scoreBaselineAffinity off the consumer's chain MAGNITUDE, which is
-    // why it lands on every DPS: getChainMagnitude's unannotated baseline is 1.0 because every DPS
-    // has a chain attack, rising to 1.3 for Starlight Billy and 1.45 for Evelyn, and dropping to 0
-    // for an unannotated support. Rated at MULT.DAMAGE_TYPE_BUFF, not MULT.CHAINS_PROVISION — the
-    // provision rate is deliberately 0.4 because gifting one chain is small, and pricing the buff
-    // there would have left Koleda WORSE than the bug did.
-    //
-    // Measured on the NEUTRAL boss on purpose: the L4 element modifier (x1.15 on-element,
-    // x0.85 off) multiplies the pair total, so on a real boss these deltas come out scaled and the
-    // Evelyn/Billy ordering inverts for a reason that has nothing to do with chains.
+    // Measured on the NEUTRAL boss on purpose: the L4 element modifier multiplies the pair total,
+    // so on a real boss these deltas come out scaled and the Evelyn/Billy ordering inverts for a
+    // reason that has nothing to do with chains.
     run('TEST 118: a chain buff scales with chain magnitude, not with a chains need', () => {
         const boss = withBosses(bosses, 'Neutral').find(Boolean);
         assert(boss, 'synthetic neutral boss not found');
@@ -3681,9 +3134,7 @@ async function main() {
             `\`scaling.chains\` appetite is leaking back into the buff.`);
     });
 
-    // ------------------------------------------------------------------------
     // Summary
-    // ------------------------------------------------------------------------
     console.log('');
 
     // Compare the failing set against KNOWN_RED so the exit code distinguishes

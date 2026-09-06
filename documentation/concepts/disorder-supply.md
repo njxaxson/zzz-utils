@@ -92,3 +92,15 @@ converts the disorders.
 `pull-engine.js` has a separate disorder-partner check used for gap gating. It must stay
 [variant-aware](anomaly-reactions.md) for the same reason the scorer does, or it will gate a
 unit out for lacking a partner the scorer is happily scoring.
+
+## Code notes
+
+### [DISO-01] Do not net polarity against cycling supply
+
+A prototype that SUBTRACTED teammate polarity provision from the cycling supply passed all
+three test suites and was still wrong: it deleted the cycling credit exactly when a polarity
+unit was present, which is backwards. Nangong + Miyabi genuinely produces ether/frost cycling
+disorders AND Nangong's polarity disorders on top — the two sources are independent and must
+be added, never netted off each other. (This used to be a hardcoded `2` gated on a boolean, so
+supply never varied with composition and Miyabi's need of 3 was permanently stuck at 67%
+coverage, unreachable by any team.)

@@ -6,8 +6,11 @@ cannot support it is actively bad advice — worse than saying nothing.
 Units flagged `scaling.codependent` run a dependency check before they are allowed to surface.
 Currently that is **Remielle, SAnby and Ye Shunguong**.
 
-`scaling.codependent` is consumed by the [pull engine](pull-engine.md) only. The scorer ignores
-it entirely.
+**Both engines read `scaling.codependent`, and they use it differently.** The pull engine uses it
+as a *gate* — the checks on this page decide whether a unit may be recommended at all. The scorer
+uses it as a *discount*: `codependencyFulfilment` and `codependencyFactor` in `team-scorer.js`
+scale down what a codependent unit is worth, and what the team pours into it, when its
+composition need is unmet. See [CODEP-01](#codep-01-the-scorer-reads-scalingcodependent-as-a-discount-not-a-gate).
 
 One codependent unit is handled differently. Remielle grows a
 [partner ladder](partner-ladder.md), which supersedes everything on this page for her — the two
@@ -45,3 +48,30 @@ non-wind anomaly or pseudo-anomaly partner. See
 Removal rather than deprioritisation is the right answer for the hard cases, because the gap's
 *reasoning* would not apply. Telling a player that Remielle fills their anomaly gap is wrong if
 they own nobody who can proc anomalies for her — she would not fill it.
+
+## Code notes
+
+### [CODEP-01] The scorer reads scaling.codependent as a discount, not a gate
+
+An earlier version of this page said the scorer ignored `scaling.codependent` entirely. That was
+wrong — `codependencyFulfilment` reads it directly and `codependencyFactor` is applied in three
+places: a unit's tier credit, what a codependent *supplier* is worth, and what the team pours
+into a codependent *consumer*.
+
+What the scorer does: `scaling.codependent` says a unit's worth depends on the team meeting its
+composition needs. The pull engine has always honoured that — it is why Remielle drops off a
+roster with no anomaly agents — but the scorer used to charge the shortfall on only the ONE
+conditional buff, through the per-buff underutilization penalty, and went on paying the unit as
+a full body for everything else.
+
+Remielle needs THREE anomaly-tagged bodies. On Nangong/Miyabi/Remielle there are two — Nangong
+reaches anomaly through a pseudo-role, which her `countTag: "anomaly"` condition rightly does
+not count — so her ATK buff resolved to 2 of 4 and her kit did not come together. She was
+scoring 539 there against 201 for the same team with Lucy in the slot. Owner: "Rem's value
+CRASHES when she isn't on triple-anomaly."
+
+`codependencyFulfilment`/`codependencyFactor` fix this: fulfilment is read off the unit's own
+team-scoped conditionals (no new annotation, no per-unit special case), and `codependencyFactor`
+scales the unit's whole contribution toward a floor rather than gating it to zero — Remielle off
+triple-anomaly still keeps her double ultimate, aftershock and luminize. A codependent unit with
+no conditional buff (Ye Shunguong) reads 1 and is untouched.

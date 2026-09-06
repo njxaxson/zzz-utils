@@ -63,4 +63,17 @@ A unit can gain extra roles through `mechanics.pseudoRole`. Once a pseudo-role a
 rest) reads activated roles before it reads the printed one. The activation rules and their
 knock-on effects are in [pseudoRole](../data-model/pseudorole.md) and
 [role activation ripple effects](../engine/role-activation-ripple.md).
-ctivation-ripple.md).
+
+## Code notes
+
+### [FUND-01] isDamageDealer is deliberately narrower than isDPS
+
+Used only by the element-resistance disqualification in L1, not as a general widening of
+isDPS. Norma is tagged `stun` with an active `subdps` pseudo-role, so `isDPS(Norma)` is false
+and she used to survive a boss that resists fire on nothing but the flat -80 stunner penalty.
+That is wrong for her specifically: a pure stunner's job is the stun window and survives a
+resisted element, but a subdps IS a damage dealer and her value craters.
+
+`DPS_ROLES` itself must not absorb `subdps` for the same reason ultimate provision must stay
+limited to one primary carry — see `isBurstDPS` in team-scorer.js and
+[the ultimates two-channel model](../engine/ultimates-two-channel.md).

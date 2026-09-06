@@ -65,4 +65,19 @@ excludes lumen entirely.
 * [The triple-anomaly archetype](../archetypes/triple-anomaly.md) — where Remielle's
   partner choice gets decided.
 
+## Code notes
+
+### [LUM-01] Lumen is exempt from the subdps "no reaction" cohesion charge
+
+A native-anomaly subdps that generates no reaction of its own (no vortex, no disorder) is
+charged an unmet need in `computeTeamworkMultiplier` — but only when anomaly is genuinely its
+job. A stunner who picks up anomaly as a pseudo-role (Roxy) is valued as a wind ENABLER for
+teammates who scale off it, not as a reaction generator herself, so she is not charged.
+
+Native lumen gets a stronger version of the same exemption: it cannot react at all (Attribute
+Mutation fills no gauge), so there is no output going nowhere to charge for. Remielle's value is
+the Luminize rebound off teammate procs, priced separately in the anomaly-quantity channel via
+`scaling.anomaly`. Without this exemption, every lumen team would pay a cohesion penalty for a
+mechanical impossibility.
+
 
