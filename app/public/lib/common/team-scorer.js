@@ -183,7 +183,7 @@ const STUNLESS_SHILL_CREDIT = 48;
 // `enhanced: 3` == `ultimate:strong: 2`, and `chain` (at ANY value) sits down with
 // `ultimate:weak`. The whole chain 1/2/3 axis spans less than one rung - which is why chain
 // magnitude earns its keep in the PROVISION channel (getChainMagnitude) rather than here.
-// See engine-context.md under `damage` for the full relative-damage table.
+// See documentation/data-model/damage-and-burst.md for the full relative-damage table.
 //
 // Unannotated does NOT mean "no burst": `damage` records what is DISTINCTIVE, and Ellen's
 // `mechanics` is literally `{}` while she still fires a real ultimate and a chain attack.
@@ -209,7 +209,7 @@ const BURST_NORM = 3.05;
 // FREQUENCY keys. `ultimate:double` and `chain:extra` say how MANY times a unit fires an
 // instrument in one window, never how hard. Both are read HERE AND NOWHERE ELSE. They must
 // never reach the provision or need channels - that leak is what fabricated an ultimate need
-// for 26 of 60 units; see scoring-engine-open-issues.md.
+// for 26 of 60 units; see documentation/engine/ultimates-two-channel.md.
 //
 // `chain:extra` is Evelyn's self-provisioned chains. It is deliberately NOT `utility.chains`:
 // provision is scored supplier -> consumer with `supplier !== consumer`, so a `utility` entry
@@ -221,13 +221,13 @@ const BURST_NORM = 3.05;
 
 // ULTIMATE MAGNITUDE. How big this unit's own ultimate is, and therefore what a FREE
 // ultimate is worth to them. One of three INDEPENDENT axes in the data (see
-// engine-context.md under `damage`), and each axis has exactly one home:
+// documentation/data-model/damage-and-burst.md), and each axis has exactly one home:
 //   frequency  `damage['ultimate:double']`       -> throughput, via getMaxBurstWeight above
 //   magnitude  `damage['ultimate:strong'|'weak']` -> the PROVISION channel, via this table
 //   scaling    `mechanics.scaling.ultimates`     -> the NEED channel, annotated values only
 // Do not collapse them. Magnitude and frequency used to be manufactured into the need
 // channel, which fabricated an ultimate need for every primary DPS and paid twice for the
-// same free ultimate; see scoring-engine-open-issues.md.
+// same free ultimate; see documentation/engine/ultimates-two-channel.md.
 //
 // Values track the in-game modifier tiers: 3 is 6000%+ (Seed, YSG), 2 is 4500%+ (Miyabi),
 // 1 is 4200%+ (Evelyn, Yixuan), and an unannotated ultimate is ~3000-3600%. The 1.0 -> 1.1
@@ -304,7 +304,7 @@ const POLARITY_VORTEX_DISCOUNT = 0.35;
 // arrive naturally anyway, AND the ability to provision them is vanishingly rare (essentially
 // Dialyn and Ju Fufu), so charging a YSG or Yixuan team for lacking a provisioner would punish
 // it for something almost no teammate could supply. Reward the upside, do not bill the absence.
-// See engine-context.md, "The ultimates two-channel model", before changing this.
+// See documentation/engine/ultimates-two-channel.md, before changing this.
 const NATURALLY_AVAILABLE_NEEDS = new Set(['ultimates', 'chains']);
 // Provision keys whose `buffs.<key>` form means "multiply this damage", NOT "provide this".
 // Only the buff form is redirected; `utility.<key>` and `debuffs.<key>` stay provisions.
@@ -326,7 +326,7 @@ const PROVISION_KEYS_BUFFED_AS_DAMAGE = new Set(['chains']);
 // Feeds BOTH sides of the reception ratio, so a unit with several needs of differing weight is
 // judged on how much of its declared dependence is covered rather than on a headcount.
 // Reads the COERCED WEIGHT, so `true` behaves as weight 1. That is the data model's own
-// convention — `engine-context.md` §3: `true`/`1` = minor, `2` = strong, `3` = defining — and
+// convention — documentation/data-model/scaling.md: `true`/`1` = minor, `2` = strong, `3` = defining — and
 // the contract wins. An interim version special-cased `true` to full severity on the theory
 // that a boolean means "depends on this" without grading; that contradicted the documented
 // scale and is the reason issue 15 existed. If a unit's need is genuinely defining, the data
@@ -1147,7 +1147,7 @@ export function getEffectiveScaling(unit) {
         // magnitude and frequency, which the annotated value then OVERWROTE. That fabricated
         // a need for units like Evelyn and Seed (neither annotates one), paid twice for the
         // same free ultimate, and exposed the fabricated need to the undersupply gate. See
-        // scoring-engine-open-issues.md.
+        // documentation/engine/ultimates-two-channel.md.
         baseline['quick-assists'] = QUICK_ASSIST_VALUE;
         const totalizeWeight = w(damage.totalize);
         if (totalizeWeight > 0) {
@@ -1268,7 +1268,7 @@ function getBurstRoleFactor(roles) {
  * this unit's burst is worth noticing - Rina's `ultimate:strong: 2` is exactly that, and it
  * is what puts her below Ellen (support role factor) but well above Astra (zero). This is
  * the same "never give a unit something it did not declare" rule that governs the need
- * channel; see scoring-engine-open-issues.md.
+ * channel; see documentation/engine/design-premise.md.
  */
 // BASIC DAMAGE. A plain baseline of how much damage a unit puts out, independent of any
 // special mechanism. It answers one question the rest of the `damage` map cannot: how do we
@@ -1329,7 +1329,7 @@ export function getBasicDamageBaseline(unit) {
 // units with no annotation at all, are neutral.
 //
 // This is a deliberate, documented departure from the mechanics-emergent premise (see CLAUDE.md
-// and engine-context.md). It is applied as a SEPARATE additive term — it must never feed the
+// and documentation/data-model/declared-archetypes.md). It is applied as a SEPARATE additive term — it must never feed the
 // cohesion multiplier, or the same judgement is charged twice, which is the compounding that made
 // every earlier cohesion change violent.
 
@@ -2606,7 +2606,7 @@ const STRUCTURE = {
     // window. The Starlight Billy / Pan Yinhu case: `Billy/Pan/Lucia` and `Dialyn/Billy/Lucia`
     // both classified CONVENTIONAL at 1.0, so two supports and no stunner earned the identical
     // structural credit as stunner-plus-support, and Pan then won on raw supply (366.1 to
-    // 365.8 on Priest). engine-context.md 2 already states the rupture archetype as
+    // 365.8 on Priest). documentation/archetypes/rupture.md already states the rupture archetype as
     // *stunner + rupture DPS + Lucia or Pan Yinhu* — Pan is the SUPPORT slot, not the stunner.
     //
     // Two tiers, not one, per the owner's ordering: an attacker without a stunner is

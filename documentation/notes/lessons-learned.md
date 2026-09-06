@@ -236,8 +236,7 @@ second: `Nangong/Miyabi/Yanagi` collected +168 of disorder credit against
 `Nangong/Miyabi/Yuzuha`'s +84. In the game the *second* anomaly agent establishes cycling; a
 third adds far less and costs field time and a support slot.
 
-That, plus two other mechanisms, is the Miyabi composition ordering work —
-[`../issues/resolved/medium-nangong-miyabi-yuzuha-ranked-fourth-among-miyabi-teams.md`](../issues/resolved/medium-nangong-miyabi-yuzuha-ranked-fourth-among-miyabi-teams.md).
+That, plus two other mechanisms, is the Miyabi composition ordering work.
 The step at coverage became a ramp and the consumer's credit became logarithmic in oversupply.
 
 **The correction inside that correction is worth keeping.** Removing the undersupply step

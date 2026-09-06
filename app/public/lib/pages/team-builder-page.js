@@ -666,7 +666,7 @@ function selectBestTeams(teams, availableUnits, calibration) {
     // regardless of archetype. Both need CALIBRATED order, or an archetype with more scoring
     // events (anomaly) fills empty cells and padding slots ahead of an equally-good team from a
     // smaller archetype — the same cross-archetype distortion calibration exists to fix
-    // elsewhere. See scoring-engine-open-issues.md.
+    // elsewhere. See documentation/engine/calibration.md.
     const scoredTeams = teams.map(({ label, team }) => {
         const trace = {};
         const raw = scoreTeamForBoss(team, neutralBoss, { lenient: true, trace });

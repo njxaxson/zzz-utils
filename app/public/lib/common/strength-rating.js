@@ -5,7 +5,7 @@ const DPS_TAGS = ['attack', 'anomaly', 'rupture', 'armorer'];
 // were badly archetype-skewed (anomaly's bigger raw numbers, not better teams, filled
 // "Excellent"). These six cutoffs were chosen against the full released corpus (19 real bosses,
 // ~55.5k viable (boss, team) pairs) and checked boss-by-boss and archetype-by-archetype before
-// being fixed — see scoring-engine-open-issues.md. Regenerate calibration.json before touching
+// being fixed — see documentation/engine/calibration.md. Regenerate calibration.json before touching
 // these; they are calibrated-scale numbers, not raw ones.
 const STRENGTH_TIERS = [
     { min: 354.4, label: 'Excellent', cssClass: 'strength-excellent', color: '#00e676' },

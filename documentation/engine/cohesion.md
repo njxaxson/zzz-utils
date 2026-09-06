@@ -4,7 +4,7 @@ Cohesion asks one question: **did what this team brought actually get used?** It
 two halves of the [teamwork multiplier](teamwork-multiplier.md).
 
 This page covers what feeds cohesion. The long history — the wrong diagnoses, the post-mortems
-— lives in `scoring-engine-internals.md`; read the relevant section there before changing any
+— lives in [known pitfalls](../notes/known-pitfalls.md); read the relevant section there before changing any
 of this.
 
 ## The shape

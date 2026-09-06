@@ -3207,7 +3207,7 @@ async function main() {
     // no support that also classified UNCONVENTIONAL_VIABLE kept 0.85 and never reached the
     // 0.80 no-support tier. On Fiend that let `Nangong/Alice/Miyabi` (456.9) edge out
     // `Nangong/Alice/Sunna` (456.5) — a team beating its own supported counterpart because
-    // it was ALSO unconventional. Filed in rankings-open-issues.txt under Alice and Jane.
+    // it was ALSO unconventional. Complaint closed; see documentation/notes/adjudications.md.
     //
     // PART 1 is asserted on Fiend only, because that is the boss the complaints were filed
     // against and the ordering is genuinely boss-conditional: on the anomaly-shill bosses
@@ -3254,11 +3254,11 @@ async function main() {
     // The Starlight Billy / Pan Yinhu case. `Billy/Pan Yinhu/Lucia` and
     // `Dialyn/Billy/Lucia` both classified CONVENTIONAL at factor 1.0, so two supports and
     // no stunner earned the identical structural credit as stunner-plus-support, and Pan
-    // then won on raw supply (366.1 to 365.8 on Priest). engine-context.md 2 states the
+    // then won on raw supply (366.1 to 365.8 on Priest). documentation/archetypes/rupture.md states the
     // rupture archetype as *stunner + rupture DPS + Lucia or Pan Yinhu* — Pan is the SUPPORT
     // slot. Owner ruling: rupture teams absolutely favour stunner+support over
     // double-support. Filed under Banyue, Starlight Billy and Yidhari in
-    // rankings-open-issues.txt.
+    // that ruling is recorded in documentation/notes/adjudications.md.
     //
     // Bosses are chosen per carry so the carry is not resisted, and the stunners compared are
     // not resisted either — the owner's rule carries an explicit "except when the stunner is
@@ -3420,7 +3420,7 @@ async function main() {
     // cannot disorder with each other, and they still cannot both hold the field. Owner
     // ruling - a second attacker counts only when it is explicitly a subdps or a
     // pseudosupport; anomaly is the role that genuinely wants two bodies, attack is not.
-    // Filed under Ellen, Nekomata and Soldier 11 in rankings-open-issues.txt.
+    // Complaints closed; see documentation/notes/adjudications.md.
     //
     // Each pair swaps the second carry for a support and keeps everything else fixed, so the
     // comparison isolates the second-carry question. Asserted per boss, corpus-wide.
@@ -3503,7 +3503,7 @@ async function main() {
     // good as RV teams with the top 2 options here, likely not better than top 3 and maybe even
     // top 4". Remielle has two tracks - Velina anchors vortex/abloom, Vivian anchors disorders
     // - and the engine used to rank the Vivian/Miyabi track above the Velina track for every
-    // carry except Aria and Promeia. See engine-context.md 2 and internals section R.
+    // carry except Aria and Promeia. See documentation/archetypes/triple-anomaly.md.
     //
     // What makes this hold is two DECLARED L5 relationships, both deliberate exceptions to
     // emergent scoring:

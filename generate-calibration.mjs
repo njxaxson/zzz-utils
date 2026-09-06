@@ -3,7 +3,7 @@
  * Generate app/public/data/calibration.json (or calibration.preview.json under -p) — the
  * per-archetype scalars that let Deadly Assault allocation, cross-archetype ladders, and
  * strength labels compare an anomaly team's score against an attack or rupture team's on equal
- * terms. See the plan doc and scoring-engine-open-issues.md for the full derivation; this file
+ * terms. See documentation/engine/calibration.md for the full derivation; this file
  * is only the mechanical regeneration.
  *
  * METHOD (linear, one factor per archetype):

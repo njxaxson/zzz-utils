@@ -34,7 +34,7 @@ const options = parseArgs({
 
 // Scores here compare teams ACROSS archetypes (one ladder per boss, anomaly/attack/rupture
 // mixed together), so -s/-r and every printed number are the CALIBRATED score, not raw — see
-// scoring-engine-open-issues.md and lib/calibration.js. Raw is still shown alongside each team
+// documentation/engine/calibration.md and lib/calibration.js. Raw is still shown alongside each team
 // for reference, since raw is what the four-suite verification loop and the engine's own debug
 // output are anchored to.
 async function main() {

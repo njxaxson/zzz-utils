@@ -1,10 +1,21 @@
 # zzz
 
-A Zenless Zone Zero team-scoring and pull-recommendation engine. Given a
-roster of units and a boss, it scores every legal team composition; given a
-roster and a target unit pool, it recommends who to pull next. The two engines
-share one mechanics vocabulary (`app/public/lib/common/team-scorer.js` and
-`pull-engine.js`).
+A Zenless Zone Zero team-scoring and pull-recommendation engine. Given a roster of units and a
+boss, it scores every legal team composition; given a roster and a target unit pool, it
+recommends who to pull next. The two engines share one mechanics vocabulary
+(`app/public/lib/common/team-scorer.js` and `pull-engine.js`).
+
+## Documentation
+
+**All documentation lives in [`documentation/`](documentation/). Start at
+[`documentation/INDEX.md`](documentation/INDEX.md)** — it is a routing table that maps what you
+are about to do to the two or three files you should read. Do not read the whole tree.
+
+Three shortcuts worth knowing:
+
+* [`documentation/STATUS.md`](documentation/STATUS.md) — what is open and whether the suites are green.
+* [`documentation/notes/known-pitfalls.md`](documentation/notes/known-pitfalls.md) — read before trying anything clever with cohesion, disorders or the teamwork multiplier. Most obvious ideas have already been measured and rejected.
+* [`documentation/notes/adjudications.md`](documentation/notes/adjudications.md) — settled calls. Do not re-litigate these.
 
 ## Layout
 
@@ -18,47 +29,7 @@ share one mechanics vocabulary (`app/public/lib/common/team-scorer.js` and
 | `lib/calibration.js` · `app/public/lib/common/calibration.js` | Archetype calibration transform (node / browser copies) |
 | `app/public/data/calibration.json` | Generated per-archetype anchors — regenerate, don't hand-edit |
 | `*.js` / `*.mjs` at repo root | CLI scripts (`matchups.js`, `compositions.js`, `test-scoring.mjs`, …) |
-| `engine-context.md` | Game-domain knowledge and design intent — see below |
-| `scoring-engine-open-issues.md` | **Short.** What is open, current test status, what to do next |
-| `scoring-engine-internals.md` | The long form: post-mortems, mechanisms, and the wrong diagnoses. Read the relevant section before changing cohesion, disorders or the teamwork multiplier |
-
-## When to read `engine-context.md`
-
-It exists to hold what the code *can't* tell you: game-domain semantics and
-*why* the engine is shaped the way it is. Read it (or the relevant section —
-it's long, don't load the whole thing for a narrow question) when the task
-involves:
-
-* Adding, editing, or debugging a unit/boss `mechanics` entry in
-  `units.json` / `bosses.json` — the field vocabulary (`pseudoRole`,
-  `scaling`, `buffs`, `join`, conditional `when` predicates, etc.) is defined
-  there, not in comments on the data file.
-* Changing scoring logic in `team-scorer.js` or `pull-engine.js` — you need
-  the design premise (mechanics-emergent scoring, not template matching — with one deliberate
-  exception, `mechanics.archetypes`, which declares support-by-carry fit directly) and
-  the L1–L5 layer responsibilities to know where a change belongs and what
-  it might ripple into (role activation effects, cohesion, teamwork
-  multiplier).
-* Explaining or sanity-checking *why* a team/boss scores the way it does —
-  archetypes, diametric synergy, anomaly reactions, element mutation, etc.
-* Deciding whether new behavior is consistent with existing design intent
-  (e.g. "should this new unit's buff count toward cohesion?").
-* Working on the pull engine's gap detection, coverage, or codependency
-  gating logic.
-
-## When *not* to read it
-
-* Pure UI/CLI/plumbing work with no game-semantics content: flag parsing,
-  output formatting, `roster-ui.js` / `custom-dropdown.js` styling, build
-  config, dependency bumps.
-* Anything about a **specific number** — tiers, thresholds, weights,
-  constants. The doc explicitly refuses to duplicate these; they live in the
-  code (which is densely commented with rationale) and go stale in prose.
-  Read the source directly.
-* Mechanical refactors, renames, or type-level cleanup that don't touch
-  behavior.
-* Straightforward bug fixes where the bug is a code error (typo, off-by-one,
-  wrong variable) rather than a misunderstanding of game mechanics.
+| `documentation/` | Everything else |
 
 ## Verification loop
 
@@ -70,62 +41,33 @@ node test-scoring.mjs && node test-recommendations.mjs && node test-bucketing.mj
 
 The last two are not optional extras. `test-bucketing.mjs` caught a structural change that had
 inverted a Deadly Assault allocation, and `cohesion-fixture.mjs` is the objective function for
-support fit — a cohesion change that leaves it green is the only kind worth keeping. `test-scoring.mjs`
-exits 0 when its failing set is exactly `KNOWN_RED`, so check the exit code, not the word "failed".
+support fit. Both suites exit 0 only when the failing set is exactly their `KNOWN_RED` map — so
+check the exit code, not the word "failed".
 
-**Then regenerate and re-certify calibration**, because a change to `team-scorer.js`, `units.json`
-or `bosses.json` invalidates the per-archetype anchors those files were fitted to. The suites will
-not catch this — they all assert against raw scores, which is exactly why a stale
-`calibration.json` fails silently and only shows up as wrong-looking ladders:
+**Then regenerate and re-certify calibration.** The suites all assert against raw scores, so a
+stale `calibration.json` fails silently and only shows up as wrong-looking ladders:
 
 ```bash
 node generate-calibration.mjs        # rewrites app/public/data/calibration.json (add -p for preview)
 node calibration-check.mjs           # must report 0 within-archetype rank inversions
 ```
 
-`generate-calibration.mjs --check` exits 1 when the committed file is stale, so it is the cheap
-guard if you only want to know *whether* regeneration is needed.
+`node generate-calibration.mjs --check` exits 1 when the committed file is stale, so it is the
+cheap guard if you only want to know *whether* regeneration is needed.
 
-For a targeted look at one change, use `--debug` on a narrow team/boss set
-before widening (see `engine-context.md` §7 for the full CLI flag reference
-and typical debugging loop).
+> **The staleness fingerprint hashes raw file bytes** of `team-scorer.js`, `units.json` and
+> `bosses.json` — so even editing a *comment* trips it. That is not a false alarm to work
+> around: regenerate, then confirm that the only fields which changed are `engineFingerprint`
+> and `generated`. Identical anchors after a regeneration is a strong proof your change was
+> behaviour-neutral.
 
-## Writing about the engine
+## Measuring a change
 
-These rules came out of a plan review where the first draft was rejected as
-unreadable and two real errors in it turned out to have been *hidden by the
-prose*. They apply to plans, issue write-ups, commit messages, and PR
-descriptions — anywhere the engine is explained to a human.
-
-
-1. **Name a problem after a concrete instance, not after its mechanism.**
-   "The Sunna/Yixuan case" beats "partial buffs land badly", because the
-   reader can hold two real units in their head and check the claim.
-   "The Lighter case", "the Miyabi/Remielle case".
-2. **Lead with the game situation, then the code.** Say what happens at the
-   keyboard first; name `computeBuffUtilization` second, if at all.
-3. **Technical vocabulary is fine in moderation — strings of it are not.**
-   "Cohesion", "oversupply", "fit" are all fine words. "The absolute-supply
-   threshold masks the fit ratio in the cohesion accumulator" is four of them
-   stacked and is unreadable. Roughly one technical term per sentence.
-4. **Show the arithmetic as a small table with real numbers** rather than
-   describing a formula in prose.
-5. **State what stays broken, not only what gets fixed.** For a change of any
-   size the reader cannot trace the impact themselves; spell out what a step
-   does and does not achieve, and say plainly which parts are guesses.
-6. **Concise is not the same as good.** Spelling something out over five lines
-   beats compressing it into one that has to be re-read three times.
-
-## Measuring a scoring change
-
-`scoring-diff.js` compares *rankings* and deliberately hides shuffles inside
-tie groups, so it reports "no material changes" for a change that moved every
-score in the corpus. Do not use it to check whether an engine change did
-anything.
-
-Use the dump/delta pair instead. Before each change, write down which teams
-are allowed to move, then make `score-delta.mjs` list the exceptions — a green
-test suite is not evidence, but a prediction with zero exceptions is.
+`scoring-diff.js` compares *rankings* and hides shuffles inside tie groups, so it reports "no
+material changes" for a change that moved every score. **Do not use it to check whether an
+engine change did anything.** Use the dump/delta pair instead — write down which teams are
+allowed to move first, then make `score-delta.mjs` list the exceptions. A green suite is not
+evidence; a prediction with zero exceptions is.
 
 ```bash
 node score-dump.mjs > matchups/before.txt
@@ -134,10 +76,32 @@ node score-dump.mjs > matchups/after.txt
 node score-delta.mjs matchups/before.txt matchups/after.txt --predict Lighter
 ```
 
-`score-delta.mjs` exits 1 when the prediction fails. `matchups/` is gitignored.
+Full detail in [`documentation/tooling/measuring-a-change.md`](documentation/tooling/measuring-a-change.md).
 
-`test-scoring.mjs` keeps a `KNOWN_RED` map of tests that are red on purpose. The suite exits 0 when the failing set is exactly that set, and 1 when something else fails **or** when a listed test starts passing (remove the entry — a stale list stops meaning anything). Never add an entry to silence a regression.
+## Comments in code
 
-## Updating Test Cases
+Production code carries **short references, not essays**. One line of plain English, then a tag:
 
-Don’t split existing tests into multiples, it causes havoc. A single test case is allowed to have multiple parts. 
+```javascript
+// Lycaon is exempt from the stunless carve-out. [COH-04]
+```
+
+The reasoning behind `[COH-04]` lives in the cohesion doc, under a heading of that name. If it
+explains **the code**, keep it in the code and keep it short. If it explains **why the code
+isn't something else** — a past state, an argument against a change, a defect history — it
+belongs in `documentation/` behind a tag. See
+[`documentation/reference/TAGS.md`](documentation/reference/TAGS.md).
+
+## Updating test cases
+
+Don't split existing tests into multiples; it causes havoc. A single test case is allowed to
+have multiple parts.
+
+Never add a `KNOWN_RED` entry to silence a regression. The suite exits 1 both when something
+unexpected fails **and** when a listed test starts passing — a stale list stops meaning
+anything.
+
+## Writing about the engine
+
+Rules for plans, issues, commit messages and PR descriptions:
+[`documentation/notes/writing-about-the-engine.md`](documentation/notes/writing-about-the-engine.md).

@@ -224,6 +224,61 @@ bonus can mask a structural verdict. See
 
 ---
 
+### Claret ranking behind Roxy and Caesar on Typhon Slugger
+
+**Complaint:** `Roxy/Claret/Caesar` ranks high, and Seth and Anby appear on Claret's ladder at
+all. This was the last release blocker.
+
+**Ruling (2026-09-02): the engine is correct**, on three separate counts.
+
+* Typhon is **fire-resistant**, so Koleda is rightly punished and cannot be Claret's stunner
+  there.
+* Caesar ranks where she does because her **general damage debuff is worth more to an armorer
+  than to a normal carry** — armorers have so few levers that each remaining one counts for more.
+* Seth and Anby appear because the roster genuinely runs out. With Koleda punished for fire and
+  Rina punished for her evasive assist, Claret's good partners are Roxy, Trigger and Nicole, then
+  Caesar and Orphie, and after that there is nothing. **The tail of that ladder is
+  barrel-scraping by construction, not by defect** — a one-unit class has nowhere else to go.
+
+### Ju Fufu beating Dialyn for Banyue on Notorious Pompey
+
+**Complaint:** `Ju Fufu/Banyue/Lucia` over `Dialyn/Banyue/Lucia`, when Dialyn outclasses Ju Fufu
+almost everywhere else.
+
+**Ruling: the engine is correct.** Ju Fufu edges Dialyn on fire weakness plus her off-field
+bonus, and that is the right answer here because **Banyue is field-hungry** — she wants the field
+to herself, so an off-field stunner suits her.
+
+Field hunger is distinct from [`scaling.greedy`](../data-model/scaling.md), which is about
+needing the *stun window* to oneself rather than the field. It is
+[deliberately not modelled](../engine/deliberately-unmodeled.md). **Do not add it.**
+
+### Norma beating Lighter for Evelyn on Notorious Pompey
+
+**Complaint:** `Norma/Evelyn/Zhao` over `Lighter/Evelyn/Astra` — close, but read as the wrong way
+round.
+
+**Ruling (2026-09-02): the engine is correct.** The team survives on Norma, who so drastically
+outweighs Lighter that the support slot cannot make up the difference. Not a defect.
+
+Note this is a different question from [the Evelyn stunner ladder on fire-weak
+Pompey](#the-evelyn-stunner-ladder-on-fire-weak-pompey--ruled-then-reversed), which is about the
+rung rather than the stunner.
+
+### Pan Yinhu outranking Koleda for Starlight Billy on The Defiler
+
+**Complaint:** a defender outranking a real stunner, against the owner's stated rule that with
+Starlight Billy and Lucia in the team, Pan should never beat Norma, Dialyn, Ju Fufu or Koleda.
+
+**Ruling (2026-09-02): the complaint was right and it was a real bug.** Koleda's chain **buff**
+was being priced as a chain **provision**. After the fix the ladder reads
+Dialyn > Norma > Ju Fufu > Koleda > Pan, so all four named stunners clear Pan.
+
+The margin TEST 62 guards was relaxed from 20 to 15 to allow it, on the standing position that
+[correct ordering beats margins](#favour-correct-ordering-over-margins). Sigrid also declares a
+chain need, so she moves with the same dial — the ordering the test guards is intact, but the
+dial is shared and is not free.
+
 ## Calibration and tuning rulings
 
 ### Rupture's mid-range being 28% below attack is not a defect
