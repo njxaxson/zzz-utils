@@ -79,6 +79,38 @@ Plus, for any carry: a small implicit `quick-assists`, and implicit `recovery` s
 Baseline *affinity* uses its own resolver with its own defaults — armorers get elevated crit
 rate weight there, for instance. Do not conflate the two paths.
 
+## `scaling.greedy` — burst window contention
+
+Two carries cannot both spend the same stun window. `greedy` says how much of a window a unit
+needs to land its burst.
+
+| Value | Units |
+|----|----|
+| 3 | Evelyn, Miyabi, Remielle, Yixuan |
+| 1 | Alice, Aria, Harumasa, Promeia, Sigrid |
+
+**The greediest carry keeps the window; everyone else's greed is what is lost.** The charge is
+per unit squeezed out. It is a narrow dial — one step lower loses a required ordering on the
+neutral boss, one step higher breaks a different one.
+
+### Reduced enemy recovery (i.e. longer stun duration) is worth more to a greedy carry
+
+Gated at greed 2 and above. Most units have plenty of time to land a burst inside a normal stun;
+a greedy carry is the one running out of window.
+
+This is why **Lighter beats Trigger as Evelyn's stunner**. Both raise her stun multiplier, but
+only Lighter shortens recovery, and Evelyn declares a recovery need outright.
+
+### What this does not reach
+
+It fires on two units annotated greedy above 1 — a *window* collision. Two attack carries who
+cannot both hold the field are a **role** collision, and nothing charges for that. See
+[deliberately unmodeled](../engine/deliberately-unmodeled.md).
+
+The value-scaling is also unverifiable on today's roster: every contender is annotated 3, so
+every clash is 3+3 and no fixture can tell scaling from a flat charge. See
+[the deferred issue](../issues/deferred/low-greed-value-scaling-cannot-be-tested-on-todays-roster.md).
+
 ## Two `scaling` keys are meta-flags, not game mechanics
 
 ### `scaling.buffs` (0–3)
