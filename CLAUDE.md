@@ -28,25 +28,30 @@ Three shortcuts worth knowing:
 | `app/public/data/bosses.json` | Boss data |
 | `lib/calibration.js` · `app/public/lib/common/calibration.js` | Archetype calibration transform (node / browser copies) |
 | `app/public/data/calibration.json` | Generated per-archetype anchors — regenerate, don't hand-edit |
-| `*.js` / `*.mjs` at repo root | CLI scripts (`matchups.js`, `compositions.js`, `test-scoring.mjs`, …) |
+| `*.js` / `*.mjs` at repo root | CLI scripts (`matchups.js`, `compositions.js`, `test-mechanics.mjs`, `test-rankings.mjs`, …) |
 | `documentation/` | Everything else |
 
 ## Verification loop
 
-After any change to `team-scorer.js`, `pull-engine.js`, or the data files, run **all four**:
+After any change to `team-scorer.js`, `pull-engine.js`, or the data files, run **all five**:
 
 ```bash
-node test-scoring.mjs && node test-recommendations.mjs && node test-bucketing.mjs && node cohesion-fixture.mjs
+node test-mechanics.mjs && node test-rankings.mjs && node test-recommendations.mjs && node test-bucketing.mjs && node cohesion-fixture.mjs
 ```
+
+`test-mechanics.mjs` and `test-rankings.mjs` split what used to be one file
+(`test-scoring.mjs`): mechanics tests pin isolated engine rules independent of roster content;
+ranking tests pin score floors/orderings/ladders for real units and are the ones that need new
+entries when a unit or boss ships.
 
 The last two are not optional extras. `test-bucketing.mjs` caught a structural change that had
 inverted a Deadly Assault allocation, and `cohesion-fixture.mjs` is the objective function for
 support fit. Neither has a `KNOWN_RED` map — they exit non-zero on any failure at all.
 
-`KNOWN_RED` belongs to `test-scoring.mjs` and `test-recommendations.mjs`. Those two exit 0 only
-when the failing set is *exactly* their map, and exit 1 both when something unexpected fails and
-when a listed test starts passing. Either way: **check the exit code, not the word "failed".**
-Both maps are currently empty.
+`KNOWN_RED` belongs to `test-mechanics.mjs`, `test-rankings.mjs`, and `test-recommendations.mjs`.
+Those exit 0 only when the failing set is *exactly* their map, and exit 1 both when something
+unexpected fails and when a listed test starts passing. Either way: **check the exit code, not
+the word "failed".** All three maps are currently empty.
 
 **Then regenerate and re-certify calibration.** The suites all assert against raw scores, so a
 stale `calibration.json` fails silently and only shows up as wrong-looking ladders:

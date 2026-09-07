@@ -49,7 +49,7 @@ The fix is two **declared** relationships:
 
 Note what this is *not*: it is not a model of anomaly buildup cadence. Nobody worked out how the gauges actually interleave. Two declared relationships paper over a gap the mechanics-emergent model could not close, which is honest but leaves the underlying blindness in place — the engine still cannot see an enabler whose value is entirely relational until someone declares it.
 
-**Test 116 pins the resulting ladder.** It is boss-conditional and asserted only on the two
+**Rankings TEST 90 pins the resulting ladder.** It is boss-conditional and asserted only on the two
 element-neutral bosses, because elemental scoring legitimately reorders the lower rungs.
 
 ## Related

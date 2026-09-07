@@ -1,6 +1,6 @@
 // test-bucketing.mjs — regression tests for Deadly Assault *allocation*: deciding which team
 // goes to which boss when the three teams must not share units. Different concern from
-// test-scoring.mjs (is a team's score right?) — this asks whether the solver hands the scarce
+// test-mechanics.mjs/test-rankings.mjs (is a team's score right?) — this asks whether the solver hands the scarce
 // unit to the boss that needs it most, and survives noise-level score wobble. Assertions are on
 // ALLOCATIONS and rank-band structure, never absolute scores, so the suite survives
 // recalibration. Run: node test-bucketing.mjs [-1 -4 ...]. Exit code 0 if all (specified) pass.

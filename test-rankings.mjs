@@ -1,12 +1,15 @@
 /**
- * test-scoring.mjs
+ * test-rankings.mjs
  *
- * Assertion-based regression tests for the team scoring engine
- * (`scoreTeamForBoss` from `app/public/lib/common/team-scorer.js`).
+ * Assertion-based regression tests for team *rankings* against the live roster —
+ * score floors, orderings, and ladders for named units and bosses — the roster-facing half of
+ * what used to be test-scoring.mjs. These are the tests expected to need new entries or
+ * adjustment whenever a new unit or boss ships. Isolated engine-mechanic assertions that do
+ * not depend on roster content live in test-mechanics.mjs.
  *
  * Run from the repository root:
- *   node test-scoring.mjs            — run all tests
- *   node test-scoring.mjs -17 -22    — run only tests 17 and 22
+ *   node test-rankings.mjs            — run all tests
+ *   node test-rankings.mjs -17 -22    — run only tests 17 and 22
  *
  * Exit code: 0 if all (specified) tests pass, 1 if any (specified) test fails.
  * Unspecified tests are completely ignored when -N flags are provided.
@@ -18,108 +21,16 @@
  */
 
 import { loadAllData } from './lib/data.js';
-import { filterBosses } from './lib/boss-filter.js';
-import { parseTeams } from './lib/team-parser.js';
-import { buildAvailableUnits } from './lib/roster-builder.js';
-import { buildTeams } from './lib/team-pipeline.js';
-import { chargeableElementArms, getBasicDamage, getBasicDamageBaseline, getMaxBurstWeight, quickAssistCohesionWeight, scoreTeamForBoss, resolveBossVariation, resolveConditionalValue, getEffectiveScaling, effectiveDisorderSupply, effectiveDisorderWeakSupply, getBossResistances, getChainMagnitude } from './app/public/lib/common/team-scorer.js';
+import { scoreTeamForBoss, resolveBossVariation, getBossResistances } from './app/public/lib/common/team-scorer.js';
+import { NEUTRAL_BOSS, assert, makeAllViableTeamEntries, filterIncludeOneOf, getTopViableTeams, scoreForTeamString, scoreMapForBoss, withBosses } from './lib/scoring-test-utils.js';
 
 // Viability / disqualification: `matchups.js` only *lists* teams with score > 0. A score <= 0
 // means the comp is not viable for that boss (disqualification, anti-synergy, etc.). Assertions
 // use the raw `scoreTeamForBoss` return value unless noted.
 
-/** Neutral synthetic boss: same as `matchups.js` (full roster has no "neutral" in JSON as a real boss in some builds — appended at runtime). */
-const NEUTRAL_BOSS = {
-    name: 'Synthetic Neutral Boss',
-    favored: [],
-    mechanics: {
-        weaknesses: [],
-        resistances: [],
-        shill: null,
-        anti: [],
-        assists: 0
-    }
-};
-
-// Small helpers
-
-function assert(cond, msg) {
-    if (!cond) throw new Error(msg);
-}
-
-/**
- * @param {object[]} allUnits
- * @param {object} roster
- * @returns {{ label: string, team: object[] }[]}
- */
-function makeAllViableTeamEntries(allUnits, roster) {
-    // This suite tests scoring mechanics on unreleased units, so preview units
-    // are always included.
-    const options = { preview: true };
-    const { availableUnits, universalUnits } = buildAvailableUnits(allUnits, options, roster);
-    const { threeCharTeams, teamLabels } = buildTeams(availableUnits, universalUnits);
-    return teamLabels.map((label) => ({ label, team: threeCharTeams[label] }));
-}
-
-/**
- * @param {{ label: string, team: object[] }[]} entries
- * @param {string[]} [includeOneOf] - if set, only teams containing at least one of these (case-insensitive name match)
- */
-function filterIncludeOneOf(entries, includeOneOf) {
-    if (!includeOneOf || includeOneOf.length === 0) return entries;
-    return entries.filter(({ team }) =>
-        includeOneOf.some((name) => team.some((u) => u.name.toLowerCase() === name.toLowerCase()))
-    );
-}
-
-/**
- * Viable = score > 0 (mirrors `matchups.js` listing).
- *
- * @param {{ label: string, team: object[] }[]} entries
- * @param {object} boss
- * @param {number} depth
- * @param {string[]} [includeOneOf]
- * @returns {{ label: string, team: object[], score: number }[]}
- */
-function getTopViableTeams(entries, boss, depth, includeOneOf) {
-    const base = filterIncludeOneOf(entries, includeOneOf);
-    const rows = [];
-    for (const { label, team } of base) {
-        const score = scoreTeamForBoss(team, boss, {});
-        if (score > 0) {
-            rows.push({ label, team, score });
-        }
-    }
-    rows.sort((a, b) => b.score - a.score);
-    return rows.slice(0, depth);
-}
-
-function scoreForTeamString(teamsString, allUnits, opts = {}) {
-    const { teams, warnings } = parseTeams(teamsString, allUnits, { preview: opts.preview ?? true });
-    for (const w of warnings) {
-        /* empty — batch suite expects expansion warnings to be ok */
-    }
-    return teams;
-}
-
-function scoreMapForBoss(parsedTeams, boss) {
-    const m = new Map();
-    for (const { label, team } of parsedTeams) {
-        m.set(label, scoreTeamForBoss(team, boss, {}));
-    }
-    return m;
-}
-
-function withBosses(bosses, filterStr) {
-    if (!filterStr) return bosses;
-    return filterBosses(bosses, filterStr);
-}
-
-// Test runner
-
 // Tests that are red ON PURPOSE: some assertions here encode an ordering the owner believes
 // correct but the engine does not yet produce, listed rather than deleted so the disagreement
-// is not lost. See ../documentation/tooling/verification-loop.md#why-known_red-works-the-way-it-does
+// is not lost. See documentation/tooling/verification-loop.md#why-known_red-works-the-way-it-does
 // for why the exit code depends on the failing set matching this EXACTLY. Every entry needs a
 // reason and the phase expected to clear it. Do NOT add an entry to silence a regression.
 const KNOWN_RED = new Map([
@@ -156,7 +67,8 @@ async function main() {
         }
     }
 
-    console.log('--- Team scoring tests (raw scoreTeamForBoss) ---\n');
+    console.log('--- Team scoring tests: rankings (raw scoreTeamForBoss) ---\n');
+
 
     // TEST 1 (partial): no SAnby + Yixuan together in top 25, every boss
     run('TEST 1 (partial): top-25 per boss has no team with both SAnby and Yixuan', () => {
@@ -201,7 +113,7 @@ async function main() {
         assert(tOrphie >= 315, `Trigger+SAnby: Orphie (${tOrphie}) >= 315`);
         assert(tCissia >= 305, `Trigger+SAnby: Cissia (${tCissia}) >= 305`);
         assert(tAstra  >= 300, `Trigger+SAnby: Orphie (${tAstra }) >= 300`);
-        // Trigger/SAnby/Seed's floor lives in TEST 113. Split out so the rest of TEST 3 keeps
+        // Trigger/SAnby/Seed's floor lives in TEST 88. Split out so the rest of TEST 3 keeps
         // guarding its five other floors and four orderings independently of it.
         assert(tZhao   >= 290, `Trigger+SAnby: Zhao   (${tZhao  }) >= 290`);
 
@@ -459,7 +371,7 @@ async function main() {
     // Yixuan wants — confirmed by owner playtesting, not just the engine. Full story:
     // ../notes/lessons-learned.md#the-team-that-was-supposed-to-be-the-bane.
     //
-    // Sunna's rupture avoid was removed from units.json for the same reason (see TEST 106).
+    // Sunna's rupture avoid was removed from units.json for the same reason (see TEST 83).
     run('TEST 15: Nangong/Yixuan/Sunna rises — Sunna >= Astra on rupture with Nangong', () => {
         for (const b of withBosses(bosses, 'Neutral,Marionettes,Butcher')) {
             const m = scoreMapForBoss(
@@ -980,60 +892,9 @@ async function main() {
         assert(hdiff > fdiff, `Difference between Jane and Piper should be more pronounced on Horizon than Butcher because of vortex buff`);
     });
 
-    // TEST 50: resolveBossVariation — merge semantics
-    run('TEST 50: resolveBossVariation — merge semantics', () => {
-        const butcher = bosses.find(b => b.id === 'butcher');
-        assert(butcher, 'Butcher must be found');
-        assert(butcher.variations?.raging, 'Butcher must have a "raging" variation');
-
-        // Default returns the base object unchanged
-        const defaultBoss = resolveBossVariation(butcher, null);
-        assert(defaultBoss === butcher, 'null variationId should return the base object itself');
-
-        // Raging variation: shill changes to stun, debuffs are erased
-        const ragingBoss = resolveBossVariation(butcher, 'raging');
-        assert(ragingBoss !== butcher, 'resolved variation must be a new object');
-        assert(ragingBoss.mechanics.shill === 'stun',
-            `Raging Butcher shill should be "stun", got "${ragingBoss.mechanics.shill}"`);
-        assert(!('debuffs' in ragingBoss.mechanics),
-            'Raging Butcher should have no debuffs key (erased by null override)');
-        assert(ragingBoss._variationId === 'raging', '_variationId should be set');
-
-        // Base object is not mutated
-        assert(butcher.mechanics.shill === 'anomaly', 'Base Butcher shill must remain "anomaly"');
-        assert('debuffs' in butcher.mechanics, 'Base Butcher debuffs must still exist');
-    });
-
-    // TEST 51: resolveBossVariation — UCC anti-anomaly + open variation
-    run('TEST 51: UCC default has anti-anomaly; open variation erases it', () => {
-        const ucc = bosses.find(b => b.id === 'ucc');
-        assert(ucc, 'UCC must be found');
-        assert(Array.isArray(ucc.mechanics.anti) && ucc.mechanics.anti.includes('anomaly'),
-            'Default UCC must have anti=["anomaly"]');
-
-        const openUcc = resolveBossVariation(ucc, 'og');
-        assert(!('anti' in openUcc.mechanics),
-            'UCC open variation should have no "anti" key (erased by null)');
-    });
-
-    // TEST 52: filterBosses supports boss:variation syntax
-    run('TEST 52: filterBosses boss:variation syntax resolves correctly', () => {
-        const ragingBosses = filterBosses(bosses, 'butcher:raging');
-        assert(ragingBosses.length === 1, `Expected 1 result for "butcher:raging", got ${ragingBosses.length}`);
-        const rb = ragingBosses[0];
-        assert(rb.mechanics.shill === 'stun',
-            `Raging Butcher from filterBosses should have shill="stun", got "${rb.mechanics.shill}"`);
-
-        // Plain filter still returns default
-        const defaultBosses = filterBosses(bosses, 'butcher');
-        assert(defaultBosses.length === 1, 'Plain butcher filter should return 1');
-        assert(defaultBosses[0].mechanics.shill === 'anomaly',
-            'Default Butcher should remain anomaly shill');
-    });
-
-    // TEST 53: Notorious Butcher is anomaly-shill (pure anomaly teams viable); Raging Butcher is
+    // TEST 50: Notorious Butcher is anomaly-shill (pure anomaly teams viable); Raging Butcher is
     // stun-shill, which DISQUALIFIES stunnerless teams outright rather than just penalising them.
-    run('TEST 53: Raging Butcher — stun-shill disqualifies stunnerless anomaly teams', () => {
+    run('TEST 50: Raging Butcher — stun-shill disqualifies stunnerless anomaly teams', () => {
         const butcher = bosses.find(b => b.id === 'butcher');
         const ragingBoss = resolveBossVariation(butcher, 'raging');
 
@@ -1049,26 +910,26 @@ async function main() {
         }
     });
 
-    // TEST 54: Remielle with 2 other primary anomaly units unlocks her max ATK buff (atk:4).
-    run('TEST 54: Ramiel triple-anomaly team scores 400+ on neutral (VRP)', () => {
+    // TEST 51: Remielle with 2 other primary anomaly units unlocks her max ATK buff (atk:4).
+    run('TEST 51: Ramiel triple-anomaly team scores 400+ on neutral (VRP)', () => {
         const b = NEUTRAL_BOSS;
         const { team, label } = scoreForTeamString('Velina/Remielle/Promeia', allUnits, { preview: true })[0];
         const s = scoreTeamForBoss(team, b, {});
         assert(s >= 400, `${label}: got ${s}, expected >= 400 (triple-anomaly Ramiel team)`);
     });
 
-    // TEST 55: triple-anomaly maximizes Remielle's conditional ATK buff (atk:4) versus only
+    // TEST 52: triple-anomaly maximizes Remielle's conditional ATK buff (atk:4) versus only
     // atk:2 on the Velina+Yuzuha wheelchair, which also eats an underutilization penalty.
-    run('TEST 55: Triple-anomaly Ramiel >= Ramiel/Velina/Yuzuha wheelchair', () => {
+    run('TEST 52: Triple-anomaly Ramiel >= Ramiel/Velina/Yuzuha wheelchair', () => {
         const b = NEUTRAL_BOSS;
         const avr = scoreTeamForBoss(scoreForTeamString('Alice/Remielle/Velina', allUnits, { preview: true })[0].team, b, {});
         const rvy = scoreTeamForBoss(scoreForTeamString('Remielle/Velina/Yuzuha', allUnits, { preview: true })[0].team, b, {});
         assert(avr >= rvy, `Triple-anomaly AVR(${avr}) should be >= wheelchair RVY(${rvy})`);
     });
 
-    // TEST 56: illegal = no unit pair has mutual join satisfaction; flex = at least one pair
+    // TEST 53: illegal = no unit pair has mutual join satisfaction; flex = at least one pair
     // does, with the 3rd unconstrained.
-    run('TEST 56: Team legality — illegal teams DQ, flex teams OK', () => {
+    run('TEST 53: Team legality — illegal teams DQ, flex teams OK', () => {
         const b = NEUTRAL_BOSS;
         const ran = scoreTeamForBoss(scoreForTeamString('Remielle/Astra/Nicole', allUnits, { preview: true })[0].team, b, {});
         assert(ran === -1, `Remielle/Astra/Nicole should be disqualified (-1), got ${ran}`);
@@ -1078,9 +939,9 @@ async function main() {
         assert(thn > 0, `Trigger/Harumasa/Nicole is a valid flex team, got ${thn}`);
     });
 
-    // TEST 57: regression guard — Miyabi has no conditional.buffs, so none of these changes
+    // TEST 54: regression guard — Miyabi has no conditional.buffs, so none of these changes
     // should alter her top team scores.
-    run('TEST 57: Miyabi/Astra/Nicole wheelchair still CONVENTIONAL (regression guard)', () => {
+    run('TEST 54: Miyabi/Astra/Nicole wheelchair still CONVENTIONAL (regression guard)', () => {
         const b = NEUTRAL_BOSS;
         const man = scoreTeamForBoss(scoreForTeamString('Miyabi/Astra/Nicole', allUnits)[0].team, b, {});
         const nmy = scoreTeamForBoss(scoreForTeamString('Nangong/Miyabi/Yuzuha', allUnits)[0].team, b, {});
@@ -1088,18 +949,18 @@ async function main() {
         assert(nmy > man, `NMY(${nmy}) should still beat MAN(${man})`);
     });
 
-    // TEST 58: Alice/Vivian/Remielle generates disorders (physical+ether), triggering the
+    // TEST 55: Alice/Vivian/Remielle generates disorders (physical+ether), triggering the
     // Refringe cascade bonus; all-physical Alice/Jane/Remielle has no reaction to cascade into.
-    run('TEST 58: Multi-element triple-anomaly > same-element (Refringe cascade)', () => {
+    run('TEST 55: Multi-element triple-anomaly > same-element (Refringe cascade)', () => {
         const b = NEUTRAL_BOSS;
         const avr = scoreTeamForBoss(scoreForTeamString('Alice/Vivian/Remielle', allUnits, { preview: true })[0].team, b, {});
         const ajr = scoreTeamForBoss(scoreForTeamString('Alice/Jane Doe/Remielle', allUnits, { preview: true })[0].team, b, {});
         assert(avr > ajr, `Multi-element AVR(${avr}) should beat same-element AJR(${ajr}) due to Refringe cascade`);
     });
 
-    // TEST 59: the conditional buff gap between triple (buff=4, +1600 ATK) and duo (buff=2, +600)
+    // TEST 56: the conditional buff gap between triple (buff=4, +1600 ATK) and duo (buff=2, +600)
     // is enormous, so triple-anomaly should decisively win.
-    run('TEST 59: Triple-anomaly Rem >> duo-anomaly wheelchair', () => {
+    run('TEST 56: Triple-anomaly Rem >> duo-anomaly wheelchair', () => {
         const b = NEUTRAL_BOSS;
         const triple = scoreTeamForBoss(scoreForTeamString('Alice/Vivian/Remielle', allUnits, { preview: true })[0].team, b, {});
         const wheelchair = scoreTeamForBoss(scoreForTeamString('Vivian/Remielle/Yuzuha', allUnits, { preview: true })[0].team, b, {});
@@ -1107,27 +968,27 @@ async function main() {
         assert(gap > 20, `Triple AVR(${triple}) should beat wheelchair VRY(${wheelchair}) by >20, gap was ${gap.toFixed(1)}`);
     });
 
-    // TEST 60: Miyabi joins on anomaly, enabling Miyabi/Rem teams without Yanagi.
-    run('TEST 60: Miyabi/Remielle/Vivian triple-anomaly scores well', () => {
+    // TEST 57: Miyabi joins on anomaly, enabling Miyabi/Rem teams without Yanagi.
+    run('TEST 57: Miyabi/Remielle/Vivian triple-anomaly scores well', () => {
         const b = NEUTRAL_BOSS;
         const mrv = scoreTeamForBoss(scoreForTeamString('Miyabi/Remielle/Vivian', allUnits, { preview: true })[0].team, b, {});
         assert(mrv >= 300, `Miyabi/Rem/Vivian should score >= 300 as triple-anomaly, got ${mrv}`);
     });
 
-    // TEST 61: Nangong+Rem+Yuzuha counts only 1 anomaly teammate (Nangong is stun, Yuzuha is
+    // TEST 58: Nangong+Rem+Yuzuha counts only 1 anomaly teammate (Nangong is stun, Yuzuha is
     // support), so Remielle's buff resolves to 0 and this should score much worse.
-    run('TEST 61: Nangong/Rem/Yuzuha penalized vs Nangong/Miyabi/Yuzuha', () => {
+    run('TEST 58: Nangong/Rem/Yuzuha penalized vs Nangong/Miyabi/Yuzuha', () => {
         const b = NEUTRAL_BOSS;
         const nry = scoreTeamForBoss(scoreForTeamString('Nangong/Remielle/Yuzuha', allUnits, { preview: true })[0].team, b, {});
         const nmy = scoreTeamForBoss(scoreForTeamString('Nangong/Miyabi/Yuzuha', allUnits)[0].team, b, {});
         assert(nmy > nry + 30, `NMY(${nmy}) should beat NRY(${nry}) by >30 — Rem buff=0 on this team`);
     });
 
-    // TEST 62: Sigrid's damage["ultimate:weak"]:2 gets 0 from Dialyn's ultimate provision, and
+    // TEST 59: Sigrid's damage["ultimate:weak"]:2 gets 0 from Dialyn's ultimate provision, and
     // his `replaces: {ultimates:chains}` penalizes her scaling.chains:3 on top — so on an
     // ice-weak boss, ice stunners' on-element bonus beats him, though he still beats low-tier
     // stunners on raw tier. Norma is best: chain provision + subdps damage + no replacement cost.
-    run('TEST 62: Sigrid stunner ordering — weak ultimate + chain replacement (Marionettes)', () => {
+    run('TEST 59: Sigrid stunner ordering — weak ultimate + chain replacement (Marionettes)', () => {
         const t = 'Norma/Sigrid/Soukaku,Lighter/Sigrid/Soukaku,Lycaon/Sigrid/Soukaku,Dialyn/Sigrid/Soukaku,Koleda/Sigrid/Soukaku';
         for (const b of withBosses(bosses, 'Marionettes')) {
             const m = scoreMapForBoss(scoreForTeamString(t, allUnits, { preview: true }), b);
@@ -1144,9 +1005,9 @@ async function main() {
         }
     });
 
-    // TEST 63: Norma has scaling.atk:3 and damage.chain:3, so Astra's atk/cd/chain-provision
+    // TEST 60: Norma has scaling.atk:3 and damage.chain:3, so Astra's atk/cd/chain-provision
     // suite should make her significantly better than Nicole here.
-    run('TEST 63: Norma/Astra synergy — Astra significantly better than Nicole (Pompey)', () => {
+    run('TEST 60: Norma/Astra synergy — Astra significantly better than Nicole (Pompey)', () => {
         const t = 'Norma/Evelyn/Astra,Norma/Evelyn/Nicole';
         for (const b of withBosses(bosses, 'Pompey')) {
             const m = scoreMapForBoss(scoreForTeamString(t, allUnits, { preview: true }), b);
@@ -1156,10 +1017,10 @@ async function main() {
         }
     });
 
-    // TEST 64: Norma is a fire stunner with subdps chain damage; Dialyn is physical with free
+    // TEST 61: Norma is a fire stunner with subdps chain damage; Dialyn is physical with free
     // ultimates. Fire-weak bosses let Norma's on-element bonus + chain provision exceed Dialyn's
     // generic utility; elsewhere Dialyn's tier and ultimate provision keep him ahead.
-    run('TEST 64: Norma vs Dialyn — fire-weak favors Norma, otherwise Dialyn wins', () => {
+    run('TEST 61: Norma vs Dialyn — fire-weak favors Norma, otherwise Dialyn wins', () => {
         // Fire-weak: Norma > Dialyn (Pompey with Evelyn/Astra, Hunter with Lucia/Banyue)
         for (const b of withBosses(bosses, 'Pompey')) {
             const t = 'Norma/Evelyn/Astra,Dialyn/Evelyn/Astra';
@@ -1189,13 +1050,13 @@ async function main() {
         }
     });
 
-    // TEST 65: Miyabi+Velina anti-pattern — wasted vortex cohesion penalty
+    // TEST 62: Miyabi+Velina anti-pattern — wasted vortex cohesion penalty
     // Velina is a wind anomaly subdps whose primary team value is vortex generation.
     // Miyabi (frost variant, vortex tier 0.001) cannot exploit vortex reactions,
     // so pairing them wastes Velina's contribution. The cohesion penalty should make
     // proper compositions score meaningfully higher than this anti-pattern.
     // Conversely, Promeia (ice, tier 4.5) actually uses vortex — no penalty there.
-    run('TEST 65: Miyabi+Velina anti-pattern — wasted vortex cohesion penalty (Girtablullu)', () => {
+    run('TEST 62: Miyabi+Velina anti-pattern — wasted vortex cohesion penalty (Girtablullu)', () => {
         const t = 'Nangong/Miyabi/Velina,Nangong/Miyabi/Yuzuha,Nangong/Promeia/Velina,Promeia/Velina/Yuzuha,Miyabi/Velina/Yuzuha';
         for (const b of withBosses(bosses, 'Girtablullu')) {
             const m = scoreMapForBoss(scoreForTeamString(t, allUnits, { preview: true }), b);
@@ -1215,9 +1076,9 @@ async function main() {
         }
     });
 
-    // TEST 66: Claret (electric armorer) should be strongly viable; swapping her for
+    // TEST 63: Claret (electric armorer) should be strongly viable; swapping her for
     // pure-defense Ben leaves the team with NO DPS, confirming she is the damage dealer.
-    run('TEST 66: Claret is a viable armorer DPS (Neutral)', () => {
+    run('TEST 63: Claret is a viable armorer DPS (Neutral)', () => {
         if (!allUnits.find(u => u.id === 'claret')) return; // preview-only unit
         for (const b of withBosses(bosses, 'Neutral')) {
             const t = 'Koleda/Claret/Rina,Koleda/Ben/Rina';
@@ -1231,9 +1092,9 @@ async function main() {
         }
     });
 
-    // TEST 67: Rina and Lucy both give buffs.atk:2, but only Rina gives buffs.def:2 (+pen:3),
+    // TEST 64: Rina and Lucy both give buffs.atk:2, but only Rina gives buffs.def:2 (+pen:3),
     // which Claret's scaling.def:3 should reward clearly.
-    run('TEST 67: Rina beats Lucy for Claret via DEF buff (Neutral)', () => {
+    run('TEST 64: Rina beats Lucy for Claret via DEF buff (Neutral)', () => {
         if (!allUnits.find(u => u.id === 'claret')) return;
         for (const b of withBosses(bosses, 'Neutral')) {
             const t = 'Koleda/Claret/Rina,Koleda/Claret/Lucy';
@@ -1245,10 +1106,10 @@ async function main() {
         }
     });
 
-    // TEST 68: armorer crit damage is normally fixed; Claret's scaling.cd:1 is the one exception,
+    // TEST 65: armorer crit damage is normally fixed; Claret's scaling.cd:1 is the one exception,
     // converting a sliver of CD into Laceration — so Astra's cd:3 is not quite dead (at half an
     // attacker's weight) but her atk:3 is worth nothing, and Rina should still dominate her.
-    run('TEST 68: CD buff barely helps Claret armorer (Neutral)', () => {
+    run('TEST 65: CD buff barely helps Claret armorer (Neutral)', () => {
         if (!allUnits.find(u => u.id === 'claret')) return;
         for (const b of withBosses(bosses, 'Neutral')) {
             const t = 'Koleda/Claret/Rina,Koleda/Claret/Astra';
@@ -1260,9 +1121,9 @@ async function main() {
         }
     });
 
-    // TEST 69: Claret (electric armorer) is a primary DPS, so electric-resistant Thrall must
+    // TEST 66: Claret (electric armorer) is a primary DPS, so electric-resistant Thrall must
     // disqualify the team — armorers get no support-unit resistance free pass.
-    run('TEST 69: Electric resistance DQs Claret on Thrall', () => {
+    run('TEST 66: Electric resistance DQs Claret on Thrall', () => {
         if (!allUnits.find(u => u.id === 'claret')) return;
         for (const b of withBosses(bosses, 'Thrall')) {
             const t = 'Koleda/Claret/Rina';
@@ -1273,9 +1134,9 @@ async function main() {
         }
     });
 
-    // TEST 70 (regression): Remielle's pseudoRole is ["subdps","support"] with no `dps` marker,
+    // TEST 67 (regression): Remielle's pseudoRole is ["subdps","support"] with no `dps` marker,
     // so a dps-pseudorole fix should not touch her.
-    run('TEST 70: Remielle regression on Solo (Alice/Vivian/Remielle)', () => {
+    run('TEST 67: Remielle regression on Solo (Alice/Vivian/Remielle)', () => {
         if (!allUnits.find(u => u.id === 'ramiel')) return;
         for (const b of withBosses(bosses, 'Solo')) {
             const parsed = scoreForTeamString('Alice/Vivian/Remielle', allUnits, { preview: true });
@@ -1285,11 +1146,11 @@ async function main() {
         }
     });
 
-    // TEST 71: Burnice's pseudoRole (`subdps` by default, promoting to primary anomaly DPS when
+    // TEST 68: Burnice's pseudoRole (`subdps` by default, promoting to primary anomaly DPS when
     // Velina is absent) means Burnice/Velina/Yuzuha (DPS/subDPS/support) should beat
     // Burnice/Vivian/Yuzuha (subDPS/subDPS/support) by claiming the primary-DPS tier multiplier,
     // while Burnice/Promeia/Yuzuha lands in the same ballpark (Burnice reverts, Promeia carries).
-    run('TEST 71: Burnice notPresent:velina conditional subdps (Neutral)', () => {
+    run('TEST 68: Burnice notPresent:velina conditional subdps (Neutral)', () => {
         for (const b of withBosses(bosses, 'Neutral')) {
             const parsed = scoreForTeamString(
                 'Burnice/Velina/Yuzuha,Burnice/Vivian/Yuzuha,Burnice/Promeia/Yuzuha',
@@ -1306,10 +1167,10 @@ async function main() {
         }
     });
 
-    // TEST 72: stun and armorer agents build a shared Gash pool that only an armorer detonates
+    // TEST 69: stun and armorer agents build a shared Gash pool that only an armorer detonates
     // into a Maim, so Koleda/Claret/Rina (armorer + stun enabler) should score meaningfully
     // higher than Claret/Lucy/Rina, a stunless "false wheelchair" with no enabler.
-    run('TEST 72: Maim enabler + armorer structure (Neutral)', () => {
+    run('TEST 69: Maim enabler + armorer structure (Neutral)', () => {
         if (!allUnits.find(u => u.id === 'claret')) return;
         for (const b of withBosses(bosses, 'Neutral')) {
             const t = 'Koleda/Claret/Rina,Claret/Lucy/Rina';
@@ -1321,39 +1182,10 @@ async function main() {
         }
     });
 
-    // TEST 73: Unified conditional framework — recipient-scoped + team-scoped
-    // Koleda's P6 narrow buff: armorers receive Laceration, everyone else CD (recipient-scoped
-    // `role` predicate). Remielle's ATK curve scales with anomaly count (team-scoped).
-    run('TEST 73: conditional framework resolves per-recipient and per-team', () => {
-        const koleda = allUnits.find(u => u.id === 'koleda');
-        const rem = allUnits.find(u => u.id === 'ramiel');
-        const armorer = { tags: ['armorer'] };
-        const attacker = { tags: ['attack'] };
-        const kLac = koleda.mechanics.buffs.laceration, kCd = koleda.mechanics.buffs.cd;
-        // Recipient-scoped: armorer → Laceration:1/CD:0; non-armorer → Laceration:0/CD:3
-        assert(resolveConditionalValue(kLac, { team: [], self: koleda, consumer: armorer }) === 1,
-            'Koleda Laceration should be 1 for an armorer recipient');
-        assert(resolveConditionalValue(kCd, { team: [], self: koleda, consumer: armorer }) === 0,
-            'Koleda CD should be 0 for an armorer recipient');
-        assert(resolveConditionalValue(kLac, { team: [], self: koleda, consumer: attacker }) === 0,
-            'Koleda Laceration should be 0 for a non-armorer recipient');
-        assert(resolveConditionalValue(kCd, { team: [], self: koleda, consumer: attacker }) === 3,
-            'Koleda CD should be 3 for a non-armorer recipient');
-        // Team-scoped: Remielle ATK by anomaly count (incl. self): 3+→4, 2→2, else 0
-        const ano = n => Array.from({ length: n }, () => ({ tags: ['anomaly'] }));
-        const rAtk = rem.mechanics.buffs.atk;
-        assert(resolveConditionalValue(rAtk, { team: ano(3), self: rem, consumer: null }) === 4,
-            'Remielle ATK should be 4 on a triple-anomaly team');
-        assert(resolveConditionalValue(rAtk, { team: ano(2), self: rem, consumer: null }) === 2,
-            'Remielle ATK should be 2 on a duo-anomaly team');
-        assert(resolveConditionalValue(rAtk, { team: ano(1), self: rem, consumer: null }) === 0,
-            'Remielle ATK should be 0 with a lone anomaly');
-    });
-
-    // TEST 74: Koleda's 3.2 rework (general-damage buff, narrow P6 Laceration/CD, tier 2.5->1.5)
+    // TEST 70: Koleda's 3.2 rework (general-damage buff, narrow P6 Laceration/CD, tier 2.5->1.5)
     // should improve Koleda/Claret/Rina considerably. The Evelyn floor is 295, not 300, because
     // the P6 rework moved her armorer-facing buff from CR to Laceration, worth nothing to Evelyn.
-    run('TEST 74: Koleda rework improves her teams (Neutral)', () => {
+    run('TEST 70: Koleda rework improves her teams (Neutral)', () => {
         for (const b of withBosses(bosses, 'Neutral')) {
             const kcr = scoreForTeamString('Koleda/Claret/Rina', allUnits, { preview: true })[0];
             const kcrScore = scoreTeamForBoss(kcr.team, b, {});
@@ -1366,13 +1198,13 @@ async function main() {
         }
     });
 
-    // TEST 75: the Claret/Rina stunner ranking depends on electric weakness, since Trigger's kit
+    // TEST 71: the Claret/Rina stunner ranking depends on electric weakness, since Trigger's kit
     // leans harder on it than Roxy's: electric-weak UCC gives Trigger > Roxy > Koleda > Lycaon >
     // Anby, electric-neutral Marionettes gives Roxy > Trigger > Koleda > Lycaon > Anby. Typhon
     // (electric + wind weak) is checked separately on a Claret/Nicole base, since Rina (evasive
     // assist) can't join Typhon's 3-defensive-assist requirement and Lycaon can't join either:
     // Roxy > Trigger > Koleda > Anby.
-    run('TEST 75: Claret stunner order — electric-weak, electric-neutral, and Typhon', () => {
+    run('TEST 71: Claret stunner order — electric-weak, electric-neutral, and Typhon', () => {
         if (!allUnits.find(u => u.id === 'roxy') || !allUnits.find(u => u.id === 'claret')) return;
         const stunnerTeams = 'Trigger/Claret/Rina,Roxy/Claret/Rina,Koleda/Claret/Rina,' +
             'Lycaon/Claret/Rina,Anby/Claret/Rina';
@@ -1406,34 +1238,10 @@ async function main() {
         }
     });
 
-    // TEST 76: Pyrois's ultimate:strong is conditioned on provisions:"anomaly:wind", which Roxy
-    // meets via her utility["anomaly:wind"] surplus. Compared against a CLONE of Roxy with that
-    // entry stripped, not a real stunner (e.g. Koleda) — see the TEST 89 lesson for why.
-    run('TEST 76: Roxy enables Pyrois over a clone without wind-anomaly provision (Neutral)', () => {
-        const roxy = allUnits.find(u => u.id === 'roxy');
-        if (!roxy) return;
-        assert(roxy.mechanics.utility?.['anomaly:wind'] > 0,
-            'fixture assumption broken: Roxy should provision utility["anomaly:wind"]');
-        const noWind = JSON.parse(JSON.stringify(roxy));
-        noWind.id = 'roxy-nowind';
-        noWind.name = 'Roxy Nowind';
-        delete noWind.mechanics.utility['anomaly:wind'];
-        const roster = [...allUnits, noWind];
-        for (const b of withBosses(bosses, 'Neutral')) {
-            const real = scoreForTeamString('Roxy/Pyrois/Astra', roster, { preview: true })[0];
-            const clone = scoreForTeamString('Roxy Nowind/Pyrois/Astra', roster, { preview: true })[0];
-            const rs = scoreTeamForBoss(real.team, b, {});
-            const cs = scoreTeamForBoss(clone.team, b, {});
-            assert(rs > 0 && cs > 0, `both fixtures must be legal teams, got ${rs} / ${cs}`);
-            assert(rs > cs,
-                `${b.name}: Roxy (${rs.toFixed(1)}, provisions anomaly:wind) must earn more from Pyrois than the same unit without that provision (${cs.toFixed(1)})`);
-        }
-    });
-
-    // TEST 77: the only fully-valid Roxy+Velina composition (Harumasa joins both), stacking wind
+    // TEST 72: the only fully-valid Roxy+Velina composition (Harumasa joins both), stacking wind
     // anomaly + daze — should be a solid, playable team on wind-weak Typhon, though not top-tier
     // until Harumasa is buffed.
-    run('TEST 77: Roxy/Harumasa/Velina viable on Typhon', () => {
+    run('TEST 72: Roxy/Harumasa/Velina viable on Typhon', () => {
         if (!allUnits.find(u => u.id === 'roxy')) return;
         for (const b of withBosses(bosses, 'Typhon')) {
             const parsed = scoreForTeamString('Roxy/Harumasa/Velina', allUnits, { preview: true })[0];
@@ -1443,32 +1251,15 @@ async function main() {
             // just CONVENTIONAL-classified ones — see ../engine/layers.md#no-support-or-defense-is-its-own-tier)
             // puts it at 0.80 instead of 0.85. The assertion is a VIABILITY FLOOR ("solid,
             // playable, not top-tier"), not an ordering. Softening NO_SUPPORT instead was
-            // rejected: TEST 101 needs it below 0.812 and this team needs it at or above 0.81 —
+            // rejected: TEST 82 needs it below 0.812 and this team needs it at or above 0.81 —
             // a 0.002 window, too narrow to serve both.
             assert(s >= 245, `Roxy/Harumasa/Velina on Typhon should be playable (>= 245), got ${s?.toFixed(1)}`);
         }
     });
 
-    // TEST 78: Pyrois's damage["ultimate:strong"] activates only with a wind-anomaly teammate,
-    // `{ when: { hasUnit: "anomaly:wind" } }` — a colon-qualified hasUnit matches by effective
-    // role + element, so Roxy (wind pseudo-anomaly) triggers it but ether-anomaly Vivian does not.
-    run('TEST 78: hasUnit "anomaly:wind" predicate (Pyrois ultimate)', () => {
-        if (!allUnits.find(u => u.id === 'roxy')) return;
-        const pyrois = allUnits.find(u => u.id === 'pyrois');
-        const roxy = allUnits.find(u => u.id === 'roxy');
-        const vivian = allUnits.find(u => u.id === 'vivian');
-        const spec = pyrois.mechanics.damage['ultimate:strong'];
-        assert(resolveConditionalValue(spec, { team: [pyrois, roxy], self: pyrois, consumer: null }) === 1,
-            'Pyrois ultimate:strong should be 1 with a wind-anomaly unit (Roxy) present');
-        assert(resolveConditionalValue(spec, { team: [pyrois, vivian], self: pyrois, consumer: null }) === 0,
-            'Pyrois ultimate:strong should be 0 with only ether anomaly (Vivian) present');
-        assert(resolveConditionalValue(spec, { team: [pyrois], self: pyrois, consumer: null }) === 0,
-            'Pyrois ultimate:strong should be 0 with no wind anomaly on the team');
-    });
-
-    // TEST 79: Pyrois's ultimate:weak normally suppresses ultimate provision (Dialyn's free
+    // TEST 73: Pyrois's ultimate:weak normally suppresses ultimate provision (Dialyn's free
     // ults wasted on him); a wind-anomaly teammate's conditional ultimate:strong overrides that.
-    run('TEST 79: wind anomaly un-suppresses Dialyn provision for Pyrois (Neutral)', () => {
+    run('TEST 73: wind anomaly un-suppresses Dialyn provision for Pyrois (Neutral)', () => {
         if (!allUnits.find(u => u.id === 'roxy')) return;
         for (const b of withBosses(bosses, 'Neutral')) { 
             const withWind = scoreForTeamString('Dialyn/Pyrois/Roxy', allUnits, { preview: true })[0];
@@ -1480,9 +1271,9 @@ async function main() {
         }
     });
 
-    // TEST 80: Sigrid's scaling["anomaly:wind"]:1 passive must NOT inhibit her with no wind
+    // TEST 74: Sigrid's scaling["anomaly:wind"]:1 passive must NOT inhibit her with no wind
     // source present — a wind-less team must still be strong, with a wind source only a bonus.
-    run('TEST 80: Sigrid not penalized without wind anomaly (Neutral)', () => {
+    run('TEST 74: Sigrid not penalized without wind anomaly (Neutral)', () => {
         if (!allUnits.find(u => u.id === 'sigrid')) return;
         for (const b of withBosses(bosses, 'Neutral')) {
             const noWind = scoreForTeamString('Lighter/Sigrid/Astra', allUnits, { preview: true })[0];
@@ -1496,11 +1287,11 @@ async function main() {
         }
     });
 
-    // TEST 81: Thrall's `shill: stun` is a hard requirement because damage only lands inside
+    // TEST 75: Thrall's `shill: stun` is a hard requirement because damage only lands inside
     // stun windows — but a stunless DPS (YSG) carries that multiplier permanently, so
     // YSG/Sunna/Zhao must stay viable without a stunner while a window-dependent DPS (Evelyn)
     // in the same shape stays disqualified.
-    run('TEST 81: stunless DPS satisfies the stun shill on Thrall', () => {
+    run('TEST 75: stunless DPS satisfies the stun shill on Thrall', () => {
         if (!allUnits.find(u => u.id === 'ysg')) return;
         for (const b of withBosses(bosses, 'Thrall')) {
             const stunless = scoreForTeamString('YSG/Sunna/Zhao', allUnits, { preview: true })[0];
@@ -1515,94 +1306,11 @@ async function main() {
         }
     });
 
-
-    // TEST 82: Laceration (the armorer's damage type, class analogue of rupture's Sheer) reaches
-    // an armorer down two independent paths — baseline affinity (MULT.LACERATION_BUFF) and the
-    // damage-lever dependency (getArmorerLeverSupply) — so each is pinned separately below; a
-    // test that only checks "score went down" would pass even with MULT.LACERATION_BUFF zeroed.
-    // Isolated by A/B-ing the SAME team with the buff stripped, so only the buff differs.
-    run('TEST 82: laceration buffs are armorer-only', () => {
-        const roxy = allUnits.find(u => u.id === 'roxy');
-        if (!roxy || !allUnits.find(u => u.id === 'claret')) return;
-
-        const rLac = roxy.mechanics.buffs.laceration;
-        assert(resolveConditionalValue(rLac, { team: [], self: roxy, consumer: { tags: ['armorer'] } }) > 0,
-            'Roxy laceration should not be 0 for an armorer recipient');
-        assert(resolveConditionalValue(rLac, { team: [], self: roxy, consumer: { tags: ['attack'] } }) === 0,
-            'Roxy laceration should be 0 for a non-armorer recipient');
-
-        // Same units with the laceration buff neutralised to 0 (optionally on one named unit).
-        // Zeroed rather than deleted on purpose: deleting Claret's only buff would empty her
-        // `buffs` map and flip her into a different cohesion branch, which would show up as a
-        // score change that has nothing to do with laceration.
-        const stripLaceration = (team, onlyId = null) => team.map(u => {
-            if (!u.mechanics?.buffs?.laceration) return u;
-            if (onlyId && u.id !== onlyId) return u;
-            return { ...u, mechanics: { ...u.mechanics, buffs: { ...u.mechanics.buffs, laceration: 0 } } };
-        });
-        const abTest = (teamString, b, onlyId = null) => {
-            const team = scoreForTeamString(teamString, allUnits, { preview: true })[0].team;
-            return [scoreTeamForBoss(team, b, {}), scoreTeamForBoss(stripLaceration(team, onlyId), b, {})];
-        };
-
-        for (const b of withBosses(bosses, 'Neutral')) {
-            // (a) Combined effect: laceration is worth real points to an armorer team.
-            const [withLac, withoutLac] = abTest('Roxy/Claret/Rina', b);
-            assert(withLac > withoutLac,
-                `${b.name}: stripping Roxy's laceration must cost Claret real points (${withLac?.toFixed(1)} → ${withoutLac?.toFixed(1)})`);
-
-            // (b) Baseline-affinity path in isolation. Nicole's cr:1 + defense:3 already
-            // saturate Claret's lever dependency (3.25 >= ARMORER_LEVER_FULL) with Roxy's
-            // laceration removed, so lever utility is pinned at 1.0 on BOTH sides and the
-            // entire remaining delta is the affinity term. This is the assertion that fails
-            // if MULT.LACERATION_BUFF is zeroed.
-            const [satWith, satWithout] = abTest('Roxy/Claret/Nicole', b);
-            assert(satWith > satWithout + 20,
-                `${b.name}: on a lever-saturated team the laceration affinity term must still land (${satWith?.toFixed(1)} → ${satWithout?.toFixed(1)})`);
-
-            // (c) Recipient gate: Roxy's laceration is written as a `role: armorer` conditional,
-            // so on a team with no armorer it resolves to 0 and the score must not move at all.
-            const [attackWith, attackWithout] = abTest('Roxy/Harumasa/Rina', b);
-            assert(attackWith === attackWithout,
-                `${b.name}: a conditional laceration buff must be worth exactly nothing without an armorer (${attackWith?.toFixed(1)} vs ${attackWithout?.toFixed(1)})`);
-
-            // (d) Consumer gate: Claret's OWN laceration:3 is unconditional, so nothing stops it
-            // reaching Roxy and Rina except resolveBaselineWeight('laceration') returning 0 for
-            // non-armorers. With no second armorer on the team it must land on nobody — stripping
-            // it changes nothing. This is the assertion that fails if that gate is removed, and
-            // (c) cannot cover it: Roxy's buff is already zeroed by its own conditional.
-            const [claretWith, claretWithout] = abTest('Roxy/Claret/Rina', b, 'claret');
-            assert(claretWith === claretWithout,
-                `${b.name}: Claret's unconditional laceration must reach no non-armorer teammate (${claretWith?.toFixed(1)} vs ${claretWithout?.toFixed(1)})`);
-        }
-    });
-
-    // TEST 83: Boss control skills — armorer quicktime intercept (synthetic)
-    // A control skill locks the player out of everything but dodge/parry/assist. Armorers
-    // intercept it and reduce it to a quicktime event, so their value rises with the count.
-    // Teams without an armorer must be completely unaffected.
-    run('TEST 83: control skills reward armorers only', () => {
-        if (!allUnits.find(u => u.id === 'claret')) return;
-        const base = withBosses(bosses, 'Neutral')[0];
-        const withControl = (n) => ({ ...base, mechanics: { ...base.mechanics, control: n } });
-        const armorer = scoreForTeamString('Koleda/Claret/Rina', allUnits, { preview: true })[0].team;
-        const noArmorer = scoreForTeamString('Koleda/Evelyn/Astra', allUnits)[0].team;
-
-        const a0 = scoreTeamForBoss(armorer, withControl(0), {});
-        const a3 = scoreTeamForBoss(armorer, withControl(3), {});
-        assert(a3 > a0, `control:3 should lift the armorer team (${a0?.toFixed(1)} → ${a3?.toFixed(1)})`);
-
-        const n0 = scoreTeamForBoss(noArmorer, withControl(0), {});
-        const n3 = scoreTeamForBoss(noArmorer, withControl(3), {});
-        assert(n0 === n3,
-            `control skills must not move a team with no armorer (${n0?.toFixed(1)} vs ${n3?.toFixed(1)})`);
-    });
-
-    // TEST 84: Graded armorer damage-lever dependency (Neutral)
+    // TEST 76: Graded armorer damage-lever dependency (Neutral)
     // Armorers have few damage levers: CR, Laceration, PEN and defense shred. A team
     // supplying none of them leaves Claret unable to reach her ceiling. Both a laceration
     // line and a pure-shred line must clear a team that hands her nothing.
-    run('TEST 84: armorer lever dependency is graded, not binary', () => {
+    run('TEST 76: armorer lever dependency is graded, not binary', () => {
         if (!allUnits.find(u => u.id === 'claret')) return;
         for (const b of withBosses(bosses, 'Neutral')) {
             const m = scoreMapForBoss(scoreForTeamString(
@@ -1618,11 +1326,11 @@ async function main() {
         }
     });
 
-    // TEST 85: Defense shred stacks cumulatively for an armorer (Neutral)
+    // TEST 77: Defense shred stacks cumulatively for an armorer (Neutral)
     // Trigger (defense:2) + Nicole (defense:3) shred ~60% between them. Shred raises armorer
     // damage without Claret receiving a buff at all, so the double-shred line must beat the
     // same team carrying only one shredder.
-    run('TEST 85: stacked defense shred is cumulative for Claret', () => {
+    run('TEST 77: stacked defense shred is cumulative for Claret', () => {
         if (!allUnits.find(u => u.id === 'claret')) return;
         for (const b of withBosses(bosses, 'Neutral')) {
             const m = scoreMapForBoss(scoreForTeamString(
@@ -1634,11 +1342,11 @@ async function main() {
         }
     });
 
-    // TEST 86: ATK is not an armorer lever — no diametric pair off it (Neutral)
+    // TEST 78: ATK is not an armorer lever — no diametric pair off it (Neutral)
     // The buff × defense-shred diametric pair normally forms off ATK/CD. An armorer gets
     // nothing from ATK, so Lucy (atk:2 only) must not earn Claret a diametric floor — while
     // the same pairing still works for a conventional attacker.
-    run('TEST 86: ATK earns an armorer no diametric credit', () => {
+    run('TEST 78: ATK earns an armorer no diametric credit', () => {
         if (!allUnits.find(u => u.id === 'claret')) return;
         for (const b of withBosses(bosses, 'Neutral')) {
             const m = scoreMapForBoss(scoreForTeamString(
@@ -1650,371 +1358,6 @@ async function main() {
             // The same ATK buffer is genuinely useful to an attacker, so that line stays healthy.
             assert(m.get('Trigger / Evelyn / Lucy') > m.get('Trigger / Claret / Lucy'),
                 `${b.name}: Lucy's ATK should still work for an attacker even though it fails for an armorer`);
-        }
-    });
-
-    // TEST 87: no unit gets an ultimate need it did not declare
-    // Pins that ultimate value flows through exactly two places — magnitude -> provision, and
-    // `scaling.ultimates` -> need — with no manufactured floor bleeding into the second. Full
-    // defect history: ../engine/ultimates-two-channel.md#never-fabricate-a-need.
-    run('TEST 87: no unit has an ultimates need it did not declare', () => {
-        const offenders = [];
-        for (const u of allUnits) {
-            const declared = u.mechanics?.scaling?.ultimates;
-            const effective = getEffectiveScaling(u).ultimates;
-            if (effective === undefined && declared === undefined) continue;
-            if (effective !== declared) offenders.push(`${u.id} declares ${declared} but reports ${effective}`);
-        }
-        assert(offenders.length === 0,
-            `effective ultimate need must equal the annotated value exactly: ${offenders.join('; ')}`);
-        // And the population is small on purpose — only units that genuinely do something
-        // extra with an ultimate belong here.
-        const withNeed = allUnits.filter(u => getEffectiveScaling(u).ultimates !== undefined).map(u => u.id).sort();
-        assert(withNeed.every(id => allUnits.find(u => u.id === id).mechanics.scaling.ultimates > 0),
-            `every unit in the need channel must annotate a positive value, got ${withNeed.join(',')}`);
-    });
-
-    // TEST 88: scaling and magnitude are independent and both count
-    // Pins that provision (magnitude) and need (declared scaling.ultimates) ADD, rather than the
-    // old override semantics where the annotated value replaced the magnitude-derived one. See
-    // ../engine/ultimates-two-channel.md#the-channels-do-not-overlap-and-that-is-the-whole-point.
-    // Synthesised: no shipped unit currently pairs ultimate:strong 3 with a scaling annotation.
-    run('TEST 88: a same-magnitude carry that also scales on ultimates is worth more to Dialyn', () => {
-        const seed = allUnits.find(u => u.id === 'seed');
-        assert(seed && seed.mechanics.damage['ultimate:strong'] === 3 && seed.mechanics.scaling?.ultimates === undefined,
-            'fixture assumption broken: Seed should be ultimate:strong 3 with no scaling.ultimates');
-        const terrence = JSON.parse(JSON.stringify(seed));
-        terrence.id = 'terrence';
-        terrence.name = 'Terrence';
-        terrence.mechanics.scaling = { ...(terrence.mechanics.scaling || {}), ultimates: 1 };
-        const roster = [...allUnits, terrence];
-        for (const b of withBosses(bosses, 'Neutral')) {
-            const withSeed = scoreForTeamString('Dialyn/Seed/Orphie', roster)[0];
-            const withTerrence = scoreForTeamString('Dialyn/Terrence/Orphie', roster)[0];
-            const ss = scoreTeamForBoss(withSeed.team, b, {});
-            const ts = scoreTeamForBoss(withTerrence.team, b, {});
-            assert(ss > 0 && ts > 0, `both fixtures must be legal teams, got Seed ${ss} / Terrence ${ts}`);
-            assert(ts > ss,
-                `${b.name}: Terrence (${ts.toFixed(1)}) has Seed's ultimate PLUS a declared benefit, so Dialyn must be worth more to him than to Seed (${ss.toFixed(1)})`);
-        }
-    });
-
-    // TEST 89: ultimate magnitude is graded, not binary
-    // Evelyn's ultimate:strong 1 (~4200%) must score above an unannotated ultimate (~3000-3600%)
-    // through the provision channel alone, guarding the 1.0 -> 1.1 rung of ULTIMATE_MAGNITUDE.
-    //
-    // Compared against a CLONE of Evelyn with the annotation stripped, not a real unit — Evelyn
-    // vs Ellen differ by ~90 points for unrelated reasons and would pass regardless (the "TEST 89
-    // lesson", reused by several tests below). See
-    // ../notes/known-pitfalls.md#a-test-that-cannot-fail-proves-nothing.
-    run('TEST 89: ultimate magnitude is graded — annotating ultimate:strong 1 beats not annotating', () => {
-        const evelyn = allUnits.find(u => u.id === 'evelyn');
-        assert(evelyn && evelyn.mechanics.damage['ultimate:strong'] === 1,
-            'fixture assumption broken: Evelyn should carry ultimate:strong 1');
-        const plain = JSON.parse(JSON.stringify(evelyn));
-        plain.id = 'evelyn-unannotated';
-        plain.name = 'Evelyn Unannotated';
-        delete plain.mechanics.damage['ultimate:strong'];
-        const roster = [...allUnits, plain];
-        for (const b of withBosses(bosses, 'Neutral')) {
-            const real = scoreForTeamString('Dialyn/Evelyn/Astra', roster)[0];
-            const clone = scoreForTeamString('Dialyn/Evelyn Unannotated/Astra', roster)[0];
-            const rs = scoreTeamForBoss(real.team, b, {});
-            const cs = scoreTeamForBoss(clone.team, b, {});
-            assert(rs > 0 && cs > 0, `both fixtures must be legal teams, got ${rs} / ${cs}`);
-            assert(rs > cs,
-                `${b.name}: Evelyn (${rs.toFixed(1)}, ultimate:strong 1) must earn more from Dialyn than the same unit unannotated (${cs.toFixed(1)})`);
-        }
-    });
-
-    // TEST 90: a weak ultimate earns nothing through EITHER channel
-    // LOAD-BEARING. `ultimate:weak` with no `ultimate:strong` means the ultimate is not a real
-    // burst, so a free one is worth nothing — see [ULT-02]. A conditional `ultimate:strong` must
-    // still lift it, which is how Pyrois's wind case works (see also TESTs 76, 78, 79).
-    run('TEST 90: weak ultimates earn no provision, and a conditional strong ultimate lifts it', () => {
-        const sigrid = allUnits.find(u => u.id === 'sigrid');
-        const pyrois = allUnits.find(u => u.id === 'pyrois');
-        if (!sigrid || !pyrois) return;
-        // Neither declares a need, and neither may acquire one.
-        assert(getEffectiveScaling(sigrid).ultimates === undefined,
-            'Sigrid must have no ultimates need — her ultimate is weaker than her enhanced attacks');
-        assert(getEffectiveScaling(pyrois).ultimates === undefined,
-            'Pyrois must have no ultimates need — he uses his ultimate as a mode switch');
-        // Swapping Dialyn (ultimates provider) for a non-provider of similar standing must not
-        // move Sigrid's line through the ultimate channels at all.
-        for (const b of withBosses(bosses, 'Neutral')) {
-            const withProvider = scoreForTeamString('Dialyn/Sigrid/Sunna', allUnits)[0];
-            const s = scoreTeamForBoss(withProvider.team, b, {});
-            assert(s > 0, `Dialyn/Sigrid/Sunna should be a legal team, got ${s}`);
-        }
-        // Pyrois: the wind-anomaly conditional must still open the provision channel.
-        if (allUnits.find(u => u.id === 'roxy')) {
-            for (const b of withBosses(bosses, 'Neutral')) {
-                const wind = scoreForTeamString('Dialyn/Pyrois/Roxy', allUnits, { preview: true })[0];
-                const noWind = scoreForTeamString('Dialyn/Pyrois/Trigger', allUnits)[0];
-                const ws = scoreTeamForBoss(wind.team, b, {});
-                const ns = scoreTeamForBoss(noWind.team, b, {});
-                assert(ws > ns,
-                    `${b.name}: wind must unlock Pyrois's ultimate provision — Roxy ${ws.toFixed(1)} vs Trigger ${ns.toFixed(1)}`);
-            }
-        }
-    });
-
-    // TEST 91: partial ultimate coverage is priced by the FRACTION of the need met
-    // Ju Fufu's `utility.ultimates: 1` must earn strictly less covering a scaling.ultimates 3
-    // need than a 2 need — the "least hungry pays the most" ruling and the squared-ratio fix
-    // (FRACTIONAL_COVERAGE_KEYS):
-    // ../notes/adjudications.md#least-hungry-pays-the-most-is-correct-for-ultimates.
-    //
-    // Two clones of ONE unit differing in exactly that field, per the TEST 89 lesson.
-    run('TEST 91: partial ultimate coverage is priced by fraction of need met', () => {
-        const yixuan = allUnits.find(u => u.id === 'yixuan');
-        const juFufu = allUnits.find(u => u.id === 'ju-fufu');
-        assert(yixuan && yixuan.mechanics.scaling?.ultimates === 2,
-            'fixture assumption broken: Yixuan should annotate scaling.ultimates 2');
-        assert(juFufu && juFufu.mechanics.utility?.ultimates === 1,
-            'fixture assumption broken: Ju Fufu should supply utility.ultimates 1');
-        const clone = (k, id, name) => {
-            const c = JSON.parse(JSON.stringify(yixuan));
-            c.id = id;
-            c.name = name;
-            c.mechanics.scaling.ultimates = k;
-            return c;
-        };
-        const half = clone(2, 'yixuan-half', 'Yixuan Halfcovered');
-        const third = clone(3, 'yixuan-third', 'Yixuan Thirdcovered');
-        const roster = [...allUnits, half, third];
-        for (const b of withBosses(bosses, 'Neutral')) {
-            const hs = scoreTeamForBoss(scoreForTeamString('Ju Fufu/Yixuan Halfcovered/Lucia', roster)[0].team, b, {});
-            const ts = scoreTeamForBoss(scoreForTeamString('Ju Fufu/Yixuan Thirdcovered/Lucia', roster)[0].team, b, {});
-            assert(hs > 0 && ts > 0, `both fixtures must be legal teams, got ${hs} / ${ts}`);
-            assert(hs > ts,
-                `${b.name}: Ju Fufu covers half of a scaling.ultimates 2 need (${hs.toFixed(1)}) and only a third of a 3 need (${ts.toFixed(1)}), so the first must score higher — equal scores mean the coverage ratio has stopped being priced`);
-        }
-    });
-
-    // TEST 92: under-met ultimate scaling is a smaller bonus, never a penalty
-    // Ultimates arrive naturally and only two units provision them, so wanting more than any
-    // teammate supplies must never score worse than declaring no need at all — including a need
-    // beyond what anyone in the roster covers. Full ruling:
-    // ../notes/adjudications.md#annotating-an-ultimate-need-above-the-maximum-provision-is-intended.
-    run('TEST 92: under-met ultimate scaling is a smaller bonus, never a penalty', () => {
-        const yixuan = allUnits.find(u => u.id === 'yixuan');
-        assert(yixuan && yixuan.mechanics.scaling?.ultimates === 2,
-            'fixture assumption broken: Yixuan should annotate scaling.ultimates 2');
-        const clone = (k, id, name) => {
-            const c = JSON.parse(JSON.stringify(yixuan));
-            c.id = id;
-            c.name = name;
-            if (k === null) delete c.mechanics.scaling.ultimates;
-            else c.mechanics.scaling.ultimates = k;
-            return c;
-        };
-        const none = clone(null, 'yixuan-noneed', 'Yixuan Noneed');
-        const k3 = clone(3, 'yixuan-k3', 'Yixuan Wants Three');
-        const k4 = clone(4, 'yixuan-k4', 'Yixuan Wants Four');
-        const roster = [...allUnits, none, k3, k4];
-        assert(getEffectiveScaling(none).ultimates === undefined,
-            'the no-annotation clone must acquire no ultimates need (see TEST 87)');
-        for (const b of withBosses(bosses, 'Neutral')) {
-            const sc = name => scoreTeamForBoss(scoreForTeamString(`Ju Fufu/${name}/Lucia`, roster)[0].team, b, {});
-            const ns = sc('Yixuan Noneed'), s3 = sc('Yixuan Wants Three'), s4 = sc('Yixuan Wants Four');
-            assert(ns > 0 && s3 > 0 && s4 > 0, `all fixtures must be legal teams, got ${ns} / ${s3} / ${s4}`);
-            assert(s3 > ns,
-                `${b.name}: a need Ju Fufu covers a third of (${s3.toFixed(1)}) must still beat declaring no need at all (${ns.toFixed(1)})`);
-            assert(s4 > ns,
-                `${b.name}: a need beyond what any unit in the roster supplies (${s4.toFixed(1)}) must still be a bonus over no need (${ns.toFixed(1)}) — unmet ultimate scaling is never charged`);
-            assert(s3 > s4,
-                `${b.name}: coverage falls as the need grows, so a 3 need (${s3.toFixed(1)}) must earn Ju Fufu more than a 4 need (${s4.toFixed(1)})`);
-        }
-    });
-
-    // TEST 93: disorder supply is MEASURED, not a constant
-    // `scaling.disorders` declares a NEED, so Miyabi's score must track how much disorder the
-    // team actually generates — it used to be a hardcoded supply of 2 behind a boolean, so every
-    // disorder-generating team paid her exactly 28.0. Full defect:
-    // ../notes/lessons-learned.md#disorder-supply-was-never-measured.
-    //
-    // The load-bearing SECOND block clones Vivian onto fire (off Nangong's ether) so Miyabi gets
-    // a second distinct cycling element with nothing else changed — the gradient alone passes
-    // against the old flat model too (see
-    // ../notes/known-pitfalls.md#a-test-that-cannot-fail-proves-nothing), since the old model's
-    // boolean can't tell ONE cycling element from TWO.
-    run('TEST 93: Miyabi rises with the team disorder supply', () => {
-        for (const b of withBosses(bosses, 'Fiend')) {
-            const t = 'Miyabi/Astra/Yuzuha,Miyabi/Vivian/Yuzuha,Nangong/Miyabi/Yuzuha';
-            const m = scoreMapForBoss(scoreForTeamString(t, allUnits), b);
-            const none = m.get('Miyabi / Astra / Yuzuha');
-            const cycling = m.get('Miyabi / Vivian / Yuzuha');
-            const both = m.get('Nangong / Miyabi / Yuzuha');
-            assert(none > 0 && cycling > 0 && both > 0,
-                `all three fixtures must be legal teams, got ${none} / ${cycling} / ${both}`);
-            assert(cycling > none,
-                `${b.name}: a cycling partner (${cycling.toFixed(1)}) must beat no disorder source at all (${none.toFixed(1)})`);
-            assert(both > cycling,
-                `${b.name}: cycling PLUS a polarity generator (${both.toFixed(1)}) must beat cycling alone (${cycling.toFixed(1)})`);
-        }
-
-        const vivian = allUnits.find(u => u.id === 'vivian');
-        assert(vivian && vivian.tags.includes('ether'),
-            'fixture assumption broken: Vivian should be an ether unit');
-        const twin = JSON.parse(JSON.stringify(vivian));
-        twin.id = 'vivian-fire'; twin.name = 'Vivian Fire';
-        twin.tags = vivian.tags.map(t => (t === 'ether' ? 'fire' : t));
-        const roster = [...allUnits, twin];
-        for (const b of withBosses(bosses, 'Neutral')) {
-            const sc = name => scoreTeamForBoss(
-                scoreForTeamString(`Nangong/Miyabi/${name}`, roster)[0].team, b, {});
-            const oneElement = sc('Vivian'), twoElements = sc('Vivian Fire');
-            assert(oneElement > 0 && twoElements > 0,
-                `both fixtures must be legal teams, got ${oneElement} / ${twoElements}`);
-            assert(twoElements > oneElement,
-                `${b.name}: Miyabi cycling with TWO distinct elements (${twoElements.toFixed(1)}) must out-supply cycling with one (${oneElement.toFixed(1)}) — equal scores mean disorder supply is a boolean again`);
-        }
-    });
-
-    // TEST 94: cycling and polarity supply AGGREGATE against one need
-    // The two disorder sources are independent and both real, so they must add. Pinned directly
-    // via a polarity provider sharing Miyabi's exact elemental variant, so element cycling is
-    // impossible (same variant -> no reaction) and forced polarity is the ONLY possible source —
-    // if it did not enter the aggregate this team would have no disorder supply at all. See
-    // ../notes/lessons-learned.md#disorder-supply-was-never-measured for why a coverage-step
-    // formulation cannot express this (it requires supply^2, deleting the appetite term).
-    //
-    // Two clones differing in exactly one field, per the TEST 89 lesson.
-    run('TEST 94: forced polarity feeds the disorder need with no element cycling at all', () => {
-        const nangong = allUnits.find(u => u.id === 'nangong');
-        const miyabi = allUnits.find(u => u.id === 'miyabi');
-        assert(nangong && nangong.mechanics.utility?.disorders === 2,
-            'fixture assumption broken: Nangong should supply utility.disorders 2');
-        assert(miyabi?.mechanics?.elementalVariant === 'frost',
-            'fixture assumption broken: Miyabi should carry elementalVariant frost');
-        // Re-elemented onto Miyabi's exact ice/frost gauge, so the pair cannot cycle.
-        const mk = (id, name, withPolarity) => {
-            const c = JSON.parse(JSON.stringify(nangong));
-            c.id = id; c.name = name;
-            c.tags = nangong.tags.map(t => (t === 'ether' ? 'ice' : t));
-            c.mechanics.elementalVariant = 'frost';
-            if (!withPolarity) delete c.mechanics.utility.disorders;
-            return c;
-        };
-        const withPol = mk('nangong-frost', 'Nangong Frost', true);
-        const noPol = mk('nangong-frost-nopol', 'Nangong Frost Nopol', false);
-        const roster = [...allUnits, withPol, noPol];
-        // Astra as the third slot, NOT Yuzuha: `utility.disorders` also gates the
-        // `buffs.disorders` affinity channel via `teamHasPolarity`, so a teammate who buffs
-        // disorders would make this pass through a completely different mechanism. Astra buffs
-        // no disorders, which leaves the aggregate-supply channel as the only difference.
-        for (const b of withBosses(bosses, 'Neutral')) {
-            const sc = name => scoreTeamForBoss(
-                scoreForTeamString(`${name}/Miyabi/Astra`, roster)[0].team, b, {});
-            const polarity = sc('Nangong Frost'), none = sc('Nangong Frost Nopol');
-            assert(polarity > 0 && none > 0,
-                `both fixtures must be legal teams, got ${polarity} / ${none}`);
-            assert(polarity > none,
-                `${b.name}: forced polarity is Miyabi's only possible disorder source here (${polarity.toFixed(1)}) and must beat having none at all (${none.toFixed(1)}) — equal scores mean polarity has stopped feeding the aggregate supply`);
-        }
-    });
-
-    // TEST 95: a disorder is a TEAM event — any source satisfies any consumer
-    // The needs side used to satisfy a `disorders` need only from the consumer's own reaction or
-    // a teammate's `utility.disorders`, so a consumer that was not itself half of the cycling
-    // pair read as unmet on a team swimming in disorders. See
-    // ../notes/lessons-learned.md#disorder-supply-was-never-measured. Latent on the live roster
-    // (both real `scaling.disorders` units are anomaly agents), hence the synthetic consumer.
-    run('TEST 95: a non-anomaly disorder consumer is credited for teammates cycling without it', () => {
-        const nicole = allUnits.find(u => u.id === 'nicole');
-        assert(nicole && !nicole.tags.includes('anomaly') && !nicole.mechanics?.pseudoRole,
-            'fixture assumption broken: Nicole should be a plain non-anomaly support');
-        for (const id of ['miyabi', 'vivian']) {
-            const u = allUnits.find(x => x.id === id);
-            assert(!u.mechanics?.utility?.disorders,
-                `fixture assumption broken: ${id} must not supply utility.disorders`);
-        }
-        const mk = (id, name, withNeed) => {
-            const c = JSON.parse(JSON.stringify(nicole));
-            c.id = id; c.name = name;
-            c.mechanics.scaling = c.mechanics.scaling || {};
-            if (withNeed) c.mechanics.scaling.disorders = 2;
-            return c;
-        };
-        const needy = mk('nicole-needy', 'Nicole Needy', true);
-        const plain = mk('nicole-plain', 'Nicole Plain', false);
-        const roster = [...allUnits, needy, plain];
-        for (const b of withBosses(bosses, 'Fiend')) {
-            const sc = name => scoreTeamForBoss(
-                scoreForTeamString(`Miyabi/Vivian/${name}`, roster)[0].team, b, {});
-            const needyScore = sc('Nicole Needy'), plainScore = sc('Nicole Plain');
-            assert(needyScore > 0 && plainScore > 0,
-                `both fixtures must be legal teams, got ${needyScore} / ${plainScore}`);
-            // The need is plainly supplied here, so declaring it must be a bonus over
-            // declaring nothing. Before the fix it was a cohesion PENALTY and this went red.
-            assert(needyScore > plainScore,
-                `${b.name}: a disorder need met by two cycling teammates (${needyScore.toFixed(1)}) must beat declaring no need at all (${plainScore.toFixed(1)}) — a lower score means the consumer is charged for a need the team fills`);
-        }
-    });
-
-    // TEST 96: elemental variants disorder with their own base element
-    // A variant tracks a SEPARATE anomaly gauge, so Miyabi's frost genuinely reacts with plain
-    // ice (documented on Soukaku's own entry). Two detectors disagreed and the live one compared
-    // BASE elements, reading frost and ice as identical and zeroing Miyabi/Soukaku and
-    // Miyabi/Promeia disorders entirely — the largest single mover in
-    // ../notes/lessons-learned.md#disorder-supply-was-never-measured.
-    //
-    // Control differs in exactly one field: a Soukaku clone handed Miyabi's own frost variant,
-    // which genuinely should NOT disorder with her.
-    run('TEST 96: an elemental variant disorders with its base element (Miyabi/Soukaku)', () => {
-        const miyabi = allUnits.find(u => u.id === 'miyabi');
-        const soukaku = allUnits.find(u => u.id === 'soukaku');
-        assert(miyabi?.mechanics?.elementalVariant === 'frost',
-            'fixture assumption broken: Miyabi should carry elementalVariant frost');
-        assert(soukaku && !soukaku.mechanics?.elementalVariant,
-            'fixture assumption broken: Soukaku should carry no elementalVariant');
-        const twin = JSON.parse(JSON.stringify(soukaku));
-        twin.id = 'soukaku-frost'; twin.name = 'Soukaku Frost';
-        twin.mechanics.elementalVariant = 'frost';
-        const roster = [...allUnits, twin];
-        for (const b of withBosses(bosses, 'Fiend')) {
-            const sc = name => scoreTeamForBoss(
-                scoreForTeamString(`Miyabi/${name}/Yuzuha`, roster)[0].team, b, {});
-            const plainIce = sc('Soukaku'), sameVariant = sc('Soukaku Frost');
-            assert(plainIce > 0 && sameVariant > 0,
-                `both fixtures must be legal teams, got ${plainIce} / ${sameVariant}`);
-            assert(plainIce > sameVariant,
-                `${b.name}: plain-ice Soukaku disorders with frost Miyabi (${plainIce.toFixed(1)}) where a frost twin cannot (${sameVariant.toFixed(1)}) — equal scores mean variants are compared on base element again`);
-        }
-    });
-
-    // TEST 97: an anomaly PROC source reacts even without an anomaly role
-    // MUTATION TEST. Reaction partners used to be enumerated as anomaly-ROLE agents only, so a
-    // `utility["anomaly:<element>"]` proc supplier without the role contributed nothing — see
-    // ../notes/lessons-learned.md#disorder-supply-was-never-measured. Latent today (Alice is the
-    // only holder, and her own element already supplies as an agent), hence the synthetic
-    // enabler.
-    run('TEST 97: a non-anomaly unit with utility[anomaly:<el>] completes a reaction', () => {
-        const nicole = allUnits.find(u => u.id === 'nicole');
-        assert(nicole && !nicole.tags.includes('anomaly') && !nicole.mechanics?.pseudoRole,
-            'fixture assumption broken: Nicole should be a plain non-anomaly support');
-        const mk = (id, name, withProcs) => {
-            const c = JSON.parse(JSON.stringify(nicole));
-            c.id = id; c.name = name;
-            c.mechanics.utility = c.mechanics.utility || {};
-            // Fire: an element nobody else on the fixture team supplies, so this annotation is
-            // the ONLY thing physical Alice could possibly react with.
-            if (withProcs) c.mechanics.utility['anomaly:fire'] = 2;
-            return c;
-        };
-        const enabler = mk('nicole-procs', 'Nicole Enabler', true);
-        const inert = mk('nicole-inert', 'Nicole Inert', false);
-        const roster = [...allUnits, enabler, inert];
-        for (const b of withBosses(bosses, 'Neutral')) {
-            const sc = name => scoreTeamForBoss(
-                scoreForTeamString(`Alice/${name}/Astra`, roster)[0].team, b, {});
-            const withProcs = sc('Nicole Enabler'), without = sc('Nicole Inert');
-            assert(withProcs > 0 && without > 0,
-                `both fixtures must be legal teams, got ${withProcs} / ${without}`);
-            assert(withProcs > without,
-                `${b.name}: physical Alice disorders with a teammate's fire procs (${withProcs.toFixed(1)}) and has nothing to react with otherwise (${without.toFixed(1)}) — equal scores mean proc sources are still gated on holding an anomaly role`);
         }
     });
 
@@ -2039,7 +1382,7 @@ async function main() {
         `ladder fixture broken: expected 4 bosses, resolved ${LADDER_BOSSES.length} (${LADDER_BOSSES.map(b => b.name).join(', ')})`);
     // The bosses whose element favours the Miyabi/Nangong lines, and the only ones where the FULL
     // ladder order is asserted. Below the top two the order is boss-conditional by owner ruling —
-    // see TEST 101 part 2.
+    // see TEST 82 part 2.
     const STRICT_LADDER_BOSSES = ['Butcher', 'Marionettes'].flatMap(f => withBosses(bosses, f));
     assert(STRICT_LADDER_BOSSES.length === 2,
         `strict ladder fixture broken: expected 2 bosses, resolved ${STRICT_LADDER_BOSSES.length}`);
@@ -2051,7 +1394,7 @@ async function main() {
         return { label: parsed.label, score: scoreTeamForBoss(parsed.team, boss, {}) };
     };
 
-    run('TEST 98: Nangong/Miyabi/Yuzuha is Miyabi\'s strongest composition, per boss', () => {
+    run('TEST 79: Nangong/Miyabi/Yuzuha is Miyabi\'s strongest composition, per boss', () => {
         const miyabiTeams = filterIncludeOneOf(allTeamEntries, ['Miyabi']);
         assert(miyabiTeams.length > 100,
             `expected the full Miyabi team space, got ${miyabiTeams.length} teams`);
@@ -2097,7 +1440,7 @@ async function main() {
         },
     ];
 
-    run('TEST 99: a third anomaly agent does not out-value a strong support for Miyabi', () => {
+    run('TEST 80: a third anomaly agent does not out-value a strong support for Miyabi', () => {
         const failures = [];
         for (const { core, support, thirds } of THIRD_ANOMALY_CASES) {
             let comparisons = 0;
@@ -2139,10 +1482,10 @@ async function main() {
     //
     // Remielle is NOT a valid third here: swapping her partner changes the team's ARCHETYPE (two
     // vs three anomaly bodies feeds her conditional ATK buff differently), so the rung would be
-    // measuring composition rather than partner quality. That rule is pinned by TEST 109 instead.
+    // measuring composition rather than partner quality. That rule is pinned by TEST 84 instead.
     const PARTNER_THIRDS = ['Yuzuha', 'Astra', 'Nicole'];
 
-    run('TEST 100: Miyabi\'s anomaly partners — Vivian first, then Burnice unless the third buffs disorders', () => {
+    run('TEST 81: Miyabi\'s anomaly partners — Vivian first, then Burnice unless the third buffs disorders', () => {
         const vivian = allUnits.find(u => u.id === 'vivian');
         assert(vivian && vivian.mechanics?.onfield === false,
             'fixture assumption broken: Vivian should be an off-field unit');
@@ -2176,7 +1519,7 @@ async function main() {
             `${failures.length} partner ordering(s) wrong:\n      - ` + failures.join('\n      - '));
     });
 
-    // TEST 101: the owner's Miyabi best-in-slot ladder
+    // TEST 82: the owner's Miyabi best-in-slot ladder
     // The owner's stated ordering, checked per boss, committed knowing parts of it fail — where
     // they do, either the engine or the expectation is wrong, settled by review rather than by
     // tuning the engine to match. Middle entries were explicitly flagged as arguable, and the
@@ -2190,7 +1533,7 @@ async function main() {
     // the pair is unordered and only its position relative to its neighbours is asserted. A rung
     // whose teams are all disqualified on a given boss is skipped for that boss, and its
     // neighbours compared directly.
-    run('TEST 101: Miyabi best-in-slot ladder (owner-stated)', () => {
+    run('TEST 82: Miyabi best-in-slot ladder (owner-stated)', () => {
         // `Nangong/Miyabi/Vivian` sits last because it has NO SUPPORT (stunner + carry + anomaly
         // subdps) and `scoreTeamStructure` demotes that from CONVENTIONAL to
         // UNCONVENTIONAL_VIABLE. `Nangong/Miyabi/Nicole` keeps a real support and stays mid-table.
@@ -2254,258 +1597,13 @@ async function main() {
             `${violations.length} ladder violation(s):\n      - ` + violations.join('\n      - '));
     });
 
-    // TEST 102: the two disorder supply curves have the shapes they claim
-    // Pure arithmetic, asserted directly rather than through scores — a score-level test cannot
-    // reach a team supply of 7 to prove the hard cap, and these are the properties the whole
-    // model rests on. The two curves are DELIBERATELY different shapes; a future reader tempted
-    // to unify them should find this red.
-    run('TEST 102: disorder supply curves — consumer diminishes forever, boss weakness hard-caps', () => {
-        // --- consumer side: full credit to the need, then unbounded but strictly diminishing ---
-        for (const need of [2, 3]) {
-            assert(effectiveDisorderSupply(need, need) === need,
-                `E_need must be identity at the need (need=${need})`);
-            assert(effectiveDisorderSupply(need - 1, need) === need - 1,
-                `E_need must be identity below the need (need=${need})`);
-            let prev = effectiveDisorderSupply(need, need);
-            let prevStep = Infinity;
-            for (let s = need + 1; s <= need + 12; s++) {
-                const cur = effectiveDisorderSupply(s, need);
-                const step = cur - prev;
-                assert(step > 0,
-                    `need=${need}: surplus must always be worth something (supply ${s} earned no more than ${s - 1})`);
-                assert(step < prevStep,
-                    `need=${need}: each extra point of surplus must be worth strictly less than the last (supply ${s})`);
-                prev = cur; prevStep = step;
-            }
-            // Smooth join: the derivative at the need is 1, so there is no cliff of the kind the
-            // old flat UNDERSUPPLY_FACTOR step produced.
-            const h = 1e-6;
-            const slope = (effectiveDisorderSupply(need + h, need) - need) / h;
-            assert(Math.abs(slope - 1) < 1e-3,
-                `need=${need}: E_need must join the linear part smoothly, got slope ${slope.toFixed(4)}`);
-            // Unbounded: a truly absurd supply still earns more, just barely.
-            assert(effectiveDisorderSupply(1000, need) > effectiveDisorderSupply(100, need),
-                `need=${need}: E_need must stay unbounded — extreme play is still worth something`);
-        }
-
-        // --- boss weakness: hard cap, sixth source earns nothing ---
-        assert(effectiveDisorderWeakSupply(3) === 3, 'E_weak identity up to the reference weight');
-        assert(effectiveDisorderWeakSupply(4) > effectiveDisorderWeakSupply(3),
-            'E_weak must still reward the 4th source');
-        assert(effectiveDisorderWeakSupply(5) > effectiveDisorderWeakSupply(4),
-            'E_weak must still reward the 5th source');
-        const cap = effectiveDisorderWeakSupply(5);
-        for (const s of [6, 7, 9, 20]) {
-            assert(effectiveDisorderWeakSupply(s) === cap,
-                `E_weak must hard-cap at 5 sources: supply ${s} earned ${effectiveDisorderWeakSupply(s)}, expected ${cap}`);
-        }
-        // The two shapes must not be collapsed into one.
-        assert(effectiveDisorderSupply(20, 3) > effectiveDisorderSupply(6, 3),
-            'the consumer curve must NOT hard-cap the way the boss-weakness curve does');
-    });
-
-    // TEST 103: Lighter's two element buffs are a menu, not two separate offerings
-    // Lighter buffs fire AND ice so one of them matches whatever the team runs — he is the only
-    // unit with more than one element buff. See [COH-02] for the menu rule cohesion applies.
-    // Layer 4 has its own version: no penalty for an arm with no target, full credit for every
-    // arm that lands, one penalty only when NOTHING lands. "Two arms landing beats one" is paid
-    // by L4 per landing pair, NOT by cohesion — cohesion reads 100% in both cases, since all
-    // usable kit is being used. Both halves are asserted here since the final score alone can't
-    // tell them apart.
-    run('TEST 103: Lighter element buffs are a menu — dead arms are not charged, live arms are paid', () => {
-        const boss = withBosses(bosses, 'Butcher')[0];
-        const scoreOf = (spec, roster = allUnits) => {
-            const parsed = scoreForTeamString(spec, roster);
-            assert(parsed.length === 1, `fixture ${spec} did not resolve to exactly one team`);
-            return scoreTeamForBoss(parsed[0].team, boss, {});
-        };
-        const l4Element = (teamSpec) => {
-            // Count what LAYER 4 pays Lighter for element buffs, by reading the debug trace.
-            const lines = [];
-            const parsed = scoreForTeamString(teamSpec, allUnits);
-            assert(parsed.length === 1, `fixture ${teamSpec} did not resolve to exactly one team`);
-            const realLog = console.log;
-            console.log = (...a) => lines.push(a.join(' '));
-            try { scoreTeamForBoss(parsed[0].team, boss, { debug: true }); }
-            finally { console.log = realLog; }
-            let total = 0;
-            let inLighterPair = false;
-            for (const line of lines) {
-                const pair = /^\s{6}(\S[^→]*?) → /.exec(line);
-                if (pair) inLighterPair = pair[1].trim() === 'Lighter';
-                const m = /element-buff\((\w+)\):\s*([\d.]+)/.exec(line);
-                if (m && inLighterPair) total += parseFloat(m[2]);
-            }
-            return total;
-        };
-
-        // Burnice is fire, Promeia is ice: BOTH arms land.
-        const both = l4Element('Lighter/Burnice/Promeia');
-        // Evelyn is fire, Astra is ether: only the fire arm lands.
-        const one = l4Element('Lighter/Evelyn/Astra');
-        // Harumasa is electric, Astra is ether: neither arm lands.
-        const none = l4Element('Lighter/Harumasa/Astra');
-
-        assert(both > one,
-            `two landing element arms must pay more than one: both=${both}, one=${one}`);
-        assert(one > none,
-            `one landing element arm must pay more than none: one=${one}, none=${none}`);
-        assert(none === 0,
-            `an element menu that matches nobody must pay nothing, got ${none}`);
-
-        // The cohesion side. Asserted directly against the rule rather than through a team's
-        // score, because it CANNOT be observed through a score today: the absolute-supply
-        // threshold in computeBuffUtilization pins Lighter's utilization at 100% whether his
-        // dead arm is charged or not. A score-level assertion here passes with the mechanism
-        // reverted, which is worse than no test at all — it was tried.
-        const lighterMenu = [['fire', 2], ['ice', 2]];
-        const unit = (name) => {
-            const u = allUnits.find(x => x.name === name);
-            assert(u, `fixture unit ${name} not found`);
-            return u;
-        };
-        const charged = (...names) =>
-            chargeableElementArms(lighterMenu, names.map(unit)).map(a => a.key).sort().join('+');
-
-        // Burnice fire + Promeia ice: both arms have a target, both are charged and credited.
-        assert(charged('Burnice', 'Promeia') === 'fire+ice',
-            `both arms land, both must be charged — got ${charged('Burnice', 'Promeia')}`);
-        // Evelyn fire + Astra ether: only fire lands. The ice arm must not be charged at all.
-        assert(charged('Evelyn', 'Astra') === 'fire',
-            `only the fire arm lands, so only fire may be charged — got ${charged('Evelyn', 'Astra')}`);
-        // Miyabi ice + Piper physical: only ice lands.
-        assert(charged('Miyabi', 'Piper') === 'ice',
-            `only the ice arm lands, so only ice may be charged — got ${charged('Miyabi', 'Piper')}`);
-        // Harumasa electric + Astra ether: nothing on the menu matches. That IS a mismatch and
-        // is still charged — but ONCE, not once per arm.
-        const dead = chargeableElementArms(lighterMenu, ['Harumasa', 'Astra'].map(unit));
-        assert(dead.length === 1,
-            `a menu matching nobody must be charged once, not once per arm — got ${dead.length}`);
-        assert(dead[0].rel === 0,
-            `the dead arm must be charged at zero relevance, got ${dead[0].rel}`);
-
-        // A single-element unit must behave exactly as it does today: Soukaku's lone ice buff
-        // is charged whether it lands or not, so an unmatched one still costs her (TEST 18).
-        const soukakuMenu = [['ice', 3]];
-        const sLands = chargeableElementArms(soukakuMenu, ['Miyabi', 'Vivian'].map(unit));
-        assert(sLands.length === 1 && sLands[0].rel > 0,
-            'Soukaku ice into an ice carry: one arm, charged, landing');
-        const sMisses = chargeableElementArms(soukakuMenu, ['Ye Shunguong', 'Zhao'].map(unit));
-        assert(sMisses.length === 1 && sMisses[0].rel === 0,
-            'Soukaku ice into a team that cannot use it: still charged, at zero — a real ' +
-            'mismatch that must keep costing her');
-    });
-
-    // TEST 104: a quick assist is a small benefit that always lands
-    // Every unit benefits from a quick assist; a few (Anton) declare a real need and get more
-    // out of it. So offering quick assists is never a mismatch — a support must never be
-    // recorded as wasting kit on the thing every carry happily uses.
-    //
-    // Asserted against the rule rather than through a score: computeBuffUtilization's
-    // absolute-supply threshold pins these suppliers at 100% either way, so a score-level
-    // assertion would pass even with the mechanism reverted.
-    run('TEST 104: quick assists are small, always land, and pay more to a declared need', () => {
-        const unit = (name) => {
-            const u = allUnits.find(x => x.name === name);
-            assert(u, `fixture unit ${name} not found`);
-            return u;
-        };
-        // A carry with no declared quick-assist need. Astra offers `quick-assists: 3`.
-        const ordinary = ['Nangong', 'Aria'].map(unit);
-        const w3 = quickAssistCohesionWeight(3, ordinary);
-
-        // It lands. The caller adds this SAME number to both the charged and the credited
-        // side, so there is no shortfall to hold against the provider — that is the whole fix.
-        // What is asserted here is that the number is small and strictly positive.
-        assert(w3 > 0, 'a quick assist must be worth something to everyone, got 0');
-        assert(w3 < 3, `a quick assist must be SMALL — weight 3 charged at ${w3}, the full annotation`);
-        assert(Math.abs(w3 - 0.75) < 1e-9,
-            `weight 3 at the standard 0.25 benefit should charge 0.75, got ${w3}`);
-
-        // Linear in the annotation: offering more quick assists is worth proportionally more.
-        assert(Math.abs(quickAssistCohesionWeight(1, ordinary) * 3 - w3) < 1e-9,
-            'quick-assist weight must scale linearly with the annotation');
-
-        // Anton declares `scaling.quick-assists`, so a provider is worth strictly more with
-        // him on the team. This is the half a naive "always charge the small floor" fix loses.
-        const withAnton = [unit('Anton'), unit('Seed')];
-        const wAnton = quickAssistCohesionWeight(3, withAnton);
-        assert(wAnton > w3,
-            `Anton declares a real quick-assist need, so a provider must be worth more to him: ` +
-            `${wAnton} vs ${w3} for a carry with no declared need`);
-
-        // A team with no DPS at all still benefits — every unit takes the standard bonus.
-        const noDPS = ['Lucy', 'Seth'].map(unit);
-        assert(quickAssistCohesionWeight(3, noDPS) > 0,
-            'every unit in the game benefits from a quick assist, including non-DPS');
-
-    });
-
-    // TEST 105: damage.basic is inherited from role, overridable, and never burst
-    run('TEST 105: damage.basic inheritance — role baseline, max across roles, out of burst', () => {
-        const unit = (name) => {
-            const u = allUnits.find(x => x.name === name);
-            assert(u, `fixture unit ${name} not found`);
-            return u;
-        };
-        const base = (name) => getBasicDamageBaseline(unit(name));
-        const basic = (name) => getBasicDamage(unit(name));
-
-        // The role table.
-        for (const name of ['Miyabi', 'Evelyn', 'Yixuan', 'Claret']) {
-            assert(base(name) === 3, `${name} holds a DPS role and must inherit basic 3, got ${base(name)}`);
-        }
-        for (const name of ['Qingyi', 'Lycaon', 'Dialyn']) {
-            assert(base(name) === 2, `${name} is a stunner and must inherit basic 2, got ${base(name)}`);
-        }
-        for (const name of ['Ben', 'Seth', 'Zhao', 'Pan Yinhu']) {
-            assert(base(name) === 1, `${name} is a defence agent and must inherit basic 1, got ${base(name)}`);
-        }
-        for (const name of ['Astra', 'Lucy', 'Nicole', 'Rina']) {
-            assert(base(name) === 0, `${name} is a plain support and must inherit basic 0, got ${base(name)}`);
-        }
-
-        // Max across roles, not first match: Caesar is tagged defence (1) and carries a
-        // pseudo-stun role (2), so he must read 2.
-        assert(base('Caesar') === 2,
-            `Caesar is defence-tagged with a pseudo-stun role, so max-across-roles gives 2, got ${base('Caesar')}`);
-        // subdps counts as a DPS role even when the unit's tag says otherwise.
-        assert(base('Norma') === 3,
-            `Norma is tagged stun but plays subdps, so she must read 3, got ${base('Norma')}`);
-
-        // The overrides, and the whole point of the key: Sunna and Yuzuha deal real damage
-        // where a support is assumed to deal none, and Astra genuinely deals none.
-        assert(basic('Sunna') === 1 && base('Sunna') === 0,
-            `Sunna must override her support baseline of 0 to 1, got ${basic('Sunna')} over ${base('Sunna')}`);
-        assert(basic('Yuzuha') === 1 && base('Yuzuha') === 0,
-            `Yuzuha must override her support baseline of 0 to 1, got ${basic('Yuzuha')} over ${base('Yuzuha')}`);
-        assert(basic('Astra') === 0,
-            `Astra deals no damage of her own and must stay at 0, got ${basic('Astra')}`);
-
-        // Resolved against EFFECTIVE roles, so it is a property of the unit ON THIS TEAM.
-        // Nangong reads 3 beside an anomaly agent (his pseudo-anomaly role activates) and 2 on
-        // a team without one. A static number in units.json would lose this.
-        const nangong = { ...unit('Nangong'), _activatedRoles: ['stun', 'anomaly'] };
-        const nangongAlone = { ...unit('Nangong'), _activatedRoles: ['stun'] };
-        assert(getBasicDamageBaseline(nangong) === 3,
-            `Nangong with his anomaly role active must read 3, got ${getBasicDamageBaseline(nangong)}`);
-        assert(getBasicDamageBaseline(nangongAlone) === 2,
-            `Nangong as a pure stunner must read 2, got ${getBasicDamageBaseline(nangongAlone)}`);
-
-        // basic must NEVER reach burst throughput. Sunna's damage accrues off-field while
-        // someone else is on screen; feeding it into the burst channel would make her contend
-        // for a stun window she does not use, which is phase 5's concern and would be wrong.
-        assert(getMaxBurstWeight(unit('Sunna')) === 0,
-            `basic must stay out of burst throughput; Sunna reads ${getMaxBurstWeight(unit('Sunna'))}`);
-    });
-
-    // TEST 106: Sunna beats Astra on attack and anomaly carries
+    // TEST 83: Sunna beats Astra on attack and anomaly carries
     // Owner spec from actual play results. The rupture half was removed after playtesting showed
     // Sunna beating Astra on rupture too — she can only reach a rupture carry beside Nangong
     // (join rules), and Nangong+Sunna is the stun wheelchair Yixuan's stacking multipliers want.
     // Full story: ../notes/lessons-learned.md#the-team-that-was-supposed-to-be-the-bane. What
     // remains here is the attack/anomaly claim, unaffected by that removal.
-    run('TEST 106: Sunna beats Astra on attack/anomaly carries', () => {
+    run('TEST 83: Sunna beats Astra on attack/anomaly carries', () => {
         const carryRole = (u) => {
             for (const r of ['rupture', 'anomaly', 'attack', 'armorer']) if (u.tags.includes(r)) return r;
             return u.tags.includes('stun') ? 'stun' : 'support';
@@ -2547,158 +1645,17 @@ async function main() {
             `${pct(tally.anomaly).toFixed(0)}% of ${tally.anomaly[1]} cores`);
     });
 
-    // TEST 107: two greedy carries cannot both own the stun window
-    // Remielle cannot fire her double ultimate while Miyabi runs enhanced -> ultimate ->
-    // enhanced. `scaling.greedy` measures how much of the window a unit needs to ITSELF — about
-    // execution difficulty, not damage: Miyabi's enhanced attacks run twice as long as Promeia's
-    // and need disorder fuel timed into the window, while Aria's are quick. Measuring by burst
-    // size instead would penalise Aria and Promeia, two of Remielle's BEST partners.
-    //
-    // Only greed ABOVE 1 contends — that is the property most worth guarding: the penalty must
-    // reach dual-greedy teams and nothing else.
-    run('TEST 107: two greedy carries contend for the stun window; one greedy carry does not', () => {
-        const boss = withBosses(bosses, 'Neutral')[0];
-        const scoreOf = (spec) => {
-            const parsed = scoreForTeamString(spec, allUnits);
-            assert(parsed.length === 1, `fixture ${spec} did not resolve to exactly one team`);
-            return scoreTeamForBoss(parsed[0].team, boss, {});
-        };
-        const greedOf = (name) => {
-            const u = allUnits.find(x => x.name === name);
-            assert(u, `fixture unit ${name} not found`);
-            return u.mechanics?.scaling?.greedy ?? 0;
-        };
-
-        // The annotation itself, so a silent data edit is caught here rather than as a mystery
-        // score movement later.
-        for (const [name, want] of [['Yixuan', 3], ['Remielle', 3], ['Miyabi', 3], ['Evelyn', 3]]) {
-            assert(greedOf(name) === want,
-                `${name} needs the stun window to itself and must be greedy ${want}, got ${greedOf(name)}`);
-        }
-        for (const name of ['Aria', 'Promeia', 'Alice', 'Sigrid', 'Harumasa']) {
-            assert(greedOf(name) === 1,
-                `${name} has a real enhanced-attack rotation but a quick one, so greedy 1, got ${greedOf(name)}`);
-        }
-        for (const name of ['Nangong', 'Velina', 'Yuzuha', 'Vivian', 'Burnice']) {
-            assert(greedOf(name) === 0,
-                `${name} does not compete for the burst window and must be greedy 0, got ${greedOf(name)}`);
-        }
-
-        // Remielle's own best teams pair her with a greedy-1 partner and must be UNTOUCHED by
-        // burst contention. This is the sharpest check in the phase: a rule that penalised
-        // these would be wrong even if it fixed everything else.
-        //
-        // ASSERTED ON THE CONTENTION TERM ITSELF, not on absolute scores — those are not on any
-        // effectiveness scale and moved on nearly every engine change for unrelated reasons. See
-        // ../notes/lessons-learned.md#the-rankings-pass--what-a-green-suite-was-hiding. Alice's
-        // position in the playtested ladder is a known-open item, so this deliberately does NOT
-        // pin it.
-        const contentionOf = (spec) => {
-            const parsed = scoreForTeamString(spec, allUnits);
-            assert(parsed.length === 1, `fixture ${spec} did not resolve to exactly one team`);
-            const trace = {};
-            scoreTeamForBoss(parsed[0].team, boss, { trace });
-            return trace.contention;
-        };
-        for (const spec of ['Promeia/Remielle/Velina', 'Burnice/Remielle/Velina',
-                            'Aria/Remielle/Velina', 'Alice/Remielle/Velina']) {
-            assert(contentionOf(spec) === 0,
-                `${spec} pairs Remielle with a greedy-1 partner and must take NO burst ` +
-                `contention charge, got ${contentionOf(spec)}`);
-        }
-        // Anti-vacuity: the charge must actually reach a dual-greedy team, or the loop above
-        // is asserting that a dead rule is dead.
-        const contendedCharge = contentionOf('Miyabi/Remielle/Vivian');
-        assert(contendedCharge < 0,
-            `Miyabi beside Remielle is two greedy-3 carries and must be charged for burst ` +
-            `contention, got ${contendedCharge}`);
-
-        // Miyabi beside Remielle is two greedy carries, and must cost.
-        const contended = scoreOf('Miyabi/Remielle/Vivian');
-        const uncontended = scoreOf('Miyabi/Vivian/Yuzuha');
-        assert(contended > uncontended,
-            `Miyabi/Remielle/Vivian should still beat Miyabi/Vivian/Yuzuha — the owner rates it ` +
-            `slightly better — got ${contended.toFixed(1)} vs ${uncontended.toFixed(1)}`);
-        const best = scoreOf('Nangong/Miyabi/Yuzuha');
-        assert(best > contended,
-            `Nangong/Miyabi/Yuzuha is Miyabi's best team and must outrank Miyabi/Remielle/Vivian: ` +
-            `${best.toFixed(1)} vs ${contended.toFixed(1)}`);
-
-        // NOT COVERED, deliberately: the penalty SCALES with the greed values, but every
-        // contender on the current roster is annotated 3, so every clash is 3+3 and no fixture
-        // can distinguish scaling from a flat charge. This becomes testable when a greedy-2 unit
-        // exists; until then the scaling is unverified by design, not by oversight.
-    });
-
-    // TEST 108: a greedy carry gets more out of a shortened enemy recovery
-    // The other half of `scaling.greedy`, and the reverse of TEST 107's penalty. Most carries
-    // have plenty of time to land their burst inside a normal stun window, so a recovery debuff
-    // is a modest bonus. A GREEDY carry is the one that was actually running out of window, and
-    // extending it lets them land damage they otherwise could not.
-    //
-    // The case: Lighter and Trigger both raise Evelyn's stun multiplier, but only Lighter
-    // shortens the enemy's recovery — and Evelyn is greedy 3 and the one carry who declares
-    // `scaling.recovery` outright.
-    run('TEST 108: a recovery debuff is worth more to a greedy carry than to an ordinary one', () => {
-        const boss = withBosses(bosses, 'Neutral')[0];
-        const scoreOf = (spec) => {
-            const parsed = scoreForTeamString(spec, allUnits);
-            assert(parsed.length === 1, `fixture ${spec} did not resolve to exactly one team`);
-            return scoreTeamForBoss(parsed[0].team, boss, {});
-        };
-
-        // Lighter (recovery 3) must beat Trigger (no recovery debuff) as Evelyn's stunner.
-        const lighter = scoreOf('Lighter/Evelyn/Astra');
-        const trigger = scoreOf('Trigger/Evelyn/Astra');
-        assert(lighter > trigger,
-            `Evelyn is greedy and wants the longer window Lighter's recovery debuff buys her, ` +
-            `so Lighter/Evelyn/Astra must beat Trigger/Evelyn/Astra: ` +
-            `${lighter.toFixed(1)} vs ${trigger.toFixed(1)}`);
-
-        // But Dialyn keeps the top slot — free ultimates plus his own recovery debuff.
-        const dialyn = scoreOf('Dialyn/Evelyn/Astra');
-        assert(dialyn > lighter,
-            `Dialyn still outclasses Lighter for Evelyn on a neutral boss: ` +
-            `${dialyn.toFixed(1)} vs ${lighter.toFixed(1)}`);
-
-        // The bonus is GATED at greed 2: a greedy-1 rotation is quick enough already, so more
-        // window is gravy rather than a multiplier. Asserted behaviourally by promoting a
-        // greedy-1 carry past the gate and checking the score responds — a fixture assertion on
-        // the annotation alone passes with the gate deleted, which was tried and caught here.
-        const greedOf = (name) => allUnits.find(u => u.name === name)?.mechanics?.scaling?.greedy ?? 0;
-        assert(greedOf('Sigrid') === 1, 'fixture intent: Sigrid sits below the gate');
-        const scoreWith = (roster) => {
-            const parsed = scoreForTeamString('Lighter/Sigrid/Astra', roster);
-            return scoreTeamForBoss(parsed[0].team, boss, {});
-        };
-        const withGreed = (g) => allUnits.map(u => u.name !== 'Sigrid' ? u : ({
-            ...u, mechanics: { ...u.mechanics, scaling: { ...u.mechanics.scaling, greedy: g } }
-        }));
-        const atZero = scoreWith(withGreed(0));
-        const atOne = scoreWith(allUnits);          // her real value, below the gate
-        const atThree = scoreWith(withGreed(3));
-        // BELOW the gate, greed must make no difference at all — this is the half that a
-        // "does greed matter" assertion misses, and deleting the gate passes that one.
-        assert(Math.abs(atOne - atZero) < 1e-9,
-            `greed 1 is below the gate and must score identically to greed 0: ` +
-            `${atOne.toFixed(2)} vs ${atZero.toFixed(2)}`);
-        // ABOVE it, greed must pay.
-        assert(atThree > atOne,
-            `promoting Sigrid past the gate must raise Lighter/Sigrid/Astra: ` +
-            `${atOne.toFixed(1)} at greed 1, ${atThree.toFixed(1)} at greed 3`);
-    });
-
-    // TEST 109: Remielle off triple-anomaly does not belong near the ladder
+    // TEST 84: Remielle off triple-anomaly does not belong near the ladder
     // Pins that any non-triple-anomaly Remielle team sits below the Miyabi ladder floor. Her ATK
     // buff is `countTag: anomaly` (4 at three bodies, 2 at two, 0 at one) and counts TAGS, not
     // effective roles, so Nangong's pseudo-anomaly does not feed it. Full ruling:
     // ../notes/adjudications.md#remielle-off-triple-anomaly.
     //
-    // The floor is TEST 101's bottom rung, so this tracks a rescale rather than needing
+    // The floor is TEST 82's bottom rung, so this tracks a rescale rather than needing
     // re-anchoring after calibration. Deliberately NOT asserted: non-triple-anomaly Remielle
     // teams without Vivian may legitimately interleave with the ladder's lower rungs — only the
     // non-triple-anomaly floor violation is pinned.
-    run('TEST 109: non-triple-anomaly Remielle teams sit below the Miyabi ladder', () => {
+    run('TEST 84: non-triple-anomaly Remielle teams sit below the Miyabi ladder', () => {
         const LADDER_FLOOR_SPEC = 'Miyabi/Vivian/Nicole';
         const violations = [];
         let checked = 0;
@@ -2729,16 +1686,16 @@ async function main() {
             + violations.join('\n      - '));
     });
 
-    // TEST 110: a supportless team is never rewarded for being unconventional
+    // TEST 85: a supportless team is never rewarded for being unconventional
     // Pins that the NO_SUPPORT demotion takes the harsher of the two classification factors, so
     // a supportless team that also classifies UNCONVENTIONAL_VIABLE cannot escape it. See
     // ../engine/layers.md#no-support-or-defense-is-its-own-tier for the Nangong/Alice/Sunna case
     // this fixed.
     //
     // PART 1 is asserted on Fiend only — boss-conditional, since Miyabi's on-element L3 edge
-    // wins the anomaly-shill bosses instead (same ruling as TEST 101). PART 2 compares the same
+    // wins the anomaly-shill bosses instead (same ruling as TEST 82). PART 2 compares the same
     // two carries corpus-wide with no elemental confound.
-    run('TEST 110: a supportless team never beats its supported counterpart (Fiend)', () => {
+    run('TEST 85: a supportless team never beats its supported counterpart (Fiend)', () => {
         const fiend = withBosses(bosses, 'Fiend');
         assert(fiend.length === 1, `expected exactly one Fiend boss, got ${fiend.length}`);
 
@@ -2769,7 +1726,7 @@ async function main() {
             `only ${checked} boss(es) were live for part 2 — this test has gone vacuous.`);
     });
 
-    // TEST 111: a carry with no stunner loses real ground
+    // TEST 86: a carry with no stunner loses real ground
     // Pins that a rupture carry with two supports and no stunner loses to stunner-plus-support,
     // per the graded structural credit in
     // ../notes/adjudications.md#a-missing-stunner-costs-different-amounts-to-different-archetypes.
@@ -2777,7 +1734,7 @@ async function main() {
     //
     // Bosses are chosen per carry so neither the carry nor the compared stunners are resisted —
     // the owner's rule carries an explicit "except when the stunner is resisted" carve-out.
-    run('TEST 111: a rupture carry prefers a stunner over a second support', () => {
+    run('TEST 86: a rupture carry prefers a stunner over a second support', () => {
         // Part 1 — the filed cases, each on the boss it was filed against.
         const cases = [
             ['Priest', 'Dialyn/Starlight Billy/Lucia', 'Starlight Billy/Pan Yinhu/Lucia'],
@@ -2815,12 +1772,12 @@ async function main() {
             `${astra.label} (${astra.score.toFixed(1)})`);
     });
 
-    // TEST 112: a resisted subdps is disqualified; a resisted pure stunner is not
+    // TEST 87: a resisted subdps is disqualified; a resisted pure stunner is not
     // Pins `isDamageDealer` (isDPS || hasSubDPSRole), used only by the L1 resistance check, not
     // a widening of DPS_ROLES. See [FUND-01]. All three arms matter: a resisted subdps (Norma)
     // is disqualified outright, a resisted pure stunner (Ju Fufu, Koleda) is only penalised, and
     // a resisted subdps who plays effective support (Orphie) is exempt from the DQ entirely.
-    run('TEST 112: resisted subdps is DQd, resisted pure stunner is only penalised', () => {
+    run('TEST 87: resisted subdps is DQd, resisted pure stunner is only penalised', () => {
         const fireResisting = bosses.filter(b => getBossResistances(b).includes('fire'));
         assert(fireResisting.length >= 4,
             `expected at least 4 fire-resisting bosses, got ${fireResisting.length}`);
@@ -2872,11 +1829,11 @@ async function main() {
             `resisted element, got ${koleda.score.toFixed(1)}`);
     });
 
-    // TEST 113: Trigger/SAnby/Seed floor on UCC
+    // TEST 88: Trigger/SAnby/Seed floor on UCC
     // Pins the floor at 295. Seed is tagged `attack` but plays support (buffs atk 3/cd 3/dmg 2)
     // beside SAnby's `scaling.codependent`, and the engine can't see that — she declares no
     // `pseudoRole`, so the team classifies as two same-element attack carries with no
-    // interaction (see TEST 114). Cleared only by two declared L5 synergy groups
+    // interaction (see TEST 89). Cleared only by two declared L5 synergy groups
     // (`"Trigger+Seed"`, `"Trigger+SAnby"`), not emergently — a DECLARED carve-out, not a fix.
     // Margin is ~2 points; treat the floor as a viability statement, not a calibrated number.
     //
@@ -2884,8 +1841,8 @@ async function main() {
     // infer pseudosupport from buff supply):
     // ../notes/lessons-learned.md#when-a-carve-out-is-a-carve-out-say-so and
     // ../issues/deferred/medium-trigger-sanby-seed-clears-its-floor-only-by-declaration.md.
-    // Do NOT rescue it by restoring the same-element escape; that re-breaks TEST 114.
-    run('TEST 113: Trigger/SAnby/Seed stays playable on UCC (>= 300)', () => {
+    // Do NOT rescue it by restoring the same-element escape; that re-breaks TEST 89.
+    run('TEST 88: Trigger/SAnby/Seed stays playable on UCC (>= 300)', () => {
         const b = withBosses(bosses, 'Corruption').find(Boolean);
         const seed = scoreSpec('Trigger/SAnby/Seed', b);
         assert(seed.score >= 295,
@@ -2893,7 +1850,7 @@ async function main() {
             `(atk 3 / cd 3 / dmg 2) but declares no pseudoRole, so the team reads as two carries; force-adjusted via L5`);
     });
 
-    // TEST 114: two attack carries of one element are not a team
+    // TEST 89: two attack carries of one element are not a team
     // Pins that `classifyTeamStructure` grants a second carry credit only when it is explicitly
     // a subdps or pseudosupport — sharing an element alone is not interaction, since same-element
     // carries can't disorder each other and still can't both hold the field. Anomaly is the role
@@ -2902,7 +1859,7 @@ async function main() {
     //
     // Each pair swaps the second carry for a support and keeps everything else fixed, so the
     // comparison isolates the second-carry question. Asserted per boss, corpus-wide.
-    run('TEST 114: a second same-element attack carry loses to a support', () => {
+    run('TEST 89: a second same-element attack carry loses to a support', () => {
         const pairs = [
             ['Norma/Ellen/Astra', 'Norma/Ellen/Sigrid'],                  // both ice
             ['Ye Shunguong/Sunna/Astra', 'Nekomata/Ye Shunguong/Sunna'],  // both physical
@@ -2924,51 +1881,7 @@ async function main() {
             `only ${checked} live boss/pair comparison(s) - this test has gone vacuous.`);
     });
 
-    // TEST 115: the stunless carve-out is role-agnostic
-    // Pins that `classifyTeamStructure`'s stunless exemption applies regardless of role — it
-    // used to live inside the attacker branch only, so a stunless rupture/armorer carry would
-    // have been charged a no-stunner tier for a window it never wanted. Latent when found (Ye
-    // Shunguong is the only stunless unit and she is attack), so this synthesises the case. See
-    // ../notes/lessons-learned.md#reviewing-the-code-found-a-bug-the-corpus-could-not.
-    //
-    // Anomaly is excluded from the carve-out: it has no no-stun tier to be exempt from.
-    // Asserted on the STRUCTURE KEY via the trace, not the score, since declaring a carry
-    // stunless also zeroes its baseline and gates the recovery debuff — so the score moves for
-    // several reasons and only the tier is under test.
-    run('TEST 115: a stunless rupture carry is not charged a no-stunner tier', () => {
-        const boss = withBosses(bosses, 'Priest').find(Boolean);
-        const find = (n) => {
-            const u = allUnits.find(x => x.name === n);
-            assert(u, `fixture unit ${n} not found`);
-            return u;
-        };
-        const yixuan = find('Yixuan'), pan = find('Pan Yinhu'), lucia = find('Lucia');
-        const structureOf = (team) => {
-            const trace = {};
-            scoreTeamForBoss(team, boss, { trace });
-            return trace.structure;
-        };
-        // Supports that actually FIT a rupture carry, so the support-fit downgrade does not
-        // fire and mask the tier — `Yixuan/Lucia/Nicole` would read UNCONVENTIONAL_VIABLE for
-        // that unrelated reason.
-        const plain = structureOf([yixuan, pan, lucia]);
-        assert(plain === -2,
-            `rupture + double support with no stunner must classify NO_STUN_RUPTURE (-2), got ${plain}`);
-
-        const stunlessYixuan = {
-            ...yixuan,
-            mechanics: {
-                ...yixuan.mechanics,
-                utility: { ...(yixuan.mechanics?.utility || {}), stunless: true },
-            },
-        };
-        const exempt = structureOf([stunlessYixuan, pan, lucia]);
-        assert(exempt === 35,
-            `a STUNLESS rupture carry does not need the window, so the same shape must classify ` +
-            `CONVENTIONAL (35), got ${exempt}`);
-    });
-
-    // TEST 116: the Remielle/Velina third-slot ladder (owner playtest)
+    // TEST 90: the Remielle/Velina third-slot ladder (owner playtest)
     // Pins the owner's playtested order (Aria > Promeia > Alice > Burnice > Jane Doe) and that
     // the whole Velina track outranks Miyabi/Vivian/Remielle. Held up by two DECLARED L5
     // relationships rather than emergent scoring — a mutual Remielle<->Velina pair, and Alice's
@@ -2978,11 +1891,11 @@ async function main() {
     // BOSS-CONDITIONAL, asserted narrowly on purpose: elemental L3 legitimately reorders the
     // lower rungs elsewhere (fire-weak Pompey lifts Burnice, ice-weak Horizon lifts Promeia
     // above Aria, ice+ether-weak Butcher/Marionettes lift frost Miyabi above the RV teams — see
-    // TEST 101 for the same pattern on the Miyabi ladder). Girtablullu and Stagnant Aberrant are
+    // TEST 82 for the same pattern on the Miyabi ladder). Girtablullu and Stagnant Aberrant are
     // the two anomaly-shill bosses that are element-neutral to every unit here, so they are
     // where the ladder is a statement about the units rather than the matchup. DO NOT widen this
     // to every boss; it will fail, and correctly.
-    run('TEST 116: Remielle/Velina third-slot ladder on element-neutral bosses', () => {
+    run('TEST 90: Remielle/Velina third-slot ladder on element-neutral bosses', () => {
         const LADDER = [
             'Aria/Remielle/Velina',
             'Promeia/Remielle/Velina',
@@ -3018,12 +1931,12 @@ async function main() {
             `only ${checked} of the 2 element-neutral bosses were live - this test has gone vacuous.`);
     });
 
-    // TEST 117: a conjunctive synergy group pays only when the WHOLE group is present
+    // TEST 91: a conjunctive synergy group pays only when the WHOLE group is present
     // `synergy.units` entries joined with "+" require every named unit on the team. This is the
-    // mechanism behind Alice's placement in TEST 116, and the gating IS the point: a group that
+    // mechanism behind Alice's placement in TEST 90, and the gating IS the point: a group that
     // paid out on a partial match would be indistinguishable from two single-name declarations
     // and would lift teams the owner never asked to lift.
-    run('TEST 117: conjunctive synergy requires the whole group', () => {
+    run('TEST 91: conjunctive synergy requires the whole group', () => {
         const boss = withBosses(bosses, 'Aberrant').find(Boolean);
         const alice = allUnits.find(u => u.name === 'Alice');
         assert(alice, 'fixture unit Alice not found');
@@ -3053,73 +1966,6 @@ async function main() {
         assert(onlyVelina === 0,
             `Velina without Remielle must not trigger Alice's group: L5 was ${onlyVelina}`);
     });
-
-    // TEST 118: a chain BUFF is not a chain PROVISION
-    // Pins scoreBaselineAffinity's chain-buff pricing: it scales with the consumer's chain
-    // MAGNITUDE (getChainMagnitude), not with a `chains` need. Koleda is the only unit that
-    // declares `buffs.chains`. See [BUFF-03].
-    //
-    // Measured on the NEUTRAL boss on purpose: the L4 element modifier multiplies the pair total,
-    // so on a real boss these deltas come out scaled and the Evelyn/Billy ordering inverts for a
-    // reason that has nothing to do with chains.
-    run('TEST 118: a chain buff scales with chain magnitude, not with a chains need', () => {
-        const boss = withBosses(bosses, 'Neutral').find(Boolean);
-        assert(boss, 'synthetic neutral boss not found');
-        const find = (n) => {
-            const u = allUnits.find(x => x.name === n);
-            assert(u, `fixture unit ${n} not found`);
-            return u;
-        };
-        const koleda = find('Koleda'), lucia = find('Lucia');
-        assert(koleda.mechanics?.buffs?.chains,
-            'Koleda must still declare `buffs.chains` — this test has no subject without it');
-
-        // Same unit with the chain buff removed, so the delta IS the chain buff.
-        const noBuff = {
-            ...koleda,
-            mechanics: {
-                ...koleda.mechanics,
-                buffs: Object.fromEntries(
-                    Object.entries(koleda.mechanics.buffs).filter(([k]) => k !== 'chains')),
-            },
-        };
-        const l4rawOf = (team) => {
-            const trace = {};
-            const score = scoreTeamForBoss(team, boss, { trace });
-            assert(score > 0, `fixture team scored ${score} — pick a legal, viable team`);
-            return trace.l4raw;
-        };
-        const chainBuffValue = (consumer) =>
-            l4rawOf([koleda, consumer, lucia]) - l4rawOf([noBuff, consumer, lucia]);
-
-        // Yixuan declares NO chain damage and NO chains need, so he is the "every DPS" case.
-        const yixuan = find('Yixuan');
-        const plain = chainBuffValue(yixuan);
-        assert(plain > 0,
-            `a chain buff must land on a DPS with no declared chain damage at all, got ${plain.toFixed(2)}`);
-
-        // It scales with how hard the consumer's chains hit.
-        const billy = chainBuffValue(find('Starlight Billy'));   // damage.chain: 2
-        const evelyn = chainBuffValue(find('Evelyn'));           // damage.chain: 3
-        assert(billy > plain,
-            `Starlight Billy's chains hit harder than an unannotated carry's, so the buff must be ` +
-            `worth more to her: ${billy.toFixed(2)} vs ${plain.toFixed(2)}`);
-        assert(evelyn > billy,
-            `Evelyn's chains hit hardest, so the buff must be worth most to her: ` +
-            `${evelyn.toFixed(2)} vs ${billy.toFixed(2)}`);
-
-        // PURITY: the value is chain magnitude and nothing else. Evelyn declares
-        // `scaling.chains: 3` and Yixuan declares none, so if the buff were still feeding the
-        // chains NEED channel Evelyn's share would carry an extra ~4.2 and this ratio would come
-        // out near 2.85 instead of 1.45. Asserted as a ratio so it does not hardcode the rate.
-        const magRatio = getChainMagnitude(find('Evelyn')) / getChainMagnitude(yixuan);
-        const valueRatio = evelyn / plain;
-        assert(Math.abs(valueRatio - magRatio) < 0.02,
-            `the buff must be priced off chain magnitude alone: value ratio ${valueRatio.toFixed(3)} ` +
-            `should equal the magnitude ratio ${magRatio.toFixed(3)}. A mismatch means Evelyn's ` +
-            `\`scaling.chains\` appetite is leaking back into the buff.`);
-    });
-
     // Summary
     console.log('');
 

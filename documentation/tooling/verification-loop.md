@@ -1,10 +1,10 @@
 # The Verification Loop
 
-After any change to `team-scorer.js`, `pull-engine.js` or the data files, run **all four**
+After any change to `team-scorer.js`, `pull-engine.js` or the data files, run **all five**
 suites, then regenerate and re-certify calibration.
 
 ```bash
-node test-scoring.mjs && node test-recommendations.mjs && node test-bucketing.mjs && node cohesion-fixture.mjs
+node test-mechanics.mjs && node test-rankings.mjs && node test-recommendations.mjs && node test-bucketing.mjs && node cohesion-fixture.mjs
 ```
 
 ```bash
@@ -51,8 +51,8 @@ It compares a SHA-256 fingerprint over exactly those three files.
 
 ## Why `KNOWN_RED` works the way it does
 
-`test-scoring.mjs` and `test-recommendations.mjs` each keep a `KNOWN_RED` map from test number
-to reason, for assertions that
+`test-mechanics.mjs`, `test-rankings.mjs` and `test-recommendations.mjs` each keep a `KNOWN_RED`
+map from test number to reason, for assertions that
 encode an ordering the owner believes correct but the engine does not yet produce.
 
 | Failing set | Exit code |
@@ -92,7 +92,7 @@ An absolute score is not on any effectiveness scale, so it moves on nearly every
 and has to be re-baselined for reasons unrelated to what the test guards. Worse, re-pinning it
 silently codifies whatever the engine currently does, including orderings the owner rejects.
 
-Test 107 guards burst contention and used to pin four exact totals. It now reads
+Mechanics TEST 24 guards burst contention and used to pin four exact totals. It now reads
 `trace.contention` off the scorer's trace option and asserts it is zero for greedy-1 teams and
 negative for a dual-greedy one.
 
@@ -106,7 +106,7 @@ A complaint usually arrives as "team A should beat team B", and A and B often di
 slots. That phrasing is fine for a bug report and useless as a test, because a failure cannot
 tell you which swap caused it.
 
-Test 110 was written straight from a complaint reading "Jane/Viv/Yuzuha should be better than
+Rankings TEST 85 was written straight from a complaint reading "Jane/Viv/Yuzuha should be better than
 Nangong/Aria/Jane", which swaps Vivian → Aria **and** Yuzuha → Nangong. It became
 `Jane/Vivian/Yuzuha` against `Nangong/Jane/Vivian`, isolating the Yuzuha → Nangong swap the
 complaint was actually about.
@@ -117,7 +117,7 @@ Owner's standing position. Where a margin assertion and an ordering pull against
 constant, **relax the margin and keep the ordering**.
 
 The margins in this suite are almost never calibrated; they are "comfortably ahead" written down
-as a number. Note the reason in the test comment when you move one. Test 62's Dialyn-over-Koleda
+as a number. Note the reason in the test comment when you move one. Rankings TEST 59's Dialyn-over-Koleda
 margin went from 20 to 15 so that the chains-buff multiplier could reach the value Koleda needed
 to outrank Pan Yinhu.
 

@@ -128,7 +128,7 @@ artifact.
 
 The one that cut the opposite way is worth knowing: Refringe filtered for lumen units on a
 list that could never contain one, so the bonus Remielle's kit exists to provide had **never
-once fired**, and TEST 58 was passing for a reason unrelated to its own comment.
+once fired**, and rankings TEST 55 was passing for a reason unrelated to its own comment.
 
 The fix was naming. `isLumenUnit` is deleted so no caller can retain the ambiguous reading;
 `isNativeLumen` reads tags and `isUnmorphedLumen` is for the morph search alone.

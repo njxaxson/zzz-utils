@@ -59,7 +59,7 @@ have different shapes.
 | Boss weakness (`effectiveDisorderWeakSupply`, boss `weak: disorders`) | Full credit to 3 sources, marginal value falling to zero at 5, **hard cap** | The game itself stops paying past 5 sources. A sixth earns nothing |
 
 The consumer's logarithm is scaled by the need, so its slope is exactly 1 at the need and it
-joins the linear part smoothly. **Test 102 pins both shapes** and goes red if someone
+joins the linear part smoothly. **Mechanics TEST 20 pins both shapes** and goes red if someone
 collapses them into one function.
 
 ## Undersupply

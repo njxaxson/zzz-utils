@@ -88,7 +88,7 @@ charged for a window it never wanted. Anomaly is deliberately excluded — it ha
 to be exempted from, and a stunless anomaly agent would affect reaction cadence too.
 
 Ye Shunguong is the only stunless unit in the data today and she is `attack`, so the rupture
-and armorer halves are currently latent. Test 115 synthesises the rupture case rather than
+and armorer halves are currently latent. Mechanics TEST 26 synthesises the rupture case rather than
 waiting for the unit that would expose it.
 
 Before this tier existed, `Starlight Billy/Pan Yinhu/Lucia` and `Dialyn/Starlight Billy/Lucia`

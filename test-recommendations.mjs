@@ -815,7 +815,8 @@ await runTest(46, 'Electric DPS coverage improves when Claret is added to roster
         `Electric coverage should improve when Claret is added — before: ${electric0}, after: ${electric1}`);
 });
 
-// Tests that are red ON PURPOSE. Same contract as test-scoring.mjs's KNOWN_RED: exits 0 only
+// Tests that are red ON PURPOSE. Same contract as test-mechanics.mjs's and test-rankings.mjs's
+// KNOWN_RED: exits 0 only
 // when the failing set is EXACTLY this map's keys — exits 1 the instant an entry starts
 // passing (stale, remove it) or anything else fails. Every entry needs a reason; never add
 // one just to silence a regression.

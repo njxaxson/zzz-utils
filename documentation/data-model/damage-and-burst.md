@@ -38,7 +38,7 @@ uneven steps because the underlying percentages are uneven — 4200 to 4500 is a
 
 The 1.0 → 1.1 step is small on purpose but **must not be collapsed**. It is the only thing that
 makes annotating `ultimate:strong: 1` mean anything at all, and it is what makes Evelyn a
-slightly better recipient of a free ultimate than Ellen. Test 89 pins it.
+slightly better recipient of a free ultimate than Ellen. Mechanics TEST 11 pins it.
 
 ### Frequency
 
@@ -80,7 +80,7 @@ magnitude **0**, so an ultimate-providing stunner earns no credit for gifting th
 An `ultimate:strong` overrides `ultimate:weak`, which is exactly how Pyrois's conditional
 works: his ultimate becomes a real burst when a wind-anomaly unit is present, lifting the
 penalty. This zeroing is load-bearing — it implements both Sigrid's exclusion and the Pyrois
-design. Test 90 pins it.
+design. Mechanics TEST 12 pins it.
 
 ### Two things not to "fix"
 

@@ -52,7 +52,7 @@ another scoring 498 against a neutral boss tell you **nothing whatsoever** about
 `compositions.js` displays a per-agent ranking that way for convenience. It is fine as a
 browsing aid and is not a valid basis for a comparison or a test.
 
-An earlier version of tests 98–101 did exactly that, and every conclusion drawn from them was
+An earlier version of rankings TESTs 79–82 did exactly that, and every conclusion drawn from them was
 unsafe until they were rewritten to evaluate each boss in a silo.
 
 ### How to pin an ordering properly

@@ -45,7 +45,7 @@ nobody and every supplier's bonus scales down proportionally. Dialyn earns about
 hypothetical `4`, against 28.8 from a `3`.
 
 That is fraction-of-need semantics working as designed, not the old cliff, and it stays a bonus
-in every case. Test 92 pins it.
+in every case. Mechanics TEST 14 pins it.
 
 ## The two calibration dials
 
@@ -98,7 +98,7 @@ wrong at once:
    from Ju Fufu, purely because the fabricated floor of 1 happened to match Ju Fufu's
    `utility.ultimates: 1` exactly.
 
-Test 87 pins the rule directly.
+Mechanics TEST 9 pins the rule directly.
 
 ## A trap to avoid
 
@@ -112,7 +112,7 @@ soft cap damps the reduction unevenly, so it can move an allocation the wrong wa
 *Annotated* ultimate scaling is the literal `mechanics.scaling.ultimates` value in `units.json`
 — YSG (3), Yixuan (2), Miyabi (1), and nobody else. The effective-scaling lookup now returns
 exactly that value, or nothing at all. The two used to differ, and conflating them was an active
-defect. They are the same number now, and test 87 keeps them that way.
+defect. They are the same number now, and mechanics TEST 9 keeps them that way.
 
 ## Code notes
 

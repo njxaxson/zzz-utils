@@ -15,7 +15,8 @@ The engine returns **raw**. Anything comparing archetypes against each other rea
 
 | Suite | State |
 |----|----|
-| scoring | **118 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
+| mechanics | **27 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
+| rankings | **91 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
 | recommendations | **44 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
 | bucketing | **6 pass, 0 fail** |
 | cohesion fixture | **11/11** owner judgements hold |
@@ -23,14 +24,18 @@ The engine returns **raw**. Anything comparing archetypes against each other rea
 | calibration certification | **CERTIFIED** — 0 within-archetype rank inversions across 57 (boss × archetype) groups and 64,325 teams |
 
 ```bash
-node test-scoring.mjs && node test-recommendations.mjs && node test-bucketing.mjs && node cohesion-fixture.mjs
+node test-mechanics.mjs && node test-rankings.mjs && node test-recommendations.mjs && node test-bucketing.mjs && node cohesion-fixture.mjs
 node generate-calibration.mjs --check
 node calibration-check.mjs
 ```
 
-Both `KNOWN_RED` maps are **empty**. That is a real state, not an oversight — every test that was
-red on purpose has been closed. See [the verification loop](tooling/verification-loop.md) for why
-an empty map still matters, and why a green suite is not evidence on its own.
+`test-mechanics.mjs` and `test-rankings.mjs` are the split of what used to be one `test-scoring.mjs`
+(118 tests total, same as before) — mechanics tests pin isolated engine rules independent of
+roster content, rankings tests pin score floors/orderings/ladders for the live roster.
+
+All three `KNOWN_RED` maps are **empty**. That is a real state, not an oversight — every test that
+was red on purpose has been closed. See [the verification loop](tooling/verification-loop.md) for
+why an empty map still matters, and why a green suite is not evidence on its own.
 
 ## Open
 

@@ -274,7 +274,7 @@ Starlight Billy and Lucia in the team, Pan should never beat Norma, Dialyn, Ju F
 was being priced as a chain **provision**. After the fix the ladder reads
 Dialyn > Norma > Ju Fufu > Koleda > Pan, so all four named stunners clear Pan.
 
-The margin TEST 62 guards was relaxed from 20 to 15 to allow it, on the standing position that
+The margin rankings TEST 59 guards was relaxed from 20 to 15 to allow it, on the standing position that
 [correct ordering beats margins](#favour-correct-ordering-over-margins). Sigrid also declares a
 chain need, so she moves with the same dial — the ordering the test guards is intact, but the
 dial is shared and is not free.

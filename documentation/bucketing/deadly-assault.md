@@ -106,5 +106,6 @@ tuned against the older 0.02 ratio.
 Why it matters more than it looks: `priority` weights `maxRank` by 100, so letting noise open a
 rank step can evict a strictly better allocation from the results entirely.
 
-**If this ever needs re-tuning, re-check this exact Thrall pair** — TEST 3 asserts the shape of
-the band, not this case, so it will stay green while the behaviour it protects has drifted.
+**If this ever needs re-tuning, re-check this exact Thrall pair** — rankings TEST 3 asserts the
+shape of the band, not this case, so it will stay green while the behaviour it protects has
+drifted.

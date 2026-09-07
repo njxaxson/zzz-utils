@@ -60,7 +60,8 @@ Each script enables a subset. Two scripts — `pulled.js` and `tiers.js` — ena
 | `calibration-check.mjs` | `--boss NAME`, `--top N`, `--mix`, `--alignment`, `--preview`, `--json` |
 | `cohesion-fixture.mjs` | `--verbose` / `-v`, `--fail`, `--stated` |
 | `scoring-diff.js` | Two positional saved ranking files. Does **not** use `lib/cli.js` |
-| `test-scoring.mjs` | Scorer assertion suite. Accepts a `-N` test filter |
+| `test-mechanics.mjs` | Engine-mechanics assertion suite (isolated rules, not roster rankings). Accepts a `-N` test filter |
+| `test-rankings.mjs` | Roster-ranking assertion suite (score floors/orderings/ladders). Accepts a `-N` test filter |
 | `test-recommendations.mjs` | Pull engine assertion suite |
 | `test-bucketing.mjs` | Deadly Assault allocation suite — marginal value and rank bands |
 

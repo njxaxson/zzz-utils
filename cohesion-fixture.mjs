@@ -47,7 +47,7 @@ const FAIL_ONLY = process.argv.includes('--fail');
 const STATED_ONLY = process.argv.includes('--stated');
 
 // Resolve a boss-filter string to a single boss object. 'neutral' is the synthetic boss, which
-// filterBosses does not know about, so it is handled here. Mirrors withBosses() in test-scoring.mjs.
+// filterBosses does not know about, so it is handled here. Mirrors withBosses() in lib/scoring-test-utils.js.
 function resolveBoss(bosses, filterStr) {
     if (!filterStr || filterStr.toLowerCase() === 'neutral') return NEUTRAL_BOSS;
     const matches = filterBosses(bosses, filterStr);

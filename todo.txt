@@ -1,5 +1,7 @@
 Consider availability accepting true/false/date
 
+And released tag in units.json and bosses.json with patch number. 
+
 Some test cases in test-scoring and test-bucketing (and maybe test-recommendations) are UNIT tests, not real scoring or bucketing or recommendation tests. 
 They should be moved into a test-fundamentals.mjs script instead. 
 
