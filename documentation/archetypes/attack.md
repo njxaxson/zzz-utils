@@ -20,7 +20,6 @@ Now that there are more supports and stronger stunners, this wheelchair is not a
 
 with many attackers preferring a strong stunner like Dialyn or Norma (etc.) and Sunna as the support agent.
 
-
 ## Evolution
 
 * 1.0, banner 1:
@@ -28,14 +27,14 @@ with many attackers preferring a strong stunner like Dialyn or Norma (etc.) and 
   * Premium attack teams are **Lycaon/Ellen/Rina, Lycaon/Ellen/Soukaku, Koleda/Soldier 11/Lucy.**  Anby/Nekomata/Nicole is intended as another premium attack team but Nekomata is underwhelming.
   * The initial monoshock team, Grace/Anton/Rina, is underwhelming and never really takes hold.
 * 1.0, banner 2:
-  * Zhu Yuan is released, allowing Anby/Zhu Yuan/Nicole. Stunner Qingyi releases in 1.1 and supplants Anby to make Qingyi/Zhu Yuan/Nicole
+  * Zhu Yuan is released, allowing Anby/Zhu Yuan/Nicole. Stunner Qingyi releases in 1.1 and supplants Anby to make **Qingyi/Zhu Yuan/Nicole.**
 * 1.3
   * Lighter releases and becomes a new best-in-slot stunner for Ellen and Soldier 11.
 * 1.4
   * Miyabi is released, and although she is an anomaly agent, her high critical scaling means that she completely obviates Ellen.
   * Harumasa releases alongside her, and is offered for free - but he demands an extremely high caliber of playskill. He is completely overshadowed by Miyabi but initially slots into traditional attack teams like Qingyi/Harumasa/Rina and monoshock teams of either Grace/Harumasa/Rina or Yanagi/Harumasa/Rina. No Harumasa teams have any real significant impact.
 * 1.5
-  * The first limited S-rank support agent is released, Astra, followed by new fire attack agent Evelyn. Lighter/Evelyn/Astra is the new dominant premium fire team.
+  * The first limited S-rank support agent is released, Astra, followed by new fire attack agent Evelyn. **Lighter/Evelyn/Astra** is the new dominant premium fire team.
   * Players realize the strength of running Nicole+Astra alongside a DPS and a new double-support wheelchair opens up some attack options, although most are running Miyabi/Astra/Nicole over attack options for this wheelchair.
 * 1.6
   * SAnby is released alongside A-rank Pulchra, followed by Trigger to make the new aftershock team, Trigger/SAnby/Pulchra.  SAnby is extremely buggy, so much that the playerbase sees her as a failure. Harumasa’s dash attacks are retrofitted as aftershock to maybe work with SAnby, but he still doesn’t takes off and his best team is Trigger/Harumasa/Astra.
@@ -46,13 +45,14 @@ with many attackers preferring a strong stunner like Dialyn or Norma (etc.) and 
 * 2.1
   * Yuzuha is released, and while intended more for disorder teams, she is a suitable alternative to Astra on attack teams. The attacker who can make the most use out of her is Harumasa, who wants faster anomaly buildup - but he continues to stay on the sidelines and no strong Harumasa/Yuzuha teams emerge.
 * 2.2
-  * Seed and Orphie are released, creating the first true double-attacker teams of Trigger/Seed/Orphie and Trigger/SAnby/Orphie.  Seed’s extremely restrictive team composition rules demand that she play with another attack teammate; without Orphie the next best options are significantly underpowered: Harumasa, Nekomata and Anton.  Seed is a divisive character to much of the playerbase, but is heavily pushed by the game producers and continues to be the dominant electric attacker for the forseeable future. Orphie is seen as a luxury; without Seed or SAnby she has no really good home to fully leverage her mechanics.  Nonetheless, **Trigger/Seed/Orphie** becomes the dominant electric attack team.
+  * Seed and Orphie are released, creating the first true double-attacker teams of Trigger/Seed/Orphie and Trigger/SAnby/Orphie.  Seed’s extremely restrictive team composition rules demand that she play with another attack teammate; without Orphie the next best options are significantly underpowered: Harumasa, Nekomata and Anton.  
+  * Seed is a divisive character to much of the playerbase, but is heavily pushed by the game producers and continues to be the dominant electric attacker for the forseeable future. Orphie is seen as a luxury; without Seed or SAnby she has no really good home to fully leverage her mechanics.  Nonetheless, **Trigger/Seed/Orphie** becomes the dominant electric attack team.
 * 2.3
   * SAnby’s buggy behavior is fixed and she performs significantly better, although not enough to keep up with Seed.
 * 2.4
   * Dialyn is released and becomes instant best-in-class stunner for attack and rupture teams.
 * 2.5
-  * Ye Shunguong is released, along with Zhao who is given away for free.  She instantaneously becomes the dominant DPS in the game, far surpassing the damage output of previous void hunter Miyabi and grandmaster Yixuan. However, she is tied to an ether-veil gimmick so that she is heavily bound to either Sunna or Zhao in order to be effective; a strategy intended to limit her interactions with future units. **Dialyn/YSG/Sunna** and **YSG/Zhao/Sunnna** become the premier attack teams.
+  * Ye Shunguong is released, along with Zhao who is given away for free.  She instantaneously becomes the dominant DPS in the game, far surpassing the average player’s damage output of previous void hunter Miyabi and grandmaster Yixuan. However, she is tied to an ether-veil gimmick so that she is heavily bound to either Sunna or Zhao in order to be effective; a strategy intended to limit her interactions with future units. **Dialyn/YSG/Sunna** and **YSG/Zhao/Sunnna** become the premier attack teams.
   * Ellen, Soldier 11, and SAnby receive potential vision unlocks to significantly improve their kits. SAnby in particular receives a very good set of buffs and finally sets her in place as a suitably strong electric attack agent, with her best team still being Trigger/SAnby/Orphie.  Ellen’s unlock keeps her viable but not more than that. Soldier 11 is now viable at lower mindscapes but extremely powerful at higher mindscapes.
 * 2.6
   * Harumasa gets a potential vision unlock that helps make him a bit easier to play and increase his damage. He is still challenging to wield and still achieves underwhelming results.

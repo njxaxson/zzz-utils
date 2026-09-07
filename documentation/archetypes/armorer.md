@@ -57,6 +57,8 @@ buff at all**, which matters exactly because so little else can reach them.
 
 ## Evolution
 
+* 3.1
+  * Rina receives a potential vision unlock that makes her the only support to buff teammates’ defense stat. This hints at her being best-in-slot for a defense-scaling DPS in a future release. 
 * 3.2
   * The armorer class is introduced with Claret, an electric limited S-rank. She arrives as a
     hypercarry with no sub-DPS counterpart and a very light kit of her own — a Laceration buff

@@ -33,9 +33,9 @@ This matters for element resistance. A stunner whose element is resisted is *pen
 ## Evolution
 
 * 1.0
-  * Three stunners at launch: A-rank Anby (the first unit a player receives), and standard S-ranks Koleda and Lycaon. 
+  * Three stunners at launch: A-rank Anby (the first unit a player receives), and standard S-ranks Koleda and Lycaon.
   * Lycaon anchors the premium ice teams (**Lycaon/Ellen/Rina**, **Lycaon/Ellen/Soukaku**); Koleda anchors
-    **Koleda/Soldier 11/Lucy**. 
+    **Koleda/Soldier 11/Lucy**.
 * 1.1
   * Qingyi releases and supplants Anby, making **Qingyi/Zhu Yuan/Nicole**. She goes on to anchor
     the early anomaly hypercarry teams too (Qingyi/Yanagi/Seth).
@@ -62,6 +62,6 @@ This matters for element resistance. A stunner whose element is resisted is *pen
     heavily contested Dialyn on rupture teams.
 * 3.2
   * Roxy releases as an armorer-centric stunner who also works well for attack agents that benefit from wind anomaly procs.
-  * Koleda is retrofitted to join with armorers and receives a potential vision unlock with buffs that increase her wider relevance. 
+  * Koleda is retrofitted to join with armorers and receives a potential vision unlock with buffs that increase her wider relevance.
 
 

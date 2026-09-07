@@ -39,12 +39,12 @@ Both shapes still exist. Promeia sometimes prefers Vivian for the abloom volume.
   * Miyabi is released, and although she is an anomaly agent, her high critical scaling means that she plays a lot like an attack agent. She will be played in both stun-based anomaly teams and disorder-based teams.
   * Mono-ice, **Lycaon/Miyabi/Soukaku**, instantly becomes the game’s strongest possible team with a truly absurd damage ceiling. The game will spend many, many patches trying to reign in Miyabi, but will be unsuccessful; as Miyabi unceasingly dominates.
   * Unfortunately, that team requires extreme-of-the-extreme playskill to hit that absurd damage ceiling. Most players find that Miyabi/Yanagi teams are easier to play; typically **Miyabi/Yanagi/Soukaku.**
-  * Some play Miyabi/Burnice variants, such as Miyabi/Burnice/Astra, but it is not as capable.  Nicole is also considered in the support slot, although she can’t activate her additional ability.
+  * Some play Miyabi/Burnice variants, such as Miyabi/Burnice/Soukaku or Miyabi/Burnice/Lucy, but they are not as capable.  Nicole is also considered in the support slot, although she can’t activate her additional ability.
   * Lighter/Miyabi/Lucy is also strong but is less popular because many players saving for Miyabi did not pull on Lighter in the previous patch. 
 * 1.5
   * The first limited S-rank support agent is released: Astra. She becomes one of Miyabi’s favorite partners, and can be paired with Nicole to make the first grand wheelchair team: Miyabi/Astra/Nicole.
 * 1.7
-  * Vivian is released, supplanting Yanagi as Miyabi’s favorite disorder engine. **Miyabi/Vivian/Astra** becomes the most dominant team in the game.  Only extreme-skill players piloting Monoice able to do better on freezable bosses; but all new bosses since 1.4 are no longer freezable in order to try and reign in Miyabi.
+  * Vivian is released, supplanting Yanagi as Miyabi’s favorite disorder engine. **Miyabi/Vivian/Astra** becomes the most dominant team in the game.  Only extreme-skill players piloting Monoice are able to do better on freezable bosses; but all new bosses since 1.4 are no longer freezable in order to try and reign in Miyabi.
   * Vivian allows Nicole to actively join and so **Miyabi/Vivian/Nicole** also becomes a favorite for those that lack Astra.
   * Vivian is also the first anomaly agent to deal abloom damage.
 * 2.1
@@ -58,7 +58,8 @@ Both shapes still exist. Promeia sometimes prefers Vivian for the abloom volume.
   * For both Burnice and Grace, their unlock gives them abloom damage.
 * 2.6
   * Sunna and Aria from Angels of Delusion are released. Aria is an onfield ether hypercarry that moves away from disorder-centric play.  This is because Aria only triggers ablooms when an anomaly proc is already present - and disorders remove anomaly procs, limiting abloom damage. Nonetheless, Aria can play nicely both solo (or with Vivian) in abloom teams, or in traditional disorder teams.
-  * Sunna is primarily for attackers but can also switch to anomaly support when she shares a team with another AoD member. Aria in particular is seen as a particularly strong anomaly agent that is very easy to play, and some even debate if she is a better anomaly agent than Miyabi for the general playerbase - although she does not nearly have the same damage ceiling, she has a uniquely low skill floor relative to her higher damage output.
+  * Sunna is primarily for attackers but can also switch to anomaly support when she shares a team with another AoD member. 
+  * Aria in particular is seen as a particularly strong anomaly agent that is very easy to play, and some even debate if she is a better anomaly agent than Miyabi for the general playerbase - although she does not nearly have the same damage ceiling, she has a uniquely low skill floor relative to her higher damage output.
   * Lycaon receives a potential vision unlock that lets him join anomaly teams, so he can now serve as a stunner for anomaly agents other than Miyabi.
 * 2.7
   * Nangong releases and is a full-blown anomaly stunner. Unlike Lycaon, Nangong herself performs all of the functions of an ether anomaly agent on top of being a stun unit that buffs anomaly agents.
@@ -70,13 +71,13 @@ Both shapes still exist. Promeia sometimes prefers Vivian for the abloom volume.
   * This means that Promeia can slot into Nangong/Yuzuha, Vivian/Yuzuha, and Lycaon/Yuzuha wheelchairs, enabling all mixes of stun and disorder compositions.  This flexibility makes her attractive to anomaly players, as Miyabi’s team-building compositions are more restrictive.
   * Although there are no wind agents, Scorched Horizon inflicts wind anomaly on itself and introduces windswept and vortexes into the game, and Promeia’s base ice vs. Miyabi’s frost is clearly a game lever they use to differentiate the two and give players a reason to pull Promeia. Promeia will continue to play nicely with wind whereas Miyabi will not. This is the first real traction that begins to showcase how Miyabi might be pulled back from her dominant position; although Miyabi is still dominant in most areas.  So while Promeia teams do not become dominant, they are still attractive and capable and sit comfortably among the better anomaly compositions.
 * 3.0
-  * The first wind agent, anomaly Velina, is released; and she instantly becomes dominant. Unlike disorders, vortexes do not clear anomaly procs; so Aria and Promeia can trigger ablooms off of them - making Aria and Promeia Velina’s favorite teammates.  **Aria/Velina/Yuzuha and Promeia/Velina/Yuzuha** become top anomaly teams - not quite on par with NMY or AoD yet, but close.
+  * The first wind agent, anomaly Velina, is released; and she instantly becomes dominant. Unlike disorders, vortexes do not clear anomaly procs; so Aria and Promeia can trigger ablooms off of them - setting Aria and Promeia as Velina’s favorite teammates.  **Aria/Velina/Yuzuha and Promeia/Velina/Yuzuha** become top anomaly teams - not quite on par with NMY or AoD yet, but close.
   * For the same reason, early season 1 anomaly agents that want to stack anomaly procs play more nicely with Velina than newer agents, so Grace, Jane, and Burnice are all considerably more synergistic with Velina and get a significant boost in their usability.
-  * It becomes evident that Grace’s P6 was intentionally designed to work with Velina, which is only clear now that Velina is out.  This makes Grace distinctly good with Velina compared to Yanagi, who has no special synergy and is not saved from the low vortex multipliers associated with standard electric anomaly procs.
+  * It becomes evident that Grace’s P6 was intentionally designed to work with Velina, which is only clear now that Velina is out.  This makes Grace no longer just passable but distinctly good with Velina compared to Yanagi, who has no special synergy and is not saved from the low vortex multipliers associated with standard electric anomaly procs.
 * 3.1
   * The next void hunter, Remielle, is released and while natively classified as an anomaly agent, she is more of a hybrid DPS/support agent that demands a triple-anomaly team to be useful.  She introduces a new element, lumen, and has particularly complicated mechanics.
   * Taking over Yuzuha’s position on anomaly teams, **Aria/Velina/Remielle** becomes the best Remielle team, with Promeia, Alice, Burnice, and Jane variants also very strong.
-  * Miyabi and Aria’s team join options are extended; they now join on any anomaly teammate. This helps them become compatible with Remielle.
+  * Miyabi and Aria’s team join options are extended; they now join on any anomaly teammate. This helps them become compatible with Remielle. Despite the new flexibility, Miyabi's preferred team is still Nangong/Miyabi/Yuzuha. 
   * Yanagi is added to the 50/50 loss pool, cementing her as no longer likely to receive any buffs. She is a particularly strong agent for the loss pool and many players rejoice that she is now more easily accessible.
   * This leaves anomaly with three distinctly strong team compositions: Velina/Remielle variants, AoD, and NMY.
 

@@ -20,7 +20,6 @@ bespoke damage type parallel to normal damage. The difference is that Laceration
 against enemy defense, so armorers want exactly the shred and PEN that rupture carries throw
 away.
 
-
 ## Evolution
 
 * 2.0
