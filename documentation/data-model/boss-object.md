@@ -9,6 +9,7 @@ applied to a team that has already been scored on its own merits.
 {
   "id": "vesper", "name": "Discordant Solo", "shortName": "Discordant Solo",
   "image": "./assets/bosses/solo.webp",
+  "released": 2.6,
   "favored": ["Aria", "Sunna", "Nangong"],
   "available": true,
   "mechanics": {
@@ -23,7 +24,15 @@ applied to a team that has already been scored on its own merits.
 }
 ```
 
-Note that `favored` is top-level, **not** inside `mechanics`.
+Note that `favored` and `released` are top-level, **not** inside `mechanics`.
+
+## Top-level fields
+
+| Field | Notes |
+|----|----|
+| `released` | Patch version when the boss was introduced (e.g., 1.0, 2.6, 3.1) |
+| `favored` | Array of unit IDs that gain a bonus on this boss |
+| `available` | If false, the boss is unreleased and hidden from the UI |
 
 ## `shill` — the role this boss prefers
 

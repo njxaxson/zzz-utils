@@ -9,7 +9,7 @@ contract a human edits by hand.
 {
   "id": "aria", "name": "Aria", "aliases": ["..."],
   "image": "./assets/characters/aria.webp",
-  "rank": "S", "limited": true, "tier": 0.5,
+  "rank": "S", "limited": true, "released": "2.6", "tier": 0.5,
   "tags": ["anomaly", "ether", "aod", "assist:defensive"],
   "join": ["stun", "support"],
   "faction": "Angels of Delusion",
@@ -27,6 +27,7 @@ contract a human edits by hand.
 | Field | Notes |
 |----|----|
 | `tier` | Numeric, **T0 is best**. Tiers change often — read the data, never quote a tier from documentation |
+| `released` | Patch version when the unit was released (e.g., "1.0", "2.4", "3.1") |
 | `tags` | Role, element, faction and assist type combined. `title` marks a titled unit |
 | `join` | Additional Ability prerequisite — see [additional abilities](../concepts/additional-abilities-join.md) |
 | `available: false` | Unreleased. Included for pre-release testing, surfaced by the CLI's `--preview` flag |

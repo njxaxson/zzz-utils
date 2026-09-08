@@ -4,6 +4,7 @@
         "name": "Notorious Dead End Butcher",
         "shortName": "Dead End Butcher",
         "image": "./assets/bosses/butcher.webp",
+        "released": 1.0,
         "favored": [],
         "mechanics": {
             "weaknesses": ["ice", "ether"],
@@ -32,6 +33,7 @@
         "shortName": "Corruption Complex",
         "image": "./assets/bosses/ucc.webp",
         "favored": [],
+        "released": 1.0,
         "mechanics": {
             "weaknesses": ["electric", "ether"],
             "resistances": [],
@@ -54,6 +56,7 @@
         "shortName": "Marionettes",
         "image": "./assets/bosses/marionette.webp",
         "favored": [],
+        "released": 1.0,
         "mechanics": {
             "weaknesses": ["ice", "ether"],
             "resistances": [],
@@ -68,6 +71,7 @@
         "shortName": "Pompey",
         "image": "./assets/bosses/pompey.webp",
         "favored": [],
+        "released": 1.2,
         "mechanics": {
             "weaknesses": ["fire"],
             "resistances": ["electric"],
@@ -83,6 +87,7 @@
         "shortName": "Typhon Slugger",
         "image": "./assets/bosses/typhon.webp",
         "favored": [],
+        "released": 1.3,
         "mechanics": {
             "weaknesses": ["electric", "wind"],
             "resistances": ["fire"],
@@ -96,6 +101,7 @@
         "name": "Sacrifice Bringer",
         "shortName": "Sacrifice Bringer",
         "image": "./assets/bosses/bringer.webp",
+        "released": 1.4,
         "favored": ["Miyabi"],
         "mechanics": {
             "weaknesses": ["ice"],
@@ -113,6 +119,7 @@
         "name": "Miasma Priest",
         "shortName": "Miasma Priest",
         "image": "./assets/bosses/priest.webp",
+        "released": 2.0,
         "favored": [],
         "mechanics": {
             "weaknesses": ["ether"],
@@ -127,6 +134,7 @@
         "name": "Miasmic Fiend Unfathomable",
         "shortName": "Miasmic Fiend",
         "image": "./assets/bosses/fiend.webp",
+        "released": 2.1,
         "favored": ["Alice","Aria"],
         "mechanics": {
             "weaknesses": ["ether", "physical"],
@@ -141,6 +149,7 @@
         "name": "The Defiler",
         "shortName": "The Defiler",
         "image": "./assets/bosses/defiler.webp",
+        "released": 2.2,
         "favored": [],
         "mechanics": {
             "weaknesses": ["electric", "physical"],
@@ -155,6 +164,7 @@
         "name": "Wandering Hunter",
         "shortName": "Wandering Hunter",
         "image": "./assets/bosses/hunter.webp",
+        "released": 2.3,
         "favored": [],
         "mechanics": {
             "weaknesses": ["fire", "ice"],
@@ -169,6 +179,7 @@
         "name": "Thrall & Sobek",
         "shortName": "Thrall & Sobek",
         "image": "./assets/bosses/thrall.webp",
+        "released": 2.4,
         "favored": [],
         "mechanics": {
             "weaknesses": ["ice", "physical", "wind"],
@@ -183,6 +194,7 @@
         "name": "Primordial Nightmare",
         "shortName": "Primordial Nightmare",
         "image": "./assets/bosses/nightmare.webp",
+        "released": 2.5,
         "favored": [],
         "mechanics": {
             "weaknesses": ["physical"],
@@ -198,6 +210,7 @@
         "name": "Discordant Solo",
         "shortName": "Discordant Solo",
         "image": "./assets/bosses/solo.webp",
+        "released": 2.6,
         "favored": ["Aria", "Sunna", "Nangong"],
         "mechanics": {
             "weaknesses": ["ether", "wind"],
@@ -213,6 +226,7 @@
         "id": "sweeper",
         "name": "Sanguine Sweeper",
         "shortName": "Sanguine Sweeper",
+        "released": 2.7,
         "image": "./assets/bosses/sweeper.webp",
         "favored": [],
         "mechanics": {
@@ -230,6 +244,7 @@
         "name": "Scorched Horizon",
         "shortName": "Scorched Horizon",
         "image": "./assets/bosses/mutant.webp",
+        "released": 2.8,
         "favored": ["Velina"],
         "mechanics": {
             "weaknesses": ["wind", "ice"],
@@ -248,6 +263,7 @@
         "name": "Girtablullu",
         "shortName": "Girtablullu",
         "image": "./assets/bosses/girta.webp",
+        "released": 3.0,
         "favored": ["Velina"],
         "mechanics": {
             "weaknesses": ["wind"],
@@ -263,6 +279,7 @@
         "name": "Stagnant Aberrant",
         "shortName": "Aberrant",
         "image": "./assets/bosses/aberrant.webp",
+        "released": 3.1,
         "favored": ["Remielle"],
         "mechanics": {
             "weaknesses": [],
