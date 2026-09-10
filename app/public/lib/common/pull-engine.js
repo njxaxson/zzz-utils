@@ -231,16 +231,26 @@ function mechanicsFitScore(supplier, consumer) {
     }
 
     // Damage types one unit can produce for another — excludes kit descriptors like ultimate:strong.
-    const MECHANIC_DAMAGE_TYPES = new Set(['aftershock', 'abloom', 'chain', 'chains', 'polarity', 'totalize']);
+    // Damage classes, matched by classifier base so a subclass such as `abloom:free` is included.
+// See [CLS-01] in team-scorer.js.
+const MECHANIC_DAMAGE_TYPES = new Set(['aftershock', 'abloom', 'chain', 'chains', 'polarity', 'totalize']);
+const mechanicDamageClass = (key) => {
+    const i = key.indexOf(':');
+    const base = i < 0 || key.slice(0, i) === 'ultimate' ? key : key.slice(0, i);
+    return MECHANIC_DAMAGE_TYPES.has(base) ? base : null;
+};
     const sDamage = supplier.mechanics?.damage || {};
     for (const [dmgType, dmgVal] of Object.entries(cDamage)) {
         const dw = w(dmgVal);
         if (dw === 0) continue;
         let buffW = w(sBuf[dmgType]);
+        const dmgClass = mechanicDamageClass(dmgType);
+        // A buff on the general class satisfies any subclass of it. [CLS-01]
+        if (dmgClass && dmgClass !== dmgType) buffW = Math.max(buffW, w(sBuf[dmgClass]));
         if (dmgType === 'polarity') buffW = Math.max(buffW, w(sBuf.disorders));
         if (buffW > 0) score += buffW * dw * 2;
         const supplyDmg = w(sDamage[dmgType]);
-        if (supplyDmg > 0 && MECHANIC_DAMAGE_TYPES.has(dmgType)) score += supplyDmg * dw * 2;
+        if (supplyDmg > 0 && dmgClass) score += supplyDmg * dw * 2;
     }
 
     // No reactions context here, so gate vortex on consumer being anomaly as a proxy.

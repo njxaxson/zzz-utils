@@ -423,7 +423,7 @@
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "stats": { "am": 2, "ap": 2 },
-            "buffs": { "vortex": 3 }
+            "buffs": { "anomaly:physical": 3 }
         },
         "faction": "PubSec",
         "displayText": "Sensuous rat lady is an older physical anomaly unit that remains a fan favorite. She has unique synergy with the vortex mechanic.",
@@ -1120,7 +1120,7 @@
         "mechanics": {
             "stats": { "am": 2.5, "ap": 2.5 },
             "pseudoRole": ["subdps"],
-            "damage": { "abloom": 2 },
+            "damage": { "abloom:free": 2 },
             "buffs": { "buildup": 1, "vortex" : 1 },
             "utility": { "daze": 2 ,"quick-assists": true },
             "scaling": { "er": 3 }

@@ -74,6 +74,37 @@ data tuning rather than engine defects.
 
 ## What shipped last
 
+**Anomaly overhaul, phase 2e-2h** — the rest of the model, 2026-09-10.
+
+* **Disorder damage scales on proc damage.** A disorder's damage comes off the two procs that
+  made it, and Miyabi's procs run on crit rather than Proficiency — which is why she is
+  simultaneously the best disorder carry and a poor vortex partner. Same fact, opposite
+  conclusions. The flat disorder bonus stopped skipping agents who declare a disorders need: that
+  skip was fair while both channels were flat and wrong once they answered different questions
+  (damage versus the consumer's conversion), and it meant the hardest-hitting procs in the game
+  earned nothing.
+* **`:` is now a classifier.** `X:Y` is a subclass of `X`, with `ultimate:*` explicitly carved
+  out because magnitude and frequency are orthogonal axes, not subclasses. This is what makes the
+  abloom split safe: relabelling Velina to `damage["abloom:free"]` moved **0 rows**, and
+  disabling the classifier drops `Promeia/Velina/Yuzuha` on Horizon by 21 raw as she falls out of
+  the abloom weakness and Promeia's buff stops reaching her.
+* **Proc-dependent abloom is discounted by proc persistence** — a discount, not an anti-synergy.
+  670 rows, max 3.1 points. Miyabi/Vivian is untouched, as required.
+* **`buffs["anomaly:<element>"]` is live** for Grace, Rina and Jane, and Jane's `buffs.vortex`
+  stand-in is gone. This is a **monoshock** fix as much as an anomaly one — Grace and Rina
+  amplifying shock is how Harumasa's `scaling.anomaly` was always meant to pay off, and none of
+  it had ever scored. The buff also amplifies a vortex built on the buffed proc, which is how
+  Jane buffs vortexes for real; that restored rankings TEST 49's boss-conditionality from a
+  0.8-point margin to 20.8.
+* **Remielle's channels read her teammates' Proficiency**, and `damage.luminize` finally feeds
+  burst (it was read by nothing at all).
+
+**Two corrections worth keeping.** Scaling the disorder NEED channel by proc damage zeroed a
+non-anomaly consumer outright (`ap` 0) and inverted the Yanagi/Burnice rung; that channel prices
+the consumer's conversion, not damage. And Remielle's channels were briefly weighted by proc
+damage rather than AP, which made crit-driven Miyabi her *best* partner — the exact inversion.
+Luminize and Refringe scale on Proficiency; disorder is the channel that reads proc damage.
+
 **Anomaly overhaul, phase 2c/2d** — Anomaly Proficiency, and tier compression, 2026-09-10.
 
 **Vortex damage now scales on the Proficiency of the agent whose proc was consumed.** Effective

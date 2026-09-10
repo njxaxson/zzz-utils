@@ -399,6 +399,39 @@ for a non-zero supplier. Only the L4 payout is weight-scaled. So reducing a decl
 cannot help a team that has no supplier at any weight; that needs a change to the severity
 curve instead.
 
+## Remielle's number-two rung is decided by noise, not by any constant
+
+`Miyabi/Remielle/Vivian` must be Miyabi's second-best team (rankings TEST 82, mechanics TEST 24).
+Once Remielle's channels were weighted by her teammates' Anomaly Proficiency — which is correct,
+and is why she dislikes Miyabi — that rung became a coin flip. Measured across the whole range of
+`ANOMALY_SUPPLY_PRESENCE`:
+
+| presence | margin over `Miyabi/Vivian/Yuzuha` |
+|----|----|
+| 0.50 | **-0.2** |
+| 0.60 | +0.2 |
+| 0.65 | +0.4 |
+| 0.70 | +0.6 |
+
+Under a point everywhere. **A passing TEST 82 is not evidence that the constant is right.**
+
+Two real forces pull against each other and both are the owner's own statements: Miyabi is one of
+Remielle's weakest partners *because* Remielle scales on AP and Miyabi's is low, and yet
+`Miyabi/Remielle/Vivian` is Miyabi's number two. The documented resolution is that those lines
+"survive purely because both units are individually enormous, not because they fit" — so the
+engine must discount the fit while individual power carries the rung. It currently does, by a
+hair.
+
+**The structural cause, which a constant cannot fix.** Remielle's Luminize rebound fires off her
+own meter, not inside a stun window. The burst model pays burst only inside a window
+(`getMaxBurstWeight` feeds stun emergence and recovery, nothing else), so on a stunless team like
+`Miyabi/Remielle/Vivian` her single biggest hit scores **nothing**. Wiring `damage.luminize` into
+burst moved 9,282 rows elsewhere and exactly 0.0 on this rung, for that reason.
+
+Do not chase this rung with the presence constant. If it needs fixing properly, the question is
+whether a burst instrument that is not window-gated should be priced outside the stun channel —
+which is an architectural change, not a tuning one.
+
 ## `MULT` is not a damage scale
 
 It is a table of L4 pair-term coefficients, multiplied by a consumer weight and then
