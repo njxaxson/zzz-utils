@@ -74,6 +74,52 @@ data tuning rather than engine defects.
 
 ## What shipped last
 
+**Anomaly overhaul, phase 2b** — the vortex tier became a pooled mean, 2026-09-10.
+
+Vortex events are gated by the wind agent's cyclones, which the non-wind agents **share**. A
+second non-wind element does not add vortex events, it splits them. The tier is now the mean of
+the team's distinct non-wind elements rather than the max over them, so a weak element dilutes
+the pool for everyone. That is why `Nangong/Miyabi/Velina` is poor despite Nangong plus Velina
+looking like a plausible shell — Miyabi's frost drags Nangong down with it.
+
+49 rows moved, all downward, `l4` only. Predicted set was "a wind source, at least two distinct
+non-wind elements **with differing tiers**, and not the wind-state boss": **zero exceptions in
+both directions**. Remielle teams and Scorched Horizon rows were predicted not to move and did
+not — she fills no gauge, and a wind-state boss consumes every proc so nothing is shared.
+
+The prediction needed sharpening once: 42 viable teams matched "two distinct elements" and did
+not move, because their pools were all tier 2 (ether, fire, physical) and a mean of equals is the
+max. **The pooling only bites when the pool is uneven**, which is when it should.
+
+**One trap, closed.** The reaction object now carries two tiers: `vortexTier`, the pooled mean
+that drives payouts, and `ownVortexTier`, read by exactly one thing — the wasted-vortex cohesion
+charge. That charge asks whether a carry's *own* element makes vortex worth building around, and
+pointing it at the pooled value instead lets Miyabi read 1.4, clear `VORTEX_PRIMARY_MIN`, and
+delete the charge silently, worth about **+70** to the team it exists to punish. Mechanics
+TEST 28 pins both halves and both mutations were checked; the gate mutation also turns the
+rankings suite red.
+
+**Anomaly overhaul, phase 2a** — frost's real vortex multiplier, 2026-09-10.
+`VORTEX_TIERS['ice:frost']` went from a synthetic **0.001 to its real 0.8**, the same value the
+other elemental variants carry. The 0.001 was suppression of one unit rather than a statement
+about the element; the reason Miyabi genuinely dislikes wind is that vortex damage scales on the
+proccing agent's Anomaly Proficiency, which phase 2 models next.
+
+276 rows moved, all upward, all `l4` only — cohesion never moved, so the wasted-vortex charge
+still fires. Predicted set was "teams containing Miyabi **and** a wind source (Velina, Roxy) or
+the wind-anomaly boss": **zero exceptions in both directions**, once already-non-viable rows are
+excluded. Calibration anchors did not move; the affected teams are not in anomaly's top ten.
+
+Two things this exposed, both fixed:
+
+* **Rankings TEST 62's fourth assertion went from a 17.8-point margin to exactly 0.00** and was
+  passing by coincidence. Its comment claimed a "same class of scores comparative to proper
+  vortex teams" judgement while the code asserted a bare 15-point gap between two teams, so it
+  now asserts against the proper vortex teams — what was meant, and worth 25.1 points of margin.
+  Mutation-checked: disabling the wasted-vortex charge turns it red.
+* **Frost at 0.8 clears `VORTEX_PRIMARY_MIN` (1.0) by 0.2**, and that inequality is the whole of
+  the Miyabi-wastes-Velina ruling. The scorer now throws at load if anyone closes the gap.
+
 **Anomaly overhaul, phase 1** (data model only), 2026-09-10. Added `mechanics.stats` — a unit's
 stat line, distinct from what it needs and what it buffs — with per-role baselines in the scorer
 and explicit `am`/`ap` rows on all twelve anomaly agents plus Nangong and Soukaku. Renamed

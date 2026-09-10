@@ -73,7 +73,7 @@ beneficiary" means no native primary anomaly carry with a meaningful
 
 | Pairing | Penalised? |
 |----|----|
-| Velina + Miyabi | Yes — frost gains nothing from vortex |
+| Velina + Miyabi | Yes — frost is below `VORTEX_PRIMARY_MIN`, so it cannot anchor a vortex team |
 | Velina + Promeia | No |
 
 This deliberately ignores *pseudo*-anomaly roles. Only units natively tagged `anomaly` count as

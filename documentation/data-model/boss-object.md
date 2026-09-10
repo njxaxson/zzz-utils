@@ -128,7 +128,7 @@ the scoring code.
 
 | Boss | Why it is interesting |
 |----|----|
-| **Scorched Horizon** | The wind `anomaly:state` boss. Team-side reactions suppressed, disorders replaced by vortex, polarity damage gutted, plus a CD debuff. Designed to favour Promeia (pure ice vortex) over Miyabi (frost, effectively zero) |
+| **Scorched Horizon** | The wind `anomaly:state` boss. Team-side reactions suppressed, disorders replaced by vortex, polarity damage gutted, plus a CD debuff. Designed to favour Promeia (pure ice vortex) over Miyabi (frost, a much weaker multiplier) |
 | **Thrall & Sobek** | `shill: stun`, a hard requirement. No stunner is a disqualification unless the team fields a stunless carry |
 | **Notorious Dead End Butcher** | The first boss with a variation, one that favors non-anomaly stun-based teams and another that favors anomaly-based disorder teams |
 | **Typhon Slugger** | `assists: 3` — every unit must have `assist:defensive` |

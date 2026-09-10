@@ -1052,10 +1052,22 @@ async function main() {
 
     // TEST 62: Miyabi+Velina anti-pattern — wasted vortex cohesion penalty
     // Velina is a wind anomaly subdps whose primary team value is vortex generation.
-    // Miyabi (frost variant, vortex tier 0.001) cannot exploit vortex reactions,
-    // so pairing them wastes Velina's contribution. The cohesion penalty should make
-    // proper compositions score meaningfully higher than this anti-pattern.
+    // Miyabi's frost is a poor vortex element (tier 0.8, below VORTEX_PRIMARY_MIN), so pairing
+    // them wastes Velina's contribution. The cohesion penalty should make proper compositions
+    // score meaningfully higher than this anti-pattern.
     // Conversely, Promeia (ice, tier 4.5) actually uses vortex — no penalty there.
+    //
+    // The last part used to read `MVY <= NMV + 15`. When frost rose from a synthetic 0.001 to
+    // its real 0.8, that margin went from 17.8 points to exactly 0.00 — it passed by
+    // coincidence and the next change would have flipped it. The gap between those two teams
+    // was never the claim; the comment says "the same class of scores comparative to proper
+    // vortex teams", so it is now asserted against the proper vortex teams, which is both what
+    // was meant and what has a real margin (25.1 points).
+    //
+    // Why the two moved so differently when frost rose: in NMV, Velina's vortex tier was
+    // already 2 from Nangong's ETHER, and the tier is a max, so frost never reached her and
+    // only Miyabi's own vortex gained (+3.2). In MVY frost is the only non-wind element
+    // available, so both members gained (+21.0).
     run('TEST 62: Miyabi+Velina anti-pattern — wasted vortex cohesion penalty (Girtablullu)', () => {
         const t = 'Nangong/Miyabi/Velina,Nangong/Miyabi/Yuzuha,Nangong/Promeia/Velina,Promeia/Velina/Yuzuha,Miyabi/Velina/Yuzuha';
         for (const b of withBosses(bosses, 'Girtablullu')) {
@@ -1071,8 +1083,14 @@ async function main() {
                 `${b.name}: Promeia+Velina(${promeiaVelina?.toFixed(1)}) > Miyabi+Velina(${miyabiVelina?.toFixed(1)}) — Promeia uses vortex`);
             assert(velinaYuzuha > miyabiVelina,
                 `${b.name}: Promeia/Velina/Yuzuha(${velinaYuzuha?.toFixed(1)}) > Miyabi+Velina(${miyabiVelina?.toFixed(1)}) — proper vortex team`);
-            assert(meebsVelYuzu <= miyabiVelina + 15,
-                    `${b.name}: MVY (${meebsVelYuzu?.toFixed(1)}) and NMV (${miyabiVelina?.toFixed(1)}) should be in the same class of scores comparative to proper vortex teams`);    
+            // Both wasted-vortex teams sit below BOTH proper vortex teams...
+            const wastedHigh = Math.max(meebsVelYuzu, miyabiVelina);
+            const properLow = Math.min(promeiaVelina, velinaYuzuha);
+            assert(wastedHigh < properLow,
+                `${b.name}: the better wasted-vortex team (${wastedHigh?.toFixed(1)}) must stay below the worse proper vortex team (${properLow?.toFixed(1)})`);
+            // ...and they are in the same class as each other, neither one carrying the pairing.
+            assert(Math.abs(meebsVelYuzu - miyabiVelina) <= 40,
+                `${b.name}: MVY (${meebsVelYuzu?.toFixed(1)}) and NMV (${miyabiVelina?.toFixed(1)}) should be in the same class of scores comparative to proper vortex teams`);
         }
     });
 

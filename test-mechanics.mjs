@@ -1137,6 +1137,81 @@ async function main() {
             `should equal the magnitude ratio ${magRatio.toFixed(3)}. A mismatch means Evelyn's ` +
             `\`scaling.chains\` appetite is leaking back into the buff.`);
     });
+
+    // TEST 28: the vortex tier is the MEAN of the team's non-wind pool, not the MAX — and the
+    // "is there a vortex carry here" gate reads a carry's OWN element, not that pool.
+    //
+    // The game fact: vortex events are gated by the wind agent's cyclones, a limited resource
+    // the non-wind agents share. A second non-wind element does not add vortex events, it splits
+    // them, so a weak element in the pool dilutes what the wind agent produces. See [VTX-01].
+    //
+    // Part 1 isolates the pool cleanly. The third slot is a clone of Nicole carrying nothing but
+    // `utility["anomaly:<element>"]`, which contributes an element to the pool while holding
+    // everything else fixed: she has no anomaly role, so no reaction of her own, and either
+    // element is equally a fresh disorder partner for Promeia. The three teams differ ONLY in
+    // the tier of the pooled element, and their teamwork multipliers are identical, so the whole
+    // delta is vortex.
+    //
+    // Anti-vacuity: under the old MAX model all three pools read ice's 4.5 and the three l4raw
+    // values would be equal. The test cannot pass against that model.
+    run('TEST 28: vortex tier pools as a mean, and the vortex-carry gate reads the own element', () => {
+        const boss = withBosses(bosses, 'Neutral').find(Boolean);
+        assert(boss, 'synthetic neutral boss not found');
+        const find = (n) => {
+            const u = allUnits.find(x => x.name === n);
+            assert(u, `fixture unit ${n} not found`);
+            return u;
+        };
+        const nicole = find('Nicole'), velina = find('Velina'), promeia = find('Promeia');
+
+        // A pure element donor: adds one element to the team's proc pool and nothing else.
+        const donor = (el) => ({
+            ...nicole,
+            name: `${nicole.name}-${el}`,
+            mechanics: {
+                ...nicole.mechanics,
+                utility: { ...(nicole.mechanics?.utility || {}), [`anomaly:${el}`]: 1 },
+            },
+        });
+        const measure = (team) => {
+            const trace = {};
+            const score = scoreTeamForBoss(team, boss, { trace });
+            assert(score > 0, `fixture team scored ${score} — pick a legal, viable team`);
+            return trace;
+        };
+
+        // Promeia is ice (4.5). Pools: {ice, electric} = 2.75, {ice, fire} = 3.25, {ice} = 4.5.
+        const weak = measure([velina, promeia, donor('electric')]);
+        const mid  = measure([velina, promeia, donor('fire')]);
+        const pure = measure([velina, promeia, nicole]);
+
+        assert(Math.abs(weak.teamwork - mid.teamwork) < 1e-9
+            && Math.abs(mid.teamwork - pure.teamwork) < 1e-9,
+            `the three fixtures must differ only in the vortex pool, but their teamwork ` +
+            `multipliers differ (${weak.teamwork}, ${mid.teamwork}, ${pure.teamwork}) — ` +
+            `something other than the pool is moving and the measurement is confounded`);
+
+        assert(weak.l4raw < mid.l4raw,
+            `a weaker element in the pool must dilute it: {ice, electric} scored ` +
+            `${weak.l4raw.toFixed(1)} but {ice, fire} scored ${mid.l4raw.toFixed(1)}`);
+        assert(mid.l4raw < pure.l4raw,
+            `adding ANY second element to a pure ice pool must dilute it: {ice, fire} scored ` +
+            `${mid.l4raw.toFixed(1)} but {ice} alone scored ${pure.l4raw.toFixed(1)}. Equal ` +
+            `values mean the tier is back to a max over the pool.`);
+
+        // Part 2 — [VTX-02]. Nangong/Miyabi/Velina pools ether (2.0) with frost (0.8) for a mean
+        // of 1.4, which CLEARS VORTEX_PRIMARY_MIN (1.0). The wasted-vortex cohesion charge must
+        // still fire, because it asks whether a carry's OWN element makes vortex worth building
+        // around and Miyabi's frost is 0.8. If the gate ever reads the pooled value instead, the
+        // charge silently disappears and this team gains roughly 70 points.
+        const nmv = measure([find('Nangong'), find('Miyabi'), velina]);
+        const npv = measure([find('Nangong'), promeia, velina]);
+        assert(nmv.teamwork < npv.teamwork - 0.05,
+            `Nangong/Miyabi/Velina (teamwork ${nmv.teamwork.toFixed(3)}) must still take the ` +
+            `wasted-vortex charge that Nangong/Promeia/Velina (${npv.teamwork.toFixed(3)}) does ` +
+            `not, even though its POOLED tier of 1.4 clears VORTEX_PRIMARY_MIN. Equal multipliers ` +
+            `mean the gate is reading the pool instead of the carry's own element.`);
+    });
     // Summary
     console.log('');
 

@@ -184,8 +184,11 @@ const NEED_KEY_MULT = { ultimates: 3.2 };
 const VORTEX_TIERS = { 
     //Base elements
     "ice": 4.5, "fire": 2, "physical": 2, "ether": 2, "electric": 1, "lumen": 0,
-    //Variants
-    "ice:frost" : 0.001, 
+    //Variants — frost is a genuinely poor vortex element, not a nil one. It sat at 0.001 for a
+    //while, which was synthetic suppression of Miyabi rather than a statement about frost; the
+    //real reason she dislikes wind is that vortex damage scales on the proccing agent's Anomaly
+    //Proficiency and hers is low. 0.8 must stay strictly below VORTEX_PRIMARY_MIN — see there.
+    "ice:frost" : 0.8, 
     "ether:auricInk" : 0.8, 
     "physical:honedEdge" : 0.8
 };
@@ -196,6 +199,18 @@ const MAX_VORTEX_TIER = 4;
 // Minimum primary DPS vortex tier for full team vortex bonuses. Below this threshold,
 // vortex bonuses are proportionally discounted — the team lacks a vortex-focused carry.
 const VORTEX_PRIMARY_MIN = 1.0;
+
+// Frost sits at 0.8 against a threshold of 1.0, so the whole "Miyabi wastes Velina" judgement
+// (rankings TEST 62) rests on a gap of 0.2. Raising frost to 1.0 or lowering this threshold
+// would silently delete that cohesion charge and hand Nangong/Miyabi/Velina roughly +70 —
+// silently, because nothing else reads the comparison. Fail loudly instead.
+if (VORTEX_TIERS['ice:frost'] >= VORTEX_PRIMARY_MIN) {
+    throw new Error(
+        `VORTEX_TIERS['ice:frost'] (${VORTEX_TIERS['ice:frost']}) must stay below ` +
+        `VORTEX_PRIMARY_MIN (${VORTEX_PRIMARY_MIN}), or the wasted-vortex cohesion charge on a ` +
+        `Miyabi + wind team stops firing. If frost genuinely deserves to clear the threshold, ` +
+        `that is a deliberate re-ruling of rankings TEST 62, not a tuning tweak.`);
+}
 // Refringe: bonus applied to each non-lumen anomaly teammate when a lumen agent is on
 // the team with Lumiflux Buildup. Large by design — comparable to vortex/disorder bonuses.
 // Deliberately tunable: allocation (to teammates, to lumen agent, or both) may shift after testing.
@@ -727,16 +742,31 @@ function computeAnomalyReactions(team, boss) {
     const teamElements = new Set();
     for (const u of team) for (const el of getProcElements(u)) teamElements.add(el);
 
+    // Vortex events are gated by the WIND agent's cyclones, which is a limited resource the
+    // non-wind agents share. A second non-wind element therefore does not add vortex events, it
+    // splits them — so a poor vortex element in the pool genuinely dilutes what the wind agent
+    // produces. The tier is the MEAN of the distinct non-wind elements the team lands, not the
+    // max over them: a max lets the best element hide the worst and triple-counts a shared
+    // resource. [VTX-01]
+    const windPresent = [...teamElements].some(el => el.split(':')[0] === 'wind');
+    const nonWindPool = windPresent
+        ? [...teamElements].filter(el => el.split(':')[0] !== 'wind')
+        : [];
+    const pooledVortexTier = nonWindPool.length
+        ? nonWindPool.reduce((sum, el) => sum + getVortexTierForVariant(el), 0) / nonWindPool.length
+        : 0;
+
     for (const unit of anomalyAgents) {
         const baseElement = getElement(unit);
-        let bestVortexTier = 0;
+        let vortexTier = 0;
+        let ownVortexTier = 0;
         const disorderElements = new Set();
 
         // Lumen agents don't build anomaly gauges via Attribute Mutation — their damage
         // morphs to a teammate's element but does not fill the corresponding anomaly gauge.
         // Therefore lumen units produce no anomaly reactions (no disorder, no vortex).
         if (isNativeLumen(unit)) {
-            reactions.set(unit, { bestVortexTier: 0, hasDisorder: false, disorderElements });
+            reactions.set(unit, { vortexTier: 0, ownVortexTier: 0, hasDisorder: false, disorderElements });
             continue;
         }
 
@@ -744,13 +774,18 @@ function computeAnomalyReactions(team, boss) {
             // Boss anomaly states are named by BASE element, so this comparison stays base.
             if (baseElement !== bossAnomaly && bossAnomaly !== 'lumen') {
                 if (bossAnomaly === 'wind' || baseElement === 'wind') {
-                    bestVortexTier = getVortexTierForElement(unit, bossAnomaly);
+                    // No pooling here. A wind-state boss consumes EVERY proc the team applies,
+                    // so vortex events scale with proc count rather than with one agent's
+                    // cyclones. Nothing is shared, so nothing dilutes.
+                    vortexTier = getVortexTierForElement(unit, bossAnomaly);
+                    ownVortexTier = vortexTier;
                 } else {
                     disorderElements.add(bossAnomaly);
                 }
             }
         } else {
             const element = getOwnGaugeElement(unit);
+            let reactsWithWind = false;
             for (const partnerEl of teamElements) {
                 // A unit cannot react with the gauge it fills itself.
                 if (partnerEl === element) continue;
@@ -759,16 +794,24 @@ function computeAnomalyReactions(team, boss) {
                 if (baseElement === 'wind' && partnerBase === 'wind') continue;
 
                 if (baseElement === 'wind' || partnerBase === 'wind') {
-                    const nonWindEl = (baseElement === 'wind') ? partnerEl : element;
-                    bestVortexTier = Math.max(bestVortexTier, getVortexTierForVariant(nonWindEl));
+                    reactsWithWind = true;
                 } else {
                     disorderElements.add(partnerEl);
                 }
             }
+            if (reactsWithWind) {
+                vortexTier = pooledVortexTier;
+                // A wind agent has no vortex element of its own — its vortexes fire off whatever
+                // partner proc is standing, so the pool IS its own tier.
+                ownVortexTier = (baseElement === 'wind')
+                    ? pooledVortexTier
+                    : getVortexTierForVariant(element);
+            }
         }
 
         reactions.set(unit, {
-            bestVortexTier,
+            vortexTier,
+            ownVortexTier,
             hasDisorder: disorderElements.size > 0,
             disorderElements
         });
@@ -783,7 +826,7 @@ function teamHasAnyDisorder(reactions) {
 }
 
 function teamHasAnyVortex(reactions) {
-    for (const [, r] of reactions) { if (r.bestVortexTier > 0) return true; }
+    for (const [, r] of reactions) { if (r.vortexTier > 0) return true; }
     return false;
 }
 
@@ -2426,7 +2469,7 @@ function scoreInherentQuality(team, { lenient = false, debug = false, boss = nul
         // gauge), so the absence is what lumen is rather than a defect of the team. Same
         // reasoning as the L5 carve-out below.
         const reactionDisabled = isSubDPS && isAnomaly(unit) && !isNativeLumen(unit) &&
-            !(unitReaction?.bestVortexTier > 0 || unitReaction?.hasDisorder) &&
+            !(unitReaction?.vortexTier > 0 || unitReaction?.hasDisorder) &&
             !onElementWeakness;
         if (reactionDisabled) {
             tierMult *= 0.5;
@@ -2781,7 +2824,7 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
             const isSubDPS = hasSubDPSRole(unit);
             const unitReaction = l3Reactions.get(unit);
             const reactionDisabled = isSubDPS && isAnomaly(unit) &&
-                !(unitReaction?.bestVortexTier > 0 || unitReaction?.hasDisorder) &&
+                !(unitReaction?.vortexTier > 0 || unitReaction?.hasDisorder) &&
                 !bossWeaknesses.includes(element);
             let bonus = isSRank(unit)
                 ? (isSubDPS ? 17 : 28)
@@ -2954,10 +2997,10 @@ function scoreBaselineAffinity(supplier, consumer, debug, options = {}) {
     // Tier-scaled so ice-vortex consumers (Promeia) benefit more than lower-tier ones.
     if (supplierBuffs.vortex) {
         const reaction = options?.reactions?.get(consumer);
-        if (reaction?.bestVortexTier > 0) {
+        if (reaction?.vortexTier > 0) {
             const cw = resolveBaselineWeight(consumer, 'anomaly-affinity');
             if (cw > 0) {
-                const tierScale = Math.min(1.0, reaction.bestVortexTier / MAX_VORTEX_TIER);
+                const tierScale = Math.min(1.0, reaction.vortexTier / MAX_VORTEX_TIER);
                 const val = w(supplierBuffs.vortex) * cw * tierScale * MULT.VORTEX_BUFF;
                 score += val;
                 dbg('vortex-buff', val);
@@ -3483,10 +3526,10 @@ function scoreMechanicalSynergy(team, debug, options = {}) {
         const reaction = reactions.get(unit);
         if (!reaction) continue;
 
-        if (reaction.bestVortexTier > 0) {
-            const vortexBonus = VORTEX_BASE * reaction.bestVortexTier;
+        if (reaction.vortexTier > 0) {
+            const vortexBonus = VORTEX_BASE * reaction.vortexTier;
             consumerScores.set(unit.name, (consumerScores.get(unit.name) || 0) + vortexBonus);
-            if (debug) console.log(`    Vortex bonus: ${unit.name} +${vortexBonus.toFixed(1)} (tier ${reaction.bestVortexTier})`);
+            if (debug) console.log(`    Vortex bonus: ${unit.name} +${vortexBonus.toFixed(1)} (tier ${reaction.vortexTier.toFixed(2)})`);
         }
 
         // Flat "a disorder happened, and this agent's own procs are part of it" bonus. Agents
@@ -3525,12 +3568,12 @@ function scoreMechanicalSynergy(team, debug, options = {}) {
             const reaction = reactions.get(partner);
             let bonus = REFRINGE_BONUS;
             if (reaction?.hasDisorder) bonus += REFRINGE_DISORDER_CASCADE;
-            if (reaction?.bestVortexTier > 0) bonus += REFRINGE_VORTEX_CASCADE;
+            if (reaction?.vortexTier > 0) bonus += REFRINGE_VORTEX_CASCADE;
             consumerScores.set(partner.name, (consumerScores.get(partner.name) || 0) + bonus);
             if (debug) {
                 const parts = [`base ${REFRINGE_BONUS}`];
                 if (reaction?.hasDisorder) parts.push(`disorder +${REFRINGE_DISORDER_CASCADE}`);
-                if (reaction?.bestVortexTier > 0) parts.push(`vortex +${REFRINGE_VORTEX_CASCADE}`);
+                if (reaction?.vortexTier > 0) parts.push(`vortex +${REFRINGE_VORTEX_CASCADE}`);
                 console.log(`    Refringe: ${partner.name} +${bonus} (${parts.join(', ')})`);
             }
         }
@@ -3795,18 +3838,24 @@ function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs =
             // lumen is exempt: it cannot react at all. See [LUM-01].
             if (hasSubDPSRole(unit) && unit.tags.includes('anomaly') && !isNativeLumen(unit)) {
                 const unitReaction = twReactions.get(unit);
-                const hasReaction = unitReaction?.bestVortexTier > 0 || unitReaction?.hasDisorder;
+                const hasReaction = unitReaction?.vortexTier > 0 || unitReaction?.hasDisorder;
                 if (!hasReaction) {
                     needsTotal += 1;
                 }
                 // Wasted vortex: subdps generates vortex but no native primary anomaly DPS
                 // benefits from it. See documentation/engine/cohesion.md ("Wasted vortex").
-                if (unitReaction?.bestVortexTier > 0) {
+                if (unitReaction?.vortexTier > 0) {
                     const primaryNativeAnomaly = team.filter(t =>
                         t !== unit && t.tags.includes('anomaly') && !hasSubDPSRole(t)
                     );
+                    // OWN tier, deliberately, not the pooled one. The question is whether
+                    // any carry's own element makes vortex worth building around — a property of
+                    // that carry, not of the team's diluted pool. Reading the pooled value here
+                    // would let a good partner element lift Miyabi over VORTEX_PRIMARY_MIN and
+                    // silently delete this charge, worth about +70 to Nangong/Miyabi/Velina.
+                    // [VTX-02]
                     const bestPrimaryTier = primaryNativeAnomaly.reduce((best, t) => {
-                        return Math.max(best, twReactions.get(t)?.bestVortexTier ?? 0);
+                        return Math.max(best, twReactions.get(t)?.ownVortexTier ?? 0);
                     }, 0);
                     if (bestPrimaryTier < VORTEX_PRIMARY_MIN) {
                         needsTotal += 1;

@@ -29,9 +29,11 @@ boss checks weakness or resistance.
 The flag is `mechanics.elementalVariant`. Variants matter in two places: deciding whether
 two units [react](anomaly-reactions.md), and picking a vortex tier.
 
-A variant can be tiered deliberately differently from its base. Miyabi's frost is worth
-essentially nothing on a vortex boss, and that single fact is why Promeia — plain ice —
-outscores Miyabi against wind bosses.
+A variant can be tiered deliberately differently from its base. Miyabi's frost multiplies far
+worse than plain ice, which is part of why Promeia outscores her against wind bosses. Only part:
+vortex damage also scales on the proccing agent's Anomaly Proficiency, and Miyabi's is low
+because her damage runs through crit rather than through AP. See
+[anomaly reactions](anomaly-reactions.md#vortex-tiers).
 
 ## The seven roles
 

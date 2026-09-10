@@ -45,10 +45,61 @@ Highest to lowest:
 
 > ice ≫ fire ≈ physical ≈ ether > electric > element variants
 
-Frost is effectively zero; auricInk and honedEdge are low. The exact numbers live in
+Frost, auricInk and honedEdge are all low and equal. The exact numbers live in
 `VORTEX_TIERS` in the scorer — read them there rather than trusting a number written down
-here. This tiering is the whole reason a plain ice anomaly agent beats frost-variant Miyabi
-on a wind boss.
+here. This tiering is a large part of why a plain ice anomaly agent beats frost-variant Miyabi
+on a wind boss — though not all of it, and the difference matters.
+
+Frost was set to an effectively-zero 0.001 for a while. That was **synthetic suppression of one
+unit**, not a statement about the element: it forced the Miyabi-dislikes-wind result by making
+her reaction arithmetically vanish. Frost's real multiplier is the same 0.8 the other variants
+carry, and the reason Miyabi genuinely dislikes wind is that vortex damage scales on the
+proccing agent's Anomaly Proficiency, which for her is low.
+
+One number is load-bearing and is guarded in code: frost must stay **below**
+`VORTEX_PRIMARY_MIN`, because that comparison is what charges a Miyabi + wind team for wasting
+its vortex. At 0.8 against 1.0 the margin is 0.2, so the scorer throws at load if anyone closes
+it.
+
+## The tier is a pooled mean, not the best element on the team
+
+Vortex events are gated by the **wind agent's** cyclones, and that is a limited resource the
+non-wind agents share. A second non-wind element does not add vortex events, it splits them — so
+a weak element in the pool genuinely dilutes what the wind agent produces.
+
+The tier is therefore the **mean of the distinct non-wind elements the team lands**, not the max
+over them. A max let the best element hide the worst and counted a shared resource once per
+agent.
+
+| team | pool | tier |
+|----|----|----|
+| Promeia + Velina | ice | 4.5 |
+| Nangong + Promeia + Velina | ether, ice | 3.25 |
+| Nangong + Miyabi + Velina | ether, frost | 1.4 |
+| Miyabi + Velina | frost | 0.8 |
+
+This is why `Nangong/Miyabi/Velina` is a poor team despite Nangong plus Velina looking like a
+plausible anomaly shell: Miyabi's frost drags the pool down for everyone, including Nangong.
+
+**Remielle teams are deliberately untouched.** She is lumen and fills no gauge, so a
+`<carry>/Remielle/Velina` team has exactly one non-wind element and its pool cannot be diluted.
+
+**A wind-anomaly-state boss does not pool either.** Scorched Horizon's wind is permanent and
+consumes every proc the team applies, so vortex events scale with proc count rather than with one
+agent's cyclones. Nothing is shared, so nothing dilutes, and each agent reads its own element.
+
+### Two tiers, and the difference matters
+
+| field | what it is | who reads it |
+|----|----|----|
+| `vortexTier` | the pooled mean | every damage payout, and every "is there a vortex here" gate |
+| `ownVortexTier` | this unit's own element's tier | **only** the wasted-vortex cohesion charge |
+
+The split is load-bearing. The cohesion charge asks whether any carry's *own* element makes
+vortex worth building around, which is a property of that carry rather than of the team's diluted
+pool. Point it at the pooled value instead and Miyabi in `Nangong/Miyabi/Velina` reads 1.4,
+clears `VORTEX_PRIMARY_MIN`, and the charge silently stops firing — worth about **+70** to the
+team the charge exists to punish. Mechanics TEST 28 pins both halves.
 
 ## Boss anomaly state
 
