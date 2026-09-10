@@ -3,7 +3,7 @@
  * used by both matchups.js and deadly-assault.js (browser-compatible ES module).
  */
 
-import { ELEMENTS, DPS_ROLES } from './constants.js';
+import { ELEMENTS, DPS_ROLES, STAT_KEYS, CLASSES } from './constants.js';
 import { isValidTeam } from './team-builder.js';
 
 // CONSTANTS
@@ -27,7 +27,9 @@ const MULT = {
     STUN_EMERGENCE: 1.0,
     ELEMENT_BUFF: 2,
     ELEMENT_DEBUFF: 2,
-    ANOMALY_BUFF: 1.6,
+    // `buffs.buildup` — anomaly buildup RATE. `buffs.disorders` is deliberately priced at the
+    // same rate; they are different mechanics that happen to be worth the same per point.
+    BUILDUP_BUFF: 1.6,
     SHEER_BUFF: 9,
     // Laceration buff -> armorers. The armorer analogue of SHEER_BUFF: a direct
     // amplifier on the class's own damage type. Priced above DEF_BUFF because the
@@ -228,7 +230,6 @@ function needSeverity(weight) {
 // SIZE, not landing (a quick assist never misses). Must agree with the cohesion weight in
 // computeBuffUtilization.
 const QUICK_ASSIST_VALUE = 0.25;
-const STAT_SCALING_KEYS = ['am', 'ap', 'cr', 'cd', 'hp', 'def', 'pen', 'sheer'];
 
 // ROLE CLASSIFICATION HELPERS
 
@@ -1086,6 +1087,116 @@ export function getBasicDamageBaseline(unit) {
     return best;
 }
 
+// BASE STATS  (mechanics.stats)
+// What a unit's stat line looks like, as opposed to what it NEEDS (`scaling`) or what it hands
+// out (`buffs`). Scale is the house 0-3 convention WITH HALF STEPS, like `tier`; a value above 3
+// is legal for a unit deliberately off the conventional scale (Remielle's `atk: 4`).
+//
+// Keyed by CLASS, not by role. A unit's class is the one thing it IS and it never changes; a
+// stat line is a property of the unit, not of the team it is on. `subdps` is a ROLE and is
+// deliberately absent — being played as a sub-DPS changes how much damage you deal, which is
+// why BASIC_DAMAGE_BY_ROLE does have a `subdps` entry, but it does not change your ATK stat.
+//
+// This is NOT the same question as `damage.basic`, and the two must not be collapsed. Most
+// S-rank supports' buffs are computed from their OWN stat line — Yuzuha needs 3000 ATK to hand
+// out her full +1200, Remielle 4000 for her +1600 — so `stats.atk` on a support is the ENGINE of
+// their buff. `damage.basic` is the separate, very low modifier turning that ATK into damage
+// they personally deal. Support reads atk 3 here and basic 0 there, and both are correct.
+// Lucia and Zhao are the exception that proves it: their buffs run off HP, so they override ATK
+// down and carry `hp: 3`. A future support buffing off a third stat needs the same override.
+//
+// Half steps must only ever be used ARITHMETICALLY. Several tables in this file are
+// integer-INDEXED with no fallback (BURST_ULTIMATE, CHAIN_MAGNITUDE, ...); a 2.5 handed to one
+// of those yields undefined and then NaN. Never key a table by a stat value.
+const STAT_BASELINE_BY_CLASS = {
+    attack:  { atk: 3,   def: 1, hp: 1, cr: 3,   cd: 3,   pen: 1, am: 0, ap: 0 },
+    anomaly: { atk: 2,   def: 1, hp: 1, cr: 0.5, cd: 0.5, pen: 1, am: 2, ap: 2 },
+    rupture: { atk: 1,   def: 1, hp: 3, cr: 2,   cd: 3,   pen: 0, am: 0, ap: 0 },
+    armorer: { atk: 0,   def: 3, hp: 1, cr: 3,   cd: 0,   pen: 1, am: 0, ap: 0 },
+    stun:    { atk: 2,   def: 1, hp: 1, cr: 1,   cd: 1,   pen: 0, am: 0, ap: 0 },
+    defense: { atk: 2,   def: 2, hp: 2, cr: 0.5, cd: 0.5, pen: 0, am: 0, ap: 0 },
+    support: { atk: 3,   def: 1, hp: 1, cr: 0,   cd: 0,   pen: 0, am: 0, ap: 0 },
+};
+
+/**
+ * This unit's level in one base stat, inherited from its class unless the unit declares
+ * `mechanics.stats[key]`. Normally 0-3; higher is legal for an off-scale unit.
+ *
+ * NOTE: nothing consumes this yet. It is authored ahead of the scoring work that reads it so
+ * that adding the data and reading the data are two separately measurable changes.
+ */
+export function getStat(unit, key) {
+    const declared = unit.mechanics?.stats?.[key];
+    if (declared !== undefined) return w(declared);
+    return getStatBaseline(unit, key);
+}
+
+/**
+ * The single class a unit natively IS, read from its tags. Every unit has exactly one.
+ */
+export function getNativeClass(unit) {
+    for (const tag of unit.tags) {
+        if (STAT_BASELINE_BY_CLASS[tag]) return tag;
+    }
+    return null;
+}
+
+/**
+ * What this unit's NATIVE class implies for one stat, ignoring any override.
+ *
+ * Native class only — never a pseudo-role, and never `getEffectiveRoles`. A pseudo-role changes
+ * what a unit DOES on a team; it does not restat the unit. Soukaku beside Miyabi is playing an
+ * anomaly agent, and her stat line is still a support's.
+ *
+ * The corollary is that this function takes no team and cannot vary by one, unlike almost
+ * everything else in this file. That is the property to protect: a base stat is fixed, and the
+ * team-dependent part of a stat lives downstream (a unit's EFFECTIVE Anomaly Proficiency rises
+ * with the Mastery its team supplies; its base `ap` does not).
+ *
+ * A pseudo-role unit is genuinely between its two classes and rarely matches either, so it
+ * declares the overrides that matter rather than inheriting an average — Nangong and Soukaku
+ * both do.
+ */
+export function getStatBaseline(unit, key) {
+    const cls = getNativeClass(unit);
+    if (!cls) {
+        warnOnceNoClass(unit);
+        return 0;
+    }
+    return STAT_BASELINE_BY_CLASS[cls][key] ?? 0;
+}
+
+// A unit with no class tag reads 0 for every stat, which is silent and wrong. Warn once per
+// unit rather than throwing: this sits on the scoring path, which runs tens of thousands of
+// times per calibration pass.
+const _warnedNoClass = new Set();
+function warnOnceNoClass(unit) {
+    if (_warnedNoClass.has(unit.name)) return;
+    _warnedNoClass.add(unit.name);
+    console.warn(`getStatBaseline: ${unit.name} has no class tag, so every base stat reads 0. ` +
+        `Expected exactly one of: ${CLASSES.join(', ')}.`);
+}
+
+// The table must cover every class and price every stat. A missing class silently reads 0 for
+// the whole unit; a missing stat silently reads 0 for that key. Same class of hole that
+// BUFF_IMPACT's load-time assertion exists to catch.
+for (const cls of CLASSES) {
+    if (!STAT_BASELINE_BY_CLASS[cls]) {
+        throw new Error(`STAT_BASELINE_BY_CLASS is missing the class "${cls}".`);
+    }
+    for (const key of STAT_KEYS) {
+        if (STAT_BASELINE_BY_CLASS[cls][key] === undefined) {
+            throw new Error(`STAT_BASELINE_BY_CLASS.${cls} is missing a baseline for "${key}".`);
+        }
+    }
+}
+for (const cls of Object.keys(STAT_BASELINE_BY_CLASS)) {
+    if (!CLASSES.includes(cls)) {
+        throw new Error(`STAT_BASELINE_BY_CLASS has "${cls}", which is not a class. ` +
+            `Roles such as "subdps" do not carry stat defaults — see constants.js.`);
+    }
+}
+
 // ARCHETYPE FIT  (mechanics.archetypes)
 // A deliberate, documented departure from the mechanics-emergent premise: support fit is
 // DECLARED, not derived. Applied as a SEPARATE additive term — must never feed the cohesion
@@ -1365,7 +1476,7 @@ function getBuffRelevance(key, consumer) {
             if (roles.includes('armorer')) return ARMORER_ATK_EFFICIENCY * scale;
             return scale;
         }
-        case 'anomaly':
+        case 'buildup':
             return roles.includes('anomaly') ? 1 : 0;
         case 'sheer':
             if (consumer.mechanics?.scaling?.sheer) return 1;
@@ -1432,7 +1543,7 @@ function getDebuffRelevance(key, consumer) {
     }
 }
 
-const STAT_BUFF_KEYS = new Set(['atk', 'anomaly', 'sheer', 'laceration', 'pen', 'cr', 'cd', 'stun-multiplier', ...ELEMENTS]);
+const STAT_BUFF_KEYS = new Set(['atk', 'buildup', 'sheer', 'laceration', 'pen', 'cr', 'cd', 'stun-multiplier', ...ELEMENTS]);
 
 // How much damage one point of each buff is worth, sourced from MULT so L4 and cohesion cannot
 // disagree about a buff's price again. [BUFF-04] Every key in STAT_BUFF_KEYS must appear; the
@@ -1443,7 +1554,7 @@ const BUFF_IMPACT = {
     cd: MULT.CD_BUFF,
     sheer: MULT.SHEER_BUFF,
     laceration: MULT.LACERATION_BUFF,
-    anomaly: MULT.ANOMALY_BUFF,
+    buildup: MULT.BUILDUP_BUFF,
     pen: MULT.PEN_BUFF,
     'stun-multiplier': MULT.STUN_MULT_BUFF,
     // Elements were already reaching MULT.ELEMENT_BUFF through the old fallthrough, so they
@@ -2813,13 +2924,15 @@ function scoreBaselineAffinity(supplier, consumer, debug, options = {}) {
         }
     }
 
-    // Anomaly buffs → anomaly agents
-    if (supplierBuffs.anomaly) {
+    // Anomaly BUILDUP buffs (Yuzuha, Nangong, Remielle, Velina) → anomaly agents.
+    // Buildup is the rate at which procs accrue. It is NOT proc damage — that is
+    // `buffs["anomaly:<element>"]`, a separate key. [BUFF-05]
+    if (supplierBuffs.buildup) {
         const cw = resolveBaselineWeight(consumer, 'anomaly-affinity');
         if (cw > 0) {
-            const val = w(supplierBuffs.anomaly) * cw * MULT.ANOMALY_BUFF;
+            const val = w(supplierBuffs.buildup) * cw * MULT.BUILDUP_BUFF;
             score += val;
-            dbg('anomaly', val);
+            dbg('buildup', val);
         }
     }
 
@@ -2830,7 +2943,7 @@ function scoreBaselineAffinity(supplier, consumer, debug, options = {}) {
         if (discount > 0) {
             const cw = resolveBaselineWeight(consumer, 'anomaly-affinity');
             if (cw > 0) {
-                const val = w(supplierBuffs.disorders) * cw * MULT.ANOMALY_BUFF * discount;
+                const val = w(supplierBuffs.disorders) * cw * MULT.BUILDUP_BUFF * discount;
                 score += val;
                 dbg('disorder-buff', val);
             }

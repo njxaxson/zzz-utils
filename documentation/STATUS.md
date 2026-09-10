@@ -3,7 +3,7 @@
 Where things stand. Everything here is measured, not remembered — if you change the engine,
 re-run the commands and update the numbers.
 
-**Last verified:** 2026-09-06.
+**Last verified:** 2026-09-10.
 
 ## Scores come on two scales
 
@@ -51,7 +51,7 @@ more tractable of the two — the underlying game fact is already known.
 
 ## Deferred
 
-Five. These are known, understood, and deliberately not being chased.
+Seven. These are known, understood, and deliberately not being chased.
 
 | Issue | Priority | Why it is parked |
 |----|----|----|
@@ -60,6 +60,8 @@ Five. These are known, understood, and deliberately not being chased.
 | [Trigger/SAnby/Seed clears its floor only by declaration](issues/deferred/medium-trigger-sanby-seed-clears-its-floor-only-by-declaration.md) | medium | A join-shape exemption is specified as the real fix, scheduled as a future engine expansion |
 | [Greed value-scaling cannot be tested](issues/deferred/low-greed-value-scaling-cannot-be-tested-on-todays-roster.md) | low | No fixture can distinguish it until a `greedy: 2` unit exists |
 | [Ye Shunguong under-paid on veils](issues/deferred/low-ye-shunguong-underpaid-four-points-on-veils.md) | low | One pair type, about four points, in the safe direction |
+| [`utility.kaleidoscope` is read only by the UI](issues/deferred/low-kaleidoscope-is-read-only-by-the-ui.md) | low | Only a support declares it, so no fixture could tell a fix from a no-op |
+| [The `ultimate:double` weight is discarded](issues/deferred/low-ultimate-double-weight-is-discarded.md) | low | Every declarer means the same thing, so grading it would move nothing |
 
 `issues/resolved/` is empty by design. A closed issue gets a file only when its history would
 change what a future reader does; otherwise it is deleted and git holds it. The durable reasoning
@@ -71,6 +73,22 @@ lives in [notes/](notes/) instead — see [the issue system](issues/README.md).
 data tuning rather than engine defects.
 
 ## What shipped last
+
+**Anomaly overhaul, phase 1** (data model only), 2026-09-10. Added `mechanics.stats` — a unit's
+stat line, distinct from what it needs and what it buffs — with per-role baselines in the scorer
+and explicit `am`/`ap` rows on all twelve anomaly agents plus Nangong and Soukaku. Renamed
+`buffs.anomaly` to `buffs.buildup`, so the `anomaly:<element>` classifier can mean proc damage
+without colliding with buildup. Removed Remielle's `damage.aftershock`, which was simply wrong.
+
+**Nothing consumes `stats` yet**, deliberately: authoring the data and reading the data are two
+separately measurable changes. Measured delta over the full preview corpus: **0 of 139,441 rows
+moved**, and regenerating `calibration.json` changed only `engineFingerprint` and `generated`.
+
+Removing Remielle's aftershock moved nothing because **no legal team pairs her with either
+aftershock buffer** — she joins on anomaly or faction, Orphie and SAnby join on stun or support.
+The estimate that it would cost her 12 and 18 points was arithmetic on a pairing that cannot
+exist. Worth remembering as a shape: a *reachability* check is cheaper than a magnitude estimate
+and settles the question outright.
 
 **Archetype calibration**, 2026-09-03. `calibrated = raw x factor[archetype]`, one factor per
 archetype, applied at the boundary rather than inside the scorer. The engine still returns raw

@@ -103,7 +103,7 @@ Populated during the comment pass. One row per tag, newest last within a prefix.
 | `[SCAL-02]` | `../data-model/scaling.md` | `needSeverity` is convex, and reads the coerced weight |
 | `[SCAL-03]` | `../data-model/scaling.md` | Exploiting a longer stun window needs two gates |
 | `[CODEP-01]` | `../recommendations/codependency-gating.md` | The scorer reads `scaling.codependent` as a discount, not a gate |
-| `[CODEP-02]` | `../recommendations/codependency-gating.md` | `anomalyProcSupply` mirrors team-scorer's anomaly-quantity rule, not `buffs.anomaly` |
+| `[CODEP-02]` | `../recommendations/codependency-gating.md` | `anomalyProcSupply` mirrors team-scorer's anomaly-quantity rule, not `buffs.buildup` |
 | `[PULL-01]` | `../recommendations/partner-ladder.md` | The partner ladder block in `pull-engine.js` is this whole page in code |
 | `[PULL-02]` | `../recommendations/pull-engine.md` | The codependency/ladder penalty is per unit, not per card |
 | `[BUCK-01]` | `../bucketing/deadly-assault.md` | The rank band 0.011/4.5 is derived from one Thrall & Sobek allocation case |

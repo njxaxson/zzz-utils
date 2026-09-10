@@ -26,6 +26,7 @@ Values above 3 exist where a unit is deliberately off the conventional scale —
 
 | Key | Meaning | Page |
 |----|----|----|
+| `stats` | This unit's stat line: `ap`, `am`, ATK, CR, CD… | [stats](stats.md) |
 | `pseudoRole` | Secondary roles | [pseudoRole](pseudorole.md) |
 | `elementalVariant` | Alternate anomaly-gauge tracking | [elements](../concepts/elements-and-roles.md) |
 | `onfield` | Explicit on-field demand override | [pseudoRole](pseudorole.md) |

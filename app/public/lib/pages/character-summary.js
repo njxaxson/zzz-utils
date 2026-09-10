@@ -339,7 +339,7 @@ function buildSynergyLine(unit) {
     const buffs = [];
     if (mechanics.buffs) {
         if (mechanics.buffs.atk) buffs.push(formatMechanic('Attack', mechanics.buffs.atk));
-        if (mechanics.buffs.anomaly) buffs.push(formatMechanic('Anomaly Buildup', mechanics.buffs.anomaly));
+        if (mechanics.buffs.buildup) buffs.push(formatMechanic('Anomaly Buildup', mechanics.buffs.buildup));
         if (mechanics.buffs.ap) buffs.push(formatMechanic('Anomaly Proficiency', mechanics.buffs.ap));
         if (mechanics.buffs.am) buffs.push(formatMechanic('Anomaly Mastery', mechanics.buffs.am));
         if (mechanics.buffs.aftershock) buffs.push(formatMechanic('Aftershock', mechanics.buffs.aftershock));

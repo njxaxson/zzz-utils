@@ -12,6 +12,7 @@ thing that will make the rest make sense, and [GLOSSARY.md](GLOSSARY.md) defines
 | If you are... | Read |
 |----|----|
 | Adding or editing a unit's `mechanics` | [mechanics-overview](data-model/mechanics-overview.md), then the specific field's page |
+| Editing a unit's **stat line** (`ap`, `am`, ATK…) | [stats](data-model/stats.md) — and note it is *not* `damage.basic` |
 | Writing a conditional (`when`, `cases`) | [predicates](data-model/predicates.md) |
 | Adding or editing a boss | [boss-object](data-model/boss-object.md) |
 | Giving a unit a second role | [pseudoRole](data-model/pseudorole.md) + [role activation ripple](engine/role-activation-ripple.md) |
@@ -62,6 +63,7 @@ defined by slot count rather than by carry:
 
 [Unit object](data-model/unit-object.md) ·
 [mechanics overview](data-model/mechanics-overview.md) ·
+[stats](data-model/stats.md) ·
 [predicates](data-model/predicates.md) ·
 [pseudoRole](data-model/pseudorole.md) ·
 [damage and burst](data-model/damage-and-burst.md) ·

@@ -4,7 +4,7 @@
  * Used by both the web UI (pull-recommendations.js) and CLI debug tool (pull-debug.js).
  */
 
-import { ELEMENTS, DPS_ROLES } from './constants.js';
+import { ELEMENTS, DPS_ROLES, STAT_KEYS } from './constants.js';
 import {
     getElement,
     getElementVariant,
@@ -21,9 +21,10 @@ export { ELEMENTS };
 export const DPS_ARCHETYPES = DPS_ROLES;
 
 const NATURALLY_AVAILABLE_KEYS = new Set(['chains', 'ultimates']);
-const FOUNDATIONAL_STAT_KEYS = new Set([
-    'cr', 'cd', 'atk', 'pen', 'hp', 'def', 'ap', 'am'
-]);
+// Base stats: a teammate can buff one of these but can never supply the stat itself, so an
+// unmet `scaling.ap` is not a missing partner. Sourced from constants.js so this and the
+// `mechanics.stats` block cannot drift apart.
+const FOUNDATIONAL_STAT_KEYS = new Set(STAT_KEYS);
 // `greedy` (wants the stun window to itself) can never be supplied by a teammate, so it's
 // skipped rather than producing a nameless "Needs  to reach full potential".
 const CODEPENDENT_SKIP_KEYS = new Set([
@@ -281,7 +282,7 @@ function mechanicsFitScore(supplier, consumer) {
 }
 
 // Weighted supply for a `scaling.anomaly` need, mirroring team-scorer.js's anomaly-quantity
-// rule rather than searching for a `buffs.anomaly` that means something else. [CODEP-02]
+// rule rather than searching for a `buffs.buildup` that means something else. [CODEP-02]
 const ANOMALY_PROC_SUPPLY_WEIGHT = 0.5;   // matches ANOMALY_PROC_SUPPLY in team-scorer.js
 
 function anomalyProcSupply(unit) {

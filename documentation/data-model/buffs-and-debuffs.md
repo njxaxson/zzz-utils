@@ -2,25 +2,40 @@
 
 What a unit does for its teammates, and what it does to the enemy.
 
-**Buff keys:** `atk`, `anomaly`, `aftershock`, `abloom`, `chain`, `chains`, `sheer`,
+**Buff keys:** `atk`, `buildup`, `anomaly:<element>`, `aftershock`, `abloom`, `chain`, `chains`, `sheer`,
 `laceration`, `pen`, `def`, `stun-multiplier`, `cr`, `cd`, `dmg`, `disorders`, `vortex`, plus
 element names.
 
 **Debuff keys:** `defense`, `recovery`, `dmg`, plus element names.
 
-## Four senses of "anomaly"
+## Five senses of "anomaly"
 
-The stem is overloaded and has been misread before. All four are distinct:
+The stem is overloaded and has been misread before. All five are distinct:
 
 | Key | Means |
 |----|----|
-| `buffs.anomaly` | Anomaly **buildup** — the rate at which procs accrue |
-| `buffs.am` / `buffs.ap` | The **stats**, Anomaly Mastery and Anomaly Proficiency |
+| `buffs.buildup` | Anomaly **buildup** — the rate at which procs accrue |
+| `buffs["anomaly:<element>"]` | **Proc damage** of that element — Grace, Rina, Jane |
+| `mechanics.stats.am` / `.ap` | The **stat levels** this unit has. See [stats](stats.md) |
 | `utility["anomaly:<element>"]` | Extra procs **produced** |
 | `scaling.anomaly` | Procs **needed** |
 
+The two anomaly stats do different jobs and the distinction is load-bearing:
+
+* **Anomaly Mastery** raises the buildup *rate* — how fast you reach a proc.
+* **Anomaly Proficiency** determines how much *damage* a proc does.
+
 Buildup is derived from Mastery without being identical to it, the same way damage is derived
-from ATK. Buildup and quantity are causally connected, though — more buildup means more procs.
+from ATK. Buildup and quantity are causally connected — more buildup means more procs — but
+only up to a point, because non-polarity procs are cooldown-gated in game.
+
+### The buff key used to be `buffs.anomaly`
+
+It was renamed because `:` is a **classifier** in this data model: `anomaly:wind` and
+`anomaly:electric` are both anomalies, and both feed Harumasa's `scaling.anomaly`. A key that
+means *buildup* cannot be the parent class of keys that mean *proc damage*. Renaming buildup to
+its own key makes the namespace honest, and leaves `buffs.anomaly` well-defined as proc damage
+of any element — currently declared by nobody.
 
 ## `vortex` is excluded from cohesion
 
