@@ -200,6 +200,25 @@ const MAX_VORTEX_TIER = 4;
 // vortex bonuses are proportionally discounted — the team lacks a vortex-focused carry.
 const VORTEX_PRIMARY_MIN = 1.0;
 
+// A vortex tier is a DAMAGE ratio out of the game. A team's VALUE is not linear in any one
+// damage channel — the score sums many channels and then soft-caps — so the spread is compressed
+// before it is paid. Same argument and same shape as buff delivery, which prices a buff at the
+// square root of its L4 coefficient because "a support's share of a team's damage is not linear
+// in its pair coefficient" [COH-03].
+//
+// Anchored at 2 because fire, physical and ether all sit there and therefore do not move at all;
+// only the outliers compress. ice 4.5 -> 3.00, electric 1 -> 1.41, the variants 0.8 -> 1.26, so
+// the ice:ether ratio falls from 2.25 to 1.50.
+//
+// Applied to the PAYOUT only. The stored tier stays raw so that frost keeps reading 0.8 against
+// VORTEX_PRIMARY_MIN; compressing the stored value would lift it to 1.26, clear the threshold,
+// and silently delete the wasted-vortex charge. [VTX-04]
+const VORTEX_VALUE_ANCHOR = 2;
+function vortexValue(tier) {
+    if (tier <= 0) return 0;
+    return VORTEX_VALUE_ANCHOR * Math.sqrt(tier / VORTEX_VALUE_ANCHOR);
+}
+
 // Frost sits at 0.8 against a threshold of 1.0, so the whole "Miyabi wastes Velina" judgement
 // (rankings TEST 62) rests on a gap of 0.2. Raising frost to 1.0 or lowering this threshold
 // would silently delete that cohesion charge and hand Nangong/Miyabi/Velina roughly +70 —
@@ -1218,6 +1237,54 @@ function warnOnceNoClass(unit) {
     _warnedNoClass.add(unit.name);
     console.warn(`getStatBaseline: ${unit.name} has no class tag, so every base stat reads 0. ` +
         `Expected exactly one of: ${CLASSES.join(', ')}.`);
+}
+
+// ANOMALY PROFICIENCY — the damage side of the anomaly stat pair.
+//
+// Mastery raises the buildup RATE (how fast you reach a proc); Proficiency decides how much
+// DAMAGE a proc does. Vortex damage is the element's multiplier times the AP of the agent who
+// applied the non-wind proc, so AP is what separates two anomaly agents of the same element.
+//
+// Some agents convert Mastery into Proficiency — Alice, Promeia and Vivian all declare
+// `scaling.am`, which is exactly that statement: "the more Mastery you feed me, the harder my
+// procs hit". So their EFFECTIVE proficiency rises with the buildup their team supplies, while
+// Miyabi, who declares no `scaling.am`, gains nothing from a buildup buffer. [AP-01]
+const BASELINE_ANOMALY_AP = 2;      // the anomaly class's own `ap`, so a stock agent reads 1.0
+const AM_TO_AP_MAX = 1.0;           // full conversion is worth one whole step of AP
+const AM_SUPPLY_FOR_FULL = 3;       // buildup supply at which the conversion saturates
+
+/**
+ * This unit's effective Anomaly Proficiency on this team: its base `ap`, plus whatever its
+ * declared Mastery appetite converts from the team's buildup supply.
+ *
+ * Reads the RAW `scaling` map on purpose. `getEffectiveScaling` synthesises `{ am: 2, ap: 1 }`
+ * for every anomaly agent, so reading the effective map would hand Miyabi a Mastery appetite she
+ * never declared and invert the whole model. Do not "helpfully" switch it.
+ */
+function computeEffectiveAP(unit, team) {
+    const baseAP = getStat(unit, 'ap');
+    const appetite = w(unit.mechanics?.scaling?.am ?? 0);
+    if (appetite <= 0) return baseAP;
+    let supply = 0;
+    for (const mate of team) {
+        if (mate === unit) continue;              // a unit does not buff itself
+        supply += w(mate.mechanics?.buffs?.buildup ?? 0);
+    }
+    if (supply <= 0) return baseAP;
+    const conversion = AM_TO_AP_MAX
+        * Math.min(1, appetite / 3)
+        * Math.min(1, supply / AM_SUPPLY_FOR_FULL);
+    return baseAP + conversion;
+}
+
+/**
+ * Effective AP expressed relative to a stock anomaly agent, so it multiplies a payout without
+ * changing that payout's units. A baseline agent returns exactly 1.0.
+ */
+function apFactor(unit) {
+    const ap = unit._effectiveAP;
+    if (ap === undefined) return 1;               // not on a scored team; contribute nothing
+    return ap / BASELINE_ANOMALY_AP;
 }
 
 // The table must cover every class and price every stat. A missing class silently reads 0 for
@@ -3527,9 +3594,13 @@ function scoreMechanicalSynergy(team, debug, options = {}) {
         if (!reaction) continue;
 
         if (reaction.vortexTier > 0) {
-            const vortexBonus = VORTEX_BASE * reaction.vortexTier;
+            // A vortex's damage is the element multiplier times the AP of the agent whose proc
+            // was consumed. Scaling the PAYOUT, never `reaction.vortexTier` itself: the stored
+            // tier is read by the wasted-vortex gate against VORTEX_PRIMARY_MIN, and folding AP
+            // in there would let a high-AP agent clear that threshold on a bad element. [VTX-03]
+            const vortexBonus = VORTEX_BASE * vortexValue(reaction.vortexTier) * apFactor(unit);
             consumerScores.set(unit.name, (consumerScores.get(unit.name) || 0) + vortexBonus);
-            if (debug) console.log(`    Vortex bonus: ${unit.name} +${vortexBonus.toFixed(1)} (tier ${reaction.vortexTier.toFixed(2)})`);
+            if (debug) console.log(`    Vortex bonus: ${unit.name} +${vortexBonus.toFixed(1)} (tier ${reaction.vortexTier.toFixed(2)} -> ${vortexValue(reaction.vortexTier).toFixed(2)}, ap x${apFactor(unit).toFixed(2)})`);
         }
 
         // Flat "a disorder happened, and this agent's own procs are part of it" bonus. Agents
@@ -4044,6 +4115,13 @@ export function scoreTeamForBoss(team, boss, options = {}) {
         unit._resolvedDamage = resolveValueMap(unit.mechanics?.damage, { team, self: unit, consumer: null });
     }
 
+    // Effective Anomaly Proficiency, once per pass. It depends on team composition (the buildup
+    // supply) but not on the boss, and not on the reaction set — which is why it can be resolved
+    // here rather than threaded through computeAnomalyReactions' four call sites.
+    for (const unit of team) {
+        unit._effectiveAP = computeEffectiveAP(unit, team);
+    }
+
     if (debug) {
         const teamLabel = team.map(u => u.name).join(' / ');
         console.log(`\n${'='.repeat(60)}`);
@@ -4064,6 +4142,7 @@ export function scoreTeamForBoss(team, boss, options = {}) {
         for (const u of team) {
             delete u._activatedRoles;
             delete u._resolvedDamage;
+            delete u._effectiveAP;
         }
     };
 

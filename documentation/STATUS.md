@@ -74,6 +74,32 @@ data tuning rather than engine defects.
 
 ## What shipped last
 
+**Anomaly overhaul, phase 2c/2d** — Anomaly Proficiency, and tier compression, 2026-09-10.
+
+**Vortex damage now scales on the Proficiency of the agent whose proc was consumed.** Effective
+AP is base `ap` plus whatever a unit's declared `scaling.am` converts out of the team's buildup
+supply, so Alice, Promeia and Vivian improve as their team feeds them Mastery while Miyabi, who
+declares no Mastery appetite, gains nothing from a buildup buffer. 1,817 rows moved. The largest
+losses are Miyabi and Soukaku teams on Scorched Horizon, both `ap: 1` and both halved — which is
+the model doing its job: Miyabi's dislike of wind no longer rests on a suppressed frost tier.
+
+**Tier values are compressed at the square root before payout**, anchored at 2. A tier is a
+damage ratio; a team's value is not linear in one damage channel. Same argument and same shape as
+buff delivery's `scaleImpact` `[COH-03]`, so it is a principle rather than a fitted constant. Ice
+falls 4.5 to 3.00, the ether/fire/physical majority does not move at all, electric rises 1 to
+1.41. 1,016 rows moved. Grace beside Remielle and Velina gained 12 points, which is the owner's
+stated game fact — her electric is the weakest wind mix-in and she is good there anyway.
+
+Three separate routes to one trap are now closed: AP, compression and pooling all scale the
+**payout** and never the stored tier, because the stored tier is what the wasted-vortex charge
+compares against `VORTEX_PRIMARY_MIN`. See `[VTX-02]`, `[VTX-03]`, `[VTX-04]`.
+
+**Decision-gate reading, interim.** Beside Remielle and Velina with the declared L5 stripped, the
+Aria-to-Promeia gap has closed from **-58.7 to -41.1** on Girtablullu (-42.3 on Aberrant), and
+Alice-to-Burnice from -27.9 to -22.5. Both still in the wrong order. Compression did the work;
+AP alone made the Aria gap slightly *worse*, because both agents have high Proficiency and
+inflating the channel widens an absolute gap. That was the plan's own forecast.
+
 **Anomaly overhaul, phase 2b** — the vortex tier became a pooled mean, 2026-09-10.
 
 Vortex events are gated by the wind agent's cyclones, which the non-wind agents **share**. A

@@ -103,8 +103,11 @@ Populated during the comment pass. One row per tag, newest last within a prefix.
 | `[SCAL-02]` | `../data-model/scaling.md` | `needSeverity` is convex, and reads the coerced weight |
 | `[SCAL-03]` | `../data-model/scaling.md` | Exploiting a longer stun window needs two gates |
 | `[CODEP-01]` | `../recommendations/codependency-gating.md` | The scorer reads `scaling.codependent` as a discount, not a gate |
+| `[AP-01]` | `../data-model/stats.md` | Effective Anomaly Proficiency: base `ap` plus what `scaling.am` converts from team buildup |
 | `[VTX-01]` | `../concepts/anomaly-reactions.md` | The vortex tier is a pooled mean of the team's non-wind elements, not a max |
 | `[VTX-02]` | `../concepts/anomaly-reactions.md` | The vortex-carry gate reads a carry's OWN element tier, never the pooled one |
+| `[VTX-03]` | `../concepts/anomaly-reactions.md` | AP scales the vortex PAYOUT, never the stored tier |
+| `[VTX-04]` | `../concepts/anomaly-reactions.md` | Tier values are compressed at the square root before payout, anchored at 2 |
 | `[CODEP-02]` | `../recommendations/codependency-gating.md` | `anomalyProcSupply` mirrors team-scorer's anomaly-quantity rule, not `buffs.buildup` |
 | `[PULL-01]` | `../recommendations/partner-ladder.md` | The partner ladder block in `pull-engine.js` is this whole page in code |
 | `[PULL-02]` | `../recommendations/pull-engine.md` | The codependency/ladder penalty is per unit, not per card |

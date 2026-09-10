@@ -88,6 +88,42 @@ plausible anomaly shell: Miyabi's frost drags the pool down for everyone, includ
 consumes every proc the team applies, so vortex events scale with proc count rather than with one
 agent's cyclones. Nothing is shared, so nothing dilutes, and each agent reads its own element.
 
+## Vortex damage scales on the proccer's Proficiency
+
+A vortex's damage is the element's multiplier times the **Anomaly Proficiency of the agent whose
+non-wind proc was consumed**. So two agents of the same element are not worth the same to a wind
+partner, and that is what separates them.
+
+Miyabi is the case this exists for. Her AP is genuinely low — her damage runs through crit rather
+than through Proficiency — so her vortexes are small whatever element she carries. That, not a
+suppressed frost tier, is why she is a poor Velina partner. Grace is the mirror: electric is the
+weakest wind mix-in and she is good there anyway, because her AP is naturally high.
+
+Effective AP is base `ap` plus whatever the unit's declared `scaling.am` converts out of the
+team's buildup supply, so Alice, Promeia and Vivian get better as their team feeds them Mastery
+while Miyabi, who declares no Mastery appetite, gains nothing from a buildup buffer. See
+[stats](../data-model/stats.md) and `[AP-01]`.
+
+## Tier values are compressed before they are paid
+
+A tier is a **damage** ratio out of the game. A team's **value** is not linear in one damage
+channel — the score sums many channels and then soft-caps — so the spread is compressed at the
+square root before payout, anchored at 2.
+
+This is the same argument, and the same shape, that buff delivery already uses: `scaleImpact`
+prices a buff at the square root of its L4 coefficient because a support's share of a team's
+damage is not linear in its pair coefficient. See `[COH-03]`.
+
+| element | tier | value paid |
+|----|----|----|
+| ice | 4.5 | 3.00 |
+| fire, physical, ether | 2.0 | 2.00 |
+| electric | 1.0 | 1.41 |
+| frost, auricInk, honedEdge | 0.8 | 1.26 |
+
+Anchored at 2 so the majority of the roster does not move at all; only the outliers compress. The
+ice-to-ether ratio falls from 2.25 to 1.50.
+
 ### Two tiers, and the difference matters
 
 | field | what it is | who reads it |
@@ -100,6 +136,11 @@ vortex worth building around, which is a property of that carry rather than of t
 pool. Point it at the pooled value instead and Miyabi in `Nangong/Miyabi/Velina` reads 1.4,
 clears `VORTEX_PRIMARY_MIN`, and the charge silently stops firing — worth about **+70** to the
 team the charge exists to punish. Mechanics TEST 28 pins both halves.
+
+**Neither AP nor tier compression touches the stored tier either**, for the same reason and by
+the same route. Both scale the payout. Compressing the stored value would lift frost to 1.26 and
+clear the threshold; folding AP in would let a high-AP agent clear it on a bad element. Three
+different ways to reach one trap — hence `[VTX-02]`, `[VTX-03]` and `[VTX-04]`.
 
 ## Boss anomaly state
 
