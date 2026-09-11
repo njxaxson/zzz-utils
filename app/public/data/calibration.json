@@ -1,15 +1,15 @@
 {
-  "generated": "2026-09-10T10:35:21.642Z",
+  "generated": "2026-09-11T05:22:17.607Z",
   "method": "linear",
   "target": 400,
   "k": 10,
   "anchorRule": "top-K mean, global across all bosses, excluding teams containing a boss favored unit",
-  "engineFingerprint": "c0cbd2e79eb774d3fc7c7b4b2c56dd7b3e3f8d3901109fe8b7d19a1221d114bc",
+  "engineFingerprint": "27e81aad9e4762ac6adb034d271942ad7b9d96c6cfec40fdefa1b2739447bcab",
   "corpus": {
     "teams": 6897,
-    "bosses": 19,
-    "totalPairs": 131043,
-    "viablePairs": 64338
+    "bosses": 20,
+    "totalPairs": 137940,
+    "viablePairs": 67075
   },
   "archetypes": {
     "anomaly": {
@@ -21,20 +21,20 @@
     "rupture": {
       "anchor": 535.1,
       "factor": 0.747552,
-      "n": 12122,
-      "excluded": 25
+      "n": 12831,
+      "excluded": 48
     },
     "armorer": {
       "anchor": 400,
       "factor": 0.999975,
-      "n": 2106,
-      "excluded": 15
+      "n": 2259,
+      "excluded": 168
     },
     "attack": {
       "anchor": 514.5,
       "factor": 0.777514,
-      "n": 32529,
-      "excluded": 236
+      "n": 34404,
+      "excluded": 251
     }
   }
 }

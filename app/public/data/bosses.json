@@ -290,5 +290,22 @@
             "shillIntensity" : 3,
             "control": 1
         }
+    },
+    {
+        "id": "kusa",
+        "name": "Kusarikku",
+        "shortName": "Kusarikku",
+        "image": "./assets/bosses/kusa.webp",
+        "released": 3.2,
+        "favored": ["Claret"],
+        "mechanics": {
+            "weaknesses": ["fire", "electric"],
+            "resistances": ["ice"],
+            "shill": "armorer",
+            "anti": ["anomaly"],
+            "assists": 2,
+            "chainParry": true,
+            "control": 1
+        }
     }
 ]
