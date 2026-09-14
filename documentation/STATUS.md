@@ -15,8 +15,8 @@ The engine returns **raw**. Anything comparing archetypes against each other rea
 
 | Suite | State |
 |----|----|
-| mechanics | **27 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
-| rankings | **91 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
+| mechanics | **28 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
+| rankings | **89 pass, 2 KNOWN_RED**, exits 0. TESTS 9 and 90 — the anomaly ladder |
 | recommendations | **44 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
 | bucketing | **6 pass, 0 fail** |
 | cohesion fixture | **11/11** owner judgements hold |
@@ -33,21 +33,21 @@ node calibration-check.mjs
 (118 tests total, same as before) — mechanics tests pin isolated engine rules independent of
 roster content, rankings tests pin score floors/orderings/ladders for the live roster.
 
-All three `KNOWN_RED` maps are **empty**. That is a real state, not an oversight — every test that
-was red on purpose has been closed. See [the verification loop](tooling/verification-loop.md) for
-why an empty map still matters, and why a green suite is not evidence on its own.
+`KNOWN_RED` is empty for mechanics and recommendations, and holds **two entries** for rankings:
+TESTS 9 and 90, the anomaly ladders that were being held up by declared `synergy.units`
+relationships until phase 3 removed them. That is one disagreement, opened deliberately and
+visible for exactly as long as it lasts — the suite goes red on a stale entry the moment a
+mechanic closes one, which is what the map is for. See
+[the verification loop](tooling/verification-loop.md) for why an empty map still matters, and why
+a green suite is not evidence on its own.
 
 ## Open
 
-Two, both boss-data levers rather than engine defects. Neither is release-blocking.
+**None as issue files.** Both boss-data levers were converted to mechanics in phase 3 of the
+anomaly overhaul; see [adjudications](notes/adjudications.md).
 
-| Issue | Priority |
-|----|----|
-| [Bringer's `shillIntensity` 6 forces Miyabi to the top](issues/open/medium-bringer-shill-intensity-forces-miyabi-to-the-top.md) | medium |
-| [Aberrant's `shillIntensity` should become a lumenize vulnerability](issues/open/medium-aberrant-shill-intensity-should-be-a-lumenize-vulnerability.md) | medium |
-
-Both are thumbs on the scale doing work that a mechanic should be doing. The Aberrant one is the
-more tractable of the two — the underlying game fact is already known.
+What IS open is the anomaly ladder itself, held in `KNOWN_RED` rather than in an issue file
+because it is a live measurement rather than a defect to be described. See below.
 
 ## Deferred
 
@@ -73,6 +73,54 @@ lives in [notes/](notes/) instead — see [the issue system](issues/README.md).
 data tuning rather than engine defects.
 
 ## What shipped last
+
+**Anomaly overhaul, phase 3** — the props came out, 2026-09-10.
+
+Every declared anomaly `synergy.units` relationship is gone: Remielle↔Velina, Aria↔Remielle,
+Aria↔Sunna, Aria↔Nangong, Burnice→Velina, and Alice's `"Remielle+Velina"` conjunctive group.
+Removed one at a time and measured individually; every strip moved downward only, and the largest
+single one (Remielle's pair) was worth up to 78.8 points on one team. The non-anomaly groups
+(Trigger/SAnby/Seed, Ye Shunguong/Dialyn, Ju Fufu) are untouched.
+
+**Both boss levers were converted to mechanics.** Bringer's `shillIntensity: 6` became a
+`weaknesses: ["ice:frost"]`, which needed boss weaknesses to understand element variants — they
+now do, and a variant weakness pays a plain-element unit half. Aberrant's `shillIntensity: 3`
+became `weak: ["luminize"]`. Both keep `favored`, which is real modelling. **No boss sets
+`shillIntensity` today and the field stays**, by owner ruling: it is the release-deadline lever
+and removing the capability would be a mistake. Closes DATA-001 and DATA-002.
+
+**What the mechanics can and cannot carry.** Beside Remielle and Velina, with nothing propping
+the ladder up:
+
+| rung | required | actual (Girtablullu) |
+|----|----|----|
+| Aria > Promeia | yes | **no**, by 39.8 |
+| Promeia > Alice | yes | **yes**, by 64.7 |
+| Alice > Burnice | yes | **no**, by 20.0 |
+| Burnice > Jane | yes | **no**, by 6.4 |
+
+Aberrant gives the same picture. The Aria rung is the buildup question, deliberately left
+unsolved. The Burnice/Jane rung inverted because Jane now has a real mechanic instead of a fake
+vortex buff. Held in `KNOWN_RED` while the fallout is assessed.
+
+**The calibration anchor tells the story on its own.** Anomaly's anchor fell from 640.2 to
+**575.2** and its factor rose from 0.625 to **0.695** — that is the fudging coming out of the raw
+scale. Anomaly now sits much closer to attack (514.5) and rupture (535.1) before calibration than
+it ever has.
+
+**TEST 91 was rewritten, not disabled.** It pinned the conjunctive-group mechanism through
+Alice's declaration; the mechanism is unchanged and still has a live user, so the test moved onto
+Trigger/SAnby/Seed.
+
+**A proc-damage buff is no longer paid twice**, 2026-09-10. `buffs["anomaly:<element>"]` was
+landing through two channels at once: the general affinity payout ("extra damage against an
+afflicted target") and the vortex amplification ("the vortex is built on the proc you buffed").
+For a consumer that is actually reacting with wind those are the SAME damage, so the affinity
+channel now skips them. A consumer with no vortex — Remielle, or Harumasa in a monoshock team —
+still collects it, because their proc damage is not being counted anywhere else.
+
+310 rows, all downward, every one of them a team holding Jane, Grace or Rina **and** a vortex
+source. Zero exceptions in both directions.
 
 **Anomaly overhaul, phase 2e-2h** — the rest of the model, 2026-09-10.
 

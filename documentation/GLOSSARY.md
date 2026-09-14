@@ -35,7 +35,7 @@ One line each. Follow the link for the real treatment.
 | `synergy.units` | Hand-curated named-partner bonuses. A low-weight L5 fallback. [→](data-model/unit-object.md) |
 | `scaling.codependent` | "This unit is non-functional without specific partners." Pull engine only. [→](recommendations/codependency-gating.md) |
 | `scaling.greedy` | How much of a stun window a carry needs to itself. [→](data-model/scaling.md) |
-| `shillIntensity` | A boss-side multiplier on favored-unit bonuses. Live, and currently contentious. [→](data-model/boss-object.md) |
+| `shillIntensity` | A boss-side multiplier on favored-unit bonuses. Live, deliberately retained as a release-deadline lever, and currently used by no boss. [→](data-model/boss-object.md) |
 
 ## Engine vocabulary
 

@@ -117,6 +117,10 @@ const BOSS_WEAK = {
     VEIL_PER_UNIT: 8,
     STUN_BONUS: 15,
     ABLOOM_PER_UNIT: 5,
+    // Lumenize weakness (Stagnant Aberrant). Priced above the others because it is far narrower:
+    // lumen is one element, Remielle is its only agent, and a boss declaring this is stating a
+    // unique vulnerability rather than a broad preference.
+    LUMINIZE_PER_UNIT: 12,
     FREEZE_BONUS: 15,
     CD_DEBUFF_PER_UNIT: 16,
     DAZE_DEBUFF_PER_UNIT: 10,
@@ -499,6 +503,26 @@ export function resolveBossVariation(boss, variationId) {
 // applied transparently without touching call sites.
 
 export function getBossWeaknesses(boss) { return boss.mechanics?.weaknesses ?? []; }
+
+// Boss weaknesses understand ELEMENT VARIANTS, because a variant is its own gauge and a boss can
+// be built to punish one specifically. `ice` matches every ice unit, Miyabi's frost included.
+// `ice:frost` matches Miyabi in full and a plain-ice unit only partially — Sacrifice Bringer is
+// weak to frost in particular, but he is not indifferent to ordinary ice.
+//
+// This is what lets a boss favour one of two same-element agents through a MECHANIC rather than
+// through `shillIntensity`, which is what it replaced there. [WEAK-01]
+const VARIANT_WEAKNESS_PARTIAL = 0.5;
+export function bossWeaknessFactor(weaknesses, unit) {
+    const base = getElement(unit);
+    const variant = getElementVariant(unit);
+    let best = 0;
+    for (const wk of weaknesses) {
+        if (wk === variant) return 1;                       // exact, variant or plain
+        if (wk === base) best = Math.max(best, 1);          // weak to the whole element
+        else if (classifierBase(wk) === base) best = Math.max(best, VARIANT_WEAKNESS_PARTIAL);
+    }
+    return best;
+}
 export function getBossResistances(boss) { return boss.mechanics?.resistances ?? []; }
 export function getBossShill(boss) { return boss.mechanics?.shill ?? null; }
 export function getBossAnti(boss) { return boss.mechanics?.anti ?? []; }
@@ -2952,6 +2976,19 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
         }
     }
 
+    // Lumenize weakness (Stagnant Aberrant): bonus scales with the team's Luminize output.
+    // Spelled to match `damage.luminize`, the key it reads — the issue that specified this wrote
+    // it "lumenize", and one spelling in the data beats two.
+    if (weakMechanics.includes('luminize')) {
+        let totalLuminize = 0;
+        for (const unit of team) totalLuminize += damageOfClass(unit, 'luminize');
+        if (totalLuminize > 0) {
+            const bonus = Math.round(totalLuminize * BOSS_WEAK.LUMINIZE_PER_UNIT);
+            score += bonus;
+            if (debug) console.log(`    Boss weak(luminize): total=${totalLuminize} → +${bonus}`);
+        }
+    }
+
     // Stun weakness (e.g. Sweeper): flat bonus when team has at least one stunner
     if (weakMechanics.includes('stun')) {
         if (team.some(isStun)) {
@@ -3060,7 +3097,8 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
     for (const unit of dpsUnits) {
         const element = getElement(unit);
 
-        if (bossWeaknesses.includes(element)) {
+        const wkFactor = bossWeaknessFactor(bossWeaknesses, unit);
+        if (wkFactor > 0) {
             onElementDPSCount++;
             const isSubDPS = hasSubDPSRole(unit);
             const unitReaction = l3Reactions.get(unit);
@@ -3072,8 +3110,10 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
                 : (isSubDPS ? 9 : 15);
             if (reactionDisabled) bonus = Math.round(bonus * 0.5);
             if (onElementDPSCount > 1 && bossWeaknesses.length >= 2) bonus = Math.round(bonus * 0.6);
+            // A partial match — plain ice against a frost-specific weakness — is worth less.
+            bonus = Math.round(bonus * wkFactor);
             score += bonus;
-            if (debug) console.log(`    ${unit.name} on-element (${element}): +${bonus}${reactionDisabled ? ' (reaction-disabled)' : ''}${onElementDPSCount > 1 ? ' (diminished)' : ''}`);
+            if (debug) console.log(`    ${unit.name} on-element (${getElementVariant(unit)}): +${bonus}${wkFactor < 1 ? ` (partial ×${wkFactor})` : ''}${reactionDisabled ? ' (reaction-disabled)' : ''}${onElementDPSCount > 1 ? ' (diminished)' : ''}`);
 
             if (isTitled(unit) && bossShill && DPS_ROLES.includes(bossShill) && !unit.tags.includes(bossShill)) {
                 score += 15;
@@ -3084,14 +3124,14 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
 
     if (bossWeaknesses.length > 0) {
         const primaryDPS = dpsUnits.filter(u => !hasSubDPSRole(u) && !isStun(u));
-        const onCount = primaryDPS.filter(u => bossWeaknesses.includes(getElement(u))).length;
+        const onCount = primaryDPS.filter(u => bossWeaknessFactor(bossWeaknesses, u) > 0).length;
         const offCount = primaryDPS.length - onCount;
 
         if (offCount > 0 && primaryDPS.length > 0) {
             const offRatio = offCount / primaryDPS.length;
             const singleWeakness = bossWeaknesses.length === 1;
             const basePenalty = singleWeakness ? 45 : 30;
-            const hasTitled = primaryDPS.some(u => isTitled(u) && !bossWeaknesses.includes(getElement(u)));
+            const hasTitled = primaryDPS.some(u => isTitled(u) && bossWeaknessFactor(bossWeaknesses, u) === 0);
             const titledReduction = hasTitled ? 0.5 : 1.0;
             const applied = Math.round(basePenalty * offRatio * titledReduction);
             score -= lenient ? Math.floor(applied / 2) : applied;
@@ -3241,6 +3281,12 @@ function scoreBaselineAffinity(supplier, consumer, debug, options = {}) {
             if (teamLandsElement) break;
         }
         if (!teamLandsElement) continue;
+        // Skip a consumer that is REACTING with wind. Their proc damage is realised as vortex,
+        // and the vortex payout already amplifies itself by this same buff — paying here as well
+        // would count one buff twice on the same damage. A consumer with no vortex (Remielle,
+        // or Harumasa in a monoshock team) has proc damage that is not being counted anywhere
+        // else, so it is paid here. [BUFF-05]
+        if (options?.reactions?.get(consumer)?.vortexTier > 0) continue;
         const cw = getBasicDamage(consumer) / 3;
         if (cw <= 0) continue;
         const val = w(buffVal) * cw * MULT.ANOMALY_ELEMENT_BUFF;

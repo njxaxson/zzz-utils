@@ -104,13 +104,12 @@
         "released": 1.4,
         "favored": ["Miyabi"],
         "mechanics": {
-            "weaknesses": ["ice"],
+            "weaknesses": ["ice:frost"],
             "resistances": ["physical"],
             "shill": "anomaly",
             "anti": [],
             "assists": 0,
-            "freezable": true,
-            "shillIntensity": 6
+            "freezable": true
 
         }
     },
@@ -287,7 +286,7 @@
             "shill": "anomaly",
             "anti": ["attack", "rupture", "armorer"],
             "assists": 2,
-            "shillIntensity" : 3,
+            "weak": ["luminize"],
             "control": 1
         }
     },

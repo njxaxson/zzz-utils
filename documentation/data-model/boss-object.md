@@ -59,7 +59,7 @@ team is still disqualified.
 |----|----|
 | `weaknesses` / `resistances` | Element match bonus; a resisted carry is disqualified. See [element resistance and role](../engine/element-resistance.md) |
 | `anti` | Carry archetypes disqualified outright |
-| `weak` | Array of mechanic weaknesses — `disorders`, `veils`, `stun`, `abloom`. A boss can have several |
+| `weak` | Array of mechanic weaknesses — `disorders`, `veils`, `stun`, `abloom`, `luminize`. A boss can have several |
 | `assists` | Minimum defensive-assist count. See [defensive assists](../concepts/defensive-assists.md) |
 | `anomaly:state` | The boss permanently carries this element's anomaly. See [anomaly reactions](../concepts/anomaly-reactions.md) |
 | `freezable` | Ice anomaly agents get a large bonus; pseudo-anomaly agents get half |
@@ -90,17 +90,38 @@ since one interceptor already covers the fight.
 
 **Bonus only.** A team without an armorer is never penalised for it.
 
-### `shillIntensity` — a working field
+### Element weaknesses understand variants
+
+A weakness may name an element (`ice`) or a specific variant (`ice:frost`). A variant is its own
+anomaly gauge, so a boss can be built to punish one of two same-element agents:
+
+| boss weakness | Miyabi (`ice:frost`) | Promeia (plain `ice`) |
+|----|----|----|
+| `ice` | full | full |
+| `ice:frost` | full | **half** |
+
+Half rather than nothing, because a boss weak to frost in particular is still not indifferent to
+ordinary ice. This is what lets Sacrifice Bringer favour Miyabi through a mechanic — see
+`[WEAK-01]`.
+
+### `shillIntensity` — a working field, deliberately kept
 
 `shillIntensity` multiplies the flat `favored` bonus. It defaults to 1, so most bosses are
 unaffected.
 
-Two bosses set it today:
+**No boss sets it today.** That is not a sign the field is dead. It is the release-deadline
+escape hatch: when a ladder has to come out right before a patch ships and the mechanic that
+would produce it does not exist yet, this is the lever that buys the time. Two bosses used it
+until the anomaly overhaul replaced both with mechanics:
 
-| Boss | `shillIntensity` | `favored` |
+| Boss | was | now |
 |----|----|----|
-| Sacrifice Bringer | 6 | Miyabi |
-| Stagnant Aberrant | 3 | Remielle |
+| Sacrifice Bringer | `shillIntensity: 6` (+132 to Miyabi) | `weaknesses: ["ice:frost"]` |
+| Stagnant Aberrant | `shillIntensity: 3` (+66 to Remielle) | `weak: ["luminize"]` |
+
+Both keep their `favored` entry, which is a different thing and is **real modelling**: the
+developers do build bosses that quietly favour the new banner unit with unadvertised damage or
+daze bonuses. `favored` says that; `shillIntensity` says how hard to lean on it.
 
 The first favored unit on the team gets the full multiplier; each subsequent one gets half of
 the excess above 1. With the base favored bonus at 22 and an intensity of 6, that is:
@@ -133,7 +154,7 @@ the scoring code.
 | **Notorious Dead End Butcher** | The first boss with a variation, one that favors non-anomaly stun-based teams and another that favors anomaly-based disorder teams |
 | **Typhon Slugger** | `assists: 3` — every unit must have `assist:defensive` |
 | **Girtablullu** | `chainParry: true` — the assist requirement cannot be reduced by limited-rotation units |
-| **Sacrifice Bringer** | `freezable`, so ice anomaly agents get a large bonus. Also the highest `shillIntensity` |
+| **Sacrifice Bringer** | `freezable`, so ice anomaly agents get a large bonus. Weak to `ice:frost` specifically, which favours Miyabi over Promeia |
 | **Discordant Solo** | `weak: veils`, built around Sunna's ether veil stacking. Also `control: 2`, the highest in the roster, so it is the best showcase for the armorer quicktime bonus |
 | **Primordial Nightmare / Wandering Hunter / Stagnant Aberrant** | Multiple `anti` entries narrow the field to a single viable archetype |
 

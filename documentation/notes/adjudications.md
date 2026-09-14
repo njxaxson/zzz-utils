@@ -188,6 +188,29 @@ So the ordering was never the defect; the defect was pricing a stunner's damage 
 carry's. Damage-type buffs never got the role weighting the generic ATK buff has always had.
 After the fix Orphie still wins, with the margin tightening from 7.7 to 1.7.
 
+### Both `shillIntensity` uses were converted to mechanics, and the field was kept
+
+**Closes DATA-001 and DATA-002.** Sacrifice Bringer's `shillIntensity: 6` and Stagnant
+Aberrant's `3` were the two number-fudging levers left in the boss data. Both are gone, replaced
+by the mechanic each was standing in for:
+
+| Boss | was | now |
+|----|----|----|
+| Sacrifice Bringer | `shillIntensity: 6`, +132 to Miyabi | `weaknesses: ["ice:frost"]` |
+| Stagnant Aberrant | `shillIntensity: 3`, +66 to Remielle | `weak: ["luminize"]` |
+
+Bringer's needed boss weaknesses to understand element variants, which they now do: a variant
+weakness pays a plain-element unit half, so Promeia is still welcome on an ice boss while Miyabi
+is the one it is built for. Aberrant's needed a Luminize weakness, and Remielle is the only
+source of it. Both bosses keep `favored`, which is a different claim and a real one.
+
+**The field itself stays, and that is the ruling.** Owner: number-fudging levers "are IMPORTANT,
+they are what allowed us to ship 3.2 on time. They are a hack but they are literally there to
+save us when the deadlines approach. After release we can go back and fix the hacks — but as a
+general call, we should not be removing these capabilities, they are CRITICAL as a backup
+mechanism." No boss sets `shillIntensity` today; the capability is retained for the next
+deadline, not deprecated.
+
 ### Sacrifice Bringer was fixed in the boss data, not the engine
 
 **Complaint:** Bringer is ice-weak and anomaly-shill, so an all-ice anomaly base should be
