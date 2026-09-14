@@ -23,6 +23,7 @@
 import { loadAllData } from './lib/data.js';
 import { scoreTeamForBoss, resolveBossVariation, getBossResistances } from './app/public/lib/common/team-scorer.js';
 import { NEUTRAL_BOSS, assert, makeAllViableTeamEntries, filterIncludeOneOf, getTopViableTeams, scoreForTeamString, scoreMapForBoss, withBosses } from './lib/scoring-test-utils.js';
+import { rankBandEpsilon } from './app/public/lib/common/team-builder.js';
 
 // Viability / disqualification: `matchups.js` only *lists* teams with score > 0. A score <= 0
 // means the comp is not viable for that boss (disqualification, anti-synergy, etc.). Assertions
@@ -44,13 +45,7 @@ const KNOWN_RED = new Map([
     // the suite goes red on the stale entry, which is the point.
     [9, 'Sanguine Sweeper: Sunna > Yuzuha behind Nangong/Aria was carried by the Aria<->Sunna ' +
         'declaration. With it gone the mechanics rank Yuzuha first. Unassessed.'],
-    [90, 'Remielle/Velina third slot, declarations stripped. Three of four rungs are inverted ' +
-         'and Promeia > Alice holds by 48.5. Measured on Girtablullu after phase 4: Aria is ' +
-         '11.3 behind Promeia (was 39.8 — proc rate and the compressed vortex tiers closed ' +
-         'most of it, and the remainder is the buildup question), Alice is 11.8 behind Burnice ' +
-         '(was 20.0), and Burnice is 21.9 behind Jane (was 6.4 — this rung got WORSE, as ' +
-         'the phase-4 plan predicted, and the open candidate is that Jane is over-priced rather ' +
-         'than anything about Burnice).'],
+    [90, 'Remielle/Velina third slot. ONE cause left, surfacing as three violations: PHOENIX IS NOT AT THE TOP — 5.6 behind Aria on Girtablullu, 6.6 on Aberrant. Her conditional proc-damage buff fires at full weight on this team and reaches only Velina (7.5 raw at weight 3, 10.0 at weight 4): Remielle is lumen [LUM-02], and a self-landing buff counts at SELF_PROC_BUFF_SHARE [BUFF-08]. Both exclusions are owner-confirmed. The binding constraint is now the L4 SOFT CAP rather than her kit — at raw L4 240 a marginal point is worth about 0.3, so the weight 3->4 bump bought only 1.5. The third violation (MRV above her on Aberrant) is the same cause seen from the other side and resolves when she does. Everything else in this ladder is green and EXERCISED — violations are collected rather than thrown, so no rung hides behind a higher one: the Alice rungs closed when an unmet weight-2 need stopped being charged against the boss matchup [TWM-02], and Alice/Burnice is an owner-stated tossup asserted within one rank band.'],
 ]);
 
 async function main() {
@@ -1932,15 +1927,19 @@ async function main() {
     // to every boss; it will fail, and correctly.
     run('TEST 90: Remielle/Velina third-slot ladder on element-neutral bosses', () => {
         const LADDER = [
+            'Phoenix/Remielle/Velina',
             'Aria/Remielle/Velina',
             'Promeia/Remielle/Velina',
             'Alice/Remielle/Velina',
             'Burnice/Remielle/Velina',
             'Jane Doe/Remielle/Velina',
         ];
+        // The top three of that ladder. Used by the Miyabi/Vivian comparison below.
+        const TOP_THREE = LADDER.slice(0, 3);
         const NEUTRAL_TO_THESE = ['Girtablullu', 'Aberrant'];
 
         let checked = 0;
+        const violations = [];
         for (const bossName of NEUTRAL_TO_THESE) {
             const bs = withBosses(bosses, bossName);
             assert(bs.length === 1, `expected exactly one ${bossName}, got ${bs.length}`);
@@ -1949,21 +1948,77 @@ async function main() {
             if (scored.some(x => x.score <= 0)) continue;
             checked++;
 
+            // Every rung is a strict ordering. Alice over Burnice is additionally a TOSSUP by
+            // owner ruling ("Alice is generally better", but "I can live with Burnice and Alice
+            // being so close"), so it carries a second, upper assertion: Alice must win, AND the
+            // two must stay within one rank band of each other. A rank band is the allocator's
+            // own definition of "close enough to trade away" ([BUCK-01]), so the pair asserts
+            // both halves of the ruling — the order is real, and it is cheap enough to give up
+            // when one of them is contested on another boss. If that gap ever widens past a
+            // band, the engine has started claiming something stronger than the owner did.
+            //
+            // Violations are COLLECTED, not thrown on sight. `assert` stops the test at the
+            // first failure, which would leave every rung below the highest broken one
+            // unexercised — an assertion that cannot fail is not encoding anything. Same shape
+            // as TESTs 79/81/82.
+            const TOSSUP_PAIRS = new Set(['Alice/Remielle/Velina|Burnice/Remielle/Velina']);
             for (let i = 1; i < scored.length; i++) {
-                assert(scored[i - 1].score > scored[i].score,
-                    `${boss.name}: ${scored[i - 1].label} (${scored[i - 1].score.toFixed(1)}) must ` +
-                    `outrank ${scored[i].label} (${scored[i].score.toFixed(1)})`);
+                const hi = scored[i - 1], lo = scored[i];
+                if (hi.score <= lo.score) {
+                    violations.push(`${boss.name}: ${hi.label} (${hi.score.toFixed(1)}) must ` +
+                        `outrank ${lo.label} (${lo.score.toFixed(1)})`);
+                } else if (TOSSUP_PAIRS.has(`${LADDER[i - 1]}|${LADDER[i]}`)) {
+                    const band = rankBandEpsilon(hi.score);
+                    if (hi.score - lo.score >= band) {
+                        violations.push(`${boss.name}: ${hi.label} (${hi.score.toFixed(1)}) beats ` +
+                            `${lo.label} (${lo.score.toFixed(1)}) by more than one rank band ` +
+                            `(${band.toFixed(1)}) — the owner called these two a tossup, so this ` +
+                            `gap is now overstated`);
+                    }
+                }
+            }
+            // The tossup may only shuffle those two against each other. Both must still clear
+            // Jane Doe outright, which is the rung the owner is emphatic about.
+            const janeIdx = LADDER.length - 1;
+            for (const idx of [janeIdx - 2, janeIdx - 1]) {
+                if (scored[idx].score <= scored[janeIdx].score) {
+                    violations.push(`${boss.name}: ${scored[idx].label} ` +
+                        `(${scored[idx].score.toFixed(1)}) must beat ${scored[janeIdx].label} ` +
+                        `(${scored[janeIdx].score.toFixed(1)})`);
+                }
             }
 
-            // The Vivian/Miyabi track must sit below the whole Velina track here.
+            // Where the Vivian/Miyabi track sits is BOSS-SPECIFIC, and deliberately so. The
+            // owner's playtest claim was about Girtablullu: there the whole Velina track beats
+            // it. Stagnant Aberrant is the opposite case — Miyabi is close to indifferent to
+            // weaknesses, and Aberrant's luminize weakness pays every Remielle team alike, so
+            // MRV legitimately climbs past the Alice/Burnice/Jane rungs. What it must NOT do is
+            // reach the top of the ladder: "as long as MVR is distinctly behind
+            // Phoenix/Aria/Promeia+VR on Aberrant, I am good with that." Distinctly = beyond one
+            // rank band, so this is a real gap and not a tie the allocator could trade away.
             const mvr = scoreSpec('Miyabi/Remielle/Vivian', boss);
-            const worstRV = Math.min(...scored.map(x => x.score));
-            assert(mvr.score < worstRV,
-                `${boss.name}: ${mvr.label} (${mvr.score.toFixed(1)}) must sit below every ` +
-                `Remielle/Velina team (worst is ${worstRV.toFixed(1)})`);
+            if (boss.name === 'Girtablullu') {
+                const worstRV = Math.min(...scored.map(x => x.score));
+                if (mvr.score >= worstRV) {
+                    violations.push(`${boss.name}: ${mvr.label} (${mvr.score.toFixed(1)}) must sit ` +
+                        `below every Remielle/Velina team (worst is ${worstRV.toFixed(1)})`);
+                }
+            } else {
+                const topThree = scored.slice(0, TOP_THREE.length);
+                const weakestTop = topThree.reduce((a, b) => (a.score <= b.score ? a : b));
+                const floor = weakestTop.score - rankBandEpsilon(weakestTop.score);
+                if (mvr.score >= floor) {
+                    violations.push(`${boss.name}: ${mvr.label} (${mvr.score.toFixed(1)}) must sit ` +
+                        `distinctly below the top of the ladder — ${weakestTop.label} ` +
+                        `(${weakestTop.score.toFixed(1)}) less one rank band ` +
+                        `(${rankBandEpsilon(weakestTop.score).toFixed(1)}) = ${floor.toFixed(1)}`);
+                }
+            }
         }
         assert(checked === 2,
             `only ${checked} of the 2 element-neutral bosses were live - this test has gone vacuous.`);
+        assert(violations.length === 0,
+            `${violations.length} ladder violation(s):\n      - ` + violations.join('\n      - '));
     });
 
     // TEST 91: a conjunctive synergy group pays only when the WHOLE group is present

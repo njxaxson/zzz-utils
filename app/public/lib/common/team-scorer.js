@@ -3428,12 +3428,27 @@ function scoreBaselineAffinity(supplier, consumer, debug, options = {}) {
             if (teamLandsElement) break;
         }
         if (!teamLandsElement) continue;
-        // Skip a consumer that is REACTING with wind. Their proc damage is realised as vortex,
-        // and the vortex payout already amplifies itself by this same buff — paying here as well
-        // would count one buff twice on the same damage. A consumer with no vortex (Remielle,
-        // or Harumasa in a monoshock team) has proc damage that is not being counted anywhere
-        // else, so it is paid here. [BUFF-05]
-        if (options?.reactions?.get(consumer)?.vortexTier > 0) continue;
+        // Skip a consumer whose proc damage is already realised as vortex: the vortex payout
+        // amplifies itself by this same buff, so paying here too would count one buff twice on
+        // the same damage. A consumer with no vortex (Remielle, or Harumasa in a monoshock team)
+        // has proc damage counted nowhere else, so it is paid here. [BUFF-05]
+        //
+        // The WIND ENABLER is the exception, and it is not a carve-out — it is the same rule
+        // applied to a payout that changed. She is credited for CREATING vortex events, not for
+        // their damage, so her half no longer scales by this buff [VTX-05] — there is nothing
+        // left to double count. And she unambiguously procs: a proc is a proc whether it is wind
+        // or one of the original elements, and being the static half of a vortex does not mean
+        // she did not make one. Without this her own proc damage is priced nowhere at all.
+        const consumerReaction = options?.reactions?.get(consumer);
+        if (consumerReaction?.vortexTier > 0) {
+            if (!consumerReaction.isWindEnabler) continue;
+            // ...and only for a buff that actually covers HER procs. The bare key is every
+            // element and reaches them; `anomaly:physical` does not buff a wind proc just
+            // because a teammate is landing physical elsewhere on the target.
+            const covers = element === null
+                || [...getProcElements(consumer)].some(el => el.split(':')[0] === element);
+            if (!covers) continue;
+        }
         // Lumen never touches an anomaly gauge in either direction, and luminize runs strictly
         // on Proficiency, so no proc-damage buff reaches Remielle by any route. [LUM-02]
         if (isNativeLumen(consumer)) continue;
@@ -4343,8 +4358,19 @@ function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs =
     const structureFactor = STRUCTURE_FACTOR.get(structureScore) ?? 0.35;
     const twReactions = computeAnomalyReactions(team, boss);
 
+    // TWO views of cohesion, differing ONLY in how an unmet weight-2 need is treated. The full
+    // view charges everything and scales the team's own contribution; the MATCHUP view omits the
+    // weight-2 charge and scales the boss matchup (L3). See [TWM-02].
     let logSum = 0;
     let totalWeight = 0;
+    let logSumM = 0;
+    let totalWeightM = 0;
+    // Add a term to both views (the default), or to just one of them.
+    const addTerm = (value, weight, view = 'both') => {
+        const term = weight * Math.log(Math.max(value, 0.01));
+        if (view !== 'matchup') { logSum += term; totalWeight += weight; }
+        if (view !== 'full') { logSumM += term; totalWeightM += weight; }
+    };
 
     for (const unit of team) {
         // Armorer damage-lever dependency, graded by total supply rather than a yes/no check —
@@ -4354,8 +4380,7 @@ function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs =
             const supply = getArmorerLeverSupply(unit, team);
             const leverUtil = ARMORER_LEVER_MISS_UTIL + (1 - ARMORER_LEVER_MISS_UTIL)
                 * Math.min(1, supply / ARMORER_LEVER_FULL);
-            logSum += ARMORER_LEVER_WEIGHT * Math.log(Math.max(leverUtil * leverUtil, 0.01));
-            totalWeight += ARMORER_LEVER_WEIGHT;
+            addTerm(leverUtil * leverUtil, ARMORER_LEVER_WEIGHT);
             if (debug) console.log(`    Armorer levers: ${unit.name} supply=${supply.toFixed(2)} util=${leverUtil.toFixed(2)}`);
         }
         const buffs = unit.mechanics?.buffs || {};
@@ -4373,6 +4398,10 @@ function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs =
             const scaling = getEffectiveScaling(unit);
             let needsMet = 0;
             let needsTotal = 0;
+            // The same tally restricted to needs the owner calls a real DEPENDENCY (weight 3+)
+            // plus the structural charges below, which are failures rather than appetites.
+            let needsMetSevere = 0;
+            let needsTotalSevere = 0;
             for (const key of NEED_FULFILLMENT_KEYS) {
                 if (NATURALLY_AVAILABLE_NEEDS.has(key)) continue;
                 const sw = w(scaling[key]);
@@ -4388,11 +4417,16 @@ function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs =
                 if (selfProvision > 0) continue;
                 const severity = needSeverity(sw);
                 needsTotal += severity;
+                const severe = sw >= 3;
+                if (severe) needsTotalSevere += severity;
                 // A disorder is a team-wide event on the target, so ANY source satisfies ANY
                 // consumer, via the same supply the L4 need channel prices — one measure,
                 // consulted in both places. See documentation/concepts/disorder-supply.md.
                 if (key === 'disorders') {
-                    if (getDisorderSupply(unit, team, twReactions) > 0) needsMet += severity;
+                    if (getDisorderSupply(unit, team, twReactions) > 0) {
+                        needsMet += severity;
+                        if (severe) needsMetSevere += severity;
+                    }
                     // Skip the generic supplier scan: it can only see annotations, never
                     // element cycling, so the supply above is the whole answer for this key.
                     continue;
@@ -4404,7 +4438,11 @@ function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs =
                         w(supplier.mechanics?.debuffs?.[key]),
                         w(supplier.mechanics?.utility?.[key])
                     );
-                    if (supplyWeight > 0) { needsMet += severity; break; }
+                    if (supplyWeight > 0) {
+                        needsMet += severity;
+                        if (severe) needsMetSevere += severity;
+                        break;
+                    }
                 }
             }
             // Native anomaly tag, not the effective role: charges a unit for its own anomaly
@@ -4413,9 +4451,17 @@ function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs =
             // lumen is exempt: it cannot react at all. See [LUM-01].
             if (hasSubDPSRole(unit) && unit.tags.includes('anomaly') && !isNativeLumen(unit)) {
                 const unitReaction = twReactions.get(unit);
-                const hasReaction = unitReaction?.vortexTier > 0 || unitReaction?.hasDisorder;
+                // An abloom counts. The charge asks whether this unit's anomaly output goes
+                // anywhere, and abloom damage is somewhere for it to go — bonus damage on an
+                // enemy already carrying a proc, needing neither a vortex nor a disorder. A
+                // mono-element anomaly pair (two fire agents) makes no disorder BY CONSTRUCTION
+                // and still ablooms constantly; charging it for having "no reaction" reads a
+                // deliberate composition as a failed one. [ANOM-01]
+                const hasReaction = unitReaction?.vortexTier > 0 || unitReaction?.hasDisorder
+                    || abloomOutput(unit, team, boss) > 0;
                 if (!hasReaction) {
                     needsTotal += 1;
+                    needsTotalSevere += 1;
                 }
                 // Wasted vortex: subdps generates vortex but no native primary anomaly DPS
                 // benefits from it. See documentation/engine/cohesion.md ("Wasted vortex").
@@ -4434,17 +4480,27 @@ function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs =
                     }, 0);
                     if (bestPrimaryTier < VORTEX_PRIMARY_MIN) {
                         needsTotal += 1;
+                        needsTotalSevere += 1;
                     }
                 }
             }
-            if (needsTotal > 0 && needsMet < needsTotal - 1e-9) {
-                const reception = needsMet / needsTotal;
-                const receptionUtil = 0.7 + 0.3 * reception;
-                const weight = Math.min(0.5, needsTotal * 0.25);
-                logSum += weight * Math.log(Math.max(receptionUtil * receptionUtil, 0.01));
-                totalWeight += weight;
-                chargedForNeeds = true;
-            }
+            // An unmet need is graded by how hard the unit DEPENDS on it. Weight 1 never reaches
+            // here at all [SCAL-04]; weight 2 is charged against the team's own contribution but
+            // not against the boss matchup; weight 3 is charged against both. Starving Miyabi
+            // (disorders 3) costs her the matchup edge too; starving Alice (disorders 2) does
+            // not, because the rest of the team still executes the matchup. [TWM-02]
+            const chargeNeeds = (met, total, view) => {
+                if (!(total > 0 && met < total - 1e-9)) return false;
+                const receptionUtil = 0.7 + 0.3 * (met / total);
+                addTerm(receptionUtil * receptionUtil, Math.min(0.5, total * 0.25), view);
+                return true;
+            };
+            // Each view gets exactly one needs term: the full view from every unmet need, the
+            // matchup view from the severe ones only. A unit with both kinds is charged in both
+            // views, but the matchup view sees only the severe half.
+            const chargedFull = chargeNeeds(needsMet, needsTotal, 'full');
+            const chargedMatchup = chargeNeeds(needsMetSevere, needsTotalSevere, 'matchup');
+            chargedForNeeds = chargedFull || chargedMatchup;
         }
         // A unit that is EXPECTED to supply something (scaling.buffs > 0 — supports and
         // defense by default, stunners at 2, or an explicit override like SAnby's 3) but
@@ -4452,9 +4508,7 @@ function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs =
         // rather than role so the data stays the single source of truth.
         if (!hasBuffContributions) {
             if (getScalingBuffs(unit) > 0) {
-                const weight = 1.0;
-                logSum += weight * Math.log(0.01);
-                totalWeight += weight;
+                addTerm(0.01, 1.0);
             }
             continue;
         }
@@ -4463,9 +4517,7 @@ function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs =
         // which must not wash out this same unit's needs penalty above.
         if (getScalingBuffs(unit) === 0) {
             if (!chargedForNeeds) {
-                const neutralWeight = isDPS(unit) ? 0.5 : 1.0;
-                logSum += neutralWeight * Math.log(1.0);
-                totalWeight += neutralWeight;
+                addTerm(1.0, isDPS(unit) ? 0.5 : 1.0);
             }
             continue;
         }
@@ -4505,21 +4557,27 @@ function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs =
         const weight = isDPS(unit) ? 0.5 : 1.0;
         const utilValue = isDPS(unit) ? util : util * util;
 
-        logSum += weight * Math.log(Math.max(utilValue, 0.01));
-        totalWeight += weight;
+        addTerm(utilValue, weight);
     }
 
-    let cohesion = totalWeight > 0 ? Math.exp(logSum / totalWeight) : 0.5;
-    if (diametricFloor > 0) {
-        cohesion = Math.max(cohesion, diametricFloor);
-    }
-    const teamwork = structureFactor * (COHESION_FLOOR + (1 - COHESION_FLOOR) * cohesion);
+    const toCohesion = (ls, tw) => {
+        let c = tw > 0 ? Math.exp(ls / tw) : 0.5;
+        return diametricFloor > 0 ? Math.max(c, diametricFloor) : c;
+    };
+    const cohesion = toCohesion(logSum, totalWeight);
+    const cohesionMatchup = toCohesion(logSumM, totalWeightM);
+    const toTeamwork = c => structureFactor * (COHESION_FLOOR + (1 - COHESION_FLOOR) * c);
+    const teamwork = toTeamwork(cohesion);
+    const teamworkMatchup = toTeamwork(cohesionMatchup);
 
     if (debug) {
         console.log(`    Teamwork multiplier: ${teamwork.toFixed(3)} (structure=${structureFactor}, cohesion=${cohesion.toFixed(2)}${diametricPairs > 0 ? `, diametric=${diametricPairs}` : ''})`);
+        if (Math.abs(teamworkMatchup - teamwork) > 1e-9) {
+            console.log(`      ...but L3 is scaled by ${teamworkMatchup.toFixed(3)} (matchup view, cohesion=${cohesionMatchup.toFixed(2)}): an unmet weight-2 need does not cost the boss matchup`);
+        }
     }
 
-    return teamwork;
+    return { teamwork, teamworkMatchup };
 }
 
 // SYNERGY AVOID CHECK
@@ -4747,13 +4805,21 @@ export function scoreTeamForBoss(team, boss, options = {}) {
         maxDiametricPairs = Math.max(maxDiametricPairs, count);
         maxDiametricFloor = Math.max(maxDiametricFloor, floor);
     }
-    const teamwork = computeTeamworkMultiplier(team, structureScore, debug, maxDiametricPairs, maxDiametricFloor, boss);
+    const { teamwork, teamworkMatchup } = computeTeamworkMultiplier(team, structureScore, debug, maxDiametricPairs, maxDiametricFloor, boss);
 
     // Archetype fit: does the support infrastructure suit the primary carry's archetype? Applied
     // FLAT, AFTER the teamwork multiplier, deliberately not scaled by it — see
     // documentation/data-model/declared-archetypes.md and documentation/engine/teamwork-multiplier.md.
     const archetype = scoreArchetypeFit(team, debug);
-    score = Math.round((rawScore * teamwork + archetype) * 10) / 10;
+    // L3 is scaled by the MATCHUP view of cohesion, which forgives an unmet weight-2 need. The
+    // two views are identical unless a unit has one, so this is a no-op on most teams. [TWM-02]
+    // Identical views take the original expression verbatim, so a team with no weight-2 need
+    // is bit-for-bit unchanged rather than drifting by a rounding step.
+    const l3 = bossResult.score;
+    const blended = teamworkMatchup === teamwork
+        ? rawScore * teamwork
+        : (rawScore - l3) * teamwork + l3 * teamworkMatchup;
+    score = Math.round((blended + archetype) * 10) / 10;
 
     if (trace) {
         trace.disqualified = false;

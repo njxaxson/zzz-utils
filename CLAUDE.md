@@ -48,6 +48,20 @@ The last two are not optional extras. `test-bucketing.mjs` caught a structural c
 inverted a Deadly Assault allocation, and `cohesion-fixture.mjs` is the objective function for
 support fit. Neither has a `KNOWN_RED` map — they exit non-zero on any failure at all.
 
+### How to REPORT a suite run
+
+**Never say "all suites green", "everything passes", or "all five exit 0" while anything is in
+`KNOWN_RED`.** Those sentences are read as "there is nothing wrong", and that is false whenever a
+map has entries — the exit code only means *the failures are the ones we already knew about*.
+
+State both halves, every time, in this order:
+
+> No new failures. 2 known red still pending (TESTs 9, 90).
+
+If the maps are genuinely empty, say so explicitly — "no failures, `KNOWN_RED` is empty" — so the
+two cases never read the same. And if a run is clean *and* a map entry went stale, that is a
+**failure to report**, not a success: the suite exits 1 and the entry needs removing.
+
 `KNOWN_RED` belongs to `test-mechanics.mjs`, `test-rankings.mjs`, and `test-recommendations.mjs`.
 Those exit 0 only when the failing set is *exactly* their map, and exit 1 both when something
 unexpected fails and when a listed test starts passing. Either way: **check the exit code, not
