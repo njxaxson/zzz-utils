@@ -3,7 +3,7 @@
 Where things stand. Everything here is measured, not remembered — if you change the engine,
 re-run the commands and update the numbers.
 
-**Last verified:** 2026-09-10.
+**Last verified:** 2026-09-14.
 
 ## Scores come on two scales
 
@@ -21,7 +21,7 @@ The engine returns **raw**. Anything comparing archetypes against each other rea
 | bucketing | **6 pass, 0 fail** |
 | cohesion fixture | **11/11** owner judgements hold |
 | calibration freshness | `calibration.json` matches the current engine and data fingerprint |
-| calibration certification | **CERTIFIED** — 0 within-archetype rank inversions across 57 (boss × archetype) groups and 64,325 teams |
+| calibration certification | **CERTIFIED** — 0 within-archetype rank inversions across 60 (boss × archetype) groups and 67,026 teams |
 
 ```bash
 node test-mechanics.mjs && node test-rankings.mjs && node test-recommendations.mjs && node test-bucketing.mjs && node cohesion-fixture.mjs
@@ -35,7 +35,8 @@ roster content, rankings tests pin score floors/orderings/ladders for the live r
 
 `KNOWN_RED` is empty for mechanics and recommendations, and holds **two entries** for rankings:
 TESTS 9 and 90, the anomaly ladders that were being held up by declared `synergy.units`
-relationships until phase 3 removed them. That is one disagreement, opened deliberately and
+relationships until phase 3 removed them. Phase 4 closed most of two rungs on mechanics alone
+and made a third worse; the entries carry the current margins, not the phase-3 ones. That is one disagreement, opened deliberately and
 visible for exactly as long as it lasts — the suite goes red on a stale entry the moment a
 mechanic closes one, which is what the map is for. See
 [the verification loop](tooling/verification-loop.md) for why an empty map still matters, and why
@@ -73,6 +74,75 @@ lives in [notes/](notes/) instead — see [the issue system](issues/README.md).
 data tuning rather than engine defects.
 
 ## What shipped last
+
+**Anomaly overhaul, phase 4** — the mechanics take over the ladder, 2026-09-14.
+
+Phase 3 stripped the declarations and asked what the mechanics could carry. Phase 4 is the
+answer: `stats.am` became live data, proc rate and Proficiency were separated, and the vortex
+event stopped being charged three times over.
+
+* **`stats.am` now does two different jobs, and only one of them is conversion.** A unit's own
+  Mastery drives `procRate` — geometric in steps, `1.2 ^ (am - 2)`, so one point of Mastery is
+  20% more procs and Aria's defining trait finally pays. Separately, a unit that declares
+  `scaling.am` converts its **own** Mastery into Proficiency. `computeEffectiveAP` used to build
+  that conversion pool out of the team's `buffs.buildup`, which was wrong on its own terms:
+  nobody in the game hands anybody Anomaly Mastery. Supports buff *buildup*, a derived rate.
+  Promeia's Proficiency is now a property of how she is built rather than of who she stands
+  next to. **Lumen is off the proc curve entirely** — Remielle fills no gauge, so she is
+  excluded rather than handed a rate below 1.0.
+* **A vortex event is paid once.** The wind agent is credited for *creating* events, not for
+  their damage, so Velina scores the same beside Aria as beside Promeia — identical wind in
+  both cases. The element difference lands once, on the agent whose proc was consumed.
+* **"Anomaly affinity" is gone.** One invented multiplier was scaling three unrelated buffs
+  (buildup, disorders, vortex) off the consumer's `scaling.am`. The owner did not recognise the
+  concept, which was the tell — it corresponded to nothing in the game. Each buff now gets the
+  gate it actually depends on: can this consumer proc, contribute to a disorder, contribute to
+  a vortex — present or absent, then a flat amount.
+* **`buffs.vortex` is flat.** Velina's vortex buff raises post-calculation vortex damage
+  regardless of how the vortex was caused, so tier-scaling it was charging the element a third
+  time.
+* **Ice fell 4.5 to 4.0**, a deliberate divergence from the in-game ratio on playtesting
+  grounds. Recorded in [adjudications](notes/adjudications.md), not left looking like a tuning
+  slip.
+* **Velina is off-field.** She had no `onfield` flag and defaulted to on-field because she is
+  anomaly-tagged, which denied a sole-carry bonus to every team pairing her with a real carry.
+  Burnice needed a conditional `onfield` alongside it, since marking Velina off-field otherwise
+  leaves `Burnice/Remielle/Velina` with nobody on field at all.
+* **The bare `buffs.anomaly` key is wired**, matching procs of every element rather than one.
+  Phoenix is its first user.
+
+**Phoenix, modelled from beta information, tops both ladders on a thin kit.** `phoenix.json` is
+a probe unit run through `spec-unit.mjs`, not a roster entry. One defining mechanic — a
+triple-anomaly-gated proc-damage buff, Jane's gimmick generalised to every element — plus an
+abloom, and everything else at class baseline. She reaches **#1 on both Girtablullu and
+Stagnant Aberrant** with no declared synergy of any kind, which is what the phase existed to
+prove was possible.
+
+**Field-time economy resized**, and two mis-priced mechanics fell out of it. The solo-carry
+bonus was consistently outweighing mechanical interactions — worth roughly 38% of the mean L4
+total on the 23% of viable rows that collect it. `SOLO_CARRY_BONUS` 15 → 10; the penalties are
+untouched. Both suites that went red turned out to be mechanics hiding behind the bonus:
+`STUNLESS_SHILL_CREDIT` 48 → 53 (a stunless team is a solo-carry shape by construction) and
+the armorer `defense` weight 2 → 3 (Trigger was beating Roxy behind Claret on field time, not
+on her defense shred). See [PIPE-01](engine/layers.md#code-notes) and
+[ARM-01](concepts/armorer-laceration-gash-maim.md#code-notes).
+
+**Where the ladder stands.** Beside Remielle and Velina on Girtablullu:
+
+| rung | required | phase 3 | phase 4 |
+|----|----|----|----|
+| Aria > Promeia | yes | no, by 39.8 | **no, by 11.3** |
+| Promeia > Alice | yes | yes, by 64.7 | **yes, by 48.5** |
+| Alice > Burnice | yes | no, by 20.0 | **no, by 11.8** |
+| Burnice > Jane | yes | no, by 6.4 | **no, by 21.9** |
+
+Three of four are still inverted, but two closed most of their gap on mechanics alone. The
+Burnice/Jane rung got worse, which the phase-4 plan predicted in advance: the remaining
+candidate is that Jane's buff is over-priced rather than anything about Burnice, and neither of
+her dials has an anchor. Still held in `KNOWN_RED`.
+
+**The calibration anchor.** Anomaly's anchor is now **571.7** (factor 0.700), against attack's
+514.5 and rupture's 533.1. It was 640.2 before the overhaul began.
 
 **Anomaly overhaul, phase 3** — the props came out, 2026-09-10.
 

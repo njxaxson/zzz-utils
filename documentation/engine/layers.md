@@ -121,3 +121,52 @@ carry the way a support otherwise would. This is deliberate; `Anby/Qingyi/Hugo` 
 * [Lenient mode](element-resistance.md#lenient-mode) — what happens to L1 for a limited roster.
 
 
+
+## Code notes
+
+### [PIPE-01] The solo-carry bonus is sized against the mechanics it sits beside
+
+`FIELD_TIME.SOLO_CARRY_BONUS` is **10**. It was 15, and the owner's objection to that was a
+smell rather than a specific wrong answer: field-time economy was consistently outweighing
+mechanical interactions, and "optimise your field time" is not the same size of decision as
+"bottleneck your resources with three on-field agents".
+
+The measurement supports it. On the released corpus, 23% of viable team-boss rows collect the
+solo-carry bonus, and the mean L4 total in that bracket is about 39. At 15 the bonus was worth
+roughly 38% of everything mechanical the engine had to say about those teams; at 10 it is
+roughly 25%. The penalties are untouched — a three-on-field team is genuinely bottlenecked, and
+`TRIPLE_ONFIELD_PENALTY` and `ZERO_ONFIELD_PENALTY` keep their full weight. This is only about
+what optimising field time is worth, not about what wasting it costs.
+
+**Two things broke when it dropped, and both were mechanics hiding behind the bonus.** That is
+the case for the change rather than a cost of it:
+
+| What broke | What it actually was |
+|----|----|
+| Bucketing TEST 5 — the stunless line fell out of one rank band of the stunner line on Thrall | A stunless team is one carry and two supports, so it collects the solo bonus **by construction**. Lowering the bonus is a flat demotion of the whole archetype, which is exactly what `STUNLESS_SHILL_CREDIT` exists to dial. Raised 48 → 53. See [ARCH-01](../archetypes/README.md#arch-01-stunless-shill-credit-sizing). |
+| Rankings TEST 71 — Trigger no longer beat Roxy behind Claret on electric-weak UCC | Trigger's lead there had been 4.0 points on a bonus of 15, so her kit was not winning that ordering at all; field time was. The fix was to price the part of her kit the test is actually about — defense shred against an armorer. See [ARM-01](../concepts/armorer-laceration-gash-maim.md#arm-01-defense-shred-is-a-full-value-armorer-lever). |
+
+**Do not reach for the band constants to resolve the first one.** `RANK_BAND_RATIO` would have
+had to go from 0.011 to about 0.020 to swallow the gap, and that constant governs real
+allocation behaviour for every boss — see [BUCK-01](../bucketing/deadly-assault.md). Widening
+the definition of "tied" across the whole allocator to settle one parity assertion is the wrong
+trade.
+
+### The double-payment question, re-opened and re-closed
+
+An earlier adjudication noted that being off-field pays a unit twice on a Miyabi team — the
+disorder-rate doubling *and* the sole-carry bonus — and judged that not to be double counting,
+since they are different effects of the same fact. **That judgement still stands.** What changed
+is the magnitude of one of the two payments, not whether both are owed.
+
+The distinction matters because the cohesion fixture holds two entries that pull against each
+other through this constant: `burnice-over-yanagi-neutral-third` needs Burnice's off-field
+status to pay, and `yanagi-over-burnice-yuzuha-third` needs it not to decide the ordering on its
+own. Lowering the magnitude satisfies both — the fixture went from 10/11 to **11/11**, closing
+the Yanagi entry while the Burnice entry kept its margin.
+
+**Gating the bonus does not.** An attempt to restrict it to teams with a genuinely solo damage
+dealer — `team.filter(isDPS).length === 1`, so an off-field sub-DPS stops the team counting as a
+solo carry — overshot: Yanagi went from 0.7 behind to 14.3 ahead and the Burnice entry failed
+instead. That is the shape of a re-litigated adjudication rather than a resized constant, and it
+is why the change that shipped was the magnitude.

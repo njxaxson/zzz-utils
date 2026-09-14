@@ -9,7 +9,7 @@
         "tier": 1,
         "tags": ["anomaly", "physical", "assist:defensive"],
         "join": ["anomaly", "support"],
-        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "synergy": { "units": ["Remielle"], "tags": [], "avoid": [] },
         "mechanics": {
             "stats": { "am": 2, "ap": 2 },
             "damage": { "enhanced": 2 },
@@ -62,7 +62,7 @@
         "rank": "S",
         "limited": true,
         "released": "2.6",
-        "tier": 0.5,
+        "tier": 0,
         "tags": ["anomaly", "ether", "assist:defensive"],
         "join": ["stun", "support", "anomaly"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
@@ -188,7 +188,7 @@
         "mechanics": {
             "stats": { "am": 2, "ap": 2 },
             "pseudoRole": [{ "role": "subdps", "when": { "notPresent": "velina" } }],
-            "onfield": false,
+            "onfield": { "cases": [ { "when": { "notPresent": "velina" }, "value": false }, { "value": true } ] },
             "damage": { "abloom": 1 }
         },
         "faction": "Sons of Calydon",
@@ -679,7 +679,7 @@
         "released": "3.0",
         "tier": 0.5,
         "tags": ["stun", "fire", "assist:defensive"],
-        "join": ["attack", "rupture"],
+        "join": ["attack", "rupture", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "onfield": false,
@@ -1118,6 +1118,7 @@
         "join": ["anomaly", "wind"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
+            "onfield": false,
             "stats": { "am": 2.5, "ap": 2.5 },
             "pseudoRole": ["subdps"],
             "damage": { "abloom:free": 2 },

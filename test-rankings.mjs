@@ -44,11 +44,13 @@ const KNOWN_RED = new Map([
     // the suite goes red on the stale entry, which is the point.
     [9, 'Sanguine Sweeper: Sunna > Yuzuha behind Nangong/Aria was carried by the Aria<->Sunna ' +
         'declaration. With it gone the mechanics rank Yuzuha first. Unassessed.'],
-    [90, 'Remielle/Velina third slot, declarations stripped. Two of four rungs are inverted and ' +
-         'one is right: Promeia > Alice holds by ~65. Measured on Girtablullu — Aria is 39.8 ' +
-         'behind Promeia (the buildup question, deliberately unsolved), Alice is 20.0 behind ' +
-         'Burnice, and Burnice is 6.4 behind Jane now that Jane has a real mechanic instead of ' +
-         'a fake vortex buff.'],
+    [90, 'Remielle/Velina third slot, declarations stripped. Three of four rungs are inverted ' +
+         'and Promeia > Alice holds by 48.5. Measured on Girtablullu after phase 4: Aria is ' +
+         '11.3 behind Promeia (was 39.8 — proc rate and the compressed vortex tiers closed ' +
+         'most of it, and the remainder is the buildup question), Alice is 11.8 behind Burnice ' +
+         '(was 20.0), and Burnice is 21.9 behind Jane (was 6.4 — this rung got WORSE, as ' +
+         'the phase-4 plan predicted, and the open candidate is that Jane is over-priced rather ' +
+         'than anything about Burnice).'],
 ]);
 
 async function main() {

@@ -36,7 +36,7 @@ const MULT = {
     ANOMALY_ELEMENT_BUFF: 2.5,
     // How much a proc-damage buff amplifies a VORTEX built on that proc. A vortex's damage IS
     // proc damage, so this is the same buff arriving through a second door, not a new one.
-    PROC_BUFF_VORTEX_SCALE: 0.15,
+    PROC_BUFF_VORTEX_SCALE: 0.15,    // How much of a proc-damage buff counts when it lands on its own owner. [BUFF-08]
     SHEER_BUFF: 9,
     // Laceration buff -> armorers. The armorer analogue of SHEER_BUFF: a direct
     // amplifier on the class's own damage type. Priced above DEF_BUFF because the
@@ -66,6 +66,10 @@ const MULT = {
     STUN_MULT_BUFF: 2,
     TOTALIZE_PENALTY: 38,
     DISORDER_BONUS: 6,
+    // `damage.abloom` — bonus damage dealt when this agent hits an enemy already carrying a
+    // proc. Not burst: it needs no stun window, so it is priced here beside the disorder
+    // bonus rather than in the burst model. Per point of declared abloom. [ANOM-01]
+    ABLOOM_BONUS: 4,
     DIAMETRIC: 3,
     VORTEX_BUFF: 4,
     REPLACEMENT_COST: 0.5,
@@ -100,6 +104,7 @@ const ANOMALY_ELEMENT_MULT = 4;
 // so it composes with the head-count it augments — a generic `scaling.anomaly` consumer absorbs
 // procs of any element, an element-scoped one only matching ones. Weighted below 1: a proc is a
 // surplus on a body, not a second body.
+const SELF_PROC_BUFF_SHARE = 0.15;
 const ANOMALY_PROC_SUPPLY = 0.5;
 
 // Disorder supply from ONE distinct cycling element, in the same units as a `utility.disorders`
@@ -111,6 +116,10 @@ const DISORDER_CYCLE_SUPPLY = 2;
 // `hasParallelGaugeSource`. This is what makes Vivian a complete disorder engine for Miyabi
 // despite generating no polarity disorders at all.
 const DISORDER_PARALLEL_MULT = 2;
+
+// Per-damage-type override on MULT.DAMAGE_TYPE_BUFF. Only list a type whose buff is genuinely a
+// perk rather than a team's reason for existing; everything unlisted takes the flat rate.
+const DAMAGE_TYPE_BUFF_RATE = { abloom: 1.5 };
 
 const BOSS_WEAK = {
     DISORDER_PER_UNIT: 4,
@@ -138,8 +147,9 @@ const ARMORER_CONTROL_FALLOFF = [1, 0.25, 0];
 const SHILL_MATCH_BONUS = 8;
 // A stun shill satisfied by a stunless carry rather than a stunner: the requirement is met
 // without spending a slot on one, so the freed slot takes a second support instead. Calibrated
-// against what that replacement support would have contributed. [ARCH-01]
-const STUNLESS_SHILL_CREDIT = 48;
+// against what that replacement support would have contributed, plus the solo-carry bonus the
+// shape used to collect in full. [ARCH-01]
+const STUNLESS_SHILL_CREDIT = 53;
 
 // BURST THROUGHPUT: what a unit dumps into a stun window, as a SUM over the instruments it can
 // fire there, not a MAX (the same ordinal means different things on different keys — see
@@ -200,7 +210,7 @@ const NEED_KEY_MULT = { ultimates: 3.2 };
 
 const VORTEX_TIERS = { 
     //Base elements
-    "ice": 4.5, "fire": 2, "physical": 2, "ether": 2, "electric": 1, "lumen": 0,
+    "ice": 4.0, "fire": 2, "physical": 2, "ether": 2, "electric": 1, "lumen": 0,
     //Variants — frost is a genuinely poor vortex element, not a nil one. It sat at 0.001 for a
     //while, which was synthetic suppression of Miyabi rather than a statement about frost; the
     //real reason she dislikes wind is that vortex damage scales on the proccing agent's Anomaly
@@ -211,8 +221,6 @@ const VORTEX_TIERS = {
 };
 const VORTEX_DEFAULT_TIER = 0.001;
 const VORTEX_BASE = 15;
-// Normalisation base for tier scaling in vortex buff affinity (ice=4).
-const MAX_VORTEX_TIER = 4;
 // Minimum primary DPS vortex tier for full team vortex bonuses. Below this threshold,
 // vortex bonuses are proportionally discounted — the team lacks a vortex-focused carry.
 const VORTEX_PRIMARY_MIN = 1.0;
@@ -231,9 +239,10 @@ const VORTEX_PRIMARY_MIN = 1.0;
 // VORTEX_PRIMARY_MIN; compressing the stored value would lift it to 1.26, clear the threshold,
 // and silently delete the wasted-vortex charge. [VTX-04]
 const VORTEX_VALUE_ANCHOR = 2;
+const VORTEX_VALUE_EXPONENT = 0.5;
 function vortexValue(tier) {
     if (tier <= 0) return 0;
-    return VORTEX_VALUE_ANCHOR * Math.sqrt(tier / VORTEX_VALUE_ANCHOR);
+    return VORTEX_VALUE_ANCHOR * Math.pow(tier / VORTEX_VALUE_ANCHOR, VORTEX_VALUE_EXPONENT);
 }
 
 // Frost sits at 0.8 against a threshold of 1.0, so the whole "Miyabi wastes Velina" judgement
@@ -400,7 +409,10 @@ export function hasDefensiveAssist(unit) {
 }
 
 export function isOnField(unit) {
-    const explicit = unit.mechanics?.onfield;
+    // `_resolvedOnfield` is the per-team resolution, mirroring `_resolvedDamage`. Off a scored
+    // team it is undefined and the raw value is used, which is the right fallback — but a unit
+    // whose ONLY onfield declaration is conditional then falls through to the role default.
+    const explicit = unit._resolvedOnfield ?? unit.mechanics?.onfield;
     if (explicit !== undefined) return explicit === true || explicit === 'shared';
     if (isDPS(unit) || isStun(unit)) return true;
     const activated = unit._activatedRoles || [];
@@ -408,7 +420,10 @@ export function isOnField(unit) {
 }
 
 function isSharedField(unit) {
-    return unit.mechanics?.onfield === 'shared';
+    // Must read the resolved value for the same reason isOnField does. This one gates a
+    // DISQUALIFICATION (reliable defensive assists), so a stale read here turns a legal team
+    // illegal or the reverse — the harshest silent consequence available. [FIELD-01]
+    return (unit._resolvedOnfield ?? unit.mechanics?.onfield) === 'shared';
 }
 
 function hasLimitedRotations(unit) {
@@ -599,6 +614,23 @@ export function maxConditionalValue(spec) {
 }
 
 // Resolve a mechanic value spec (scalar or { cases }) to a numeric weight given a context.
+/**
+ * Resolve a conditional spec WITHOUT coercing the winning value to a number.
+ *
+ * `resolveConditionalValue` ends in `w()`, which maps anything that is not a number or `true` to
+ * 0 — so `'shared'` and `false` come out identical. `onfield` is a three-state field ('shared',
+ * true, false), so it needs the raw value. Do not merge these two. [FIELD-01]
+ */
+export function resolveConditionalRaw(spec, ctx) {
+    if (isConditionalSpec(spec)) {
+        for (const c of spec.cases) {
+            if (evaluatePredicate(c.when, ctx)) return c.value;
+        }
+        return undefined;
+    }
+    return spec;
+}
+
 export function resolveConditionalValue(spec, ctx) {
     if (isConditionalSpec(spec)) {
         for (const c of spec.cases) {
@@ -822,14 +854,26 @@ function getProcElements(unit) {
  * Jane's buff lands on Jane's own physical procs, and a pair loop that excludes self would never
  * see the largest part of what she does. [BUFF-05]
  */
-function teamProcDamageBuff(team, element) {
+function teamProcDamageBuff(team, element, self = null) {
     if (!element) return 0;
     const base = element.split(':')[0];
     let total = 0;
     for (const u of team) {
+        // A buff landing on its own owner is worth less than one landing on a teammate: the
+        // owner's own damage is already priced through AP and proc rate, and this channel
+        // exists to value what a unit brings to OTHERS. Jane beside a second physical agent
+        // is the case that makes the distinction real. [BUFF-08]
+        const share = (self !== null && u === self) ? SELF_PROC_BUFF_SHARE : 1;
         for (const [key, val] of Object.entries(u.mechanics?.buffs || {})) {
-            if (classifierBase(key) !== 'anomaly' || key === 'anomaly') continue;
-            if (key.slice('anomaly:'.length) === base) total += w(val);
+            if (classifierBase(key) !== 'anomaly') continue;
+            // Bare `anomaly` is the parent class: proc damage of EVERY element. A subclass
+            // matches only its own. NOTE `'anomaly'.slice(8)` is `''`, not `'anomaly'`, so the
+            // bare case needs its own branch or it silently matches nothing. [BUFF-05]
+            const matches = (key === 'anomaly') || (key.slice('anomaly:'.length) === base);
+            if (!matches) continue;
+            // Resolved, not raw: Phoenix's buff is a `{ cases: [...] }` spec and `w()` returns 0
+            // for an object, so a raw read would silently drop the whole mechanic here.
+            total += share * w(resolveConditionalValue(val, { team, self: u, consumer: null }));
         }
     }
     return total;
@@ -844,6 +888,25 @@ function teamProcDamageBuff(team, element) {
 // This is a DISCOUNT, not an anti-synergy, and the floor is what keeps it one. Miyabi and Vivian
 // are a superb disorder package even though Vivian's abloom is proc-dependent: her disorder
 // value dwarfs her abloom, and nothing here should suggest otherwise.
+// A unit's abloom output on this team. `abloom:free` (Velina's expiring cyclones) fires whether
+// or not a proc is standing; every other abloom needs one, so it is discounted by persistence.
+// Reads `_resolvedDamage` so a conditional abloom resolves for the team it is on. [ANOM-01]
+function abloomOutput(unit, team, boss) {
+    const damage = unit._resolvedDamage || unit.mechanics?.damage || {};
+    let total = 0;
+    for (const [key, val] of Object.entries(damage)) {
+        if (classifierBase(key) !== 'abloom') continue;
+        // A proc-dependent abloom fires when this agent hits a target that already carries a
+        // proc, so the rate it puts procs up is part of how often it fires — the same argument
+        // the vortex payout makes. `abloom:free` is paced by Velina's cyclones expiring, not by
+        // buildup, so it takes neither the discount nor the rate. [ANOM-01]
+        total += (key === 'abloom:free')
+            ? w(val)
+            : w(val) * computeProcPersistence(team, boss);
+    }
+    return total;
+}
+
 const PROC_PERSISTENCE_FLOOR = 0.7;
 const PROC_PERSISTENCE_SATURATION = 4;   // disorder supply at which the discount bottoms out
 
@@ -898,13 +961,14 @@ function computeAnomalyReactions(team, boss) {
         let vortexTier = 0;
         let ownVortexTier = 0;
         let vortexProcElements = [];
+        let isWindEnabler = false;
         const disorderElements = new Set();
 
         // Lumen agents don't build anomaly gauges via Attribute Mutation — their damage
         // morphs to a teammate's element but does not fill the corresponding anomaly gauge.
         // Therefore lumen units produce no anomaly reactions (no disorder, no vortex).
         if (isNativeLumen(unit)) {
-            reactions.set(unit, { vortexTier: 0, ownVortexTier: 0, vortexProcElements: [], hasDisorder: false, disorderElements });
+            reactions.set(unit, { vortexTier: 0, ownVortexTier: 0, isWindEnabler: false, vortexProcElements: [], hasDisorder: false, disorderElements });
             continue;
         }
 
@@ -940,6 +1004,7 @@ function computeAnomalyReactions(team, boss) {
             }
             if (reactsWithWind) {
                 vortexTier = pooledVortexTier;
+                isWindEnabler = (baseElement === 'wind');
                 // Which element's proc this agent's vortexes consume — its own if it is not the
                 // wind agent, otherwise the pool it fires off. Used to find a matching
                 // proc-damage buff at payout.
@@ -955,6 +1020,7 @@ function computeAnomalyReactions(team, boss) {
         reactions.set(unit, {
             vortexTier,
             ownVortexTier,
+            isWindEnabler,
             vortexProcElements,
             hasDisorder: disorderElements.size > 0,
             disorderElements
@@ -1139,12 +1205,6 @@ function resolveBaselineWeight(consumer, category) {
             // Sunna, who overrides her support baseline to 1, reads 0.33 — she attacks, so ATK
             // on her is worth something, where on Astra it is worth nothing at all.
             return getBasicDamage(consumer) / 3;
-        case 'anomaly-affinity': {
-            const am = scaling?.am;
-            const ap = scaling?.ap;
-            if (am || ap) return Math.max(w(am || 0), w(ap || 0));
-            return roles.includes('anomaly') ? 2 : 0;
-        }
         case 'sheer':
             if (scaling?.sheer) return w(scaling.sheer);
             return roles.includes('rupture') ? 3 : 0;
@@ -1185,10 +1245,9 @@ function resolveBaselineWeight(consumer, category) {
             }
             return 0;
         case 'defense':
-            // Armorer premium, same reasoning as 'pen'. Defense shred is doubly valuable
-            // to them because it stacks across suppliers (Trigger + Nicole ~= 60% shred)
-            // and raises their damage without the armorer receiving a buff at all.
-            if (roles.includes('armorer')) return 2;
+            // Defense shred is a full-value armorer lever, sized with cr/def/laceration
+            // rather than with pen. [ARM-01]
+            if (roles.includes('armorer')) return 3;
             return ((isDPSByRoles(roles) || isStunnerByRoles(roles)) && !roles.includes('rupture')) ? 1 : 0;
         case 'element':
             return (isDPSByRoles(roles) || isStunnerByRoles(roles)) ? 1 : 0;
@@ -1376,7 +1435,7 @@ function warnOnceNoClass(unit) {
 // Miyabi, who declares no `scaling.am`, gains nothing from a buildup buffer. [AP-01]
 const BASELINE_ANOMALY_AP = 2;      // the anomaly class's own `ap`, so a stock agent reads 1.0
 const AM_TO_AP_MAX = 1.0;           // full conversion is worth one whole step of AP
-const AM_SUPPLY_FOR_FULL = 3;       // buildup supply at which the conversion saturates
+const AM_FOR_FULL_CONVERSION = 3;   // Mastery at which a converter's conversion is complete
 
 // How much of anomaly-QUANTITY supply is presence versus proficiency.
 //
@@ -1385,39 +1444,116 @@ const AM_SUPPLY_FOR_FULL = 3;       // buildup supply at which the conversion sa
 // replacing it. Hence presence-weighted rather than an even split: a body that procs at all
 // contributes, and how hard it procs adjusts that contribution.
 //
-// Purely AP-scaled was measured and is wrong on both counts: it reads the field as if it named
-// damage rather than volume, and it knocked Miyabi/Remielle/Vivian off the owner-stated
-// number-two rung (rankings TEST 82, mechanics TEST 24).
-//
-// WARNING: that rung passes on well under a point at EVERY value of this constant (measured:
-// -0.2 at 0.5, +0.2 at 0.6, +0.4 here, +0.6 at 0.7). Do not read a passing TEST 82 as evidence
-// that this number is right — the rung is decided by noise. The structural reason is recorded in
-// documentation/notes/known-pitfalls.md; briefly, Remielle's Luminize rebound fires off her own
-// meter rather than inside a stun window, but the burst model only pays burst inside a window,
-// so on a stunless team her biggest hit scores nothing at all.
+// WARNING: the Miyabi/Remielle/Vivian rung (rankings TEST 82, mechanics TEST 24) passes on well
+// under a point at EVERY value of this constant. Do not read a passing TEST 82 as evidence that
+// this number is right — the rung is decided by noise. See
+// documentation/notes/known-pitfalls.md for the structural reason.
 const ANOMALY_SUPPLY_PRESENCE = 0.65;
 
+// PROC RATE — how fast this unit puts anomaly procs on the target.
+//
+// Three things mean "more procs land": the unit's own Mastery, the buildup its team buffs, and
+// any `utility["anomaly:<element>"]` surplus it brings. They are one quantity from the point of
+// view of anything that counts procs.
+//
+// It MUST saturate. Non-polarity procs are cooldown-gated in game, so buildup buys the first proc
+// sooner rather than an unbounded stream of them. HEADROOM is the most an infinitely-fed agent
+// procs above a stock one; SCALE is the input at which ~63% of that is taken.
+//
+// ANCHORED ON A STOCK ANOMALY AGENT, not on zero input: dividing by `procRateRaw(2)` — the
+// anomaly class's own `am` baseline — puts the whole roster in roughly 0.84 to 1.13 rather than
+// 1.0 to 1.35. A baseline agent reads exactly 1.0, and a low-Mastery agent reads below it, which
+// is the honest statement and is symmetric with apFactor already letting Miyabi read 0.50.
+// [AP-04]
+// Two separate things drive how fast procs land, and they have different shapes.
+//
+// MASTERY is the unit's own stat and is bounded at 3, so it does not need a saturating curve —
+// it needs the right step size. Owner: an agent with high Mastery lands roughly 20% more procs
+// than an ordinary one. Geometric in steps, anchored at the anomaly class baseline, gives
+// exactly that: am 1.5 -> 0.91, am 2 -> 1.00, am 2.5 -> 1.10, am 3 -> 1.20.
+//
+// The exponential shape used before could not express this. Forcing a 20% gap between two
+// adjacent Mastery steps out of `1 + H(1-exp(-x/S))` needs a headroom of 3.6 to 8, which puts the
+// ceiling at 2.1 to 5.1 — far past where frost would clear VORTEX_PRIMARY_MIN.
+//
+// TEAM BUILDUP BUFFS are the part that stacks without limit, so they keep a saturating curve:
+// non-polarity procs are cooldown-gated, and a second buildup buff is worth less than the first.
+// [AP-04]
+// The consumer weight that "anomaly affinity" used to supply for an ordinary anomaly agent. It
+// is a constant now rather than a number read off the consumer's Mastery appetite. Kept OUT of
+// MULT.BUILDUP_BUFF on purpose: that constant is shared with BUFF_IMPACT, which is cohesion's
+// view of how big the buff is, and doubling it there made a buff that lands on nobody twice as
+// expensive to whiff — it cost Nangong/Ye Shunguong/Sunna 99 points. [BUFF-04] [BUFF-07]
+const ANOMALY_BUFF_CONSUMER_WEIGHT = 2;
+
+const MASTERY_STEP = 1.2;           // one point of Mastery = 20% more procs
+const BASELINE_ANOMALY_AM = 2;      // === STAT_BASELINE_BY_CLASS.anomaly.am
+const BUILDUP_HEADROOM = 0.20;      // the most an infinitely-buffed team procs above an unbuffed one
+const BUILDUP_SCALE = 2.5;          // buildup supply at which ~63% of that is taken
+
+function buildupRate(supply) {
+    return 1 + BUILDUP_HEADROOM * (1 - Math.exp(-Math.max(0, supply) / BUILDUP_SCALE));
+}
+
+/** Buildup the team buffs onto this unit. One helper so its two readers cannot drift. */
+function teamBuildupSupply(unit, team) {
+    let supply = 0;
+    for (const mate of team) {
+        if (mate === unit) continue;            // a unit does not buff itself
+        supply += w(resolveConditionalValue(mate.mechanics?.buffs?.buildup,
+            { team, self: mate, consumer: unit }));
+    }
+    return supply;
+}
+
+function computeProcInput(unit, team) {
+    // Lumen is OFF this curve. Remielle is the only anomaly unit with `am: 0`, and that is not a
+    // low value on a scale — it is the statement that she fills no gauge and procs nothing at
+    // all. A rate below 1.0 would say she procs slowly, which is a different and wrong claim.
+    if (isNativeLumen(unit)) return null;
+    let surplus = 0;
+    for (const [key, val] of Object.entries(unit.mechanics?.utility || {})) {
+        if (key.startsWith('anomaly:')) surplus += w(val);
+    }
+    return {
+        mastery: getStat(unit, 'am'),
+        supply: teamBuildupSupply(unit, team) + surplus,
+    };
+}
+
+/** Proc rate relative to a stock anomaly agent. A baseline agent returns exactly 1.0. */
+function procRate(unit) {
+    const input = unit._procInput;
+    if (!input) return 1;                       // lumen, or not on a scored team
+    return Math.pow(MASTERY_STEP, input.mastery - BASELINE_ANOMALY_AM) * buildupRate(input.supply);
+}
+
 /**
- * This unit's effective Anomaly Proficiency on this team: its base `ap`, plus whatever its
- * declared Mastery appetite converts from the team's buildup supply.
+ * This unit's effective Anomaly Proficiency: its base `ap`, plus whatever its own Mastery
+ * converts into Proficiency.
  *
- * Reads the RAW `scaling` map on purpose. `getEffectiveScaling` synthesises `{ am: 2, ap: 1 }`
- * for every anomaly agent, so reading the effective map would hand Miyabi a Mastery appetite she
- * never declared and invert the whole model. Do not "helpfully" switch it.
+ * BOTH INPUTS BELONG TO THE UNIT. Nobody buffs Anomaly Mastery — it is a base stat, set by how a
+ * player builds the agent. Supports buff *buildup*, which is the RATE procs accrue at; that is
+ * derived from Mastery but is a different thing, and it is why `buffs.buildup` and `stats.am` are
+ * separate keys. Buildup feeds `procRate`, not this.
+ *
+ * This used to sum the team's `buffs.buildup` as though a teammate were handing over Mastery.
+ * That made Promeia's Proficiency depend on who she stood next to, when it depends on how she is
+ * built. [AP-01]
+ *
+ * Reads the RAW `scaling` map on purpose: `getEffectiveScaling` synthesises `{ am: 2, ap: 1 }`
+ * for every anomaly agent, so the effective map would hand Miyabi a Mastery appetite she never
+ * declared and invert the whole model.
  */
-function computeEffectiveAP(unit, team) {
+function computeEffectiveAP(unit) {
     const baseAP = getStat(unit, 'ap');
     const appetite = w(unit.mechanics?.scaling?.am ?? 0);
     if (appetite <= 0) return baseAP;
-    let supply = 0;
-    for (const mate of team) {
-        if (mate === unit) continue;              // a unit does not buff itself
-        supply += w(mate.mechanics?.buffs?.buildup ?? 0);
-    }
-    if (supply <= 0) return baseAP;
+    const mastery = getStat(unit, 'am');
+    if (mastery <= 0) return baseAP;
     const conversion = AM_TO_AP_MAX
         * Math.min(1, appetite / 3)
-        * Math.min(1, supply / AM_SUPPLY_FOR_FULL);
+        * Math.min(1, mastery / AM_FOR_FULL_CONVERSION);
     return baseAP + conversion;
 }
 
@@ -1762,7 +1898,7 @@ function getBuffRelevance(key, consumer) {
     // member would land in BUFF_IMPACT as undefined. It buffs damage against a target carrying
     // that anomaly, so it lands on any damage dealer. Whether the TEAM actually lands the
     // element is not visible from here (no team argument), and is checked where it is paid.
-    if (classifierBase(key) === 'anomaly' && key !== 'anomaly') {
+    if (classifierBase(key) === 'anomaly') {
         return dps ? 1 : 0;
     }
 
@@ -1886,6 +2022,11 @@ function scaleImpact(raw) {
 
 /** How much one point of this buff is worth, relative to a buff of average impact. */
 function buffImpact(key) {
+    // The `anomaly` family is a DYNAMIC key set (`anomaly`, `anomaly:fire`, ...), so it cannot go
+    // in BUFF_IMPACT — that table is fixed and guarded by a load-time throw over STAT_BUFF_KEYS.
+    // Without this branch the whole family falls through to IMPACT_UNIT and cohesion prices a
+    // flagship proc-damage buff below what L4 pays for it.
+    if (classifierBase(key) === 'anomaly') return scaleImpact(MULT.ANOMALY_ELEMENT_BUFF);
     return scaleImpact(BUFF_IMPACT[key] ?? IMPACT_UNIT);
 }
 
@@ -2446,8 +2587,9 @@ const STRUCTURE = {
     WILDLY_UNCONVENTIONAL: -150,
 };
 
+// Sized so the field-time economy cannot outweigh the mechanics it sits beside. [PIPE-01]
 const FIELD_TIME = {
-    SOLO_CARRY_BONUS: 15,
+    SOLO_CARRY_BONUS: 10,
     TRIPLE_ONFIELD_PENALTY: -25,
     ZERO_ONFIELD_PENALTY: -30,
 };
@@ -3251,13 +3393,16 @@ function scoreBaselineAffinity(supplier, consumer, debug, options = {}) {
     // Anomaly BUILDUP buffs (Yuzuha, Nangong, Remielle, Velina) → anomaly agents.
     // Buildup is the rate at which procs accrue. It is NOT proc damage — that is
     // `buffs["anomaly:<element>"]`, a separate key. [BUFF-05]
-    if (supplierBuffs.buildup) {
-        const cw = resolveBaselineWeight(consumer, 'anomaly-affinity');
-        if (cw > 0) {
-            const val = w(supplierBuffs.buildup) * cw * MULT.BUILDUP_BUFF;
-            score += val;
-            dbg('buildup', val);
-        }
+    if (supplierBuffs.buildup && consumerRoles.includes('anomaly')) {
+        // Flat. The gate is the whole question — does this consumer proc anomalies at all — and
+        // once it passes, a buildup buff is a buildup buff. It used to be multiplied by an
+        // invented "anomaly affinity" weight read off the consumer's `scaling.am`/`scaling.ap`,
+        // which meant a Mastery CONVERTER collected 1.5x on a buff that has nothing to do with
+        // conversion. The old weight of 2 for an ordinary anomaly agent is folded into the rate,
+        // so the common case is unchanged. [BUFF-07]
+        const val = w(supplierBuffs.buildup) * ANOMALY_BUFF_CONSUMER_WEIGHT * MULT.BUILDUP_BUFF;
+        score += val;
+        dbg('buildup', val);
     }
 
     // Element-scoped anomaly buffs: extra damage against enemies afflicted with that element's
@@ -3270,13 +3415,15 @@ function scoreBaselineAffinity(supplier, consumer, debug, options = {}) {
     // also how it reaches a vortex — a vortex's damage IS proc damage, so buffing the proc
     // buffs the vortex built on it, which is what Jane really does. [BUFF-05]
     for (const [buffKey, buffVal] of Object.entries(supplierBuffs)) {
-        if (classifierBase(buffKey) !== 'anomaly' || buffKey === 'anomaly') continue;
-        const element = buffKey.slice('anomaly:'.length);
+        if (classifierBase(buffKey) !== 'anomaly') continue;
+        // null means the bare key: every element, not one. Never `slice` the bare key — it
+        // yields '' and would match an element nobody has. [BUFF-05]
+        const element = (buffKey === 'anomaly') ? null : buffKey.slice('anomaly:'.length);
         const team = options?.team ?? [];
         let teamLandsElement = false;
         for (const u of team) {
             for (const el of getProcElements(u)) {
-                if (el.split(':')[0] === element) { teamLandsElement = true; break; }
+                if (element === null || el.split(':')[0] === element) { teamLandsElement = true; break; }
             }
             if (teamLandsElement) break;
         }
@@ -3287,6 +3434,9 @@ function scoreBaselineAffinity(supplier, consumer, debug, options = {}) {
         // or Harumasa in a monoshock team) has proc damage that is not being counted anywhere
         // else, so it is paid here. [BUFF-05]
         if (options?.reactions?.get(consumer)?.vortexTier > 0) continue;
+        // Lumen never touches an anomaly gauge in either direction, and luminize runs strictly
+        // on Proficiency, so no proc-damage buff reaches Remielle by any route. [LUM-02]
+        if (isNativeLumen(consumer)) continue;
         const cw = getBasicDamage(consumer) / 3;
         if (cw <= 0) continue;
         const val = w(buffVal) * cw * MULT.ANOMALY_ELEMENT_BUFF;
@@ -3298,13 +3448,12 @@ function scoreBaselineAffinity(supplier, consumer, debug, options = {}) {
     // On vortex bosses, natural disorders are suppressed; discount proportionally
     if (supplierBuffs.disorders && options?.hasDisorderGeneration) {
         const discount = options?.disorderBuffDiscount ?? 1;
-        if (discount > 0) {
-            const cw = resolveBaselineWeight(consumer, 'anomaly-affinity');
-            if (cw > 0) {
-                const val = w(supplierBuffs.disorders) * cw * MULT.BUILDUP_BUFF * discount;
-                score += val;
-                dbg('disorder-buff', val);
-            }
+        // Gated on whether this consumer can actually contribute to a disorder on THIS team,
+        // which is what the reaction set already answers. Flat once it does. [BUFF-07]
+        if (discount > 0 && options?.reactions?.get(consumer)?.hasDisorder) {
+            const val = w(supplierBuffs.disorders) * ANOMALY_BUFF_CONSUMER_WEIGHT * MULT.BUILDUP_BUFF * discount;
+            score += val;
+            dbg('disorder-buff', val);
         }
     }
 
@@ -3313,13 +3462,15 @@ function scoreBaselineAffinity(supplier, consumer, debug, options = {}) {
     if (supplierBuffs.vortex) {
         const reaction = options?.reactions?.get(consumer);
         if (reaction?.vortexTier > 0) {
-            const cw = resolveBaselineWeight(consumer, 'anomaly-affinity');
-            if (cw > 0) {
-                const tierScale = Math.min(1.0, reaction.vortexTier / MAX_VORTEX_TIER);
-                const val = w(supplierBuffs.vortex) * cw * tierScale * MULT.VORTEX_BUFF;
-                score += val;
-                dbg('vortex-buff', val);
-            }
+            // Flat, gated on whether this consumer contributes to a vortex on this team. Owner:
+            // the buff "directly buffs the final post-calc damage of the vortex, regardless of
+            // how it was caused. It is a flat percentage, not tiered based on element or AP."
+            // It used to be scaled by BOTH the element tier and the affinity weight, so it came
+            // out 3x apart between an ice team and an ether one — charging the element a third
+            // time and the Mastery appetite a second. [BUFF-07]
+            const val = w(supplierBuffs.vortex) * MULT.VORTEX_BUFF;
+            score += val;
+            dbg('vortex-buff', val);
         }
     }
 
@@ -3653,7 +3804,13 @@ function scoreNeedFulfillment(supplier, consumer, debug, options = {}) {
             // `atk` buff — without it a stunner's damage type was paid like a carry's. See
             // documentation/notes/adjudications.md ("Orphie beating Sunna for Harumasa").
             const damageShare = Math.min(1, getBasicDamage(consumer) / 3);
-            let val = buffWeight * dw * MULT.DAMAGE_TYPE_BUFF * damageShare * procScale;
+            // Not every damage type is equally central to the kit that deals it, and the rate has to
+            // say so. SAnby's aftershock buff is what her teams are BUILT AROUND; Promeia's abloom
+            // buff is a perk that makes her pleasant alongside Vivian and Burnice. Priced at the flat
+            // rate, Promeia's was worth 18 raw into Velina — the second-largest single item in the
+            // Aria/Promeia gap, for a mechanic nobody builds a team around. [BUFF-06]
+            const typeRate = DAMAGE_TYPE_BUFF_RATE[damageClass] ?? MULT.DAMAGE_TYPE_BUFF;
+            let val = buffWeight * dw * typeRate * damageShare * procScale;
             if (damageType === 'polarity' && isVortexBoss(options?.boss)) {
                 val *= POLARITY_VORTEX_DISCOUNT;
             }
@@ -3863,12 +4020,39 @@ function scoreMechanicalSynergy(team, debug, options = {}) {
             // the same for shock. This is also the only place her buff reaches her OWN procs.
             let procBuff = 0;
             for (const el of (reaction.vortexProcElements || [])) {
-                procBuff = Math.max(procBuff, teamProcDamageBuff(team, el));
+                procBuff = Math.max(procBuff, teamProcDamageBuff(team, el, unit));
             }
             const procBuffScale = 1 + MULT.PROC_BUFF_VORTEX_SCALE * procBuff;
-            const vortexBonus = VORTEX_BASE * vortexValue(reaction.vortexTier) * apFactor(unit) * procBuffScale;
+            // A vortex event has ONE damage number. It used to be paid to both participants, each
+            // scaled by the partner's element — so the element difference landed twice and Velina
+            // scored 57.5 beside Promeia against 40.6 beside Aria for supplying identical wind.
+            //
+            // The wind agent is credited for CREATING the events, not for their damage, so she
+            // reads a neutral element and her own Proficiency and proc rate. The element then
+            // lands once, on the agent whose proc was actually consumed. [VTX-05]
+            // NOTHING here writes back to `reaction.vortexTier` or `reaction.ownVortexTier`. AP,
+            // proc rate, tier compression and the proc-damage buff all scale the PAYOUT. The
+            // stored tier is what the wasted-vortex cohesion charge compares against
+            // VORTEX_PRIMARY_MIN, and Miyabi's frost sits 0.2 below it — scale the stored value
+            // by any of these and that charge silently disappears, worth about +70 to the team it
+            // exists to punish. Mechanics TEST 28 asserts the stored tier is unmoved; a constant
+            // guard cannot check this, which is why it is a test.
+            // ...except when the pool cannot support a vortex team at all. VORTEX_PRIMARY_MIN is
+            // already the engine's "is there a vortex carry here" threshold — the same question
+            // the wasted-vortex cohesion charge asks — so below it the wind agent falls back to
+            // what the pool is actually worth. Velina beside Aria or Promeia reads the neutral
+            // 2.0 either way; beside Miyabi alone she reads frost's 0.8, because there her
+            // cyclones really are producing nothing. [VTX-05]
+            const enablerTier = reaction.vortexTier >= VORTEX_PRIMARY_MIN
+                ? VORTEX_VALUE_ANCHOR
+                : reaction.vortexTier;
+            const paidTier = reaction.isWindEnabler ? enablerTier : reaction.vortexTier;
+            // Same argument as the element, one step further: a proc-damage buff is DAMAGE, and
+            // the wind agent is not paid for damage. It scales the consumed proc's half only.
+            const paidProcBuff = reaction.isWindEnabler ? 1 : procBuffScale;
+            const vortexBonus = VORTEX_BASE * vortexValue(paidTier) * apFactor(unit) * procRate(unit) * paidProcBuff;
             consumerScores.set(unit.name, (consumerScores.get(unit.name) || 0) + vortexBonus);
-            if (debug) console.log(`    Vortex bonus: ${unit.name} +${vortexBonus.toFixed(1)} (tier ${reaction.vortexTier.toFixed(2)} -> ${vortexValue(reaction.vortexTier).toFixed(2)}, ap x${apFactor(unit).toFixed(2)})`);
+            if (debug) console.log(`    Vortex bonus: ${unit.name} +${vortexBonus.toFixed(1)} (tier ${paidTier.toFixed(2)} -> ${vortexValue(paidTier).toFixed(2)}${reaction.isWindEnabler ? ' wind-enabler' : ''}, ap x${apFactor(unit).toFixed(2)}, rate x${procRate(unit).toFixed(2)})`);
         }
 
         // Flat "a disorder happened, and this agent's own procs are part of it" bonus — this is
@@ -3880,6 +4064,18 @@ function scoreMechanicalSynergy(team, debug, options = {}) {
         // prices the damage a disorder does, the need channel prices the consumer's CONVERSION
         // of disorders into something else. Miyabi does both, and skipping her here meant the
         // agent with the hardest-hitting procs in the game earned nothing for them. [AP-02]
+        // Abloom: bonus damage on an enemy that already carries a proc. Having it is better
+        // than not having it, and until now the only things that read `damage.abloom` at all
+        // were an abloom-weak boss and a teammate's `buffs.abloom` — so an agent whose kit
+        // deals it earned nothing for dealing it. Same hole `damage.luminize` had. [ANOM-01]
+        const abloomWeight = abloomOutput(unit, team, boss);
+        if (abloomWeight > 0) {
+            // Anomaly damage, so it reads Proficiency, like the vortex payout above.
+            const abloomBonus = MULT.ABLOOM_BONUS * abloomWeight * apFactor(unit);
+            consumerScores.set(unit.name, (consumerScores.get(unit.name) || 0) + abloomBonus);
+            if (debug) console.log(`    Abloom: ${unit.name} +${abloomBonus.toFixed(1)} (weight ${abloomWeight.toFixed(2)}, ap x${apFactor(unit).toFixed(2)})`);
+        }
+
         if (reaction.hasDisorder) {
             // A disorder's damage comes off the combined damage of the two procs that made it,
             // so it scales with how hard this agent's procs hit. [AP-02]
@@ -3989,7 +4185,7 @@ function scoreMechanicalSynergy(team, debug, options = {}) {
                 // is the channel that reads proc damage; this one does not. [AP-03]
                 if (!isNativeLumen(u)
                     && getEffectiveRoles(u).includes('anomaly')
-                    && (element === null || getElement(u) === element)) supply += anomalySupplyWeight(u);
+                    && (element === null || getElement(u) === element)) supply += anomalySupplyWeight(u) * procRate(u);
                 for (const [ukey, uval] of Object.entries(u.mechanics?.utility || {})) {
                     if (!ukey.startsWith('anomaly:')) continue;
                     if (element !== null && ukey.slice('anomaly:'.length) !== element) continue;
@@ -4180,7 +4376,10 @@ function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs =
             for (const key of NEED_FULFILLMENT_KEYS) {
                 if (NATURALLY_AVAILABLE_NEEDS.has(key)) continue;
                 const sw = w(scaling[key]);
-                if (sw < 1) continue;
+                // A need of 1 says "this feeds me, but I do not depend on it" — rewarded when
+                // supplied, never charged when it is not. The L4 need channel still pays it.
+                // Charging starts above 1. [SCAL-04]
+                if (sw <= 1) continue;
                 const selfProvision = Math.max(
                     w(unit.mechanics?.buffs?.[key]),
                     w(unit.mechanics?.debuffs?.[key]),
@@ -4418,13 +4617,19 @@ export function scoreTeamForBoss(team, boss, options = {}) {
     // so consumer context isn't needed. Damage-reading helpers prefer `_resolvedDamage`.
     for (const unit of team) {
         unit._resolvedDamage = resolveValueMap(unit.mechanics?.damage, { team, self: unit, consumer: null });
+        // `onfield` may be conditional — Burnice stands off-field normally and on-field when she
+        // is the carry beside Velina. Resolved raw so the 'shared' state survives. [FIELD-01]
+        if (unit.mechanics?.onfield !== undefined) {
+            unit._resolvedOnfield = resolveConditionalRaw(unit.mechanics.onfield, { team, self: unit, consumer: null });
+        }
     }
 
     // Effective Anomaly Proficiency, once per pass. It depends on team composition (the buildup
     // supply) but not on the boss, and not on the reaction set — which is why it can be resolved
     // here rather than threaded through computeAnomalyReactions' four call sites.
     for (const unit of team) {
-        unit._effectiveAP = computeEffectiveAP(unit, team);
+        unit._effectiveAP = computeEffectiveAP(unit);
+        unit._procInput = computeProcInput(unit, team);
         unit._procDamage = computeProcDamage(unit, unit._effectiveAP);
     }
 
@@ -4448,8 +4653,10 @@ export function scoreTeamForBoss(team, boss, options = {}) {
         for (const u of team) {
             delete u._activatedRoles;
             delete u._resolvedDamage;
+            delete u._resolvedOnfield;
             delete u._effectiveAP;
             delete u._procDamage;
+            delete u._procInput;
         }
     };
 

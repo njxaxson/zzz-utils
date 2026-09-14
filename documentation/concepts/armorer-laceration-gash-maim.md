@@ -103,3 +103,24 @@ Only armorers **open** Gash meters, and all meters share **one pool of marks**.
 More builders fill the shared pool faster, which is why an armorer wants a stun-dense or
 armorer-dense team rather than double support. The engine models this as a builder-scaled
 bonus with the builder count capped, representing the shared ceiling.
+## Code notes
+
+### [ARM-01] Defense shred is a full-value armorer lever
+
+`resolveBaselineWeight(consumer, 'defense')` returns **3** for an armorer against 1 for an
+ordinary DPS or stunner — the same tier as `cr`, `def` and `laceration`, and one step above
+`pen`.
+
+It sat at 2, level with `pen`, and the two are not comparable. `pen` earns its armorer premium
+defensively: ATK and CD are dead for an armorer, so PEN is one of the few levers *left*. Defense
+shred earns a premium on its own merits — it stacks across suppliers (Trigger plus Nicole is
+roughly 60% shred), and it raises Laceration damage without the armorer receiving a buff at all,
+so it costs the team nothing in buff-utilisation fit.
+
+Reachable only by a team pairing Claret with Nicole or Trigger — the roster's only two defense
+debuffers. Measured across the released corpus at the time of the change: 415 team-boss rows
+moved, every one of them a Claret line, all upward, nothing else in the corpus touched.
+
+The immediate cause for revisiting it was TEST 71, where Trigger's lead over Roxy on
+electric-weak UCC turned out to rest on the solo-carry bonus rather than on any part of her kit.
+See [PIPE-01](../engine/layers.md#pipe-01-the-solo-carry-bonus-is-sized-against-the-mechanics-it-sits-beside).

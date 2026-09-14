@@ -404,3 +404,32 @@ The pull engine rates her Medium with Velina and Medium without, which is a real
 it cannot tell those two rosters apart. But the *Medium without* half was accepted as correct.
 The old fixture asserted High because it was blind to the distinction, not because the engine
 was wrong.
+### The solo-carry bonus is 10, and the tests that broke were the argument for it
+
+Owner's objection was structural, not a specific wrong answer: "optimising field time isn't the
+same magnitude" as bottlenecking three on-field agents, so the field-time economy should not be
+consistently outweighing mechanical interactions. Measured: the bonus was worth roughly 38% of
+the mean L4 total on the 23% of viable team-boss rows that collect it.
+
+`FIELD_TIME.SOLO_CARRY_BONUS` dropped 15 → 10. **The penalties were not touched** — wasting
+field time still costs full price; only optimising it is worth less.
+
+Two suites went red, and in both cases the bonus had been masking a mis-priced mechanic:
+
+* `STUNLESS_SHILL_CREDIT` 48 → 53. A stunless team is one carry plus two supports, so it
+  collects the solo bonus by construction; lowering the bonus demotes the archetype flatly, and
+  this constant is its documented dial. **Do not widen `RANK_BAND_RATIO` instead** — it would
+  have taken 0.011 → 0.020, changing what counts as a tie for every allocation in the product.
+* Armorer `defense` baseline weight 2 → 3. Trigger led Roxy behind Claret on electric-weak UCC
+  by 4.0 points while collecting a 15-point bonus Roxy did not, so her kit was not winning that
+  ordering at all. Defense shred against an armorer is now priced with the full-value armorer
+  levers.
+
+**The "off-field pays twice" judgement is not re-opened.** Disorder-rate doubling and the
+sole-carry bonus remain different effects of the same fact, both owed. Resizing one payment is
+not the same as deciding one is not owed — and the experiment that *did* decide that (gating the
+bonus on a solo damage dealer) flipped `burnice-over-yanagi-neutral-third`, which is the
+fixture entry that judgement produced.
+
+Full reasoning and the measurements: [PIPE-01](../engine/layers.md#code-notes) and
+[ARM-01](../concepts/armorer-laceration-gash-maim.md#code-notes).

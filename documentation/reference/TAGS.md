@@ -63,6 +63,7 @@ isn't something else**, it becomes a tag.
 | `BUFF` | `../data-model/buffs-and-debuffs.md` |
 | `BOSS` | `../data-model/boss-object.md` |
 | `PIPE` | `../engine/layers.md` |
+| `FIELD` | `../data-model/pseudorole.md` |
 | `COMP` | `../engine/l4-components.md` |
 | `ULT` | `../engine/ultimates-two-channel.md` |
 | `COH` | `../engine/cohesion.md` |
@@ -85,6 +86,7 @@ Populated during the comment pass. One row per tag, newest last within a prefix.
 | `[FUND-01]` | `../concepts/elements-and-roles.md` | `isDamageDealer` is narrower than `isDPS` — a subdps is a damage dealer even when tagged `stun` |
 | `[LUM-01]` | `../concepts/lumen.md` | Lumen is exempt from the subdps "no reaction" cohesion charge |
 | `[DISO-01]` | `../concepts/disorder-supply.md` | Do not net polarity provision against element-cycling supply |
+| `[ARM-01]` | `../concepts/armorer-laceration-gash-maim.md` | Defense shred is a full-value armorer lever, not a `pen`-tier one |
 | `[ARCH-01]` | `../archetypes/README.md` | Stunless shill credit sizing |
 | `[ARCH-02]` | `../archetypes/README.md` | Primary carry selection ignores pseudo-DPS |
 | `[ARCH-03]` | `../archetypes/README.md` | The monoshock calibration override |
@@ -112,3 +114,4 @@ Populated during the comment pass. One row per tag, newest last within a prefix.
 | `[PULL-01]` | `../recommendations/partner-ladder.md` | The partner ladder block in `pull-engine.js` is this whole page in code |
 | `[PULL-02]` | `../recommendations/pull-engine.md` | The codependency/ladder penalty is per unit, not per card |
 | `[BUCK-01]` | `../bucketing/deadly-assault.md` | The rank band 0.011/4.5 is derived from one Thrall & Sobek allocation case |
+| `[PIPE-01]` | `../engine/layers.md` | The solo-carry bonus is sized against the mechanics it sits beside |
