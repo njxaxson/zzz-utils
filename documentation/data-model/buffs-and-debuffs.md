@@ -166,3 +166,96 @@ buffing Claret was measured as if her defining buff were worth a third of what t
 actually pays for it. `BUFF_IMPACT` is now one table sourced from `MULT`, so the two paths
 cannot drift again; an assertion at load fails loudly if a stat-buff key is added without a
 price rather than silently pricing it at 2.
+### [BUFF-05] The three senses of an anomaly buff, and the bare key
+
+Three different keys, deliberately not one:
+
+| key | means |
+|----|----|
+| `buffs.buildup` | anomaly buildup **rate** |
+| `buffs["anomaly:<element>"]` | **proc damage** of that element |
+| `buffs.anomaly` | proc damage of **any** element |
+
+The bare key was defined in phase 2 with no user and wired in phase 4 for Phoenix. Three traps
+sit on it, all silent:
+
+* **`'anomaly'.slice('anomaly:'.length)` is `''`, not `'anomaly'`.** Two sites do this. Removing
+  the bare-key guard without an explicit branch makes it match an element nobody has — the code
+  compiles, the tests pass, and the feature does nothing.
+* **`teamProcDamageBuff` iterates raw values** and `w()` returns 0 for an object. Phoenix's buff
+  is a `{ cases: [...] }` spec, so a raw read drops her whole mechanic. It resolves the spec.
+* **`getBuffRelevance` must widen to the bare key**, or Phoenix's flagship buff is charged at
+  relevance 0 in cohesion.
+
+Gated on the **team** landing the element rather than on the consumer's own element: the buff is
+partly about the state of the target, so a teammate hitting an afflicted enemy benefits. That is
+what pays Harumasa in a monoshock team. Two exceptions carve out of it — `[LUM-02]` and the wind
+enabler in `[VTX-05]`.
+
+**A consumer already reacting with wind is skipped**, because their proc damage is realised as
+vortex and the vortex payout amplifies itself by this same buff. Paying here as well would count
+one buff twice on the same damage.
+
+### [BUFF-06] A damage-type buff is rated by how central the type is to its kit
+
+`DAMAGE_TYPE_BUFF_RATE` overrides the flat `MULT.DAMAGE_TYPE_BUFF` per type, and `abloom` sits
+below the default.
+
+Not every damage type is equally central to the kit that deals it. SAnby's aftershock buff is
+what her teams are **built around**; Promeia's abloom buff is a perk that makes her pleasant
+alongside Vivian and Burnice. Priced at the flat rate, Promeia's was worth **18 raw** into Velina
+— the second-largest single item in the Aria/Promeia gap, for a mechanic nobody builds a team
+around.
+
+> **A measurement trap.** Deleting the buff outright reads as **−376 points**, which is not its
+> value. Promeia declares no other buff, so removing it leaves her supplying nothing at all and
+> trips a separate "expected to supply something, supplied nothing" cohesion penalty. Never
+> measure a unit's only buff by deleting it — vary its weight.
+
+### [BUFF-07] Three anomaly buffs, three gates, all flat
+
+`buffs.buildup`, `buffs.disorders` and `buffs.vortex` each ask one question about the consumer
+**on this team**, then pay a flat amount:
+
+| buff | gate |
+|----|----|
+| `buildup` | does the consumer proc anomalies at all |
+| `disorders` | can the consumer contribute to a **disorder** here |
+| `vortex` | can the consumer contribute to a **vortex** here |
+
+All three used to be scaled by one multiplier, `resolveBaselineWeight(consumer, 'anomaly-affinity')`,
+which returned the consumer's `scaling.am`/`scaling.ap` if declared and 2 otherwise. The owner did
+not recognise the concept, which was the tell: it corresponded to nothing in the game.
+`scaling.am` means "I convert Mastery into Proficiency", and it was being read as "buildup buffs
+are valuable to me" — a different claim. It quietly multiplied Promeia's three buffs by 1.5
+against Aria's 1.0.
+
+`ANOMALY_BUFF_CONSUMER_WEIGHT` replaces it as a constant. **It is deliberately kept out of**
+`MULT.BUILDUP_BUFF`: that constant is shared with `BUFF_IMPACT`, cohesion's view of how big a
+buff is, and folding it in made a buff that lands on nobody twice as expensive to whiff — it cost
+`Nangong/Ye Shunguong/Sunna` **99 points**. See `[BUFF-04]`.
+
+`buffs.vortex` is **flat**, not tier-scaled. Owner: Velina's vortex buff raises the final
+post-calculation damage of the vortex regardless of how it was caused — a flat percentage, not
+something tiered by element or AP. Tier-scaling it charged the element a third time and the
+consumer's Mastery appetite a second.
+
+### [BUFF-08] A proc-damage buff landing on its own owner counts at 15%
+
+`SELF_PROC_BUFF_SHARE` discounts the part of `teamProcDamageBuff` that comes from the consumer's
+own kit, where the buff scales that consumer's own vortex.
+
+The engine's universal rule is that a supplier is not its own consumer — `chain:extra` is kept
+out of `utility.chains` for exactly this reason, see `[ULT-01]`. The vortex payout deliberately
+breaks it, because Jane really does buff her own assault procs in game and the vortex is built on
+them. But a unit's own damage is already priced through AP and proc rate; this channel exists to
+value what a unit brings to **others**.
+
+`Alice/Jane/Yuzuha` is the case that makes the distinction real: there Jane's buff lands on a
+second physical agent at full value, which is why that team is good. Beside Remielle and Velina
+it lands on nobody, and before this discount Jane's entire lead over Burnice came from
+self-buffing — at `PROC_BUFF_VORTEX_SCALE: 0` the two were identical to the decimal.
+
+**The value is not anchored.** 0.15 is where the Burnice/Jane rung lands, and 0.0 is arguably
+more principled (it is what every other self-provision gets). Owner call, recorded as a known
+weakness rather than dressed up.

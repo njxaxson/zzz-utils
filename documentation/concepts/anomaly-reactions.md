@@ -73,8 +73,8 @@ agent.
 
 | team | pool | tier |
 |----|----|----|
-| Promeia + Velina | ice | 4.5 |
-| Nangong + Promeia + Velina | ether, ice | 3.25 |
+| Promeia + Velina | ice | 4.0 |
+| Nangong + Promeia + Velina | ether, ice | 3.0 |
 | Nangong + Miyabi + Velina | ether, frost | 1.4 |
 | Miyabi + Velina | frost | 0.8 |
 
@@ -99,9 +99,10 @@ than through Proficiency — so her vortexes are small whatever element she carr
 suppressed frost tier, is why she is a poor Velina partner. Grace is the mirror: electric is the
 weakest wind mix-in and she is good there anyway, because her AP is naturally high.
 
-Effective AP is base `ap` plus whatever the unit's declared `scaling.am` converts out of the
-team's buildup supply, so Alice, Promeia and Vivian get better as their team feeds them Mastery
-while Miyabi, who declares no Mastery appetite, gains nothing from a buildup buffer. See
+Effective AP is base `ap` plus whatever the unit's declared `scaling.am` converts out of its
+**own** `stats.am`. No teammate appears in it: nobody in the game hands anybody Anomaly Mastery,
+so Alice, Promeia and Vivian convert what their own build carries, and Miyabi — who declares no
+Mastery appetite — converts nothing however much Mastery she has. See
 [stats](../data-model/stats.md) and `[AP-01]`.
 
 ## Tier values are compressed before they are paid
@@ -116,13 +117,18 @@ damage is not linear in its pair coefficient. See `[COH-03]`.
 
 | element | tier | value paid |
 |----|----|----|
-| ice | 4.5 | 3.00 |
+| ice | 4.0 | 2.83 |
 | fire, physical, ether | 2.0 | 2.00 |
 | electric | 1.0 | 1.41 |
 | frost, auricInk, honedEdge | 0.8 | 1.26 |
 
 Anchored at 2 so the majority of the roster does not move at all; only the outliers compress. The
-ice-to-ether ratio falls from 2.25 to 1.50.
+ice-to-ether ratio falls from 2.00 to 1.41.
+
+**Ice is 4.0, not the game's own ratio.** Phase 4 of the anomaly overhaul lowered it on
+playtesting grounds — the ice-versus-ether difference simply is not enough to put Promeia over
+Aria in practice, so the datum was judged wrong rather than the model. Recorded as a deliberate
+divergence in [adjudications](../notes/adjudications.md), not left to look like a tuning slip.
 
 ### Two tiers, and the difference matters
 
@@ -190,3 +196,98 @@ as part of the agent’s kit.
 * [Lumen](lumen.md) — lumen fills no gauge and so generates neither disorder nor vortex.
 
 
+
+## Code notes
+
+### [VTX-01] The vortex tier is a pooled mean, not a max
+
+Covered in full under
+[The tier is a pooled mean](#the-tier-is-a-pooled-mean-not-the-best-element-on-the-team) above. In short: cyclones
+are shared, so a second non-wind element splits the vortex events rather than adding to them, and
+a weak element dilutes the pool for everyone.
+
+### [VTX-02] The wasted-vortex gate reads a carry's OWN tier
+
+### [VTX-03] AP scales the vortex payout, never the stored tier
+
+### [VTX-04] Tier values are compressed at the square root before payout, anchored at 2
+
+All three are one trap reached three ways, covered together under
+[Two tiers, and the difference matters](#two-tiers-and-the-difference-matters) above. The stored
+tier is what the wasted-vortex cohesion charge compares against `VORTEX_PRIMARY_MIN`; AP, tier
+compression and pooling all scale the **payout** instead. Let any of them touch the stored value
+and the charge silently stops firing, worth about +70 to the team it exists to punish.
+
+
+### [VTX-05] A vortex event has one damage number, and it is paid once
+
+A vortex fires when a wind agent's cyclone meets a non-wind proc. The engine splits the event's
+value between the two participants, and the split is asymmetric on purpose:
+
+| participant | credited for | scales by |
+|----|----|----|
+| the **wind enabler** | creating the events | a neutral element, her own Proficiency, her own proc rate |
+| the **proc owner** | the event's damage | the pooled tier, their Proficiency, their proc rate, any proc-damage buff |
+
+Both halves used to be scaled by the partner's element, so the element landed **twice**. Velina
+scored 57.5 beside Promeia and 40.6 beside Aria for supplying identical wind — and her own
+Proficiency read 1.25 on both teams, which proves the only thing moving her payout was her
+partner. She now scores the same beside either, and the element lands once.
+
+The same argument goes one step further for a **proc-damage buff**, which is damage: the wind
+agent is not paid for damage, so her half does not scale by it. See `[BUFF-08]`.
+
+**But she still procs.** A proc is a proc whether it is wind or one of the original elements, and
+being the static half of a vortex does not mean she did not make one. So the wind enabler is the
+one consumer with a vortex who is still paid in the direct proc-damage channel — for a buff that
+actually covers **her** procs, which means the bare `anomaly` key, not `anomaly:physical`. Without
+that carve-out her own proc damage is priced nowhere at all.
+
+**Below `VORTEX_PRIMARY_MIN` the neutral reading is dropped.** That threshold is already the
+engine's "is there a vortex carry here" question, so under it the wind agent falls back to what
+the pool is actually worth. Velina beside Aria or Promeia reads the neutral anchor either way;
+beside Miyabi alone she reads frost's 0.8, because there her cyclones really are producing
+nothing. Skipping this made `Miyabi/Velina/Yuzuha` gain 16 points and broke TEST 62 — the
+element-neutral credit was over-rewarding the worst pairing in the game.
+
+**Nothing here writes back to the stored tier.** AP, compression, proc rate and the proc-damage
+buff all scale the **payout**. See `[VTX-02]` and `[VTX-03]`.
+
+### [ANOM-01] Abloom is damage, and it is also a reaction
+
+`damage.abloom` used to be read by exactly two things: an abloom-weak boss, and a teammate's
+`buffs.abloom`. **Nothing paid a unit for dealing it.** Same hole `damage.luminize` had before
+phase 2 — a headline damage type contributing nothing to its owner's output.
+
+It is priced beside the implicit-disorder bonus rather than in the burst model, because it is not
+burst: owner, *"abloom isn't burst damage; it is generally bonus damage applied when you hit
+procced enemies."* It needs no stun window, so the burst model's stun-window semantics would be
+wrong for it.
+
+Two gates:
+
+* `abloom:free` (Velina's expiring cyclones) fires whether or not a proc is standing, so it is
+  paid in full.
+* Every other abloom needs a live proc, so it is discounted by `computeProcPersistence`. A
+  disorder **consumes** both procs that made it; a vortex leaves them standing. That is why a
+  proc-dependent abloom is worth less beside a heavy disorder engine.
+
+**It also counts as a reaction for cohesion.** The "this unit's anomaly output goes nowhere"
+charge tests for a vortex or a disorder, and a mono-element anomaly pair makes no disorder **by
+construction** — two fire agents proc the same gauge. Charging `Phoenix/Burnice/Remielle` for
+having "no reaction" read a deliberate composition as a failed one; it was worth 36 points to that
+team. Abloom is a reason to incentivise mono-elemental anomaly, and the cohesion half has to agree
+with the damage half.
+
+**`ABLOOM_BONUS` is capped by the Miyabi ladder, not by principle.** The anchored value is **7.5** —
+`BOSS_WEAK.ABLOOM_PER_UNIT: 5` against `DISORDER_PER_UNIT: 4`, scaled by `MULT.DISORDER_BONUS: 6`,
+so the boss layer and L4 agree on what the two mechanics are worth relative to each other. It sits
+at **4**, because at 4.2 Vivian's `abloom: 3` lifts `Miyabi/Remielle/Vivian` past
+`Nangong/Miyabi/Yuzuha` — a rung TESTs 79/82 pin and which holds by **0.3 points**. Scaling abloom
+by proc rate as well (the "frequency" half of the owner's magnitude×frequency reading) breaks the
+same rungs plus `yanagi-over-burnice-yuzuha-third`. Both were measured and reverted.
+
+The weights encode magnitude **times** frequency as one number, per the owner: Promeia and Phoenix
+high-magnitude/low-frequency at 3, Vivian slightly-lower-magnitude/very-high-frequency at 3, Aria
+lower-magnitude/high-frequency at 2, Grace, Burnice and Nangong at 1. So Burnice genuinely deals
+less abloom damage than Promeia, Vivian or Aria — that is data, not an under-annotation.

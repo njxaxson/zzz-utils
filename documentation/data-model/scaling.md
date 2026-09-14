@@ -202,3 +202,23 @@ than about the carry:
    comical — it lands maybe once in a fight by accident. The team still earns the BASE recovery
    credit for that; this gate only withholds the greedy EXTRA, which is about repeatedly getting
    a longer window.
+### [SCAL-04] A need of 1 is an appetite, not a dependency
+
+The cohesion needs charge starts **above** weight 1. A `scaling.<key>: 1` says "this feeds me,
+but I do not depend on it": rewarded through the L4 need channel when supplied, never charged
+when it is not.
+
+Owner's framing, and it generalises — it is a statement about what weight 1 *means*, not a
+carve-out for one key. Today it touches exactly one unit. Aria's `veils: 1` is the only need at
+weight 1 on the roster besides Miyabi's `ultimates: 1`, and `ultimates` is already exempt here
+via `NATURALLY_AVAILABLE_NEEDS`.
+
+Worth 7.9 points to Aria beside Remielle and Velina, which closed most of her gap to Promeia.
+Measured at 3,843 rows, `teamwork` layer only, every one an Aria team, zero exceptions.
+
+**84 of those rows went *down*, by up to 1.0, and that is not a bug.** Cohesion is a geometric
+mean, so removing a term also removes its weight; if the removed term was *better* than the
+team's average, dropping it pulls the mean down. Removing a penalty is not strictly monotonic
+here, which is exactly the kind of thing that looks like a defect later.
+
+See `[TWM-02]` for what weight 2 does, which is the next rung of the same ladder.

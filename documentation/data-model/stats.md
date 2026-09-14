@@ -145,3 +145,82 @@ number.
 * [buffs and debuffs](buffs-and-debuffs.md) — the five senses of "anomaly".
 * [scaling](scaling.md) — the need side, and why `scaling.am` is not `stats.am`.
 * [anomaly reactions](../concepts/anomaly-reactions.md) — where AP is consumed.
+
+## Code notes
+
+### [AP-01] Effective Anomaly Proficiency is a property of the unit, not the team
+
+`computeEffectiveAP` = base `ap` plus whatever the unit's **own** `scaling.am` converts from its
+**own** `stats.am`. No teammate appears in it.
+
+It used to build the conversion pool by summing the team's `buffs.buildup`, and that was wrong on
+its own terms. **Nobody in the game hands anybody Anomaly Mastery.** It is a base stat set by how
+a player builds the unit. Supports buff *buildup* — the rate at which procs accrue, derived from
+Mastery but a separate thing — which is exactly why `buffs.buildup` and `stats.am` are different
+keys.
+
+The visible symptom was that Promeia, Alice and Vivian read a high Proficiency beside Remielle
+and Velina and a low one without them, for a reason that does not exist. Their Proficiency is now
+a property of how they are built.
+
+Aria is the case that keeps the two jobs of Mastery apart: `am: 3` with no `scaling.am`, so she
+converts **nothing** and reads her base `ap` of 3. Her Mastery is not wasted — it is what makes
+her proc faster, which is `procRate` and `[AP-04]`. Miyabi is the same shape.
+
+### [AP-02] Disorder damage reads proc damage; the disorder NEED does not
+
+A disorder's damage comes off the combined damage of the two procs that made it, so the flat
+"a disorder happened" bonus scales by `procDamageFactor`. Miyabi's procs run on crit rather than
+Proficiency, which is why she is simultaneously the best disorder carry in the game and a poor
+vortex partner — the same fact reaching opposite conclusions.
+
+That bonus used to skip anyone declaring a `disorders` need, on the grounds they were paid
+through the need channel instead. Fair while both channels were flat; wrong once they answered
+different questions. The result was that the agent with the hardest-hitting procs in the game
+earned nothing for them.
+
+**The need channel is deliberately NOT scaled by proc damage.** It prices the consumer's
+*conversion* — Miyabi turning disorders into enhanced attacks — which is driven by how many
+disorders arrive, not how hard they hit. Scaling it broke two things at once: a non-anomaly
+consumer with `ap: 0` had its whole payout zeroed (mechanics TEST 17), and amplifying supply
+differences inverted the Yanagi/Burnice rung. Do not "fix" the asymmetry; it is the point.
+
+### [AP-03] Luminize and Refringe scale on Proficiency, never on raw proc damage
+
+Everything Remielle does reads Proficiency. Refringe boosts **every** anomaly proc, including
+Miyabi's unusual crit-driven ones — but the *size* of the increase is based on the proc's AP, not
+on the proc's whole damage. So Refringe does raise Miyabi's procs, just far less than anyone
+else's. It is not a question of **if** but of **how much**.
+
+Weighting these channels by proc damage instead made crit-driven Miyabi Remielle's **best**
+partner, which is the exact inversion of the truth. The current reading blends presence with
+`apFactor`: a proc being boosted at all is worth something regardless of the stat line, and its
+damage on top is AP-scaled. Straight multiplication was too sharp and cost
+`Miyabi/Remielle/Vivian` its owner-stated number-two slot.
+
+### [AP-04] Mastery is geometric, buildup buffs saturate, and the curve is anchored at 2
+
+Two different things drive how fast procs land, and they have different shapes.
+
+**Mastery** is the unit's own stat, bounded at 3, so it does not need a saturating curve — it
+needs the right step size. Owner: an agent with high Mastery lands roughly **20% more procs**.
+`MASTERY_STEP ** (am - 2)` gives exactly that: `am 1.5 → 0.91`, `2 → 1.00`, `2.5 → 1.10`,
+`3 → 1.20`.
+
+The exponential shape used before could not express it. Forcing a 20% gap between adjacent
+Mastery steps out of `1 + H(1 - exp(-x/S))` needs a headroom of 3.6 to 8, putting the ceiling at
+2.1 to 5.1 — far past where frost would clear `VORTEX_PRIMARY_MIN` and silently delete the
+wasted-vortex charge.
+
+**Team buildup buffs** are the part that stacks without limit, so they keep the saturating curve:
+non-polarity procs are cooldown-gated, so buildup buys the first proc *sooner* rather than an
+unbounded stream, and a second buildup buff is worth less than the first.
+
+**Anchored on a stock anomaly agent, not on zero.** Dividing by the class's own `am` baseline puts
+the roster in roughly 0.84–1.13 instead of 1.0–1.35. A baseline agent reads exactly 1.0 and a
+low-Mastery agent reads below it, which is the honest statement and is symmetric with `apFactor`
+already letting Miyabi read 0.50.
+
+**Lumen is off this curve entirely.** Remielle's `am: 0` is not a low value on a scale — it is the
+statement that she fills no gauge and procs nothing. A rate below 1.0 would imply she procs
+slowly, when she does not proc. `computeProcInput` returns null for her. See `[LUM-01]`.

@@ -159,3 +159,19 @@ the scoring code.
 | **Primordial Nightmare / Wandering Hunter / Stagnant Aberrant** | Multiple `anti` entries narrow the field to a single viable archetype |
 
 Full weakness and resistance lists and current `anti` sets belong in `bosses.json`, not here.
+## Code notes
+
+### [WEAK-01] A boss weakness understands element variants
+
+`bossWeaknessFactor` matches a weakness against both a unit's element and its variant. `ice`
+matches every ice unit, Miyabi's frost included; `ice:frost` matches Miyabi in full and a
+plain-ice unit at `VARIANT_WEAKNESS_PARTIAL`.
+
+Half rather than nothing, because a variant is its own anomaly gauge but a boss built to punish
+frost is still not indifferent to ordinary ice.
+
+This exists so a boss can favour one of two same-element agents through a **mechanic** rather
+than through `shillIntensity`. Sacrifice Bringer's `shillIntensity: 6` became
+`weaknesses: ["ice:frost"]` in phase 3 of the anomaly overhaul, which is what the field replaced
+there. `shillIntensity` itself stays available and no boss sets it — it is the release-deadline
+lever, kept by owner ruling.

@@ -52,7 +52,7 @@ because it is a live measurement rather than a defect to be described. See below
 
 ## Deferred
 
-Seven. These are known, understood, and deliberately not being chased.
+Eight. These are known, understood, and deliberately not being chased.
 
 | Issue | Priority | Why it is parked |
 |----|----|----|
@@ -63,6 +63,7 @@ Seven. These are known, understood, and deliberately not being chased.
 | [Ye Shunguong under-paid on veils](issues/deferred/low-ye-shunguong-underpaid-four-points-on-veils.md) | low | One pair type, about four points, in the safe direction |
 | [`utility.kaleidoscope` is read only by the UI](issues/deferred/low-kaleidoscope-is-read-only-by-the-ui.md) | low | Only a support declares it, so no fixture could tell a fix from a no-op |
 | [The `ultimate:double` weight is discarded](issues/deferred/low-ultimate-double-weight-is-discarded.md) | low | Every declarer means the same thing, so grading it would move nothing |
+| [A vortex is worth ~5x a full abloom engine](issues/deferred/medium-vortex-outweighs-every-other-anomaly-payout.md) | medium | The skew may be correct — the game does push vortex-with-abloom as the optimal anomaly line. Needs a design ruling, not a constant nudged |
 
 `issues/resolved/` is empty by design. A closed issue gets a file only when its history would
 change what a future reader does; otherwise it is deleted and git holds it. The durable reasoning

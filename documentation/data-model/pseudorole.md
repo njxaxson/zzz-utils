@@ -63,3 +63,28 @@ exactly when Miyabi is present.
 Activating a role is not a local change. It moves the unit between the carry and support
 halves of several calculations at once. See
 [role activation ripple effects](../engine/role-activation-ripple.md) before adding one.
+## Code notes
+
+### [FIELD-01] Conditional `onfield` needs a raw resolver, and `isSharedField` reads it too
+
+`mechanics.onfield` can be a conditional spec, which means it has to be resolved per team
+alongside `_resolvedDamage`. Two things make that sharper than it looks.
+
+**`resolveConditionalValue` ends in `w()`**, which maps `'shared'` and `false` alike to 0. The
+field-time model distinguishes three states — on, off, and shared — so it needs a
+**raw-preserving** resolver. Do not merge the two functions.
+
+**`isSharedField` must be updated alongside `isOnField`.** It gates a *disqualification*
+(reliable defensive assists), so a stale read there turns a legal team illegal or the reverse —
+the harshest silent consequence available.
+
+Burnice is the reason the machinery exists. Velina had no `onfield` flag and defaulted to
+on-field because she is anomaly-tagged, which denied a sole-carry bonus to every team pairing her
+with a real carry — `Burnice/Remielle/Velina` collected it and looked like it was cheating, when
+in fact everyone else was being denied one. But marking Velina off-field **alone** leaves that
+team with nobody on field at all, tripping the no-primary-damage-dealer penalty and costing
+Burnice 45. So Burnice takes a conditional `onfield` mirroring her existing `subdps` conditional:
+off-field normally, on-field beside Velina. The two fixes only work together.
+
+The `'shared'` state itself is currently declared by nobody — see
+[deliberately unmodeled](../engine/deliberately-unmodeled.md).

@@ -81,3 +81,25 @@ the Luminize rebound off teammate procs, priced separately in the anomaly-quanti
 mechanical impossibility.
 
 
+
+### [LUM-02] No proc-damage buff reaches lumen, by any route
+
+Lumen never touches an anomaly gauge in either direction — `getProcElements` returns an empty set
+for it, because Attribute Mutation morphs damage rather than filling a gauge. And luminize runs
+strictly on Proficiency. So a buff to anomaly **proc damage** has nothing to land on.
+
+The direct `anomaly:<element>` channel was paying Remielle anyway, because its gate is
+`getBasicDamage(consumer) / 3` — a generic "does this unit deal damage" test that she passes.
+`Jane Doe → Remielle: anomaly:physical: 7.5` was a *physical proc-damage* buff paid to an agent
+who procs nothing and is not physical.
+
+This is the same ruling the phase-4 plan already made about Refringe — that a proc-damage buff
+scales the proc's own damage and the vortex built on it, **not** Refringe's increment, so
+Phoenix's gimmick does not reach Remielle through Refringe. It was simply being violated at a
+different site.
+
+Consequence worth knowing: on a Remielle/Velina team a universal proc-damage buff reaches only
+Velina, because Remielle is excluded here, the wind enabler is excluded from the vortex scale by
+`[VTX-05]`, and a self-landing buff is discounted by `[BUFF-08]`. Each exclusion is individually
+correct and together they cover nearly every recipient Phoenix has. That is the open half of
+rankings TEST 90.

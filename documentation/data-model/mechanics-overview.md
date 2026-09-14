@@ -69,3 +69,22 @@ has the same hazard.
 
 Any mechanic value may be a scalar **or** a set of cases. See
 [predicates](predicates.md) for the vocabulary and the two scoping rules.
+
+## Code notes
+
+### [CLS-01] `:` is a classifier, and two stems are exempt
+
+`X:Y` names a **subclass** of `X`, the same way `unit.species` uses it. So `anomaly:wind` and
+`anomaly:electric` are both anomalies and both feed a plain `anomaly` need, and a buff on the
+general class reaches every subclass — Promeia's `buffs.abloom` must still reach Velina's
+`damage['abloom:free']`. `classifierBase` is the single place that decides this, and both the
+scorer and `pull-engine.js` read it so the two engines cannot drift apart.
+
+**`ultimate` is not a classifier, and getting that wrong would resurrect a defect the burst model
+was built to remove.** `ultimate:strong` is magnitude, `ultimate:weak` is magnitude-zero, and
+`ultimate:double` is frequency. They are **orthogonal axes**, not subclasses of one "ultimate"
+quantity. Aggregating them once fabricated an ultimate need for **26 of 60 units**. See
+[damage and burst](damage-and-burst.md#why-the-axes-must-stay-apart).
+
+`NON_CLASSIFIER_STEMS` is the exemption list. Adding to it should be rare and needs the same
+argument: the stem names independent axes rather than a family.

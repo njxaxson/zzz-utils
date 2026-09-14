@@ -171,6 +171,66 @@ Also tried and rejected: a piecewise curve fitted on the neutral boss (it has to
 exactly where it matters, and produced 931.3 on a 400 scale), and a per-archetype power curve
 (fixes anomaly to within 7% at every depth, over-rates weak rupture teams by 48%).
 
+## The L4 soft cap was NOT obviated by calibration, and three ways to relax it all fail
+
+Investigated 2026-09-14 after the owner's repeated (and reasonable) suspicion that the cap kills
+every lever at the top of the anomaly ladder. Both halves of that suspicion check out; the
+conclusion is still "do not move it yet".
+
+**Calibration cannot have replaced it, structurally.** `calibrated = raw x factor[archetype]` is a
+per-archetype **linear** map, and a linear map is order-preserving *within* an archetype. The cap
+is non-linear and changes within-archetype order — that is its entire job. The two cannot
+substitute for each other in principle, and the measurement agrees: removing the cap immediately
+fails rankings TEST 85, with the supportless `Nangong/Alice/Miyabi` (502.5) beating its supported
+counterpart `Nangong/Alice/Sunna` (492.2).
+
+**The shape, for reference.** Passthrough 100, cap 250, asymptote 350 — no team's L4 can exceed
+that however it is built. Marginal rate: 1.00 up to 100, 0.69 at 150, 0.51 at 200, 0.41 at 240,
+0.26 at 339. **90.2% of viable teams sit under raw L4 100 and are untouched.**
+
+**It is well-targeted at the top and badly targeted in the middle.** By the engine's own structure
+classification:
+
+| raw L4 | teams | NO SUPPORT | conventional |
+|----|----|----|----|
+| >= 250 | 89 | **78%** | 20% |
+| >= 200 | 206 | **57%** | 32% |
+| 150-199 | 653 | 16% | 46% |
+| 100-149 | 4,128 | 18% | 34% |
+
+Above 200 it is doing exactly what it was built for. Below that it is mostly compressing ordinary
+conventional teams — and that band holds 95% of everything the cap touches. That is the honest
+content of "it kills every lever": the anomaly ladder's top teams are conventional, sit at raw L4
+190-260, and collect 0.4-0.5 on the margin.
+
+**Three relaxations, all measured, all rejected:**
+
+| attempt | what broke |
+|----|----|
+| Remove it entirely | rankings TESTs 8, 14, 82 (six ladder violations), 85, 90 worse; bucketing TEST 5 |
+| Raise `L4_PASSTHROUGH` to 140 / 180 / 220 | rankings TESTs 14, 90 (Aria/Promeia inverts); bucketing TEST 5 — identical failures at all three values |
+| Apply the cap only to supportless teams | rankings TESTs 8, 9, 14, 82, 90; bucketing — the **worst** of the three |
+
+**Why they all fail the same way.** Relaxing compression always favours whichever team already has
+more raw L4. Three suite anchors are fitted to the current rate and break in that direction: TEST
+14 is a **ceiling** (`Norma/Banyue/Lucia` must stay under 485, reads 488 at passthrough 140),
+bucketing TEST 5 is a **parity band** (the stunless and stunner lines drift apart, exactly as they
+did when the field-time bonus moved), and TEST 90's Aria-over-Promeia rung holds by **0.4 points**
+so any broad relaxation flips it.
+
+**Order of operations, if this is ever taken on.** Do
+[SCORE-143](../issues/deferred/medium-vortex-outweighs-every-other-anomaly-payout.md) **first**.
+65% of the teams above raw L4 200 hold a wind agent or are the wind-state boss, so vortex is what
+is filling the range the cap compresses. If vortex is genuinely over-weighted at ~5x every other
+anomaly payout, the cap is partly a band-aid on that, and shrinking vortex may pull the
+distribution back under the passthrough without touching the cap at all. Retuning the cap first
+would then be fitting a curve to a number that is about to move — and any measurement taken now
+is confounded the same way.
+
+Then, and only then: re-derive TEST 14's ceiling, re-derive `STUNLESS_SHILL_CREDIT` for bucketing
+TEST 5 (the same fix that absorbed the field-time change), and expect the Aria/Promeia rung to
+need re-closing from a different lever.
+
 ## Do not raise the L4 soft cap to fix a Miyabi ordering
 
 It helps the ladder and **un-fixes the supportless rungs** at the same time.
