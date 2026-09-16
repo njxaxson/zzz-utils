@@ -599,7 +599,20 @@ function othersFormDisorder(self, team) {
     return elements.size >= 2;
 }
 
-function evaluatePredicate(when, ctx) {
+/**
+ * The ONE predicate evaluator. Exported because the pull engine reads the same vocabulary —
+ * predicates.md's promise that "anything added here becomes available in both places" was only
+ * true of the scorer until this was shared. [PRED-03]
+ *
+ * NO-TEAM DEFAULTS. With no team to evaluate against (`ctx.team` absent), `notPresent` answers
+ * permissively and every other key answers restrictively. That is not an accident of `|| []` —
+ * it is the documented pull-engine default that makes Burnice read as a sub-DPS and Yanagi as a
+ * primary carry. See documentation/data-model/predicates.md.
+ *
+ * SELF IS COUNTED. `countTag` and `hasRole` count the whole team including the unit asking, so
+ * callers must pass a team that contains `self` exactly once.
+ */
+export function evaluatePredicate(when, ctx) {
     if (!when) return true;
     // Every other key is a single question; `allOf` is the only way to ask two. [PRED-02]
     if (when.allOf !== undefined) return when.allOf.every(c => evaluatePredicate(c, ctx));
@@ -615,6 +628,15 @@ function evaluatePredicate(when, ctx) {
         // Recipient-scoped: needs a consumer. Team-global reads (no consumer) fall through
         // to the default case by treating role predicates as unmet.
         return ctx.consumer ? getEffectiveRoles(ctx.consumer).includes(when.role) : false;
+    }
+    if (when.hasRole !== undefined) {
+        // Reads RESOLVED roles, so it is deferred to the second activation pass. [PRED-03]
+        if (ctx.deferResolved) return false;
+        const [role, element] = String(when.hasRole).split(':');
+        const count = (ctx.team || []).filter(u =>
+            getEffectiveRoles(u).includes(role) && (element === undefined || getElement(u) === element)
+        ).length;
+        return count >= (when.minCount ?? 1);
     }
     if (when.countTag !== undefined) {
         const count = (ctx.team || []).filter(u => u.tags.includes(when.countTag)).length;
@@ -634,7 +656,7 @@ export function isTeamScopedConditional(spec) {
     if (!isConditionalSpec(spec)) return false;
     return spec.cases.some(c => c.when && (
         c.when.countTag !== undefined || c.when.hasUnit !== undefined || c.when.notPresent !== undefined
-        || c.when.provisions !== undefined
+        || c.when.provisions !== undefined || c.when.hasRole !== undefined
     ));
 }
 
@@ -2647,6 +2669,13 @@ function scoreTeamStructure(team, debug) {
         if (debug) console.log('    Structure: ^ kept — no support, but the second stunner serves as one (totalize)');
         return classified;
     }
+    // Exemption: a unit whose `join` mandates a second carry (Seed) has no composition where a
+    // support fits over the stunner. It WAIVES the penalty, it never grants anything — a Seed team
+    // that HAS a support returned above, at the isEffectiveSupport check. [PIPE-03]
+    if (team.some(mandatesDualCarry)) {
+        if (debug) console.log(`    Structure: ^ kept — no support, but a member's join mandates a second carry`);
+        return classified;
+    }
     // Take the HARSHER of the two factors rather than overriding, so a supportless
     // WILDLY_UNCONVENTIONAL team is not PROMOTED up to the no-support tier. See
     // documentation/engine/layers.md ("No support or defense is its own tier").
@@ -2656,6 +2685,24 @@ function scoreTeamStructure(team, debug) {
     }
     if (debug) console.log('    Structure: ^ DEMOTED to NO-SUPPORT tier — no support or defense agent');
     return STRUCTURE.NO_SUPPORT;
+}
+
+// A carry whose `join` offers NO alternative to a second carry: Seed joins on "attack" and
+// nothing else, so every legal Seed team has two attack agents in it. The second carry is
+// mandated by the kit, not chosen, which is interaction rather than a doubled-up mistake. Only
+// ATTACK and RUPTURE qualify as the base unit — they are the classes that assume a solo carry, so
+// a forced second DPS costs them the stunner or the support slot. Anomaly and armorer assume a
+// DPS partner already and have nothing to be excused for. [PIPE-03]
+//
+// Reads RAW tags and RAW `join`, never effective roles: `join` legality (team-builder.js) matches
+// raw tags, so a role-reading version would claim a mandate the legality check does not enforce.
+const DUAL_CARRY_BASE_ROLES = ['attack', 'rupture'];
+const DUAL_CARRY_JOIN_ROLES = ['attack', 'rupture', 'armorer', 'anomaly'];
+function mandatesDualCarry(unit) {
+    if (!DUAL_CARRY_BASE_ROLES.some(r => unit.tags.includes(r))) return false;
+    const join = unit.join;
+    if (!Array.isArray(join) || join.length === 0) return false;
+    return join.every(j => DUAL_CARRY_JOIN_ROLES.includes(j));
 }
 
 function secondStunnerActsAsSupport(team) {
@@ -2831,6 +2878,14 @@ function classifyTeamStructure(team, debug) {
         // documentation/engine/layers.md ("Which compositions accept a second carry").
         if (hasSubDPS) {
             if (debug) console.log('    Structure: UNCONVENTIONAL viable (double attacker, second is a subdps)');
+            return STRUCTURE.UNCONVENTIONAL_VIABLE;
+        }
+        // The third declaration form: a `join` with no non-carry activation at all. Same-element
+        // is still not interaction (rankings TEST 89) — this reads one declared array, never the
+        // pair. Rupture has no equivalent branch because it never accepts a second rupture carry;
+        // a rupture-mandating unit would need one adding here. [PIPE-03]
+        if (attackers.some(mandatesDualCarry)) {
+            if (debug) console.log('    Structure: UNCONVENTIONAL viable (double attacker, one mandates a dual carry)');
             return STRUCTURE.UNCONVENTIONAL_VIABLE;
         }
         if (debug) console.log('    Structure: UNCONVENTIONAL (double attacker, no interaction)');

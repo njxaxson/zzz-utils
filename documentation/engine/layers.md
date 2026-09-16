@@ -48,10 +48,15 @@ carry exempts a stunnerless team from a stun shill.
 ## No support or defense is its own tier
 
 A team with no effective support and no effective defense — pseudo-roles included, so Orphie,
-Remielle and Cissia-alongside-Seed all count — is demoted to a dedicated no-support tier.
+Remielle and Cissia-beside-a-second-electric-attacker all count — is demoted to a dedicated
+no-support tier.
 
 Supports exist because buffs matter, and forgoing one is a genuine teambuilding failure rather
 than a stylistic choice. The hit is meant to be large.
+
+**Two exemptions, both waivers rather than grants.** A totalize plus double-stun team (below), and
+a team holding a carry whose `join` mandates a second carry ([PIPE-03]). Both return the tier the
+team already classified as; neither promotes it.
 
 Before this rule, `Nangong/Miyabi/Vivian` and `Nangong/Miyabi/Yuzuha` classified identically,
 which is why triple-anomaly lines outranked the [wheelchairs](../archetypes/wheelchairs.md)
@@ -104,13 +109,48 @@ These differ by role and must not be collapsed.
 |----|----|
 | **Anomaly** | Yes, unconditionally. Most anomaly teams *want* two anomaly bodies, ideally with one a sub-DPS or a pseudo-stunner. That is the baseline assumption, because the team is built to produce reactions |
 | **Rupture** | **Never.** One rupture carry only |
-| **Attack** | Only when the second attacker is explicitly a **sub-DPS** or a **pseudo-support**. Sharing an element is *not* interaction — two carries of one element cannot disorder with each other and still cannot both hold the field |
+| **Attack** | Only on an explicit **declaration**, in one of three forms: the second attacker declares a **sub-DPS** pseudo-role, declares a **pseudo-support** one, or its `join` array offers **no non-carry activation at all** ([PIPE-03]). Sharing an element is *not* interaction — two carries of one element cannot disorder with each other and still cannot both hold the field |
 | **Attack + anomaly** ([monoshock](../archetypes/monoshock.md)) | Only when the attacker declares `scaling.anomaly` — Harumasa and Sigrid. `scaling.am` and `scaling.ap` are **stats, not mechanics**, and must never be read as evidence that a kit runs on anomaly |
 | **Armorer** | Two armorers are conventional — [Maim](../concepts/armorer-laceration-gash-maim.md) is the shared-resource payoff |
 
 **One exemption: [totalize](../archetypes/totalize.md) plus double stun.** There the second
 stunner *is* the support — totalize damage *is* stun uptime, so a second stunner feeds the
 carry the way a support otherwise would. This is deliberate; `Anby/Qingyi/Hugo` is a real team.
+
+### [PIPE-03] A `join` that mandates a second carry
+
+Seed's `join` is `["attack"]` and nothing else, so **every legal Seed team holds two attack
+agents**. The second carry is mandated by the kit rather than chosen, which is interaction — and
+the engine could not see it, because `join` had never been read as a statement about composition.
+
+The rule: a unit tagged **attack or rupture** whose `join` is non-empty and consists *entirely* of
+carry-role tags (`attack`/`rupture`/`armorer`/`anomaly`). Two sides, asymmetric on purpose.
+
+*The base must be attack or rupture*, because those classes assume a **solo** carry — the other
+two slots are free for a stunner and a support, and a mandated second DPS takes one of them. That
+displacement is the whole thing being modelled. Anomaly and armorer assume a DPS partner already
+(two armorers are conventional, one row up), so they have nothing to be excused for.
+
+*The join targets may be any carry class.* An attacker that joins only on `rupture` is boxed out
+exactly as one that joins only on `attack`; "an agent of the same role" is too narrow a reading.
+
+It applies at **two sites**, and neither alone moves anything:
+
+1. the double-attacker branch, lifting it off no-interaction to `UNCONVENTIONAL_VIABLE`;
+2. the no-support gate, waiving the demotion that would otherwise pull 0.85 back to 0.75.
+
+Site 1 deliberately applies to supported teams too. The branch accepts `nSup >= 1`, so without it
+a Seed team **with** a support would sit at 0.6 while a supportless one sat at 0.85 — backwards.
+What a support buys is the no-support gate returning before site 2 is consulted. The rule never
+reaches `CONVENTIONAL`: it waives a charge, it does not grant a tier.
+
+Reads **raw** tags and **raw** `join`, never effective roles, because `join` legality itself
+matches raw tags — a role-reading version would claim a mandate the legality check does not
+enforce. Seed is the only unit on the roster that qualifies; mechanics TEST 34 asserts that, so a
+future unit shipping the same join shape trips a test rather than quietly moving the corpus.
+
+Measured: **1,448 team-boss rows, every one upward, signature `structure+teamwork` and nothing
+else, zero exceptions.**
 
 ## Related
 
@@ -188,11 +228,14 @@ multiplier. Below **0.70** the wasted-vortex anti-pattern (rankings TEST 62) sta
 Measured: **8,430 team-boss rows moved, every one of them downward, zero exceptions** — every
 mover was classified no-support.
 
-**Two floors went red and both were left red on purpose.** `Lighter/Promeia/Burnice` misses its
-floor by 2.8; the owner's call is to recalibrate the floor rather than soften the factor to
-protect one odd composition. `Trigger/SAnby/Cissia` misses by more, and it is not a trustworthy
-boundary at all — see [known pitfalls](../notes/known-pitfalls.md) on why a SAnby, Seed or Cissia
-team cannot be used to size a constant.
+**Two floors went red, and neither was repaired by moving the factor.**
+`Lighter/Promeia/Burnice` missed its floor by 2.8; the owner re-derived the floor from 345 to
+**320** rather than soften the factor to protect one odd composition. It reads **342.2**, so the
+floor now asserts the team is *viable* with 22 points of margin, rather than pinning a
+supportless line to a number it was never going to hold. `Trigger/SAnby/Cissia` misses by more and stays in
+`KNOWN_RED`: it is not a trustworthy boundary at all — see
+[known pitfalls](../notes/known-pitfalls.md) on why a SAnby, Seed or Cissia team cannot be used
+to size a constant.
 
 **What was tried and rejected.** Scaling the penalty by how much buff weight the team actually
 lands looked promising and does not survive: among genuinely supportless teams the measure runs

@@ -19,8 +19,13 @@ unit's own kit cannot tell "wrong tool" from "narrow but right". So it is declar
 [lessons-learned.md](lessons-learned.md#archetypes-had-to-be-declared).
 
 Everything else that had to be hand-encoded — Lycaon's cohesion exemption, the
-Remielle/Velina pair, the Trigger/SAnby/Seed group — is a debt, not a pattern. Each is named
-in [adjudications.md](adjudications.md) with the reason it was allowed.
+Remielle/Velina pair — is a debt, not a pattern. Each is named in
+[adjudications.md](adjudications.md) with the reason it was allowed.
+
+**The Trigger/SAnby/Seed group was one of these and has been paid off.** Two declared conjunctive
+synergy groups were holding that team over its floor; both are gone, and the team now clears
+emergently because the engine reads Seed's `join` as the composition statement it always was
+([PIPE-03]). That is what paying a debt looks like: the declaration is deleted, not moved.
 
 ## A green suite is not evidence. A prediction with zero exceptions is
 

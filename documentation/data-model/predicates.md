@@ -4,11 +4,16 @@ One predicate vocabulary drives both [pseudo-role activation](pseudorole.md) and
 mechanic values. Anything added to `evaluatePredicate` becomes available in both places
 automatically.
 
+**And in the pull engine**, which imports the same function. That sentence used to be true only of
+the scorer: the pull engine carried a fork that understood three keys and silently answered
+`false` for everything else. See [PRED-03].
+
 ## The predicates
 
 | Predicate | Passes when |
 |----|----|
 | `{ "countTag": "<tag>", "minCount": n }` | The team, self included, has at least *n* units with that tag |
+| `{ "hasRole": "<role>[:<element>]", "minCount": n }` | The team, self included, has at least *n* units with that **effective role**, optionally narrowed to one element |
 | `{ "hasUnit": "<ident>" }` | See identifier forms below |
 | `{ "notPresent": "<ident>" }` | The inverse of `hasUnit`, same identifier forms |
 | `{ "role": "<role>" }` | The **consumer receiving the value** has that effective role |
@@ -93,6 +98,45 @@ depends on and another it does not. Mechanics TEST 29 asserts both halves — a 
 flag still takes the full charge — because a test that only checks the opt-out cannot tell "the
 flag works" from "the penalty stopped firing entirely".
 
+### [PRED-03] `hasRole`, one shared evaluator, and the no-team defaults
+
+`countTag` counts a raw tag in a vacuum. It cannot express *"a second **electric attacker**"*,
+because it understands neither effective roles nor element — and that gap was being papered over
+with `hasUnit: "seed"`, which named one unit where the real condition was a kind of unit. Cissia
+does not care that it is Seed; she cares that somebody else is an electric attacker.
+
+`hasRole` closes it. Self is counted, matching `countTag`. The element is optional, so
+`"attack"` counts the role at any element and `"attack:electric"` narrows it.
+
+**It defers in pass one**, like `othersDisorder`, because it reads resolved roles. Cissia does not
+need that — `attack` is a native tag on every unit that could satisfy her, so her answer is the
+same in both passes — but the *family* does. Without the deferral a future `hasRole: "anomaly:ether"`
+would read `getEffectiveRoles`' unconditional fallback in pass one and answer differently depending
+on array order in `units.json`. Deferring makes the whole family order-independent by construction.
+
+#### One evaluator, two engines
+
+`evaluatePredicate` is exported and the pull engine's `isSubdps` calls it. It used to fork:
+three keys handled by hand and `return false` for anything else, which meant a new predicate key
+was understood by the scorer and invisible to the recommendations. Reconciling the fork needed two
+things written down rather than left implicit:
+
+**No-team defaults.** With no team to evaluate against, `notPresent` answers **permissively** and
+every other key answers **restrictively**. That is what makes Burnice read as a sub-DPS and Yanagi
+as a primary carry with no team context — the table in [pseudoRole](pseudorole.md). It is now one
+stated rule instead of two implementations that happened to agree.
+
+**Self is counted exactly once.** The scorer counts the whole team including the asking unit; the
+fork filtered a self-excluding list and added a self-count back, which double-counted wherever the
+caller's roster already contained the unit. Callers normalise now.
+
+Three sites in the pull engine still read `when.countTag` directly. Those ask *"which tag would
+the user need to own?"* — introspection, not evaluation — and `evaluatePredicate` cannot answer
+it. They skip `hasUnit`/`notPresent`/`hasRole` knowingly.
+
+Measured: the predicate moved **0 rows** before any data used it, and sharing the evaluator moved
+**0 rows** with the recommendation suite still green — the same two-step proof [PRED-02] records.
+
 ### [PRED-02] `allOf`, `othersDisorder`, and two-pass role activation
 
 Soukaku is the reason all three exist, and the reason is a game fact: she is the non-frost ice
@@ -123,9 +167,18 @@ identity, which today is all of them — this is where Nangong promotes to anoma
 Pass two re-answers with those roles visible, and Nangong's promotion is exactly what stands
 Soukaku down. A role-reading predicate resolves **false** in pass one rather than looping.
 
-Nothing may depend on another unit's role-reading predicate. Nothing does: all sixteen pseudo-role
-predicates on the roster read raw tags or identity. If that ever changes, two passes stop being
-enough and the right answer is to refuse the data, not to add a third pass.
+The invariant here was originally written as *"nothing may depend on another unit's role-reading
+predicate — all sixteen pseudo-role predicates read raw tags or identity."* That stopped being
+true when Cissia's roles moved to `hasRole`, so state the rule that actually carries the weight:
+
+> **No role-reading predicate may consume a role that another role-reading predicate produces.**
+
+Two exist today and they are disjoint. Soukaku *produces* `anomaly` and *consumes* the proc
+elements of anomaly-role units; Cissia *produces* `support`/`subdps` and *consumes*
+`attack:electric`, and she is never anomaly. Two passes remain sufficient exactly while that holds.
+
+A third predicate reading `anomaly:<element>` would depend on Soukaku's own two-pass answer and
+break it. If that day comes: **refuse the data, do not add a third pass.**
 
 Measured: the machinery moved **0 rows** before Soukaku's data used it, and her data then moved
 **10 teams with zero exceptions** — exactly those where Miyabi already has a partner. Mechanics

@@ -1407,6 +1407,183 @@ async function main() {
             `Velina's buildup must NOT reach Remielle — she is lumen and procs nothing, so there ` +
             `is no rate to buff. Lines were: ${JSON.stringify(toRem)}`);
     });
+
+    // TEST 32: a conjunctive synergy group pays only when the WHOLE group is present
+    // `synergy.units` entries joined with "+" require every named unit on the team, and the gating
+    // IS the point: a group that paid out on a partial match would be indistinguishable from two
+    // single-name declarations and would lift teams nobody asked to lift.
+    //
+    // Lives here, on a SYNTHETIC clone, because it pins the mechanism rather than any unit's data.
+    // It was written twice against live declarations — Alice's "Remielle+Velina", then SAnby's
+    // "Trigger+Seed" — and broke both times when that data was removed rather than when the
+    // mechanism changed. The roster currently declares no conjunctive group at all.
+    run('TEST 32: conjunctive synergy requires the whole group', () => {
+        const boss = withBosses(bosses, 'Neutral').find(Boolean);
+        assert(boss, 'synthetic neutral boss not found');
+        const sanby = allUnits.find(u => u.id === 'sanby');
+        assert(sanby, 'fixture unit SAnby not found');
+        assert(!(sanby.synergy?.units || []).some(e => typeof e === 'string' && e.includes('+')),
+            'fixture assumption broken: SAnby should declare no conjunctive group of her own');
+
+        const clone = JSON.parse(JSON.stringify(sanby));
+        clone.id = 'sanby-clone';
+        clone.name = 'SAnbyClone';
+        clone.synergy = { units: ['Trigger+Seed'], tags: [], avoid: [] };
+        const roster = [...allUnits, clone];
+
+        const l5Of = (spec) => {
+            const trace = {};
+            const parsed = scoreForTeamString(spec, roster);
+            assert(parsed.length === 1, `fixture ${spec} did not resolve to one team`);
+            scoreTeamForBoss(parsed[0].team, boss, { trace });
+            return trace.l5;
+        };
+
+        // Whole group present: the clone's 55 pays.
+        const both = l5Of('Trigger/SAnbyClone/Seed');
+        assert(both >= 55,
+            `with the whole group present the conjunctive bonus must pay: L5 was ${both}`);
+
+        // Only ONE member present: the group pays nothing at all.
+        const onlyTrigger = l5Of('Trigger/SAnbyClone/Astra');
+        assert(onlyTrigger === 0,
+            `Trigger without Seed must not trigger the clone's group: L5 was ${onlyTrigger}`);
+    });
+
+    // TEST 33: `hasRole` counts EFFECTIVE roles, optionally narrowed by element
+    // `countTag` could not express "a second electric attacker": it counts a raw tag in a vacuum
+    // and understands neither pseudo-roles nor element. Both directions are asserted — a test that
+    // only checks the match cannot tell "the element filter works" from "the predicate always
+    // passes". Self is counted, matching `countTag`. [PRED-03]
+    run('TEST 33: hasRole counts effective roles and honours the element qualifier', () => {
+        const boss = withBosses(bosses, 'Neutral').find(Boolean);
+        const probe = (when) => {
+            const c = JSON.parse(JSON.stringify(allUnits.find(u => u.id === 'cissia')));
+            c.id = 'probe';
+            c.name = 'Probe';
+            c.mechanics.pseudoRole = [{ role: 'subdps', when }];
+            return c;
+        };
+        const structureOf = (spec, unit) => {
+            const parsed = scoreForTeamString(spec, [...allUnits, unit]);
+            assert(parsed.length === 1, `fixture ${spec} did not resolve to one team`);
+            const trace = {};
+            scoreTeamForBoss(parsed[0].team, boss, { trace });
+            return trace.structure;
+        };
+
+        const EL = probe({ hasRole: 'attack:electric', minCount: 2 });
+        const ANY = probe({ hasRole: 'attack', minCount: 2 });
+
+        // Beside SAnby (attack, ELECTRIC) both forms agree — the element qualifier is satisfied.
+        const elElectric = structureOf('Trigger/Probe/SAnby', EL);
+        const anyElectric = structureOf('Trigger/Probe/SAnby', ANY);
+        assert(elElectric === anyElectric,
+            `beside an electric attacker both forms must agree: ${elElectric} vs ${anyElectric}`);
+
+        // Beside Ellen (attack, ICE) only the unqualified form promotes. Same role, wrong element —
+        // exactly the distinction countTag cannot draw.
+        const elIce = structureOf('Lycaon/Probe/Ellen', EL);
+        const anyIce = structureOf('Lycaon/Probe/Ellen', ANY);
+        assert(anyIce !== elIce,
+            `"attack" must promote beside an ICE attacker where "attack:electric" does not: ` +
+            `qualified ${elIce} vs unqualified ${anyIce}`);
+        assert(anyIce === anyElectric,
+            `the unqualified form should not care about element: ${anyIce} vs ${anyElectric}`);
+
+        // minCount is real: three electric attackers cannot be met by two, so the role stands down.
+        const THREE = probe({ hasRole: 'attack:electric', minCount: 3 });
+        const elThree = structureOf('Trigger/Probe/SAnby', THREE);
+        assert(elThree !== elElectric,
+            `minCount 3 cannot be met by two electric attackers: ${elThree} vs ${elElectric}`);
+        assert(elThree === elIce,
+            `an unmet hasRole should read the same as a non-matching one: ${elThree} vs ${elIce}`);
+    });
+
+    // TEST 34: a `join` with no non-carry option mandates a dual carry
+    // Seed joins on "attack" and nothing else, so every legal Seed team holds two attack agents.
+    // That displacement — the mandated second carry boxes out the stunner or the support — is what
+    // the rule models, and it WAIVES the no-support charge rather than granting anything. Five
+    // parts, because a test that only checks the exemption cannot tell "the rule works" from "the
+    // tier stopped firing". [PIPE-03]
+    run('TEST 34: a join with no non-carry option mandates a dual carry', () => {
+        const boss = withBosses(bosses, 'Neutral').find(Boolean);
+        const clone = (srcId, id, name, patch) => {
+            const c = JSON.parse(JSON.stringify(allUnits.find(u => u.id === srcId)));
+            c.id = id;
+            c.name = name;
+            return Object.assign(c, patch);
+        };
+        const structureOf = (spec, roster) => {
+            const parsed = scoreForTeamString(spec, roster);
+            assert(parsed.length === 1, `fixture ${spec} did not resolve to one team`);
+            const trace = {};
+            scoreTeamForBoss(parsed[0].team, boss, { trace });
+            return trace.structure;
+        };
+
+        // Ellen joins on stunners and supports: a conventional team exists for her, so pairing two
+        // of her kind is a choice, not a mandate.
+        const plain = clone('ellen', 'mandate-off', 'MandateOff', {});
+        const NO_INTERACTION = structureOf('Lycaon/Ellen/MandateOff', [...allUnits, plain]);
+
+        // (1) the same unit with its join narrowed to "attack" only is mandated, so the second
+        //     carry counts as interaction.
+        const mandated = clone('ellen', 'mandate-on', 'MandateOn', { join: ['attack'] });
+        const MANDATED = structureOf('Lycaon/Ellen/MandateOn', [...allUnits, mandated]);
+        assert(MANDATED > NO_INTERACTION,
+            `a join offering no non-carry option must lift the team off the no-interaction tier: ` +
+            `${MANDATED} vs ${NO_INTERACTION}`);
+
+        // (2) the unmodified pair must NOT be lifted, or the tier has simply stopped firing.
+        assert(NO_INTERACTION < 0,
+            `two ordinary attack carries must still classify as no-interaction, got ${NO_INTERACTION}`);
+
+        // (3) CROSSING carry class qualifies. An attacker that can only join ruptures is boxed out
+        //     exactly as one that can only join attackers; "same role" is too narrow a reading.
+        const crossed = clone('ellen', 'mandate-rup', 'MandateRup', { join: ['rupture'] });
+        assert(structureOf('Lycaon/Ellen/MandateRup', [...allUnits, crossed]) === MANDATED,
+            `an attacker joining only on rupture must qualify like one joining only on attack`);
+
+        // (4) ARMORER does not qualify, even with the same all-carry join. Attack and rupture
+        //     assume a solo carry; armorer and anomaly assume a DPS partner already.
+        const arm = clone('claret', 'mandate-arm', 'MandateArm', { join: ['attack'] });
+        const armPlain = clone('claret', 'mandate-arm2', 'MandateArm2', { join: ['stun', 'support'] });
+        const armMandated = structureOf('Lycaon/Ellen/MandateArm', [...allUnits, arm]);
+        const armOrdinary = structureOf('Lycaon/Ellen/MandateArm2', [...allUnits, armPlain]);
+        assert(armMandated === armOrdinary,
+            `an armorer's join must not buy the dual-carry exemption: ${armMandated} vs ${armOrdinary}`);
+
+        // (5) The rule WAIVES a charge, it never GRANTS a tier. Two halves:
+        //
+        //   (a) the waiver itself — a supportless mandated team keeps the classified tier instead
+        //       of being demoted to NO_SUPPORT.
+        assert(MANDATED === 0,
+            `a mandated team must land on UNCONVENTIONAL_VIABLE, not be demoted to the ` +
+            `no-support tier: got ${MANDATED}`);
+        //
+        //   (b) the ceiling — the mandate never reaches CONVENTIONAL. Note this applies to a
+        //       team that ALREADY has a support too, and must: the double-attacker branch accepts
+        //       `nSup >= 1`, so if the mandate did not apply there, a Seed team WITH a support
+        //       would sit on the 0.6 no-interaction tier while a supportless one sat on 0.85 —
+        //       backwards. What a support does buy is the no-support check returning early.
+        const supported = structureOf('Ellen/MandateOn/Astra', [...allUnits, mandated]);
+        assert(supported === MANDATED,
+            `a support must not change the mandated classification: ${supported} vs ${MANDATED}`);
+        assert(supported < 35,
+            `the mandate must never reach CONVENTIONAL: got ${supported}`);
+
+        // Roster guard: Seed is the only live qualifier. A future unit shipping this join shape
+        // should trip a test rather than quietly move thousands of corpus rows.
+        const CARRY = ['attack', 'rupture', 'armorer', 'anomaly'];
+        const qualifiers = allUnits.filter(u =>
+            ['attack', 'rupture'].some(r => u.tags.includes(r)) &&
+            Array.isArray(u.join) && u.join.length > 0 && u.join.every(j => CARRY.includes(j)));
+        assert(qualifiers.length === 1 && qualifiers[0].id === 'seed',
+            `Seed should be the only unit whose join mandates a dual carry, got ` +
+            `[${qualifiers.map(u => u.name).join(', ')}]. If that is intended, update this test ` +
+            `and re-measure — the rule moves every double-carry team the new unit appears on.`);
+    });
     // Summary
     console.log('');
 

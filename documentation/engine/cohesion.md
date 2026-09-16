@@ -118,8 +118,9 @@ Owner: "for damage-dealing calcs she is a subdps... for buff relevance she is su
 generally speaking, support wins."
 
 `isSupport()` reads ACTIVATED roles, so a conditional support pseudo-role only counts when its
-predicate holds — Cissia routes to the support-side measure only on a team with Seed. Affects
-exactly three units: Remielle, Orphie, and Cissia-with-Seed.
+predicate holds — Cissia routes to the support-side measure only beside a **second electric
+attacker** (Anton, Harumasa, SAnby or Seed), not on a team with Seed specifically. Affects
+exactly three units: Remielle, Orphie, and Cissia-with-an-electric-partner.
 
 The same fix applies to how a team-scoped conditional buff is measured: `resolveMapForUtil`
 hands back the value the team actually unlocked, so measuring THAT value only ever asks "did

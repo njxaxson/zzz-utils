@@ -112,8 +112,22 @@ Two attack carries were keeping a favourable structure tier purely for sharing a
 `Norma/Evelyn/Soldier 11` (both fire).
 
 **Ruling: same element is not interaction.** Two carries of one element cannot disorder with
-each other and still cannot both hold the field. A second attacker counts only when it is
-explicitly a sub-DPS or a pseudo-support.
+each other and still cannot both hold the field. A second attacker counts only on an explicit
+**declaration in the data**, never on a property the engine infers from the pair.
+
+There are **three declaration forms**. The third was added when SCORE-140 closed and does not
+weaken this ruling — it is another way for the data to say the same thing:
+
+1. the second carry declares a `subdps` pseudo-role;
+2. it declares a `support` pseudo-role;
+3. its `join` array offers **no non-carry activation at all** — every entry is a carry-role tag,
+   whether or not it is the unit's own role ([PIPE-03]).
+
+Ellen and Sigrid both join on stunners and supports: either is happy in a conventional team, so
+pairing them is a *choice*. Seed joins on `attack` and nothing else — there is no conventional
+team for her, and the second carry is mandated rather than chosen. Form 3 reads one declared
+array and nothing else: no element, no buff count, no tier. The three teams above are unaffected,
+and mechanics TEST 34 pins that Seed is the only unit on the roster that qualifies.
 
 **Do not generalise this to anomaly.** Anomaly is the role that genuinely wants two bodies, and
 the two concepts must not be collapsed.
@@ -526,8 +540,9 @@ classified no-support.
   owner. The cap is the wrong mechanism, not the wrongly-scoped one, and a scoped version would
   re-create the same ceiling for any future composition that hit it.
 
-**What stays broken, deliberately.** Two supportless floors are red and held in `KNOWN_RED`.
-`Lighter/Promeia/Burnice` misses by 2.8 and its floor should be recalibrated rather than the
-factor softened to protect one odd composition. `Trigger/SAnby/Cissia` misses by more and is not
-a trustworthy boundary at all — see known-pitfalls on why a SAnby, Seed or Cissia team cannot be
-used to size a constant.
+**What the fallout cost.** Two supportless floors went red. `Lighter/Promeia/Burnice` missed by
+2.8 and its floor was re-derived from 345 to **320** — the owner's call was explicitly to move the
+floor rather than soften the factor to protect one odd composition. It reads **342.2**, clearing
+the new floor by 22. `Trigger/SAnby/Cissia` misses by more, stays in `KNOWN_RED`, and is not a trustworthy
+boundary at all — see known-pitfalls on why a SAnby, Seed or Cissia team cannot be used to size a
+constant.

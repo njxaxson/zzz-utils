@@ -212,22 +212,31 @@ ordering plus a playable floor, which survives a repricing where a band does not
 safe; ceilings are not. Eight remain in `test-rankings.mjs` and should be converted the same way
 if they ever start biting.
 
-## Do not calibrate against a SAnby, Seed or Cissia team
+## RESOLVED: the SAnby / Seed / Cissia calibration ban
 
-Owner ruling, and it applies to any constant you are trying to size.
+**This ruling is lifted.** It is kept rather than deleted because the wrong answer it produced is
+the part worth remembering.
 
-Those units have an open conflagration in their L5 synergy mechanics — the declared
-Trigger/SAnby/Seed group, Cissia's pseudo-support that does not resolve on
-`Trigger/SAnby/Cissia`, and the Seed interplay behind both. Until that is fixed, **a score on any
-team holding SAnby, Seed or Cissia is not a valid boundary.** It may be high or low for reasons
-that have nothing to do with the constant you are measuring.
+It used to read: *a score on any team holding SAnby, Seed or Cissia is not a valid boundary*,
+because those units had an open conflagration — the declared Trigger/SAnby/Seed L5 group, and
+Cissia's pseudo-support that did not resolve on `Trigger/SAnby/Cissia`. Both causes are now fixed:
+Cissia resolves her roles from `hasRole attack:electric` rather than Seed's id ([PRED-03]), and
+Seed's `join` is read as the composition mandate it always was ([PIPE-03]). The two conjunctive
+declarations are deleted.
 
-This has already produced one wrong answer. `Trigger/SAnby/Cissia` was used as the upper bound
-when sizing the supportless structure factor, and its TEST 3 floor appeared to squeeze the usable
-range to a 0.017 window with no margin. With that data point removed the constraint largely
-disappears — the floor it was defending is not trustworthy in the first place.
+**The wrong answer it produced, which is the durable lesson.** `Trigger/SAnby/Cissia` was used as
+the upper bound when sizing the supportless structure factor, and its TEST 3 floor appeared to
+squeeze the usable range to a **0.017 window with no margin**. That window was an artefact of a
+broken mechanic, not a real constraint. The team read 287.4 then and reads 371.2 now.
 
-Related: `../issues/deferred/medium-trigger-sanby-seed-clears-its-floor-only-by-declaration.md`.
+The general form: **a boundary drawn from a team whose classification is itself in dispute will
+manufacture a false constraint, and the constraint will look tight and convincing.** When a window
+comes out that narrow, suspect the data point before you believe the window.
+
+Floors touching these units were re-derived **after** the mechanics landed, never before: TEST 3
+305 → 340, TEST 88 295 → 310.
+
+Related: `../issues/resolved/medium-trigger-sanby-seed-clears-its-floor-only-by-declaration.md`.
 
 ## Do not halve sub-DPS rank, and do not un-halve the sub-DPS tier
 
@@ -373,6 +382,12 @@ Both predictions below were otherwise sound and both failed for the same reason.
 Then it happened a third time inside a checker rather than the engine: a verification script
 reported 882 false exceptions because it counted Cissia's *conditional* support pseudo-role as
 unconditional. The engine was right and the check was wrong.
+
+A fourth, during SCORE-140, and the same unit again. A sweep looking for supportless teams
+classified them by **raw tags**, so every `Seed + Cissia` team counted as supportless when Cissia
+is an effective support beside her. It reported 93 inversions; the real number under effective
+roles was 30. Cissia has now caused this error twice. When a check asks "is this team
+supportless", it must ask the engine, not the tags.
 
 When a gate reads effective roles, enumerate the prediction the same way — and check both
 directions.

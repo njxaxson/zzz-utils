@@ -99,7 +99,16 @@ await runTest(0, 'isSubdps correctness (pre-test)', () => {
     assert(!isSubdps(cissia), 'Cissia should not be subdps without team context');
     const seed = unitByName(allUnits, 'Seed');
     if (seed) {
-        assert(isSubdps(cissia, [seed]), 'Cissia should be subdps when Seed is a teammate (2 attackers total)');
+        assert(isSubdps(cissia, [seed]),
+            'Cissia should be subdps beside Seed — two ELECTRIC attackers, self included');
+    }
+    // The element qualifier reaches the pull engine too, not just the scorer. Evelyn is an
+    // attacker, so the old `countTag attack >= 2` promoted Cissia beside her; `hasRole
+    // attack:electric` does not. [PRED-03]
+    const evelyn = unitByName(allUnits, 'Evelyn');
+    if (evelyn) {
+        assert(!isSubdps(cissia, [evelyn]),
+            'Cissia should NOT be subdps beside a FIRE attacker — the predicate is element-qualified');
     }
     const yanagi = unitByName(allUnits, 'Yanagi');
     assert(yanagi, 'missing unit Yanagi');
@@ -158,7 +167,7 @@ await runTest(4, 'Yanagi NOT a subdps candidate without Miyabi in roster', () =>
     }
 });
 
-await runTest(5, 'Cissia counts as attack subdps when Seed is owned', () => {
+await runTest(5, 'Cissia counts as attack subdps when a second electric attacker is owned', () => {
     // Owned coverage: Cissia fills subdps role, gap should not fire
     const { unitStates, ownedUnits } = buildSyntheticRoster(
         allUnits, ['Evelyn', 'Cissia', 'Seed', 'Nicole', 'Anby', 'Billy']
@@ -179,15 +188,27 @@ await runTest(5, 'Cissia counts as attack subdps when Seed is owned', () => {
     }
 });
 
-await runTest(6, 'Cissia NOT a subdps candidate without Seed in roster', () => {
+await runTest(6, 'Cissia NOT a subdps candidate without a second electric attacker', () => {
+    // Evelyn is an attacker but FIRE. Under the old `countTag attack >= 2` this roster activated
+    // Cissia's sub-DPS role; under `hasRole attack:electric` it does not. The direct assertion is
+    // the point — the gap check below is guarded and would pass vacuously on its own. [PRED-03]
+    const cissia = unitByName(allUnits, 'Cissia');
+    const evelyn = unitByName(allUnits, 'Evelyn');
+    const sanby = unitByName(allUnits, 'SAnby');
+    assert(cissia && evelyn && sanby, 'missing fixture units');
+    assert(!isSubdps(cissia, [evelyn]),
+        'Cissia must not be subdps beside a fire attacker');
+    assert(isSubdps(cissia, [sanby]),
+        'Cissia must be subdps beside SAnby — an electric attacker, which is the real condition');
+
     const { unitStates, ownedUnits } = buildSyntheticRoster(
         allUnits, ['Evelyn', 'Nicole', 'Anby', 'Billy']
     );
     const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 20 });
     const gap = findGap(result, 'subdps-attack');
     if (gap) {
-        const cissia = gap.units.find(u => u.id === 'cissia');
-        assert(!cissia, 'Cissia should NOT appear as attack subdps candidate — no Seed to activate her conditional role');
+        const c = gap.units.find(u => u.id === 'cissia');
+        assert(!c, 'Cissia should NOT appear as attack subdps candidate — no electric attacker to activate her');
     }
 });
 

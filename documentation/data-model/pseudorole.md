@@ -22,7 +22,7 @@ the engine — if a unit behaves oddly, the cause is in `units.json`, not in the
 | Soukaku | `[{anomaly, when hasUnit miyabi}]` | Anomaly *only* with Miyabi, otherwise a pure support |
 | Yanagi | `[{subdps, when hasUnit miyabi}]` | **Demoted** to sub-DPS when Miyabi is present |
 | Burnice | `[{subdps, when notPresent velina}]` | **Promoted** to primary carry when Velina is present |
-| Cissia | `[{subdps, when countTag attack ≥ 2}]` | Sub-DPS only on a double-attacker team |
+| Cissia | `[{subdps, …}, {support, …}]`, both `when hasRole attack:electric ≥ 2` | Both roles, or neither, on a team with a second electric attacker |
 
 See [predicates](predicates.md) for the `when` vocabulary.
 

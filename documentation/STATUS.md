@@ -15,13 +15,13 @@ The engine returns **raw**. Anything comparing archetypes against each other rea
 
 | Suite | State |
 |----|----|
-| mechanics | **31 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
-| rankings | **89 pass, 3 KNOWN_RED**, exits 0. TESTs 3, 35 and 90 |
+| mechanics | **34 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
+| rankings | **90 pass, 1 KNOWN_RED**, exits 0. TEST 90 |
 | recommendations | **44 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
 | bucketing | **6 pass, 0 fail** |
 | cohesion fixture | **11/11** owner judgements hold |
 | calibration freshness | `calibration.json` matches the current engine and data fingerprint |
-| calibration certification | **CERTIFIED** — 0 within-archetype rank inversions across 60 (boss × archetype) groups and 67,024 teams |
+| calibration certification | **CERTIFIED** — 0 within-archetype rank inversions across 60 (boss × archetype) groups and 67,062 teams |
 
 ```bash
 node test-mechanics.mjs && node test-rankings.mjs && node test-recommendations.mjs && node test-bucketing.mjs && node cohesion-fixture.mjs
@@ -30,19 +30,24 @@ node calibration-check.mjs
 ```
 
 `test-mechanics.mjs` and `test-rankings.mjs` are the split of what used to be one `test-scoring.mjs`
-(118 tests total, same as before) — mechanics tests pin isolated engine rules independent of
-roster content, rankings tests pin score floors/orderings/ladders for the live roster.
+(124 tests total) — mechanics tests pin isolated engine rules independent of roster content,
+rankings tests pin score floors/orderings/ladders for the live roster. TEST 91 moved from rankings
+to mechanics as **TEST 32** when SCORE-140 removed the last live conjunctive declaration: it pins
+the mechanism, so it belongs on a synthetic clone rather than on data that keeps being deleted
+underneath it.
 
-`KNOWN_RED` is empty for mechanics and recommendations, and holds **three entries** for rankings.
+`KNOWN_RED` is empty for mechanics and recommendations, and holds **one entry** for rankings.
 TEST 90 is the Remielle/Velina ladder, open since phase 3 stripped the declared `synergy.units`
-relationships that were propping it up. TESTs 3 and 35 are two supportless score floors that went
-red when the L4 soft cap was removed and the supportless structure factor took over the judgement
-— both are expected fallout, to be re-derived rather than defended, and TEST 3's floor is not a
-trustworthy boundary in the first place. Every entry carries its current margin and its reason. That is one disagreement, opened deliberately and
-visible for exactly as long as it lasts — the suite goes red on a stale entry the moment a
-mechanic closes one, which is what the map is for. See
-[the verification loop](tooling/verification-loop.md) for why an empty map still matters, and why
-a green suite is not evidence on its own.
+relationships that were propping it up. TESTs 3 and 35 were the two supportless floors opened by
+hardening `STRUCTURE.NO_SUPPORT` and both are now closed — 35 by re-deriving its floor, 3 by the
+mechanic it was explicitly waiting on (Cissia now resolves her support role from a second electric
+attacker, so `Trigger/SAnby/Cissia` is no longer supportless: 287.4 → 371.2).
+
+The entry carries its current margin and its reason. That is one disagreement, opened deliberately
+and visible for exactly as long as it lasts — the suite goes red on a stale entry the moment a
+mechanic closes one, which is what the map is for, and is exactly how TEST 3's closure announced
+itself. See [the verification loop](tooling/verification-loop.md) for why an empty map still
+matters, and why a green suite is not evidence on its own.
 
 ## Open
 
@@ -54,13 +59,12 @@ because it is a live measurement rather than a defect to be described. See below
 
 ## Deferred
 
-Seven. These are known, understood, and deliberately not being chased.
+Six. These are known, understood, and deliberately not being chased.
 
 | Issue | Priority | Why it is parked |
 |----|----|----|
 | [Sub-DPS tier halved beside a same-type carry](issues/deferred/high-sub-dps-tier-is-halved-beside-a-same-type-carry.md) | high | Wide blast radius; post-release |
 | [The partner ladder is a fitted stopgap](issues/deferred/medium-the-partner-ladder-is-a-fitted-stopgap.md) | medium | The honest fix is a feature, not a repair |
-| [Trigger/SAnby/Seed clears its floor only by declaration](issues/deferred/medium-trigger-sanby-seed-clears-its-floor-only-by-declaration.md) | medium | A join-shape exemption is specified as the real fix, scheduled as a future engine expansion |
 | [Greed value-scaling cannot be tested](issues/deferred/low-greed-value-scaling-cannot-be-tested-on-todays-roster.md) | low | No fixture can distinguish it until a `greedy: 2` unit exists |
 | [Ye Shunguong under-paid on veils](issues/deferred/low-ye-shunguong-underpaid-four-points-on-veils.md) | low | One pair type, about four points, in the safe direction |
 | [`utility.kaleidoscope` is read only by the UI](issues/deferred/low-kaleidoscope-is-read-only-by-the-ui.md) | low | Only a support declares it, so no fixture could tell a fix from a no-op |

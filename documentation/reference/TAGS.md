@@ -131,7 +131,9 @@ Populated during the comment pass. One row per tag, newest last within a prefix.
 | `[PULL-01]` | `../recommendations/partner-ladder.md` | The partner ladder block in `pull-engine.js` is this whole page in code |
 | `[PRED-01]` | `../data-model/predicates.md` | `optional` — a conditional buff allowed not to fire, and why waiving the penalty alone is not enough |
 | `[PRED-02]` | `../data-model/predicates.md` | `allOf`, `othersDisorder`, and two-pass role activation — the Soukaku backfill |
+| `[PRED-03]` | `../data-model/predicates.md` | `hasRole`, the shared evaluator, and the no-team defaults |
 | `[PULL-02]` | `../recommendations/pull-engine.md` | The codependency/ladder penalty is per unit, not per card |
 | `[BUCK-01]` | `../bucketing/deadly-assault.md` | The rank band 0.011/4.5 is derived from one Thrall & Sobek allocation case |
 | `[PIPE-01]` | `../engine/layers.md` | The solo-carry bonus is sized against the mechanics it sits beside |
 | `[PIPE-02]` | `../engine/layers.md` | The supportless structure factor is the whole judgement now the L4 cap is gone |
+| `[PIPE-03]` | `../engine/layers.md` | A `join` that mandates a second carry — why it waives rather than grants |

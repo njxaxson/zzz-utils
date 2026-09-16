@@ -232,8 +232,8 @@
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "pseudoRole": [
-                { "role": "subdps", "when":{"countTag":"attack","minCount":2} },
-                { "role": "support", "when":{"hasUnit":"seed"} }
+                { "role": "subdps", "when":{"hasRole":"attack:electric","minCount":2} },
+                { "role": "support", "when":{"hasRole":"attack:electric","minCount":2} }
             ],
             "archetypes" : { "intended" : ["attack"] },
             "buffs": { "cr": 1, "cd": 3 },
@@ -975,7 +975,7 @@
         "tier": 1.5,
         "tags": ["attack", "electric", "assist:defensive"],
         "join": ["stun", "support"],
-        "synergy": { "units": ["Trigger+Seed"], "tags": [], "avoid": [] },
+        "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "damage": { "aftershock": 2 },
             "buffs": { "aftershock": 3 },
@@ -997,7 +997,7 @@
         "tier": 0.5,
         "tags": ["attack", "electric", "assist:defensive"],
         "join": ["attack"],
-        "synergy": { "units": ["Trigger+SAnby"], "tags": [], "avoid": [] },
+        "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "damage": { "ultimate:strong": 3 },
             "buffs": { "atk": 3, "cd": 3, "dmg": 2 }

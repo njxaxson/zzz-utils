@@ -44,18 +44,10 @@ const KNOWN_RED = new Map([
     // Owner authorised marking the Remielle/Velina laddering red while the fallout is assessed.
     // Do NOT extend this map to silence anything else — and when a mechanic closes one of these,
     // the suite goes red on the stale entry, which is the point.
-    // Both opened by hardening STRUCTURE.NO_SUPPORT from 0.80 to 0.75, which is what stopped a
-    // supportless team outranking its supported counterpart on the Miyabi ladder (TEST 82).
-    // Owner authorised both as expected fallout, to be re-derived rather than defended.
-    [3, 'Trigger/SAnby/Cissia reads 287.4 against a 305 floor. NOT a trustworthy boundary: '
-        + 'SAnby, Seed and Cissia have an open L5 conflagration, and Cissia does not resolve '
-        + 'her pseudo-support role on this team at all, which is why it classifies supportless '
-        + 'in the first place. See notes/known-pitfalls.md ("Do not calibrate against a SAnby, '
-        + 'Seed or Cissia team"). Re-derive this floor AFTER that mechanic is fixed, not before.'],
-    [35, 'Lighter/Promeia/Burnice reads 342.2 against a 345 floor — short by 2.8. A supportless '
-         + 'team, so it takes the harder structure factor. Owner: this composition has always '
-         + 'induced odd scoring and the floor should be recalibrated rather than the factor '
-         + 'softened to protect it.'],
+    // TESTs 3 and 35 were both opened by hardening STRUCTURE.NO_SUPPORT from 0.80 to 0.75 and
+    // both are now closed. TEST 35's floor was re-derived; TEST 3 was closed by the mechanic it
+    // was waiting on — Cissia now resolves her support pseudo-role from a second electric
+    // attacker rather than from Seed's id, so Trigger/SAnby/Cissia is no longer supportless.
     [90, 'Remielle/Velina third slot, after the L4 soft cap was removed. THREE causes now. (1) PHOENIX IS NOT AT THE TOP, 4.4 behind Aria on Girtablullu. Her mechanics are already equal to Aria’s — the deficit is a half-tier of L2, so no repricing of her kit closes it; see notes/adjudications.md. (2) ARIA NOW SITS BELOW PROMEIA by 5.6, which uncapping caused: Promeia carries the larger raw L4 and the cap had been compressing her more. (3) ALICE BEATS BURNICE BY MORE THAN A RANK BAND — the ordering is right and the owner-stated tossup is now overstated, same cause as (2). The MRV rung on Aberrant is (1) seen from the other side and resolves when Phoenix does. Every rung is exercised: violations are collected rather than thrown, so none hides behind a higher one.'],
 ]);
 
@@ -141,7 +133,10 @@ async function main() {
         const tAstra = m.get('Trigger / SAnby / Astra');
         const tZhao = m.get('Trigger / SAnby / Zhao');
         assert(tOrphie >= 315, `Trigger+SAnby: Orphie (${tOrphie}) >= 315`);
-        assert(tCissia >= 305, `Trigger+SAnby: Cissia (${tCissia}) >= 305`);
+        // Re-derived from 305 after Cissia's support pseudo-role started resolving on this team:
+        // she reads 371.2 where she used to read 287.4. The old floor was set while the team
+        // classified supportless and is recorded in notes/known-pitfalls.md as untrustworthy.
+        assert(tCissia >= 340, `Trigger+SAnby: Cissia (${tCissia}) >= 340`);
         assert(tAstra  >= 300, `Trigger+SAnby: Orphie (${tAstra }) >= 300`);
         // Trigger/SAnby/Seed's floor lives in TEST 88. Split out so the rest of TEST 3 keeps
         // guarding its five other floors and four orderings independently of it.
@@ -754,7 +749,7 @@ async function main() {
         for (const b of withBosses(bosses, 'Horizon')) {
             const m = scoreMapForBoss(teams, b);
             const lpb = m.get('Lighter / Burnice / Promeia');
-            assert(lpb > 345, `${b.name}: LPB (${lpb}) expected > 345 (abloom + dual vortex)`); 
+            assert(lpb > 320, `${b.name}: LPB (${lpb}) expected > 320 (abloom + dual vortex)`);
         }
     });
 
@@ -1910,24 +1905,23 @@ async function main() {
     });
 
     // TEST 88: Trigger/SAnby/Seed floor on UCC
-    // Pins the floor at 295. Seed is tagged `attack` but plays support (buffs atk 3/cd 3/dmg 2)
-    // beside SAnby's `scaling.codependent`, and the engine can't see that — she declares no
-    // `pseudoRole`, so the team classifies as two same-element attack carries with no
-    // interaction (see TEST 89). Cleared only by two declared L5 synergy groups
-    // (`"Trigger+Seed"`, `"Trigger+SAnby"`), not emergently — a DECLARED carve-out, not a fix.
-    // Margin is ~2 points; treat the floor as a viability statement, not a calibrated number.
+    // Cleared EMERGENTLY since SCORE-140 closed. Seed's `join` is ["attack"] and nothing else, so
+    // every legal Seed team has two attack agents in it; `mandatesDualCarry` reads that declared
+    // array and treats the second carry as interaction rather than a doubled-up mistake, which
+    // lifts the team off the double-attacker no-interaction tier and waives the no-support
+    // demotion. The two conjunctive L5 groups that used to prop this floor up ("Trigger+Seed",
+    // "Trigger+SAnby") are gone — the team lost 110 raw and still gained 34 net.
     //
-    // History, rejected fixes, and the open principled fix (give Seed a support `pseudoRole`, or
-    // infer pseudosupport from buff supply):
-    // ../notes/lessons-learned.md#when-a-carve-out-is-a-carve-out-say-so and
-    // ../issues/deferred/medium-trigger-sanby-seed-clears-its-floor-only-by-declaration.md.
+    // Floor re-derived 295 -> 310 on a reading of 330.6. Still a viability statement rather than
+    // a calibrated number: notes/known-pitfalls.md records why a SAnby, Seed or Cissia team must
+    // not be used to size a constant, and this floor has moved four times.
     // Do NOT rescue it by restoring the same-element escape; that re-breaks TEST 89.
-    run('TEST 88: Trigger/SAnby/Seed stays playable on UCC (>= 300)', () => {
+    run('TEST 88: Trigger/SAnby/Seed stays playable on UCC (>= 310)', () => {
         const b = withBosses(bosses, 'Corruption').find(Boolean);
         const seed = scoreSpec('Trigger/SAnby/Seed', b);
-        assert(seed.score >= 295,
-            `${b.name}: ${seed.label} (${seed.score.toFixed(1)}) >= 295 - Seed plays support ` +
-            `(atk 3 / cd 3 / dmg 2) but declares no pseudoRole, so the team reads as two carries; force-adjusted via L5`);
+        assert(seed.score >= 310,
+            `${b.name}: ${seed.label} (${seed.score.toFixed(1)}) >= 310 - Seed mandates a second ` +
+            `attacker via her join, so the team is not charged as two carries with no interaction`);
     });
 
     // TEST 89: two attack carries of one element are not a team
@@ -2071,43 +2065,10 @@ async function main() {
             `${violations.length} ladder violation(s):\n      - ` + violations.join('\n      - '));
     });
 
-    // TEST 91: a conjunctive synergy group pays only when the WHOLE group is present
-    // `synergy.units` entries joined with "+" require every named unit on the team, and the
-    // gating IS the point: a group that paid out on a partial match would be indistinguishable
-    // from two single-name declarations and would lift teams nobody asked to lift.
-    //
-    // Rewritten onto Trigger/SAnby/Seed. It used to test the mechanism through Alice's
-    // "Remielle+Velina" group, which was removed when the anomaly declarations were stripped —
-    // the mechanism is unchanged and still has a live user, so the test moved to it rather than
-    // being deleted. See documentation/notes/lessons-learned.md ("When a carve-out is a
-    // carve-out, say so") for why that group exists.
-    run('TEST 91: conjunctive synergy requires the whole group', () => {
-        const boss = withBosses(bosses, 'Neutral').find(Boolean);
-        assert(boss, 'synthetic neutral boss not found');
-        const sanby = allUnits.find(u => u.name === 'SAnby');
-        assert(sanby, 'fixture unit SAnby not found');
-        const group = (sanby.synergy?.units || []).find(e => typeof e === 'string' && e.includes('+'));
-        assert(group === 'Trigger+Seed',
-            `SAnby should declare the conjunctive group "Trigger+Seed", got ${JSON.stringify(group)}`);
-
-        const l5Of = (spec) => {
-            const trace = {};
-            const parsed = scoreForTeamString(spec, allUnits);
-            assert(parsed.length === 1, `fixture ${spec} did not resolve to one team`);
-            scoreTeamForBoss(parsed[0].team, boss, { trace });
-            return trace.l5;
-        };
-
-        // Whole group present: SAnby's 55 pays, and Seed's mirrored group pays too.
-        const both = l5Of('Trigger/SAnby/Seed');
-        assert(both >= 55,
-            `with the whole group present the conjunctive bonus must pay: L5 was ${both}`);
-
-        // Only ONE member present: the group pays nothing at all.
-        const onlyTrigger = l5Of('Trigger/SAnby/Astra');
-        assert(onlyTrigger === 0,
-            `Trigger without Seed must not trigger SAnby's group: L5 was ${onlyTrigger}`);
-    });
+    // TEST 91 moved to test-mechanics.mjs. It pins the conjunctive-group MECHANISM, which is
+    // roster-independent, and it had been rewritten onto live data twice already (Alice's
+    // "Remielle+Velina", then SAnby's "Trigger+Seed") — breaking both times when that data was
+    // removed rather than when the mechanism changed. It now runs against a synthetic clone.
 
     // TEST 92: which support belongs behind Nangong and an anomaly carry.
     //

@@ -329,19 +329,33 @@ and she is the only attack-tagged unit supplying two or more baseline buffs at d
 weight.
 
 The team was brought back over the floor with two declared synergy groups. That is fine, and
-the entry recording it states plainly what it is:
+the entry recording it stated plainly what it was:
 
-* It is a **declared carve-out, not an emergent outcome.** The engine still classifies the
-  shape as two attack carries with no interaction. Nothing was learned about Seed's role.
-* The margin is **2.1 points**. That floor is a viability statement, not a calibrated number.
-  It has since been adjusted a third time.
-* The principled fixes remain open: give Seed a support pseudo-role, or infer pseudo-support
-  from buff supply — the discriminator is clean, since every attacker in the filed complaints
-  supplies zero baseline buffs and Seed supplies two at defining weight.
-* Do **not** close it by restoring the same-element escape, which re-breaks three other teams.
+* a **declared carve-out, not an emergent outcome** — the engine still classified the shape as two
+  attack carries with no interaction, and nothing had been learned about Seed's role;
+* a margin of **2.1 points**, on a floor that is a viability statement rather than a calibrated
+  number, and that had already been adjusted three times.
 
-The owner's own preferred solution is recorded in the deferred issue:
-[`../issues/deferred/medium-trigger-sanby-seed-clears-its-floor-only-by-declaration.md`](../issues/deferred/medium-trigger-sanby-seed-clears-its-floor-only-by-declaration.md).
+**It has since been paid off, and the honesty is why.** Because the entry said "carve-out" instead
+of "fix", nobody built on it: the floor was never cited as evidence, the +110 was never mistaken
+for a modelling result, and when the real mechanic arrived the declarations could simply be
+deleted rather than unpicked. A carve-out labelled as a fix would have had three things depending
+on it by then.
+
+Two things the write-up got wrong, which are worth as much as the part it got right:
+
+* **The recorded fix was a no-op on its own.** Exempting the team from the no-support penalty did
+  nothing, because it classified *harsher* than that tier already and the engine takes the harsher
+  of the two. A proposed fix that is never measured can sit in an issue for weeks looking correct.
+* **Two of the three "principled fixes remain open" were not open.** Giving Seed a support
+  pseudo-role breaks `Trigger/Cissia/Seed` outright. An alternative listed but never tried is a
+  guess, and should be labelled as one.
+
+The closed issue is
+[`../issues/resolved/medium-trigger-sanby-seed-clears-its-floor-only-by-declaration.md`](../issues/resolved/medium-trigger-sanby-seed-clears-its-floor-only-by-declaration.md);
+the mechanic is [PIPE-03].
+
+Still true, and still forbidden: do **not** close it by restoring the same-element escape.
 
 ---
 

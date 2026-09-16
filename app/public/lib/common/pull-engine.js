@@ -10,6 +10,7 @@ import {
     getElementVariant,
     getEffectiveScaling,
     getEffectiveRoles,
+    evaluatePredicate,
     resolveConditionalValue,
     isConditionalSpec,
     isTeamScopedConditional,
@@ -83,23 +84,22 @@ export function getPrimaryDPSArchetype(unit) {
     return DPS_ARCHETYPES.find(a => p.includes(a)) ?? null;
 }
 
+// Delegates to the scorer's `evaluatePredicate` rather than forking it: one vocabulary, one
+// implementation, so a new predicate key cannot be understood here and not there. The no-team
+// defaults that used to be spelled out inline (Yanagi → primary DPS, Burnice → subdps) are now
+// the shared evaluator's documented behaviour for an absent team. [PRED-03]
+//
+// `team` here is a ROSTER and may or may not already contain `unit`; the shared evaluator counts
+// self exactly once, so normalise instead of adding a separate self-count.
 export function isSubdps(unit, team = null) {
     const pr = unit.mechanics?.pseudoRole;
     if (!Array.isArray(pr)) return false;
+    const ctxTeam = team === null ? undefined : [unit, ...team.filter(u => u.id !== unit.id)];
     return pr.some(entry => {
         const role = typeof entry === 'string' ? entry : entry?.role;
         if (role !== 'subdps') return false;
         if (typeof entry === 'string' || !entry?.when) return true;
-        const when = entry.when;
-        // No-team contexts default permissively (Yanagi → primary DPS, Burnice → subdps).
-        if (when.notPresent !== undefined) return true;
-        if (team === null) return false;
-        if (when.hasUnit !== undefined) return team.some(u => u.id === when.hasUnit);
-        if (when.countTag !== undefined) {
-            const selfCount = unit.tags.includes(when.countTag) ? 1 : 0;
-            return (team.filter(u => u.tags.includes(when.countTag)).length + selfCount) >= (when.minCount ?? 1);
-        }
-        return false;
+        return evaluatePredicate(entry.when, { team: ctxTeam, self: unit, consumer: null });
     });
 }
 
@@ -374,7 +374,9 @@ export function checkTeamDependencies(candidate, ownedUnits, allUnits) {
             const maxLevel = maxConditionalValue(spec);
             if (maxLevel <= 0) continue;
             const neededTag = spec.cases.map(c => c.when?.countTag).find(Boolean);
-            if (!neededTag) continue; // hasUnit/notPresent conditionals: no tag-based feasibility
+            // hasUnit/notPresent/hasRole conditionals: no tag-based feasibility. This READS the
+            // predicate rather than evaluating it, so it cannot use evaluatePredicate. [PRED-03]
+            if (!neededTag) continue;
             const selfCount = candidate.tags.includes(neededTag) ? 1 : 0;
             const rosterCount = selfCount + ownedUnits.filter(u => u.tags.includes(neededTag)).length;
             // Best achievable value: resolve the spec against a pseudo-team of that many tagged units.
