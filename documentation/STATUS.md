@@ -16,7 +16,7 @@ The engine returns **raw**. Anything comparing archetypes against each other rea
 | Suite | State |
 |----|----|
 | mechanics | **34 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
-| rankings | **92 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
+| rankings | **93 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
 | recommendations | **44 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
 | bucketing | **6 pass, 0 fail** |
 | cohesion fixture | **11/11** owner judgements hold |
@@ -85,6 +85,28 @@ to read and delete when ready, not deleting it yourself. The durable reasoning l
 data tuning rather than engine defects.
 
 ## What shipped last
+
+**The Angels of Delusion are declared, not modelled**, 2026-09-16. `Nangong/Aria/Sunna` was
+underpriced by about 150 points against the two premier anomaly teams, and that is *sensible* —
+much of its real strength is innate faction synergy that is very hard to model, and the game is
+suspected of carrying hidden modifiers that fire only when all three are together.
+
+A **conjunctive group** is the literal encoding of that sentence, so all three units declare one.
+`CONJUNCTIVE_SYNERGY_BONUS` was re-derived **55 → 45** at the same time: its 55 had been sized for
+the Trigger/SAnby/Seed stopgap, which no longer exists, so the constant had no users at all when
+this landed. Three declarations at 45 is 135 raw.
+
+**Measured: AoD now averages 17.5 points behind the better of `Nangong/Miyabi/Yuzuha` and
+`Aria/Remielle/Velina`**, across the 14 bosses where it and a reference are both viable — the
+owner's target was 15–20 — and it is the top non-Miyabi, non-Remielle anomaly team on 12 of those
+14, never worse than third.
+
+**Conjunctive rather than mutual, and the difference was measured.** A mutual Nangong ↔ Aria pair
+would also pay on every other team holding those two. The conjunctive form moved **exactly 14
+team-boss rows, all of them this one team** — no two-of-three team touched. Rankings TEST 94 pins
+the sizing from both sides; mechanics TEST 32 pins the gating and was corrected in passing, since
+its `>= 55` turned out to be a hidden pin on the constant rather than a test of the mechanism.
+Full reasoning and the sizing table are in `[AOD-01]`.
 
 **Phoenix tops the anomaly ladder, and the ladder now runs the whole roster**, 2026-09-16. This
 closed the last `KNOWN_RED` entry in the engine.

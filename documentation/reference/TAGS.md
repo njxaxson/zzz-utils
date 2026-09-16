@@ -137,3 +137,4 @@ Populated during the comment pass. One row per tag, newest last within a prefix.
 | `[PIPE-01]` | `../engine/layers.md` | The solo-carry bonus is sized against the mechanics it sits beside |
 | `[PIPE-02]` | `../engine/layers.md` | The supportless structure factor is the whole judgement now the L4 cap is gone |
 | `[PIPE-03]` | `../engine/layers.md` | A `join` that mandates a second carry — why it waives rather than grants |
+| `[AOD-01]` | `../data-model/unit-object.md` | Angels of Delusion are declared, not modelled; `CONJUNCTIVE_SYNERGY_BONUS` re-derived 55 → 45 against them |

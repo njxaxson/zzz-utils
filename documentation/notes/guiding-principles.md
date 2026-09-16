@@ -18,14 +18,22 @@ unit's own kit cannot tell "wrong tool" from "narrow but right". So it is declar
 [../engine/cohesion.md](../engine/cohesion.md) and
 [lessons-learned.md](lessons-learned.md#archetypes-had-to-be-declared).
 
-Everything else that had to be hand-encoded — Lycaon's cohesion exemption, the
-Remielle/Velina pair — is a debt, not a pattern. Each is named in
+Everything else that had to be hand-encoded — Lycaon's cohesion exemption, Alice's bare
+Remielle synergy — is a debt, not a pattern. Each is named in
 [adjudications.md](adjudications.md) with the reason it was allowed.
 
-**The Trigger/SAnby/Seed group was one of these and has been paid off.** Two declared conjunctive
-synergy groups were holding that team over its floor; both are gone, and the team now clears
-emergently because the engine reads Seed's `join` as the composition statement it always was
-([PIPE-03]). That is what paying a debt looks like: the declaration is deleted, not moved.
+**Two of those debts have been paid off, and that is the standard.** The Trigger/SAnby/Seed group
+was held over its floor by two declared conjunctive groups; both are gone, and the team clears
+emergently now that the engine reads Seed's `join` as the composition statement it always was
+([PIPE-03]). The mutual Remielle/Velina pair went the same way when the anomaly overhaul modelled
+the buildup channels properly. That is what paying a debt looks like: the declaration is deleted,
+not moved.
+
+**The Angels of Delusion are the one declaration that is not a debt** ([AOD-01]). The difference
+is that nobody is claiming the underlying cause is modellable-but-unmodelled: the owner's position
+is that the game carries hidden modifiers which fire only when the trio is together, and a
+conjunctive group *is* that statement. It belongs with declared archetypes, not with the stopgaps.
+Hold a future one to the same bar, and note that both predecessors failed it.
 
 ## A green suite is not evidence. A prediction with zero exceptions is
 

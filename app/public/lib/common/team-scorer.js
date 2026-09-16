@@ -4367,7 +4367,8 @@ function scoreMechanicalSynergy(team, debug, options = {}) {
 
 // A "+"-joined `synergy.units` entry is a CONJUNCTIVE group: pays only when EVERY named unit is
 // on the team. See documentation/data-model/unit-object.md ("synergy.units").
-const CONJUNCTIVE_SYNERGY_BONUS = 55;
+// Re-derived 55 -> 45 against Angels of Delusion, now its only user. [AOD-01]
+const CONJUNCTIVE_SYNERGY_BONUS = 45;
 
 function scoreAdditionalSynergies(team, debug) {
     let score = 0;

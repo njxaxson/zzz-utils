@@ -445,6 +445,21 @@ breaks if she stops preferring the Vivian seat or if anyone else starts to. Remo
 The general shape: **when an assertion's margin is an order of magnitude past its threshold, the
 threshold is not what is being tested.** Find the comparison that sits near a real boundary.
 
+## A test asserting a constant's VALUE is pinning the constant, not the mechanism
+
+Mechanics TEST 32 exists to prove that a conjunctive synergy group pays only when every named
+unit is present. It asserted `L5 >= 55` for the satisfied case — so re-deriving
+`CONJUNCTIVE_SYNERGY_BONUS` to 45 turned it red, though nothing about the gating had changed.
+
+That is the same shape as TEST 28's old hidden pin on `VORTEX_BASE`, and it is worth naming as a
+class: **a mechanism test should assert the SHAPE of the behaviour — paid vs not paid, ordered vs
+not ordered — and leave the magnitude to a rankings test that is explicitly about sizing.** Here
+the mechanism claim is `both > 0 && partial === 0`; the number 45 is pinned in rankings TEST 94,
+where changing it is supposed to matter.
+
+A quick check when writing one: if re-deriving a constant *should* break this test, it belongs in
+rankings. If it should not, do not write the constant into the assertion.
+
 ## Growing a ladder test can silently delete its coverage
 
 Two ways, both hit while extending TEST 90 from six rungs to the whole anomaly roster.

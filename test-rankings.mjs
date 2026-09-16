@@ -2270,6 +2270,57 @@ async function main() {
         assert(violations.length === 0,
             `${violations.length} ladder violation(s):\n      - ` + violations.join('\n      - '));
     });
+
+    // TEST 94: Angels of Delusion sits just below the two premier anomaly teams.
+    //
+    // `Nangong/Aria/Sunna` is the one team in the game carried by DECLARED synergy rather than
+    // modelled mechanics, and deliberately so. Owner: much of its real strength comes from innate
+    // faction synergy that is very hard to model, and the game is suspected of carrying hidden
+    // modifiers that fire only when all three are together. That is precisely what a conjunctive
+    // group means, so all three declare one — Nangong `"Aria+Sunna"`, Aria `"Nangong+Sunna"`,
+    // Sunna `"Nangong+Aria"` — and they are the only conjunctive declarations on the roster.
+    //
+    // CONJUNCTIVE AND NOT MUTUAL, on purpose. A mutual Nangong<->Aria pair would pay on every team
+    // holding those two, lifting `Nangong/Aria/Yuzuha` and friends nobody asked to lift. The
+    // conjunctive form is airtight: the change that added these declarations moved exactly **14
+    // team-boss rows, all of them this one team**, with no two-of-three team touched at all.
+    //
+    // WHAT IS BEING PINNED IS THE SIZING, which is fitted rather than derived and therefore needs
+    // a guard. `CONJUNCTIVE_SYNERGY_BONUS` was re-derived 55 -> 45 against this team, its only
+    // user, so 3 x 45 = 135 raw. The target was the owner's: AoD lands within 15-20 points of the
+    // better of the two premier anomaly teams, averaged over every boss where all three are
+    // viable. Measured at 45: **-17.5**, and AoD is the top non-Miyabi, non-Remielle anomaly team
+    // on 12 of 14 bosses, never worse than third.
+    //
+    // The band is asserted on the AVERAGE, not per boss, because matchup legitimately swings it
+    // from -80 to +50 — Girtablullu and Bringer are far worse for AoD than Vesper or Sweeper. A
+    // per-boss assertion would be pinning the boss table, not the synergy.
+    run('TEST 94: Angels of Delusion within 15-20 points of the premier anomaly teams', () => {
+        const AOD = 'Nangong/Aria/Sunna';
+        const REFERENCES = ['Nangong/Miyabi/Yuzuha', 'Aria/Remielle/Velina'];
+
+        const gaps = [];
+        for (const boss of bosses) {
+            const aod = scoreSpec(AOD, boss);
+            if (aod.score <= 0) continue;
+            const refs = REFERENCES.map(s => scoreSpec(s, boss)).filter(r => r.score > 0);
+            if (refs.length === 0) continue;             // nothing to compare against here
+            gaps.push(aod.score - Math.max(...refs.map(r => r.score)));
+        }
+        assert(gaps.length >= 12,
+            `only ${gaps.length} boss(es) had AoD and a reference both viable — this test has gone vacuous.`);
+
+        const mean = gaps.reduce((a, b) => a + b, 0) / gaps.length;
+        // Two-sided. The lower bound is the owner's "within 15-20"; the upper bound is what stops
+        // a future resizing from quietly making a declaration-carried team the best in the game.
+        assert(mean <= -10,
+            `AoD averages ${mean.toFixed(1)} against the better reference — it must stay BELOW ` +
+            `them. A team carried by declared synergy outscoring the modelled ones means the ` +
+            `declaration has been oversized.`);
+        assert(mean >= -25,
+            `AoD averages ${mean.toFixed(1)} against the better reference, further back than the ` +
+            `owner's 15-20 point target. Raise CONJUNCTIVE_SYNERGY_BONUS or add a declaration.`);
+    });
     // Summary
     console.log('');
 

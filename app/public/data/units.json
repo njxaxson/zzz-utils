@@ -65,7 +65,7 @@
         "tier": 0.5,
         "tags": ["anomaly", "ether", "assist:defensive"],
         "join": ["stun", "support", "anomaly"],
-        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "synergy": { "units": ["Nangong+Sunna"], "tags": [], "avoid": [] },
         "mechanics": {
             "stats": { "am": 3, "ap": 3.75 },
             "damage": { "enhanced": 2, "abloom": 2 },
@@ -617,7 +617,7 @@
         "tier": 0,
         "tags": ["stun", "ether", "assist:defensive"],
         "join": ["anomaly", "faction"],
-        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "synergy": { "units": ["Aria+Sunna"], "tags": [], "avoid": [] },
         "mechanics": {
             "stats": { "am": 2, "ap": 2 },
             "pseudoRole": [{"role":"anomaly","when":{"countTag":"anomaly","minCount":1}}],
@@ -1100,7 +1100,7 @@
         "tier": 0,
         "tags": ["support", "physical", "assist:defensive"],
         "join": ["attack", "faction"],
-        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "synergy": { "units": ["Nangong+Aria"], "tags": [], "avoid": [] },
         "mechanics": {
             "archetypes" : { "intended" : ["attack", "anomaly"], "avoid": ["armorer"] },
             "damage": { "basic": 1 },

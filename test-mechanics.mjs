@@ -1416,7 +1416,13 @@ async function main() {
     // Lives here, on a SYNTHETIC clone, because it pins the mechanism rather than any unit's data.
     // It was written twice against live declarations — Alice's "Remielle+Velina", then SAnby's
     // "Trigger+Seed" — and broke both times when that data was removed rather than when the
-    // mechanism changed. The roster currently declares no conjunctive group at all.
+    // mechanism changed. The live declarations today are the three Angels of Delusion, whose
+    // MAGNITUDE is pinned in rankings TEST 94; this test deliberately knows nothing about it.
+    //
+    // ASSERTS THE GATING, NOT THE AMOUNT. It used to require `>= 55`, which was a hidden pin on
+    // `CONJUNCTIVE_SYNERGY_BONUS` — re-deriving that constant to 45 broke this test, which is not
+    // a statement about whether conjunctive groups gate correctly. Same failure shape as TEST 28's
+    // old hidden pin on `VORTEX_BASE`. The claim here is "all present pays, partial pays nothing".
     run('TEST 32: conjunctive synergy requires the whole group', () => {
         const boss = withBosses(bosses, 'Neutral').find(Boolean);
         assert(boss, 'synthetic neutral boss not found');
@@ -1439,12 +1445,15 @@ async function main() {
             return trace.l5;
         };
 
-        // Whole group present: the clone's 55 pays.
+        // Whole group present: the clone's group pays SOMETHING. How much is not this test's
+        // business — see the header.
         const both = l5Of('Trigger/SAnbyClone/Seed');
-        assert(both >= 55,
+        assert(both > 0,
             `with the whole group present the conjunctive bonus must pay: L5 was ${both}`);
 
-        // Only ONE member present: the group pays nothing at all.
+        // Only ONE member present: the group pays nothing at all. This is the half that matters —
+        // a group paying out on a partial match would be indistinguishable from two single-name
+        // declarations, so `both > 0` alone would not tell a working gate from a broken one.
         const onlyTrigger = l5Of('Trigger/SAnbyClone/Astra');
         assert(onlyTrigger === 0,
             `Trigger without Seed must not trigger the clone's group: L5 was ${onlyTrigger}`);

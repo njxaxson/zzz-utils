@@ -305,9 +305,15 @@ either unit. A group that paid out on a partial match would be indistinguishable
 names and would lift teams nobody asked to lift.
 
 The conjunctive mechanism was built general rather than as a special case, which paid off
-immediately: it was reused to settle an unrelated complaint. It is now carrying two unrelated
-jobs, and a third use should prompt a look at whether the underlying inference is worth doing
-properly.
+immediately: it was reused to settle an unrelated complaint. The note recorded here at the time
+was that it was carrying two unrelated jobs and a third use should prompt a look at whether the
+underlying inference was worth doing properly.
+
+**Both jobs were later deleted, and the answer was yes.** Alice's `"Remielle+Velina"` went when
+the anomaly overhaul modelled the buildup channels; the SAnby/Seed pair went when Cissia's support
+role was made to resolve from a second electric attacker. The mechanism now has exactly one user,
+the Angels of Delusion ([AOD-01]), and that one is declared on purpose rather than as a stopgap.
+The instinct in the original note was right — it just took two deletions to act on.
 
 **A separate requirement fell out of the same change.** Two teams needed to move in opposite
 directions relative to a third, and it had already been proved that **no uniform value could
