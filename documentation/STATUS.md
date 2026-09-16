@@ -3,7 +3,7 @@
 Where things stand. Everything here is measured, not remembered — if you change the engine,
 re-run the commands and update the numbers.
 
-**Last verified:** 2026-09-15.
+**Last verified:** 2026-09-16.
 
 ## Scores come on two scales
 
@@ -16,7 +16,7 @@ The engine returns **raw**. Anything comparing archetypes against each other rea
 | Suite | State |
 |----|----|
 | mechanics | **34 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
-| rankings | **90 pass, 1 KNOWN_RED**, exits 0. TEST 90 |
+| rankings | **92 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
 | recommendations | **44 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
 | bucketing | **6 pass, 0 fail** |
 | cohesion fixture | **11/11** owner judgements hold |
@@ -36,26 +36,31 @@ to mechanics as **TEST 32** when SCORE-140 removed the last live conjunctive dec
 the mechanism, so it belongs on a synthetic clone rather than on data that keeps being deleted
 underneath it.
 
-`KNOWN_RED` is empty for mechanics and recommendations, and holds **one entry** for rankings.
-TEST 90 is the Remielle/Velina ladder, open since phase 3 stripped the declared `synergy.units`
-relationships that were propping it up. TESTs 3 and 35 were the two supportless floors opened by
-hardening `STRUCTURE.NO_SUPPORT` and both are now closed — 35 by re-deriving its floor, 3 by the
-mechanic it was explicitly waiting on (Cissia now resolves her support role from a second electric
-attacker, so `Trigger/SAnby/Cissia` is no longer supportless: 287.4 → 371.2).
+**All three `KNOWN_RED` maps are empty** — mechanics, rankings and recommendations. There are
+no known disagreements between the engine and the owner's playtested orderings.
 
-The entry carries its current margin and its reason. That is one disagreement, opened deliberately
-and visible for exactly as long as it lasts — the suite goes red on a stale entry the moment a
-mechanic closes one, which is what the map is for, and is exactly how TEST 3's closure announced
-itself. See [the verification loop](tooling/verification-loop.md) for why an empty map still
-matters, and why a green suite is not evidence on its own.
+Four entries passed through the rankings map during the anomaly overhaul and every one was closed
+by a mechanic rather than by moving the assertion, with a single deliberate exception:
+
+| | closed by |
+|----|----|
+| TEST 9 | Sunna's anomaly proc-damage buff being modelled at all |
+| TEST 3 | Cissia resolving her support role from a second electric attacker rather than Seed's id, so `Trigger/SAnby/Cissia` stopped classifying supportless (287.4 → 371.2) |
+| TEST 35 | *the exception* — its floor was re-derived 345 → 320, on the ruling that a supportless line should not be pinned that tightly |
+| TEST 90 | Phoenix's and Aria's stats, and Grace's Proficiency |
+
+Each closure announced itself: the suite exits 1 on a **stale** entry as well as an unexpected
+failure, so a test that starts passing cannot quietly stay listed. That is what makes an empty map
+worth stating rather than assuming. See
+[the verification loop](tooling/verification-loop.md) for why an empty map still matters, and why
+a green suite is not evidence on its own.
 
 ## Open
 
 **None as issue files.** Both boss-data levers were converted to mechanics in phase 3 of the
 anomaly overhaul; see [adjudications](notes/adjudications.md).
 
-What IS open is the anomaly ladder itself, held in `KNOWN_RED` rather than in an issue file
-because it is a live measurement rather than a defect to be described. See below.
+The anomaly ladder, which was the last thing held in `KNOWN_RED`, closed on 2026-09-16.
 
 ## Deferred
 
@@ -81,13 +86,55 @@ data tuning rather than engine defects.
 
 ## What shipped last
 
+**Phoenix tops the anomaly ladder, and the ladder now runs the whole roster**, 2026-09-16. This
+closed the last `KNOWN_RED` entry in the engine.
+
+TEST 90 pins the owner's playtested third slot behind Remielle + Velina. It now reads
+Phoenix > Aria > Promeia > Alice > Burnice > Jane Doe > Yanagi > Piper > Miyabi > Vivian, with
+Grace on a boss-conditional rung. The bottom five were already correct before they were asserted;
+they are pinned so they stop being true by accident.
+
+Three data changes, each measured on its own:
+
+* **Phoenix `stats` 2/2 → 2.5/2.5.** She was statted at the anomaly median while being the unit
+  the ladder expects to top. 549.4 → **570.0** on Girtablullu. **Zero corpus rows** — she is
+  `available: false` and outside the dump's corpus.
+* **Aria `tier` 0 → 0.5 and `ap` 3 → 3.75.** The demotion is the point; the Proficiency raise buys
+  back enough of the half-tier to clear Promeia. 3,793 rows moved — **2,748 down, 1,045 up, zero
+  exceptions** — which is exactly the shape "half a tier lower but a better proccer" should have.
+* **Grace `ap` 3 → 2.5.** She carried Aria's old base Proficiency on a tier-1.5 standard-banner
+  unit, which lifted her past Burnice. 2,595 rows, all downward, zero exceptions.
+
+4 meaningful adjacent-pair inversions out of 60,858 for Aria, 1 for Grace.
+
+**Phoenix's margin is deliberately thin** — 4.4 and 2.7, inside one rank band. This is early beta
+and the magnitude by which she beats Aria and Promeia is not yet knowable, so the ordering is
+asserted and the magnitude is not. Measured levers to widen it later are tabulated in
+[adjudications](notes/adjudications.md), along with the one that looks obvious and is worst.
+
+**Alice over Burnice stopped being a tossup.** The rung's upper band assertion was retired by
+owner ruling: post-overhaul Alice really is the better unit here. Strict ordering stays.
+
+**The Vivian ladder is now pinned too, as TEST 93** — the sister of 90, same two bosses, Vivian in
+the Velina seat: Miyabi > Alice > Promeia > Yanagi > Jane Doe > Aria > Piper. It needed no engine
+change; the engine already produced it. Two reorderings against TEST 90 carry the content, and
+each is asserted separately from the chain so a failure names the mechanism:
+
+* **Miyabi leads here and is second from bottom there.** She is the only carry on the roster who
+  prefers the Vivian seat (+78.0, against −94 to −216 for everyone else) — frost vortexes badly,
+  so a disorder partner beats a wind one.
+* **Aria collapses from second to sixth.** She, Vivian and the ether-morphed Remielle land three
+  ether elements, so the team generates no disorder at all: zero disorder lines in the trace
+  against six for Alice or Yanagi in the same seat.
+
 **The L4 soft cap is gone**, 2026-09-15 — and with it the ceiling that was making the engine
 progressively worse at separating new top-end units.
 
 The cap compressed Layer 4 toward a fixed asymptote of 350. That number never moved; the roster
 does. So every release pushed the top of the ladder deeper into the compressed region, and a new
-mechanic arrived worth less than the last one. Phoenix is the witness — raising her signature buff
-by a third bought **1.5 points**.
+mechanic arrived worth less than the last one. Phoenix was the witness — raising her signature buff
+by a third bought **1.5 points**. With the cap gone, a 0.5 step in two of her stats is worth
+**20.6**, which is the same fact stated from the other side.
 
 It also buried mistakes. With the cap off, the engine ranked **Astra below Soukaku** behind
 Nangong/Miyabi, a plainly wrong answer that had been damped into a 0.3-point margin for as long
@@ -119,9 +166,11 @@ a claim.
 **And one constant was re-derived because its basis disappeared:** `STUNLESS_SHILL_CREDIT`, whose
 documented sizing was quoted "after the L4 element modifier **and soft cap**".
 
-**What is still open.** Phoenix does not top the Remielle/Velina ladder, and removing the cap did
-not change that — her mechanics already equal Aria's and the deficit is a half-tier of L2. Aria
-now sits below Promeia, which uncapping caused. Both in TEST 90.
+**What it left open, and how that resolved.** Phoenix did not top the Remielle/Velina ladder, and
+removing the cap did not by itself change that; Aria also fell below Promeia, which uncapping
+caused. Both were closed the next day by the ladder entry above — *not* by anything shaped like
+the cap, and the prediction recorded here at the time (that no repricing of Phoenix's kit could
+close a half-tier L2 deficit) was measured under the cap and expired with it.
 
 **Not yet done:** the six calibrated cutoffs in `strength-rating.js` drifted harsher (Good 9.9% →
 8.1% of the corpus) and have not been re-derived.

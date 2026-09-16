@@ -232,10 +232,12 @@ mover was classified no-support.
 `Lighter/Promeia/Burnice` missed its floor by 2.8; the owner re-derived the floor from 345 to
 **320** rather than soften the factor to protect one odd composition. It reads **342.2**, so the
 floor now asserts the team is *viable* with 22 points of margin, rather than pinning a
-supportless line to a number it was never going to hold. `Trigger/SAnby/Cissia` misses by more and stays in
-`KNOWN_RED`: it is not a trustworthy boundary at all — see
+supportless line to a number it was never going to hold. `Trigger/SAnby/Cissia` missed by more and
+was never a trustworthy boundary at all — see
 [known pitfalls](../notes/known-pitfalls.md) on why a SAnby, Seed or Cissia team cannot be used
-to size a constant.
+to size a constant. It closed on the mechanic it was waiting for rather than on this factor:
+Cissia now resolves her support pseudo-role from a second electric attacker, so the team stopped
+classifying supportless.
 
 **What was tried and rejected.** Scaling the penalty by how much buff weight the team actually
 lands looked promising and does not survive: among genuinely supportless teams the measure runs

@@ -31,10 +31,15 @@ Burnice is an less-optimal alternative to Vivian for disorder-based compositions
 
 Playtested, best first:
 
-> Aria, Promeia, Alice, Burnice, Jane
+> Phoenix, Aria, Promeia, Alice, Burnice, Jane, Yanagi, Piper, Miyabi, Vivian
 
-Burnice and Jane are close to each other. `Miyabi / Vivian / Remielle` sits below the whole
-Velina track.
+Grace sits between Burnice and Jane, close to Jane — but her team is **non-viable on
+Girtablullu**, where `assist:evasive` leaves it one reliable defensive assist short.
+
+Phoenix, Aria and Promeia are within a rank band of each other; the order between them is
+asserted, the size of the gap is not. `Miyabi / Vivian / Remielle` sits below the whole Velina
+track on Girtablullu, and on Stagnant Aberrant it legitimately climbs past the lower rungs but
+must stay distinctly behind the top three.
 
 ## The Miyabi/Velina correction
 
@@ -42,15 +47,52 @@ Velina track.
 
 The engine measures individual power well, and that was the problem. Velina's entire value is making Remielle work; measured on her own she prices out as a half-tier secondary sub-DPS. (This is a known issue of the scoring engine, but it remains for now.) Left alone, the engine ranked the Miyabi track above the Velina track for every carry except Aria and Promeia.
 
-The fix is two **declared** relationships:
+The first fix was two **declared** relationships — a mutual Remielle ↔ Velina pair, and Alice's
+conjunctive `"Remielle+Velina"` group. Both were stopgaps, and the note recorded at the time was
+that they papered over a gap the mechanics could not close, leaving the underlying blindness in
+place: the engine could not see an enabler whose value is entirely relational until someone
+declared it.
 
-* a mutual Remielle ↔ Velina pair, and
-* Alice's conjunctive `"Remielle+Velina"` group.
+**Both have since been deleted, and the ladder holds without them.** Phase 3 of the anomaly
+overhaul stripped every declared anomaly `synergy.units` relationship precisely to find out how
+much the mechanics could carry, and the answer turned out to be all of it — once vortex, abloom,
+proc rate, Luminize rebound and the lumen exclusions were each modelled properly. The one survivor
+is a plain Alice → Remielle unit synergy, kept as an acknowledged compromise rather than a model.
 
-Note what this is *not*: it is not a model of anomaly buildup cadence. Nobody worked out how the gauges actually interleave. Two declared relationships paper over a gap the mechanics-emergent model could not close, which is honest but leaves the underlying blindness in place — the engine still cannot see an enabler whose value is entirely relational until someone declares it.
+What closed the blindness was not a better declaration but the **anomaly-supply channel**: a
+partner's worth to Remielle is their Proficiency times their proc rate, summed as a weighted
+count. That is why Aria is a strong Remielle partner and Miyabi a weak one, and it is mechanical.
 
 **Rankings TEST 90 pins the resulting ladder.** It is boss-conditional and asserted only on the two
 element-neutral bosses, because elemental scoring legitimately reorders the lower rungs.
+
+## Third-slot ordering on the Vivian track
+
+Playtested, best first:
+
+> Miyabi, Alice, Promeia, Yanagi, Jane, Aria, Piper
+
+**Pinned by rankings TEST 93**, on the same two bosses. Swapping Velina for Vivian reorders the
+track substantially, and the two big movers are the reason the second ladder exists at all:
+
+* **Miyabi goes from second-from-bottom to first.** Velina is wind and Miyabi is frost, whose
+  vortex tier is 0.8 — she wastes a wind enabler, which is the anti-pattern TEST 62 charges for.
+  Vivian is ether, so the pair makes **disorders** instead, and disorder damage reads proc damage
+  rather than Proficiency. That is the one channel Miyabi's crit-driven procs dominate `[AP-02]`.
+  She is the only carry on the roster who prefers the Vivian seat: **+78.0**, where everyone else
+  loses 94 to 216 points by the swap.
+* **Aria goes from second to sixth.** She is ether, Vivian is ether, and Remielle's lumen morphs
+  to ether to follow them — so the team lands three ether elements and generates **no disorder at
+  all**. The debug trace prints zero disorder lines, against six for Alice or Yanagi in the same
+  seat. The best Proficiency on the roster has nothing to react with.
+
+Grace and Burnice both demote to sub-DPS on this track — their `subdps` pseudo-role fires on
+`notPresent: velina` — so neither is the carry being ordered, and neither is a rung. Their teams
+are still legal and still score.
+
+Yanagi, Jane and Aria are separated by 0.2 and 3.2 points here against a rank band of ~4.5. The
+order is pinned because it is the owner's, but the engine is not claiming they are meaningfully
+apart.
 
 ## Related
 

@@ -62,12 +62,12 @@
         "rank": "S",
         "limited": true,
         "released": "2.6",
-        "tier": 0,
+        "tier": 0.5,
         "tags": ["anomaly", "ether", "assist:defensive"],
         "join": ["stun", "support", "anomaly"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
-            "stats": { "am": 3, "ap": 3 },
+            "stats": { "am": 3, "ap": 3.75 },
             "damage": { "enhanced": 2, "abloom": 2 },
             "scaling": { "veils": 1, "greedy": 1 }
         },
@@ -357,7 +357,7 @@
         "join": ["electric", "faction", "anomaly"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
-            "stats": { "am": 2, "ap": 3 },
+            "stats": { "am": 2, "ap": 2.5 },
             "pseudoRole": [{ "role": "subdps", "when": { "notPresent": "velina" } }],
             "damage": { "abloom": 1 },
             "buffs": { "anomaly:electric" : 1 },
@@ -755,7 +755,7 @@
         "join": ["anomaly", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
-            "stats": { "am": 2, "ap": 2 },
+            "stats": { "am": 2.5, "ap": 2.5 },
             "damage": { "abloom": 3 },
             "buffs": {
                 "anomaly": { "cases": [

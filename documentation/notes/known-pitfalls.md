@@ -434,6 +434,39 @@ Four instances, all in this repo:
 
 Mutation-check new tests: break the mechanism deliberately and confirm the right test goes red.
 
+A fifth, caught by that very habit while writing TEST 93. The first draft asserted "Miyabi leads
+the Vivian ladder by more than one rank band" — true, and useless: her lead over Promeia is 89.6
+against a band of 5.3, and stripping her crit-driven proc declaration outright moved her 5.1
+points. **A band-width assertion on a 17x margin cannot fail.** It was replaced with a universal
+that can: Miyabi is the *only* carry who scores higher beside Vivian than beside Velina, which
+breaks if she stops preferring the Vivian seat or if anyone else starts to. Removing her
+`elementalVariant: "frost"` flips it immediately, because plain ice vortexes at tier 4.0.
+
+The general shape: **when an assertion's margin is an order of magnitude past its threshold, the
+threshold is not what is being tested.** Find the comparison that sits near a real boundary.
+
+## Growing a ladder test can silently delete its coverage
+
+Two ways, both hit while extending TEST 90 from six rungs to the whole anomaly roster.
+
+**A non-viable chain member voids the entire boss.** The loop guards with
+`if (scored.some(x => x.score <= 0)) continue;` — reasonable on its own, since a ladder is
+meaningless if a rung cannot be scored. But it skips the *whole boss*, not the rung. Grace's team
+is disqualified on Girtablullu (she brings `assist:evasive`, so `Grace/Remielle/Velina` supplies
+2 of the 3 reliable defensive assists that boss demands), so adding her to the chain would have
+stopped testing **every other rung there** while the test still reported a pass on Aberrant. The
+`checked === 2` vacuity assert catches it — but only after the fact, and only because someone
+wrote that assert. A unit that is conditionally non-viable belongs on a boss-conditional rung
+outside the chain, with a vacuity count of its own.
+
+**An "every" quantifier expires when its set grows.** The same test asserted that
+`Miyabi/Remielle/Vivian` sits "below every Remielle/Velina team" on Girtablullu. True, and
+playtested, when the ladder stopped at Jane Doe. Extending it down to Vivian made the assertion
+demand that `Miyabi/Remielle/VELINA` (402.2) outrank `Miyabi/Remielle/VIVIAN` (480.2) — the exact
+opposite of the wasted-vortex anti-pattern the engine correctly enforces in TEST 62. The fix is to
+scope the quantifier to the rungs the claim was actually made about, and say so in the comment.
+**When you extend a list, re-read every assertion that quantifies over it.**
+
 ## Score-neutrality can be evidence a fix is empty
 
 An early attempt kept both ultimate axes and combined them with `max` rather than letting the

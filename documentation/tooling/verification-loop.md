@@ -72,8 +72,11 @@ Every entry needs its reason and what would clear it.
 
 > **Never add an entry to silence a regression.**
 
-If only one assertion in a multi-assertion test is red, split it into its own test number so the
-rest keeps guarding.
+If only one assertion in a multi-assertion test is red, **do not split the test** — that causes
+havoc with numbering and `KNOWN_RED` alike. Collect violations into an array and assert once at
+the end, so every rung is exercised and the failure message shows the whole shape of the problem
+rather than stopping at the first disagreement. TESTs 79, 81, 82 and 90 all use this pattern; 90
+is the clearest example.
 
 ## Test conventions
 

@@ -101,5 +101,9 @@ different site.
 Consequence worth knowing: on a Remielle/Velina team a universal proc-damage buff reaches only
 Velina, because Remielle is excluded here, the wind enabler is excluded from the vortex scale by
 `[VTX-05]`, and a self-landing buff is discounted by `[BUFF-08]`. Each exclusion is individually
-correct and together they cover nearly every recipient Phoenix has. That is the open half of
-rankings TEST 90.
+correct and together they cover nearly every recipient Phoenix has.
+
+This is why Phoenix was **not** priced by inflating that buff when rankings TEST 90 was closed —
+doubling it to 8 would have paid all 8 weight to a single teammate. She was priced on her stats
+instead, which reach vortex, abloom, refringe, her own proc rate and her weight in Remielle's
+anomaly supply. A key that lands on one teammate is not a way to price a unit.

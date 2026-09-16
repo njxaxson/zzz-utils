@@ -35,20 +35,21 @@ import { rankBandEpsilon } from './app/public/lib/common/team-builder.js';
 // for why the exit code depends on the failing set matching this EXACTLY. Every entry needs a
 // reason and the phase expected to clear it. Do NOT add an entry to silence a regression.
 const KNOWN_RED = new Map([
-    // One disagreement, opened deliberately when phase 3 of the anomaly overhaul removed every
-    // declared anomaly `synergy.units` relationship. The ladder below was being held up by those
-    // declarations, not by mechanics, and the whole point of the overhaul was to find out how
-    // much the mechanics can actually carry. Now we know. TEST 9 was the second entry and closed
-    // when Sunna's anomaly buff was modelled — see TEST 92.
+    // EMPTY, and that is the whole point of it existing.
     //
-    // Owner authorised marking the Remielle/Velina laddering red while the fallout is assessed.
-    // Do NOT extend this map to silence anything else — and when a mechanic closes one of these,
-    // the suite goes red on the stale entry, which is the point.
-    // TESTs 3 and 35 were both opened by hardening STRUCTURE.NO_SUPPORT from 0.80 to 0.75 and
-    // both are now closed. TEST 35's floor was re-derived; TEST 3 was closed by the mechanic it
-    // was waiting on — Cissia now resolves her support pseudo-role from a second electric
-    // attacker rather than from Seed's id, so Trigger/SAnby/Cissia is no longer supportless.
-    [90, 'Remielle/Velina third slot, after the L4 soft cap was removed. THREE causes now. (1) PHOENIX IS NOT AT THE TOP, 4.4 behind Aria on Girtablullu. Her mechanics are already equal to Aria’s — the deficit is a half-tier of L2, so no repricing of her kit closes it; see notes/adjudications.md. (2) ARIA NOW SITS BELOW PROMEIA by 5.6, which uncapping caused: Promeia carries the larger raw L4 and the cap had been compressing her more. (3) ALICE BEATS BURNICE BY MORE THAN A RANK BAND — the ordering is right and the owner-stated tossup is now overstated, same cause as (2). The MRV rung on Aberrant is (1) seen from the other side and resolves when Phoenix does. Every rung is exercised: violations are collected rather than thrown, so none hides behind a higher one.'],
+    // Four entries have passed through here during the anomaly overhaul, every one closed by a
+    // mechanic rather than by moving the assertion to meet the engine:
+    //   TEST  9 — closed when Sunna's anomaly proc-damage buff was modelled (see TEST 92).
+    //   TEST  3 — closed when Cissia started resolving her support pseudo-role from a second
+    //             electric attacker rather than from Seed's id, so Trigger/SAnby/Cissia stopped
+    //             classifying supportless.
+    //   TEST 35 — the one exception: its floor was re-derived 345 -> 320, on the owner's ruling
+    //             that a supportless line should not be pinned to a number that tight.
+    //   TEST 90 — closed by Phoenix's and Aria's stats and Grace's Proficiency.
+    //
+    // Do NOT add an entry to silence a regression. The suite exits 1 both when something
+    // unexpected fails AND when a listed test starts passing, so a stale list stops meaning
+    // anything — which is exactly what makes an empty one worth reporting.
 ]);
 
 async function main() {
@@ -1956,11 +1957,14 @@ async function main() {
     });
 
     // TEST 90: the Remielle/Velina third-slot ladder (owner playtest)
-    // Pins the owner's playtested order (Aria > Promeia > Alice > Burnice > Jane Doe) and that
-    // the whole Velina track outranks Miyabi/Vivian/Remielle. Held up by two DECLARED L5
+    // Pins the owner's playtested order for the WHOLE anomaly roster in the third slot, and that
+    // Miyabi/Remielle/Vivian does not reach the top of it. Once held up by two DECLARED L5
     // relationships rather than emergent scoring — a mutual Remielle<->Velina pair, and Alice's
-    // CONJUNCTIVE "Remielle+Velina" group, which pays only when both are present. Full history:
-    // ../notes/lessons-learned.md#declared-relationships-fixed-what-no-constant-could.
+    // CONJUNCTIVE "Remielle+Velina" group. Both are gone; the order is now mechanical. Full
+    // history: ../notes/lessons-learned.md#declared-relationships-fixed-what-no-constant-could.
+    //
+    // The bottom five rungs (Jane Doe down to Vivian) were already true before they were asserted
+    // here. They are pinned so they stop being true by accident.
     //
     // BOSS-CONDITIONAL, asserted narrowly on purpose: elemental L3 legitimately reorders the
     // lower rungs elsewhere (fire-weak Pompey lifts Burnice, ice-weak Horizon lifts Promeia
@@ -1977,12 +1981,23 @@ async function main() {
             'Alice/Remielle/Velina',
             'Burnice/Remielle/Velina',
             'Jane Doe/Remielle/Velina',
+            'Yanagi/Remielle/Velina',
+            'Piper/Remielle/Velina',
+            'Miyabi/Remielle/Velina',
+            'Vivian/Remielle/Velina',
         ];
+        // GRACE IS DELIBERATELY NOT IN `LADDER`. Her team is non-viable on Girtablullu — she
+        // brings `assist:evasive`, so Grace/Remielle/Velina supplies 2 of the 3 reliable
+        // defensive assists that boss demands — and the guard below skips the WHOLE boss when
+        // any chain member scores <= 0. Putting her in the chain would silently stop testing
+        // every other rung on Girtablullu. She gets a boss-conditional rung of her own instead.
+        const GRACE = 'Grace/Remielle/Velina';
         // The top three of that ladder. Used by the Miyabi/Vivian comparison below.
         const TOP_THREE = LADDER.slice(0, 3);
         const NEUTRAL_TO_THESE = ['Girtablullu', 'Aberrant'];
 
         let checked = 0;
+        let graceChecked = 0;
         const violations = [];
         for (const bossName of NEUTRAL_TO_THESE) {
             const bs = withBosses(bosses, bossName);
@@ -1992,43 +2007,52 @@ async function main() {
             if (scored.some(x => x.score <= 0)) continue;
             checked++;
 
-            // Every rung is a strict ordering. Alice over Burnice is additionally a TOSSUP by
-            // owner ruling ("Alice is generally better", but "I can live with Burnice and Alice
-            // being so close"), so it carries a second, upper assertion: Alice must win, AND the
-            // two must stay within one rank band of each other. A rank band is the allocator's
-            // own definition of "close enough to trade away" ([BUCK-01]), so the pair asserts
-            // both halves of the ruling — the order is real, and it is cheap enough to give up
-            // when one of them is contested on another boss. If that gap ever widens past a
-            // band, the engine has started claiming something stronger than the owner did.
+            // Every rung is a strict ordering, Alice over Burnice included.
+            //
+            // That pair used to carry a second, UPPER assertion as well: Alice must win AND the
+            // two must stay within one rank band, encoding the owner's "Alice is generally
+            // better, but I can live with them being so close". The engine now separates them by
+            // ~11 against a band of ~6, and the owner has re-ruled: post-overhaul Alice really is
+            // the better unit here, and the tossup call predates the mechanics that opened the
+            // gap — chiefly Alice's `utility["anomaly:physical"]`, which feeds Remielle's
+            // Luminize rebound to 45.0 against Burnice's 29.5. The ceiling is retired rather than
+            // fitted around. Kept in the comment because a two-sided band assertion is the right
+            // shape whenever a pair genuinely IS a tossup; this pair stopped being one.
             //
             // Violations are COLLECTED, not thrown on sight. `assert` stops the test at the
             // first failure, which would leave every rung below the highest broken one
             // unexercised — an assertion that cannot fail is not encoding anything. Same shape
             // as TESTs 79/81/82.
-            const TOSSUP_PAIRS = new Set(['Alice/Remielle/Velina|Burnice/Remielle/Velina']);
             for (let i = 1; i < scored.length; i++) {
                 const hi = scored[i - 1], lo = scored[i];
                 if (hi.score <= lo.score) {
                     violations.push(`${boss.name}: ${hi.label} (${hi.score.toFixed(1)}) must ` +
                         `outrank ${lo.label} (${lo.score.toFixed(1)})`);
-                } else if (TOSSUP_PAIRS.has(`${LADDER[i - 1]}|${LADDER[i]}`)) {
-                    const band = rankBandEpsilon(hi.score);
-                    if (hi.score - lo.score >= band) {
-                        violations.push(`${boss.name}: ${hi.label} (${hi.score.toFixed(1)}) beats ` +
-                            `${lo.label} (${lo.score.toFixed(1)}) by more than one rank band ` +
-                            `(${band.toFixed(1)}) — the owner called these two a tossup, so this ` +
-                            `gap is now overstated`);
-                    }
                 }
             }
-            // The tossup may only shuffle those two against each other. Both must still clear
-            // Jane Doe outright, which is the rung the owner is emphatic about.
-            const janeIdx = LADDER.length - 1;
-            for (const idx of [janeIdx - 2, janeIdx - 1]) {
-                if (scored[idx].score <= scored[janeIdx].score) {
-                    violations.push(`${boss.name}: ${scored[idx].label} ` +
-                        `(${scored[idx].score.toFixed(1)}) must beat ${scored[janeIdx].label} ` +
-                        `(${scored[janeIdx].score.toFixed(1)})`);
+
+            // Grace, boss-conditional — see the note on `GRACE` above for why she is not a chain
+            // member. Owner: "she shouldn't beat Burnice and I think she's close with Jane."
+            // Both halves are asserted. She must also stay clear of Yanagi, which is what stops
+            // "below Burnice" being satisfiable by dropping her through the floor.
+            const grace = scoreSpec(GRACE, boss);
+            if (grace.score > 0) {
+                graceChecked++;
+                const at = name => scored[LADDER.findIndex(s => s.startsWith(`${name}/`))];
+                const burnice = at('Burnice'), jane = at('Jane Doe'), yanagi = at('Yanagi');
+                if (grace.score >= burnice.score) {
+                    violations.push(`${boss.name}: ${grace.label} (${grace.score.toFixed(1)}) must ` +
+                        `sit below ${burnice.label} (${burnice.score.toFixed(1)})`);
+                }
+                if (grace.score <= yanagi.score) {
+                    violations.push(`${boss.name}: ${grace.label} (${grace.score.toFixed(1)}) must ` +
+                        `still beat ${yanagi.label} (${yanagi.score.toFixed(1)})`);
+                }
+                const band = rankBandEpsilon(jane.score);
+                if (Math.abs(grace.score - jane.score) >= band) {
+                    violations.push(`${boss.name}: ${grace.label} (${grace.score.toFixed(1)}) must ` +
+                        `stay within one rank band (${band.toFixed(1)}) of ${jane.label} ` +
+                        `(${jane.score.toFixed(1)}) — owner calls them close`);
                 }
             }
 
@@ -2040,12 +2064,22 @@ async function main() {
             // reach the top of the ladder: "as long as MVR is distinctly behind
             // Phoenix/Aria/Promeia+VR on Aberrant, I am good with that." Distinctly = beyond one
             // rank band, so this is a real gap and not a tie the allocator could trade away.
+            //
+            // SCOPED TO THE PLAYTESTED RUNGS on purpose. The claim was made when this ladder
+            // stopped at Jane Doe, and "the whole Velina track" meant those six. It does not
+            // extend to the rungs added below her: Miyabi/Remielle/VELINA (402.2) has no business
+            // beating Miyabi/Remielle/VIVIAN (480.2) — that is the wasted-vortex anti-pattern of
+            // TEST 62 being right, not the ladder being wrong. Quantifying over the full chain
+            // would assert the opposite of a rule the engine already enforces.
+            const PLAYTEST_CORE = LADDER.slice(0, LADDER.indexOf('Jane Doe/Remielle/Velina') + 1);
             const mvr = scoreSpec('Miyabi/Remielle/Vivian', boss);
             if (boss.name === 'Girtablullu') {
-                const worstRV = Math.min(...scored.map(x => x.score));
-                if (mvr.score >= worstRV) {
+                const core = scored.slice(0, PLAYTEST_CORE.length);
+                const worstRV = core.reduce((a, b) => (a.score <= b.score ? a : b));
+                if (mvr.score >= worstRV.score) {
                     violations.push(`${boss.name}: ${mvr.label} (${mvr.score.toFixed(1)}) must sit ` +
-                        `below every Remielle/Velina team (worst is ${worstRV.toFixed(1)})`);
+                        `below every playtested Remielle/Velina rung — weakest is ${worstRV.label} ` +
+                        `(${worstRV.score.toFixed(1)})`);
                 }
             } else {
                 const topThree = scored.slice(0, TOP_THREE.length);
@@ -2061,6 +2095,11 @@ async function main() {
         }
         assert(checked === 2,
             `only ${checked} of the 2 element-neutral bosses were live - this test has gone vacuous.`);
+        // Grace is expected on exactly one of the two: viable on Aberrant, disqualified on
+        // Girtablullu for the assist reason above. Zero means her rung stopped being exercised;
+        // two means Girtablullu's assist requirement changed and this comment is now wrong.
+        assert(graceChecked === 1,
+            `Grace's rung ran on ${graceChecked} of the 2 bosses, expected exactly 1 (Aberrant).`);
         assert(violations.length === 0,
             `${violations.length} ladder violation(s):\n      - ` + violations.join('\n      - '));
     });
@@ -2116,6 +2155,120 @@ async function main() {
             `only ${checked} carry/boss pair(s) were live — this test has gone vacuous.`);
         assert(violations.length === 0,
             `${violations.length} support-order violation(s):\n      - ` + violations.join('\n      - '));
+    });
+
+    // TEST 93: the Remielle/VIVIAN third-slot ladder (owner playtest)
+    //
+    // The sister of TEST 90. Same shape — third slot behind Remielle, asserted on the same two
+    // element-neutral bosses — but Vivian in the Velina seat, which reorders it substantially:
+    //
+    //   Miyabi > Alice > Promeia > Yanagi > Jane Doe > Aria > Piper
+    //
+    // TWO REORDERINGS ARE THE POINT OF THE TEST, and both are mechanical:
+    //
+    // * MIYABI LEADS, where on the Velina ladder she is second from bottom. Velina is wind, so
+    //   Miyabi's frost procs vortex badly (`VORTEX_TIERS['ice:frost']` is 0.8 — see TEST 62 and
+    //   the wasted-vortex charge). Vivian is ether, so the pair makes DISORDERS instead, and
+    //   disorder damage reads proc damage rather than Proficiency — which is the one channel
+    //   Miyabi's crit-driven procs dominate. `[AP-02]`. She is the ONLY carry on the roster who
+    //   prefers the Vivian seat: +78.0, against -94 to -216 for everyone else.
+    //
+    // * ARIA COLLAPSES to sixth, from second on the Velina ladder. She is ether and so is
+    //   Vivian, and Remielle's lumen morphs to ether to follow them, so the team lands three
+    //   ether elements and generates NO disorder at all — the debug trace prints zero disorder
+    //   lines, against six for Alice or Yanagi in the same seat. Her Proficiency, the best on
+    //   the roster, is left with nothing to react with.
+    //
+    // FRAGILE RUNGS, stated plainly: Yanagi/Jane Doe/Aria are separated by 0.2 and 3.2 points on
+    // Girtablullu (0.7 and 4.1 on Aberrant) against a rank band of ~4.5. All three sit inside one
+    // band of each other on both bosses, so the engine is NOT claiming they are meaningfully
+    // apart — only that this is the order it produces. The owner confirmed the order is right;
+    // a future repricing that flips the 0.2 is a tie breaking the other way, not a regression,
+    // and should be re-ruled rather than chased. Read the failure message before fixing anything.
+    //
+    // ABSENT ON PURPOSE: Grace and Burnice both demote to sub-DPS here (their `subdps` pseudo-role
+    // fires on `notPresent: velina`), so neither is the carry the ladder is ordering. Their teams
+    // are still legal and still score — Burnice 345.3/421.2, Grace 461.6 on Aberrant and
+    // disqualified on Girtablullu for the same defensive-assist reason as in TEST 90 — they are
+    // simply not rungs. Do not add them without a fresh ruling on where they belong.
+    //
+    // Violations are COLLECTED, not thrown on sight, so a break at the top cannot hide the rest.
+    run('TEST 93: Remielle/Vivian third-slot ladder on element-neutral bosses', () => {
+        const LADDER = [
+            'Miyabi/Remielle/Vivian',
+            'Alice/Remielle/Vivian',
+            'Promeia/Remielle/Vivian',
+            'Yanagi/Remielle/Vivian',
+            'Jane Doe/Remielle/Vivian',
+            'Aria/Remielle/Vivian',
+            'Piper/Remielle/Vivian',
+        ];
+        const NEUTRAL_TO_THESE = ['Girtablullu', 'Aberrant'];
+
+        let checked = 0;
+        const violations = [];
+        for (const bossName of NEUTRAL_TO_THESE) {
+            const bs = withBosses(bosses, bossName);
+            assert(bs.length === 1, `expected exactly one ${bossName}, got ${bs.length}`);
+            const boss = bs[0];
+            const scored = LADDER.map(spec => scoreSpec(spec, boss));
+            if (scored.some(x => x.score <= 0)) continue;
+            checked++;
+
+            for (let i = 1; i < scored.length; i++) {
+                const hi = scored[i - 1], lo = scored[i];
+                if (hi.score <= lo.score) {
+                    violations.push(`${boss.name}: ${hi.label} (${hi.score.toFixed(1)}) must ` +
+                        `outrank ${lo.label} (${lo.score.toFixed(1)})`);
+                }
+            }
+
+            // The two claims the ladder is actually FOR, asserted separately from the chain so a
+            // failure names the mechanism rather than just a pair.
+            const at = name => scored[LADDER.findIndex(s => s.startsWith(`${name}/`))];
+            const aria = at('Aria'), promeia = at('Promeia');
+
+            // ARIA'S ETHER CLASH. A plain `Promeia > Aria` is already in the chain above and is
+            // only worth 41 points of nothing in particular; this says she must be demoted by
+            // MORE than the allocator would trade away, which is the actual claim.
+            if (promeia.score - aria.score < rankBandEpsilon(promeia.score)) {
+                violations.push(`${boss.name}: ${aria.label} (${aria.score.toFixed(1)}) must sit ` +
+                    `more than one rank band below ${promeia.label} ` +
+                    `(${promeia.score.toFixed(1)}) — three ether elements on one team generate ` +
+                    `no disorder, and that is what demotes her here`);
+            }
+
+            // MIYABI'S PREFERENCE, as a universal over the whole ladder: she is the ONLY carry
+            // who does better beside Vivian than beside Velina. Live margins are +78.0 for her
+            // against -94 to -216 for everyone else, so this is a statement about the roster and
+            // not a coin flip.
+            //
+            // Asserted this way ON PURPOSE. The obvious version — "Miyabi leads this ladder by
+            // more than a rank band" — cannot fail: her lead over Promeia is 89.6 against a band
+            // of 5.3, and stripping her crit-driven proc declaration entirely moved her only 5.1
+            // points. An assertion with a 17x margin is not encoding anything. This one breaks in
+            // both directions: if Miyabi stops preferring Vivian, or if anyone else starts to.
+            for (const spec of LADDER) {
+                const carry = spec.slice(0, spec.indexOf('/'));
+                const beside = scoreSpec(`${carry}/Remielle/Velina`, boss);
+                if (beside.score <= 0) continue;          // not viable in the Velina seat
+                const here = at(carry);
+                const prefersVivian = here.score > beside.score;
+                if (carry === 'Miyabi' && !prefersVivian) {
+                    violations.push(`${boss.name}: ${here.label} (${here.score.toFixed(1)}) must ` +
+                        `beat ${beside.label} (${beside.score.toFixed(1)}) — frost vortexes badly, ` +
+                        `so Miyabi wants a disorder partner, not a wind one`);
+                } else if (carry !== 'Miyabi' && prefersVivian) {
+                    violations.push(`${boss.name}: ${here.label} (${here.score.toFixed(1)}) beats ` +
+                        `${beside.label} (${beside.score.toFixed(1)}), but Miyabi is supposed to ` +
+                        `be the only carry who prefers the Vivian seat`);
+                }
+            }
+        }
+        assert(checked === 2,
+            `only ${checked} of the 2 element-neutral bosses were live - this test has gone vacuous.`);
+        assert(violations.length === 0,
+            `${violations.length} ladder violation(s):\n      - ` + violations.join('\n      - '));
     });
     // Summary
     console.log('');

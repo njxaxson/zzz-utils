@@ -164,8 +164,16 @@ and Velina and a low one without them, for a reason that does not exist. Their P
 a property of how they are built.
 
 Aria is the case that keeps the two jobs of Mastery apart: `am: 3` with no `scaling.am`, so she
-converts **nothing** and reads her base `ap` of 3. Her Mastery is not wasted — it is what makes
-her proc faster, which is `procRate` and `[AP-04]`. Miyabi is the same shape.
+converts **nothing** and reads her base `ap` straight. Her Mastery is not wasted — it is what
+makes her proc faster, which is `procRate` and `[AP-04]`. Miyabi is the same shape.
+
+That base is **3.75**, the highest Proficiency on the roster, and it is paired with `tier: 0.5`
+rather than the `tier: 0` she used to carry. The two moved together and mean one thing: Aria is
+half a tier less of a unit than her old rating claimed, and a better proccer than it captured.
+The corpus shows exactly that shape — of the 3,793 rows the pair moved, **2,748 went down and
+only 1,045 up**. The teams that lean on her Proficiency gained; the rest paid for the demotion.
+See [adjudications](../notes/adjudications.md) for the ladder that forced it and for how narrow
+the window on that 3.75 is.
 
 ### [AP-02] Disorder damage reads proc damage; the disorder NEED does not
 

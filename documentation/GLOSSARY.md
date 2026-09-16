@@ -50,5 +50,5 @@ One line each. Follow the link for the real treatment.
 | **Anchor / factor** | Per-archetype calibration constants, fitted and certified. [→](engine/calibration.md) |
 | **Provision vs need vs buff** | Three distinct channels that share words. Confusing them has caused real bugs. [→](data-model/utility.md) |
 | **Partner ladder** | A fitted stopgap letting the pull engine see partner quality. [→](recommendations/partner-ladder.md) |
-| `KNOWN_RED` | Tests that are red on purpose. Both maps are currently empty. [→](tooling/verification-loop.md) |
+| `KNOWN_RED` | Tests that are red on purpose. All three maps are currently empty. [→](tooling/verification-loop.md) |
 | **Fingerprint** | A hash of `team-scorer.js` + `units.json` + `bosses.json` that marks calibration stale. It hashes **raw bytes**, so even a comment edit trips it. [→](engine/calibration.md) |

@@ -540,9 +540,87 @@ classified no-support.
   owner. The cap is the wrong mechanism, not the wrongly-scoped one, and a scoped version would
   re-create the same ceiling for any future composition that hit it.
 
-**What the fallout cost.** Two supportless floors went red. `Lighter/Promeia/Burnice` missed by
-2.8 and its floor was re-derived from 345 to **320** — the owner's call was explicitly to move the
-floor rather than soften the factor to protect one odd composition. It reads **342.2**, clearing
-the new floor by 22. `Trigger/SAnby/Cissia` misses by more, stays in `KNOWN_RED`, and is not a trustworthy
-boundary at all — see known-pitfalls on why a SAnby, Seed or Cissia team cannot be used to size a
-constant.
+**What the fallout cost.** Two supportless floors went red, and both are now closed.
+`Lighter/Promeia/Burnice` missed by 2.8 and its floor was re-derived from 345 to **320** — the
+owner's call was explicitly to move the floor rather than soften the factor to protect one odd
+composition. It reads **342.2**, clearing the new floor by 22. `Trigger/SAnby/Cissia` missed by
+more and was never a trustworthy boundary in the first place — see known-pitfalls on why a SAnby,
+Seed or Cissia team cannot be used to size a constant. It closed on the mechanic it was actually
+waiting for: Cissia now resolves her support pseudo-role from a second electric attacker rather
+than from Seed's id, so the team stopped classifying supportless at all.
+
+*Phoenix's rung closed too, in the entry below — the cap's last witness stopped being a witness.*
+
+### Phoenix tops the anomaly ladder, and the ladder grows to the whole roster
+
+The last `KNOWN_RED` entry in the engine. TEST 90 pins the owner's playtested third slot behind
+Remielle + Velina, on the two anomaly-shill bosses that are element-neutral to everyone in it.
+
+**The cap entry above predicted this could not be fixed by repricing Phoenix's kit** — her L4 was
+already level with Aria's and the deficit looked like a half-tier of L2. That was true *under the
+cap*, and false the moment it came off. A 0.5 step in two stats is now worth **20.6 points**;
+under the cap the same class of change bought 1.5. The prediction was a correct measurement of a
+world that no longer existed, which is the failure mode worth remembering: a conclusion sized
+against a constant expires with the constant.
+
+**Phoenix: `stats` 2/2 → 2.5/2.5.** She was statted at the anomaly median — Alice, Promeia and
+Burnice are all 2/2 — while being the unit the ladder expects to top it. Because she declares
+`scaling.am: 3` the Mastery half also converts into Proficiency, so this lifts her through five
+channels at once: vortex, abloom, refringe, her own proc rate, and her weight in Remielle's
+anomaly supply. 549.4 → **570.0** on Girtablullu. Zero corpus rows moved: she is
+`available: false` and sits outside the dump's corpus entirely.
+
+**Her margin is deliberately thin**, because this is early beta and nobody knows yet by how much
+she beats Aria and Promeia. The gaps are 4.4 and 2.7 — *inside* one rank band. The ordering is
+asserted; the magnitude is not being claimed. Measured levers to widen it later, so the next
+person does not re-derive them:
+
+| lever | worth | note |
+|----|----|----|
+| `utility["anomaly:fire"]: 2` | +16.9 | the honest first choice — Alice's polarity assaults are exactly `utility["anomaly:physical"]: 2`, and [utility.md](../data-model/utility.md) already names `anomaly:fire` as the hypothetical fire equivalent |
+| `am: 3 / ap: 2.5` | +8 beyond current | |
+| `am: 2.5 / ap: 3` | +11 beyond current | |
+| `buffs.anomaly` 4 → 8 | +14.2 | **the trap.** Looks like the obvious lever and is the worst one |
+
+That last row is worth its own sentence. Phoenix's flagship buff is structurally near-worthless
+on her own signature team: it pays 10.0 and all of it to Velina. Remielle is excluded because
+lumen never receives a proc-damage buff `[LUM-02]`; Phoenix herself is excluded because her proc
+damage is already realised as vortex `[BUFF-05]`. Both gates are settled and neither was reopened
+for her. **Buffing a key that lands on one teammate is not a way to price a unit.**
+
+**Aria: `tier` 0 → 0.5 *and* `stats.ap` 3 → 3.75.** The demotion is the point; the Proficiency
+raise buys back enough of the lost half-tier to clear Promeia. The owner asked for the tier-0.5
+variant specifically as the more technically correct statement, and the corpus is the evidence it
+worked: of 3,793 rows moved, **2,748 down and 1,045 up, zero exceptions** — most Aria teams got
+worse and only the Proficiency-leveraged ones got better, which is what "half a tier lower but a
+better proccer" should look like. 4 meaningful adjacent-pair inversions out of 60,858, all of them
+Aria teams passing Alice teams by 5–9 points.
+
+**The window on 3.75 is narrow: ap 3.6 to 3.9.** At 3.5 the Aria/Promeia gap collapses to 0.6; at
+4.0 Aria overtakes Phoenix. It is the only number in this change off the half-step grid, and it
+was chosen as the midpoint of its window rather than for its own sake. The clean-values
+alternative, `ap 3.5 / am 3.5`, also works but leaves Phoenix ahead by only 1.6 on Aberrant.
+
+**Grace: `stats.ap` 3 → 2.5.** She was carrying `ap: 3` — equal to Aria's old base — on a
+tier-1.5 standard-banner unit whose own display text calls her what you run "when you don't have a
+better alternative". That outlier is what lifted her past Burnice by 1.0. Owner's ruling: she
+should not beat Burnice, and she is close to Jane Doe. At 2.5 she reads **530.7**, below Burnice
+(538.2), within one rank band of Jane Doe (536.0), still clear of Yanagi. 2,595 rows moved, every
+one downward, zero exceptions, 1 meaningful inversion.
+
+**Alice over Burnice stops being a tossup.** The rung used to carry a second, *upper* assertion —
+Alice must win AND the two must stay within one rank band — encoding "Alice is generally better,
+but I can live with them being so close". The engine now separates them by ~11 against a band of
+~6, chiefly through Alice's `utility["anomaly:physical"]` feeding Remielle's Luminize rebound to
+45.0 against Burnice's 29.5. The owner re-ruled rather than fitting around it: post-overhaul Alice
+really is the better unit here, and the tossup call predates the mechanics that opened the gap.
+The band ceiling is retired; the strict ordering stays. The reasoning is kept in the test comment,
+because a two-sided band assertion remains the right shape for a pair that genuinely *is* a
+tossup — this pair stopped being one.
+
+**The ladder now runs the full anomaly roster**: Phoenix > Aria > Promeia > Alice > Burnice >
+Jane Doe > Yanagi > Piper > Miyabi > Vivian, with Grace on a boss-conditional rung of her own.
+The bottom five were already true before they were asserted; they are pinned so they stop being
+true by accident. Two structural traps that extension exposed are recorded in
+[known pitfalls](known-pitfalls.md) — a non-viable chain member voiding a whole boss, and an
+"every" quantifier that expires when the set it quantified over grows.
