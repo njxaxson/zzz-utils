@@ -36,6 +36,11 @@ related: []            # other issue filenames; omit if none
 ```
 
 `resolved/` files add `closed: YYYY-MM-DD`.
+
+**`resolved/` is gitignored.** Closing an issue means **moving the file there**, not deleting it —
+the owner reads what accumulates and deletes when ready. Do not delete a closed issue yourself,
+and do not commit one. The durable reasoning still belongs in [notes/](../notes/) behind a tag;
+the file in `resolved/` is a holding area for review, not the permanent record.
 `deferred/` files add `deferred-reason:` — one line, why we are not chasing it.
 
 ## Body

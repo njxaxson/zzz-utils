@@ -35,17 +35,28 @@ import { rankBandEpsilon } from './app/public/lib/common/team-builder.js';
 // for why the exit code depends on the failing set matching this EXACTLY. Every entry needs a
 // reason and the phase expected to clear it. Do NOT add an entry to silence a regression.
 const KNOWN_RED = new Map([
-    // Both entries are ONE disagreement, opened deliberately when phase 3 of the anomaly
-    // overhaul removed every declared anomaly `synergy.units` relationship. The ladders below
-    // were being held up by those declarations, not by mechanics, and the whole point of the
-    // overhaul was to find out how much the mechanics can actually carry. Now we know.
+    // One disagreement, opened deliberately when phase 3 of the anomaly overhaul removed every
+    // declared anomaly `synergy.units` relationship. The ladder below was being held up by those
+    // declarations, not by mechanics, and the whole point of the overhaul was to find out how
+    // much the mechanics can actually carry. Now we know. TEST 9 was the second entry and closed
+    // when Sunna's anomaly buff was modelled — see TEST 92.
     //
     // Owner authorised marking the Remielle/Velina laddering red while the fallout is assessed.
     // Do NOT extend this map to silence anything else — and when a mechanic closes one of these,
     // the suite goes red on the stale entry, which is the point.
-    [9, 'Sanguine Sweeper: Sunna > Yuzuha behind Nangong/Aria was carried by the Aria<->Sunna ' +
-        'declaration. With it gone the mechanics rank Yuzuha first. Unassessed.'],
-    [90, 'Remielle/Velina third slot. ONE cause left, surfacing as three violations: PHOENIX IS NOT AT THE TOP — 5.6 behind Aria on Girtablullu, 6.6 on Aberrant. Her conditional proc-damage buff fires at full weight on this team and reaches only Velina (7.5 raw at weight 3, 10.0 at weight 4): Remielle is lumen [LUM-02], and a self-landing buff counts at SELF_PROC_BUFF_SHARE [BUFF-08]. Both exclusions are owner-confirmed. The binding constraint is now the L4 SOFT CAP rather than her kit — at raw L4 240 a marginal point is worth about 0.3, so the weight 3->4 bump bought only 1.5. The third violation (MRV above her on Aberrant) is the same cause seen from the other side and resolves when she does. Everything else in this ladder is green and EXERCISED — violations are collected rather than thrown, so no rung hides behind a higher one: the Alice rungs closed when an unmet weight-2 need stopped being charged against the boss matchup [TWM-02], and Alice/Burnice is an owner-stated tossup asserted within one rank band.'],
+    // Both opened by hardening STRUCTURE.NO_SUPPORT from 0.80 to 0.75, which is what stopped a
+    // supportless team outranking its supported counterpart on the Miyabi ladder (TEST 82).
+    // Owner authorised both as expected fallout, to be re-derived rather than defended.
+    [3, 'Trigger/SAnby/Cissia reads 287.4 against a 305 floor. NOT a trustworthy boundary: '
+        + 'SAnby, Seed and Cissia have an open L5 conflagration, and Cissia does not resolve '
+        + 'her pseudo-support role on this team at all, which is why it classifies supportless '
+        + 'in the first place. See notes/known-pitfalls.md ("Do not calibrate against a SAnby, '
+        + 'Seed or Cissia team"). Re-derive this floor AFTER that mechanic is fixed, not before.'],
+    [35, 'Lighter/Promeia/Burnice reads 342.2 against a 345 floor — short by 2.8. A supportless '
+         + 'team, so it takes the harder structure factor. Owner: this composition has always '
+         + 'induced odd scoring and the floor should be recalibrated rather than the factor '
+         + 'softened to protect it.'],
+    [90, 'Remielle/Velina third slot, after the L4 soft cap was removed. THREE causes now. (1) PHOENIX IS NOT AT THE TOP, 4.4 behind Aria on Girtablullu. Her mechanics are already equal to Aria’s — the deficit is a half-tier of L2, so no repricing of her kit closes it; see notes/adjudications.md. (2) ARIA NOW SITS BELOW PROMEIA by 5.6, which uncapping caused: Promeia carries the larger raw L4 and the cap had been compressing her more. (3) ALICE BEATS BURNICE BY MORE THAN A RANK BAND — the ordering is right and the owner-stated tossup is now overstated, same cause as (2). The MRV rung on Aberrant is (1) seen from the other side and resolves when Phoenix does. Every rung is exercised: violations are collected rather than thrown, so none hides behind a higher one.'],
 ]);
 
 async function main() {
@@ -83,6 +94,13 @@ async function main() {
 
 
     // TEST 1 (partial): no SAnby + Yixuan together in top 25, every boss
+    /** Score one parsed spec against one boss. Returns -1 for a disqualified team. */
+    const scoreSpec = (spec, boss, roster = allUnits) => {
+        const parsed = scoreForTeamString(spec, roster)[0];
+        assert(parsed, `fixture must parse to a legal team: ${spec}`);
+        return { label: parsed.label, score: scoreTeamForBoss(parsed.team, boss, {}) };
+    };
+
     run('TEST 1 (partial): top-25 per boss has no team with both SAnby and Yixuan', () => {
         for (const boss of bosses) {
             const top = getTopViableTeams(allTeamEntries, boss, 25, null);
@@ -262,7 +280,7 @@ async function main() {
         }
     });
 
-    // TEST 9: Nangong/Aria support order — Sunna > Yuzuha > Astra > Zhao > Nicole > Vivian on
+    // TEST 9: Nangong/Aria support order — Sunna > Yuzuha > Zhao > Astra > Nicole > Vivian on
     // Sweeper/Butcher. Solo scrambles the middle, so only Sunna-best and Nicole > Vivian hold.
     run('TEST 9: Nangong/Aria support order (Solo, Sweeper, Butcher)', () => {
         const t =
@@ -365,15 +383,52 @@ async function main() {
         }
     });
 
-    // TEST 14: Banyue fire-weak band
-    run('TEST 14: Banyue teams >350 (Pompey, Hunter)', () => {
-        const t = 'Dialyn/Banyue/Lucia,Ju Fufu/Banyue/Lucia,Banyue/Astra/Lucia,Banyue/Pan Yinhu/Lucia,Norma/Banyue/Lucia';
+    // TEST 14: which support line belongs behind Banyue, and that they are all playable.
+    //
+    // This used to assert an absolute BAND — every line between 350 and 485. The upper bound was
+    // the problem: it pinned nothing about Banyue and broke the moment the scale moved, which it
+    // did when the L4 soft cap was removed. An ordering survives a repricing; an absolute
+    // ceiling does not. So the claim is now "here is how these rank, and the worst of them is
+    // still a good option".
+    //
+    // Dialyn is deliberately OUTSIDE the ladder and inside the floor check. She is worth far
+    // more on fire-weak Pompey than on Wandering Hunter, so her rung is genuinely
+    // boss-dependent and asserting it either way would be asserting the matchup, not the team.
+    run('TEST 14: Banyue support ladder, and every line stays playable (Pompey, Hunter)', () => {
+        const LADDER = [
+            'Norma/Banyue/Lucia',
+            'Ju Fufu/Banyue/Lucia',
+            'Koleda/Banyue/Lucia',
+            'Banyue/Pan Yinhu/Lucia',
+            'Banyue/Astra/Lucia',
+        ];
+        const FLOOR_ONLY = ['Dialyn/Banyue/Lucia'];
+        const PLAYABLE = 350;
+
+        const violations = [];
+        let checked = 0;
         for (const b of withBosses(bosses, 'Pompey,Hunter')) {
-            for (const { team, label } of scoreForTeamString(t, allUnits)) {
-                const s = scoreTeamForBoss(team, b, {});
-                assert(s >= 350 && s <= 485, `${b.name} ${label}: got ${s}, expected strong Banyue performance ~[350,485]`);
+            const rungs = LADDER.map(spec => scoreSpec(spec, b));
+            if (rungs.some(r => r.score <= 0)) continue;
+            checked++;
+            for (let i = 0; i < rungs.length - 1; i++) {
+                if (!(rungs[i].score > rungs[i + 1].score)) {
+                    violations.push(`${b.name}: ${rungs[i].label} (${rungs[i].score.toFixed(1)}) ` +
+                        `must outrank ${rungs[i + 1].label} (${rungs[i + 1].score.toFixed(1)})`);
+                }
+            }
+            // The worst line in the set is still a team you would happily field.
+            for (const spec of [...LADDER, ...FLOOR_ONLY]) {
+                const t = scoreSpec(spec, b);
+                if (t.score > 0 && t.score < PLAYABLE) {
+                    violations.push(`${b.name}: ${t.label} (${t.score.toFixed(1)}) fell below the ` +
+                        `playable floor of ${PLAYABLE} — these are all meant to be good Banyue options`);
+                }
             }
         }
+        assert(checked >= 2, `only ${checked} boss(es) were live — this test has gone vacuous.`);
+        assert(violations.length === 0,
+            `${violations.length} Banyue ladder violation(s):\n      - ` + violations.join('\n      - '));
     });
 
     // TEST 15: Nangong/Yixuan/Sunna — the emergent-team-building proof
@@ -1417,13 +1472,6 @@ async function main() {
     assert(STRICT_LADDER_BOSSES.length === 2,
         `strict ladder fixture broken: expected 2 bosses, resolved ${STRICT_LADDER_BOSSES.length}`);
 
-    /** Score one parsed spec against one boss. Returns -1 for a disqualified team. */
-    const scoreSpec = (spec, boss, roster = allUnits) => {
-        const parsed = scoreForTeamString(spec, roster)[0];
-        assert(parsed, `fixture must parse to a legal team: ${spec}`);
-        return { label: parsed.label, score: scoreTeamForBoss(parsed.team, boss, {}) };
-    };
-
     run('TEST 79: Nangong/Miyabi/Yuzuha is Miyabi\'s strongest composition, per boss', () => {
         const miyabiTeams = filterIncludeOneOf(allTeamEntries, ['Miyabi']);
         assert(miyabiTeams.length > 100,
@@ -1578,8 +1626,10 @@ async function main() {
             ['Miyabi/Vivian/Remielle'],
             ['Nangong/Miyabi/Sunna'],
             ['Nangong/Miyabi/Astra', 'Miyabi/Vivian/Yuzuha'],
-            ['Miyabi/Vivian/Astra'],
-            ['Nangong/Miyabi/Nicole'],
+            // Owner: these two are super-close and the order between them is not a claim.
+            // Banded, so the test asserts what it means — both below the top five, both above
+            // the bottom two.
+            ['Miyabi/Vivian/Astra', 'Nangong/Miyabi/Nicole'],
             ['Miyabi/Vivian/Nicole'],
             ['Nangong/Miyabi/Vivian'],
         ];
@@ -2057,6 +2107,54 @@ async function main() {
         const onlyTrigger = l5Of('Trigger/SAnby/Astra');
         assert(onlyTrigger === 0,
             `Trigger without Seed must not trigger SAnby's group: L5 was ${onlyTrigger}`);
+    });
+
+    // TEST 92: which support belongs behind Nangong and an anomaly carry.
+    //
+    // Owner's playtest rule: Yuzuha first, then Sunna, then Astra — EXCEPT behind Aria, where
+    // Sunna is the best of the three. Aria is the exception because Sunna's contribution to an
+    // anomaly team is proc damage, and Aria has the highest Proficiency and proc rate on the
+    // roster, so the same flat buff is worth relatively more to her than to anyone else.
+    //
+    // Sunna's anomaly buff is what makes this test possible at all. It went unmodelled for a
+    // long time because the engine had no first-class way to express buffing anomaly procs, and
+    // without it the engine ranked Yuzuha over Sunna behind Aria by a tenth of a point.
+    //
+    // Violations are COLLECTED, not thrown on sight, so one bad carry cannot hide the other four.
+    run('TEST 92: Nangong/<anomaly> support order — Yuzuha > Sunna > Astra, except Aria', () => {
+        // Every anomaly carry that forms a legal Nangong/<carry>/<support> team with all three.
+        const CARRIES = ['Alice', 'Aria', 'Miyabi', 'Promeia', 'Vivian'];
+        // Aria alone inverts the top two. Everything else runs Yuzuha first.
+        const SUNNA_FIRST = new Set(['Aria']);
+
+        const violations = [];
+        let checked = 0;
+        for (const boss of STRICT_LADDER_BOSSES) {
+            for (const carry of CARRIES) {
+                const yuz = scoreSpec(`Nangong/${carry}/Yuzuha`, boss);
+                const sun = scoreSpec(`Nangong/${carry}/Sunna`, boss);
+                const ast = scoreSpec(`Nangong/${carry}/Astra`, boss);
+                if ([yuz, sun, ast].some(t => t.score <= 0)) continue;
+                checked++;
+
+                // Sunna over Astra holds for every carry — neither is anomaly-specialised, and
+                // Sunna's proc-damage buff is the whole of the difference.
+                if (!(sun.score > ast.score)) {
+                    violations.push(`${boss.name}: ${sun.label} (${sun.score.toFixed(1)}) must ` +
+                        `beat ${ast.label} (${ast.score.toFixed(1)})`);
+                }
+
+                const [hi, lo] = SUNNA_FIRST.has(carry) ? [sun, yuz] : [yuz, sun];
+                if (!(hi.score > lo.score)) {
+                    violations.push(`${boss.name}: behind ${carry}, ${hi.label} ` +
+                        `(${hi.score.toFixed(1)}) must beat ${lo.label} (${lo.score.toFixed(1)})`);
+                }
+            }
+        }
+        assert(checked >= 8,
+            `only ${checked} carry/boss pair(s) were live — this test has gone vacuous.`);
+        assert(violations.length === 0,
+            `${violations.length} support-order violation(s):\n      - ` + violations.join('\n      - '));
     });
     // Summary
     console.log('');

@@ -3,7 +3,7 @@
 Where things stand. Everything here is measured, not remembered — if you change the engine,
 re-run the commands and update the numbers.
 
-**Last verified:** 2026-09-14.
+**Last verified:** 2026-09-15.
 
 ## Scores come on two scales
 
@@ -15,13 +15,13 @@ The engine returns **raw**. Anything comparing archetypes against each other rea
 
 | Suite | State |
 |----|----|
-| mechanics | **28 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
-| rankings | **89 pass, 2 KNOWN_RED**, exits 0. TESTS 9 and 90 — the anomaly ladder |
+| mechanics | **31 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
+| rankings | **89 pass, 3 KNOWN_RED**, exits 0. TESTs 3, 35 and 90 |
 | recommendations | **44 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
 | bucketing | **6 pass, 0 fail** |
 | cohesion fixture | **11/11** owner judgements hold |
 | calibration freshness | `calibration.json` matches the current engine and data fingerprint |
-| calibration certification | **CERTIFIED** — 0 within-archetype rank inversions across 60 (boss × archetype) groups and 67,026 teams |
+| calibration certification | **CERTIFIED** — 0 within-archetype rank inversions across 60 (boss × archetype) groups and 67,024 teams |
 
 ```bash
 node test-mechanics.mjs && node test-rankings.mjs && node test-recommendations.mjs && node test-bucketing.mjs && node cohesion-fixture.mjs
@@ -33,10 +33,12 @@ node calibration-check.mjs
 (118 tests total, same as before) — mechanics tests pin isolated engine rules independent of
 roster content, rankings tests pin score floors/orderings/ladders for the live roster.
 
-`KNOWN_RED` is empty for mechanics and recommendations, and holds **two entries** for rankings:
-TESTS 9 and 90, the anomaly ladders that were being held up by declared `synergy.units`
-relationships until phase 3 removed them. Phase 4 closed most of two rungs on mechanics alone
-and made a third worse; the entries carry the current margins, not the phase-3 ones. That is one disagreement, opened deliberately and
+`KNOWN_RED` is empty for mechanics and recommendations, and holds **three entries** for rankings.
+TEST 90 is the Remielle/Velina ladder, open since phase 3 stripped the declared `synergy.units`
+relationships that were propping it up. TESTs 3 and 35 are two supportless score floors that went
+red when the L4 soft cap was removed and the supportless structure factor took over the judgement
+— both are expected fallout, to be re-derived rather than defended, and TEST 3's floor is not a
+trustworthy boundary in the first place. Every entry carries its current margin and its reason. That is one disagreement, opened deliberately and
 visible for exactly as long as it lasts — the suite goes red on a stale entry the moment a
 mechanic closes one, which is what the map is for. See
 [the verification loop](tooling/verification-loop.md) for why an empty map still matters, and why
@@ -52,7 +54,7 @@ because it is a live measurement rather than a defect to be described. See below
 
 ## Deferred
 
-Eight. These are known, understood, and deliberately not being chased.
+Seven. These are known, understood, and deliberately not being chased.
 
 | Issue | Priority | Why it is parked |
 |----|----|----|
@@ -63,11 +65,10 @@ Eight. These are known, understood, and deliberately not being chased.
 | [Ye Shunguong under-paid on veils](issues/deferred/low-ye-shunguong-underpaid-four-points-on-veils.md) | low | One pair type, about four points, in the safe direction |
 | [`utility.kaleidoscope` is read only by the UI](issues/deferred/low-kaleidoscope-is-read-only-by-the-ui.md) | low | Only a support declares it, so no fixture could tell a fix from a no-op |
 | [The `ultimate:double` weight is discarded](issues/deferred/low-ultimate-double-weight-is-discarded.md) | low | Every declarer means the same thing, so grading it would move nothing |
-| [A vortex is worth ~5x a full abloom engine](issues/deferred/medium-vortex-outweighs-every-other-anomaly-payout.md) | medium | The skew may be correct — the game does push vortex-with-abloom as the optimal anomaly line. Needs a design ruling, not a constant nudged |
 
-`issues/resolved/` is empty by design. A closed issue gets a file only when its history would
-change what a future reader does; otherwise it is deleted and git holds it. The durable reasoning
-lives in [notes/](notes/) instead — see [the issue system](issues/README.md).
+`issues/resolved/` is **gitignored**: closing an issue means moving its file there for the owner
+to read and delete when ready, not deleting it yourself. The durable reasoning lives in
+[notes/](notes/) behind a tag either way — see [the issue system](issues/README.md).
 
 ## For release
 
@@ -75,6 +76,71 @@ lives in [notes/](notes/) instead — see [the issue system](issues/README.md).
 data tuning rather than engine defects.
 
 ## What shipped last
+
+**The L4 soft cap is gone**, 2026-09-15 — and with it the ceiling that was making the engine
+progressively worse at separating new top-end units.
+
+The cap compressed Layer 4 toward a fixed asymptote of 350. That number never moved; the roster
+does. So every release pushed the top of the ladder deeper into the compressed region, and a new
+mechanic arrived worth less than the last one. Phoenix is the witness — raising her signature buff
+by a third bought **1.5 points**.
+
+It also buried mistakes. With the cap off, the engine ranked **Astra below Soukaku** behind
+Nangong/Miyabi, a plainly wrong answer that had been damped into a 0.3-point margin for as long
+as the cap existed. Full reasoning in [adjudications](notes/adjudications.md); read
+[known pitfalls](notes/known-pitfalls.md) before proposing anything shaped like a compression
+curve, including a scoped one.
+
+**What replaced it is one constant.** `STRUCTURE.NO_SUPPORT` 0.80 → 0.75, in the structure layer
+where the supportless judgement belongs. 8,430 rows moved, all downward, zero exceptions.
+
+**Three real defects surfaced and were fixed at the root:**
+
+* **Sunna buffs anomaly proc damage**, and never had. The engine had no first-class way to express
+  it until recently. Closes TEST 9, which was failing by **0.1 points**, and produces the owner's
+  support rule for free: Yuzuha > Sunna > Astra behind Nangong, except behind Aria where the same
+  flat buff flips a 0.1-point gap and nothing else. New TEST 92.
+* **Soukaku only plays anomaly when she is BACKFILLING a disorder partner.** She used to promote
+  beside Miyabi unconditionally, which made an A-rank support a full third carry. Needed three new
+  pieces — an `allOf` combinator, an `othersDisorder` predicate, and two-pass role activation —
+  all in `[PRED-02]`. Astra now beats her by **52 points** where she had lost by 0.3.
+* **Buildup buffs no longer reach lumen.** Velina was handing Remielle a proc-rate buff for procs
+  she does not make. 469 rows.
+
+**Two tests were rewritten rather than re-fitted.** TEST 14 was an absolute score band; an upper
+bound pins nothing and breaks on every repricing, so it is now an ordering plus a playable floor,
+with Koleda added. TEST 82's two closest rungs are banded, since the order between them was never
+a claim.
+
+**And one constant was re-derived because its basis disappeared:** `STUNLESS_SHILL_CREDIT`, whose
+documented sizing was quoted "after the L4 element modifier **and soft cap**".
+
+**What is still open.** Phoenix does not top the Remielle/Velina ladder, and removing the cap did
+not change that — her mechanics already equal Aria's and the deficit is a half-tier of L2. Aria
+now sits below Promeia, which uncapping caused. Both in TEST 90.
+
+**Not yet done:** the six calibrated cutoffs in `strength-rating.js` drifted harsher (Good 9.9% →
+8.1% of the corpus) and have not been re-derived.
+
+**`VORTEX_BASE` re-derived, 15 to 12**, 2026-09-14. A vortex was worth about five times a full
+abloom engine, and the scalar in front of the vortex model had never been re-derived after phase 2
+stacked Proficiency, proc rate and tier compression on top of it. The physics were **not**
+re-litigated — only the constant.
+
+The binding anchor is rankings TESTs 34/44: ice must out-vortex frost on Scorched Horizon, the
+boss where vortex is the whole point. That margin falls linearly with the constant and inverts at
+9; **12 is the lowest value that keeps it outside one rank band.**
+
+Vortex on `Phoenix/Remielle/Velina` falls 95.3 to 76.3 against an unchanged 26.0 of abloom (4.8x
+to 3.8x). Teams above raw L4 200 fall from 295 to 234. Of 67,003 adjacent team pairs, **only 6
+invert where the original gap exceeded one rank band** — the other 1,923 are within-band shuffles.
+
+**Mechanics TEST 28 was silently pinning the constant** and has been fixed: its second assertion
+compared a team holding an element donor against one without, so it measured pool dilution net of
+the donor's own disorder and proc contributions. It now reads the pooled tier the payout used
+(4.0 / 3.0 / 2.5), is immune to `VORTEX_BASE`, and is mutation-checked against a `max` pool.
+
+Closes SCORE-143. Full reasoning in [adjudications](notes/adjudications.md).
 
 **Anomaly overhaul, phase 4** — the mechanics take over the ladder, 2026-09-14.
 

@@ -153,90 +153,81 @@ boss's own favouritism as a penalty where anomaly should be winning.
 The rule that works is the third. Excluding only the extreme shill (Sacrifice Bringer alone)
 is not enough.
 
-## Calibration: do not anchor on pre-cap scores, even though the argument is correct
+## Calibration: "anchor on pre-cap scores" — MOOT, and kept for the shape of the mistake
 
-The concern was real and correctly reasoned. Anchors are means of an archetype's top ten
-teams, those are exactly the teams the L4 soft cap bites hardest, so the anchor is measured on
-already-compressed scores. Measured distortion: anomaly 3.83%, attack 1.33%, rupture 5.02%,
-against a Fiend margin of 2.3%. Decisive, and it says plainly: anchor on pre-cap scores.
+**This one is now history: the L4 soft cap was removed, so there are no pre-cap scores and no
+compression for an anchor to be measured through.** Kept because the shape of the error recurs.
+
+The concern was real and correctly reasoned. Anchors are means of an archetype's top ten teams;
+those were exactly the teams the cap bit hardest, so anchors were measured on already-compressed
+scores. The measured distortion — anomaly 3.83%, attack 1.33%, rupture 5.02% against a Fiend
+margin of 2.3% — was decisive, and said plainly: anchor on pre-cap scores.
 
 **Doing so made things worse, in the direction opposite to the argument.** Anomaly's top teams
-sit deepest in cap territory, so removing the cap's effect inflates anomaly's anchor *more*
-than the others', which shrinks anomaly's factor and undoes the favored-exclusion fix on the
-exact cases it was built for.
+sat deepest in cap territory, so removing the cap's effect inflated anomaly's anchor *more* than
+the others', shrinking anomaly's factor and undoing the favored-exclusion fix on the exact cases
+it was built for.
 
-Do not revisit this on the distortion table alone. The two tables have to be read together.
+The transferable lesson: a correct argument about a distortion does not tell you the sign of the
+correction. Read both tables, not the one that motivated the change.
 
 Also tried and rejected: a piecewise curve fitted on the neutral boss (it has to extrapolate
 exactly where it matters, and produced 931.3 on a 400 scale), and a per-archetype power curve
 (fixes anomaly to within 7% at every depth, over-rates weak rupture teams by 48%).
 
-## The L4 soft cap was NOT obviated by calibration, and three ways to relax it all fail
+## The L4 soft cap is GONE — do not reintroduce it, in any scope
 
-Investigated 2026-09-14 after the owner's repeated (and reasonable) suspicion that the cap kills
-every lever at the top of the anomaly ladder. Both halves of that suspicion check out; the
-conclusion is still "do not move it yet".
+Removed 2026-09-15. Read this before proposing anything shaped like a compression curve.
 
-**Calibration cannot have replaced it, structurally.** `calibrated = raw x factor[archetype]` is a
-per-archetype **linear** map, and a linear map is order-preserving *within* an archetype. The cap
-is non-linear and changes within-archetype order — that is its entire job. The two cannot
-substitute for each other in principle, and the measurement agrees: removing the cap immediately
-fails rankings TEST 85, with the supportless `Nangong/Alice/Miyabi` (502.5) beating its supported
-counterpart `Nangong/Alice/Sunna` (492.2).
+**Why it went.** The curve asymptoted at an L4 of 350. That number was fixed; the roster is not.
+Every release adds units with real interactions, so the top of the ladder migrated deeper into
+the compressed region and the marginal worth of a new mechanic fell as it went — 1.00 below 100,
+0.51 at 200, 0.26 near the ceiling. **The engine was getting worse at its primary job over time,
+by construction.** Phoenix was the first unit to hit the wall: raising her signature buff by a
+third bought 1.5 points.
 
-**The shape, for reference.** Passthrough 100, cap 250, asymptote 350 — no team's L4 can exceed
-that however it is built. Marginal rate: 1.00 up to 100, 0.69 at 150, 0.51 at 200, 0.41 at 240,
-0.26 at 339. **90.2% of viable teams sit under raw L4 100 and are untouched.**
+**The second reason, which is the sharper one.** "Runaway mechanical stacking" only makes sense
+as a worry if you do not trust the mechanics underneath. If they are priced correctly a large L4
+is a *true statement* about a team and compressing it is a lie; if they are priced incorrectly
+the cap buries the error instead of surfacing it. It was doing the second. Removing it
+immediately exposed a real defect that had been sitting under it for as long as it existed —
+Astra losing to Soukaku behind Nangong/Miyabi, because a pseudo-role promotion was making an
+A-rank support a full third carry. See `[PRED-02]`.
 
-**It is well-targeted at the top and badly targeted in the middle.** By the engine's own structure
-classification:
+**Do not bring it back scoped to supportless teams.** This was proposed, on the grounds that the
+teams with runaway L4 are overwhelmingly one shape (Nangong plus two anomaly carries, no
+support). Owner rejected it outright, and the reasoning is that the cap is the **wrong
+mechanism**, not the wrongly-scoped one. The supportless judgement now lives in the structure
+factor where it belongs — see `[PIPE-02]`.
 
-| raw L4 | teams | NO SUPPORT | conventional |
-|----|----|----|----|
-| >= 250 | 89 | **78%** | 20% |
-| >= 200 | 206 | **57%** | 32% |
-| 150-199 | 653 | 16% | 46% |
-| 100-149 | 4,128 | 18% | 34% |
+**What replaced it, and what it cost.** One constant: `STRUCTURE.NO_SUPPORT` from 0.80 to 0.75.
+Two floors went red and were left red deliberately, both recorded in `KNOWN_RED`. Several other
+things had to be re-derived because they had been sized *net of the compression* —
+`STUNLESS_SHILL_CREDIT` most explicitly, whose old figure was quoted "after the L4 element
+modifier and soft cap".
 
-Above 200 it is doing exactly what it was built for. Below that it is mostly compressing ordinary
-conventional teams — and that band holds 95% of everything the cap touches. That is the honest
-content of "it kills every lever": the anomaly ladder's top teams are conventional, sit at raw L4
-190-260, and collect 0.4-0.5 on the margin.
+**Absolute score ceilings are the standing hazard.** Scores rise when compression is removed, so
+any test asserting an upper bound is exposed. TEST 14 was one and has been rewritten as an
+ordering plus a playable floor, which survives a repricing where a band does not. Floors are
+safe; ceilings are not. Eight remain in `test-rankings.mjs` and should be converted the same way
+if they ever start biting.
 
-**Three relaxations, all measured, all rejected:**
+## Do not calibrate against a SAnby, Seed or Cissia team
 
-| attempt | what broke |
-|----|----|
-| Remove it entirely | rankings TESTs 8, 14, 82 (six ladder violations), 85, 90 worse; bucketing TEST 5 |
-| Raise `L4_PASSTHROUGH` to 140 / 180 / 220 | rankings TESTs 14, 90 (Aria/Promeia inverts); bucketing TEST 5 — identical failures at all three values |
-| Apply the cap only to supportless teams | rankings TESTs 8, 9, 14, 82, 90; bucketing — the **worst** of the three |
+Owner ruling, and it applies to any constant you are trying to size.
 
-**Why they all fail the same way.** Relaxing compression always favours whichever team already has
-more raw L4. Three suite anchors are fitted to the current rate and break in that direction: TEST
-14 is a **ceiling** (`Norma/Banyue/Lucia` must stay under 485, reads 488 at passthrough 140),
-bucketing TEST 5 is a **parity band** (the stunless and stunner lines drift apart, exactly as they
-did when the field-time bonus moved), and TEST 90's Aria-over-Promeia rung holds by **0.4 points**
-so any broad relaxation flips it.
+Those units have an open conflagration in their L5 synergy mechanics — the declared
+Trigger/SAnby/Seed group, Cissia's pseudo-support that does not resolve on
+`Trigger/SAnby/Cissia`, and the Seed interplay behind both. Until that is fixed, **a score on any
+team holding SAnby, Seed or Cissia is not a valid boundary.** It may be high or low for reasons
+that have nothing to do with the constant you are measuring.
 
-**Order of operations, if this is ever taken on.** Do
-[SCORE-143](../issues/deferred/medium-vortex-outweighs-every-other-anomaly-payout.md) **first**.
-65% of the teams above raw L4 200 hold a wind agent or are the wind-state boss, so vortex is what
-is filling the range the cap compresses. If vortex is genuinely over-weighted at ~5x every other
-anomaly payout, the cap is partly a band-aid on that, and shrinking vortex may pull the
-distribution back under the passthrough without touching the cap at all. Retuning the cap first
-would then be fitting a curve to a number that is about to move — and any measurement taken now
-is confounded the same way.
+This has already produced one wrong answer. `Trigger/SAnby/Cissia` was used as the upper bound
+when sizing the supportless structure factor, and its TEST 3 floor appeared to squeeze the usable
+range to a 0.017 window with no margin. With that data point removed the constraint largely
+disappears — the floor it was defending is not trustworthy in the first place.
 
-Then, and only then: re-derive TEST 14's ceiling, re-derive `STUNLESS_SHILL_CREDIT` for bucketing
-TEST 5 (the same fix that absorbed the field-time change), and expect the Aria/Promeia rung to
-need re-closing from a different lever.
-
-## Do not raise the L4 soft cap to fix a Miyabi ordering
-
-It helps the ladder and **un-fixes the supportless rungs** at the same time.
-`Nangong/Miyabi/Vivian`'s raw L4 of 234.5 is exactly what the cap is holding down. The two
-defects pull the cap in opposite directions, which is why no single value serves both.
-Removing the cap entirely still nets Nangong only +9.5, short of the 19.3 needed.
+Related: `../issues/deferred/medium-trigger-sanby-seed-clears-its-floor-only-by-declaration.md`.
 
 ## Do not halve sub-DPS rank, and do not un-halve the sub-DPS tier
 

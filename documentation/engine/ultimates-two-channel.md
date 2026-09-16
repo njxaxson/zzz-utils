@@ -103,8 +103,9 @@ Mechanics TEST 9 pins the rule directly.
 ## A trap to avoid
 
 Do not try to use the L5 exemption as an L4 discount to reallocate a contended provider.
-Cheapening a *shared* provision lowers its value to every consumer simultaneously, and the L4
-soft cap damps the reduction unevenly, so it can move an allocation the wrong way. See
+Cheapening a *shared* provision lowers its value to every consumer simultaneously, which is
+reason enough. (It used to be worse: the L4 soft cap damped the reduction unevenly and could move
+an allocation the wrong way. The cap is gone, so that second effect no longer applies.) See
 [Deadly Assault allocation](../bucketing/deadly-assault.md).
 
 ## Terminology

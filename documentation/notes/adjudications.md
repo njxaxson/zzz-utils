@@ -433,3 +433,101 @@ fixture entry that judgement produced.
 
 Full reasoning and the measurements: [PIPE-01](../engine/layers.md#code-notes) and
 [ARM-01](../concepts/armorer-laceration-gash-maim.md#code-notes).
+
+### `VORTEX_BASE` is 12, re-derived against ice-over-frost on the vortex boss
+
+Closes SCORE-143. The complaint was that a vortex was worth about **five times** a full abloom
+engine — 95.3 of a 240.0 raw L4 on `Phoenix/Remielle/Velina`, against 20.0 of 89.7 on the
+mono-fire `Phoenix/Burnice/Remielle`.
+
+**The physics were not re-litigated.** Owner: the AP-based vortex model was built deliberately to
+capture what separates the Velina/Remielle lines from the Miyabi lines, and the compounding of
+tier x Proficiency x proc rate x proc-damage buff is correct. Only the scalar in front of it was
+wrong, and it had never been re-derived after phase 2 stacked those factors on top of it.
+
+**15 -> 12.** The binding constraint is rankings TESTs 34/44: on Scorched Horizon,
+`Nangong/Promeia/Yuzuha` must beat `Nangong/Miyabi/Yuzuha` — ice's vortex advantage over frost on
+the boss where vortex is the whole point. That margin falls linearly with the constant:
+
+| `VORTEX_BASE` | NPY - NMY |
+|----|----|
+| 15 | 11.8 |
+| 12 | **6.2** |
+| 11 | 4.2 |
+| 10 | 1.8 |
+| 9 | **-0.6** — inverts |
+
+12 is the lowest value that keeps the claim **outside one rank band** (5.4 at that score). At 11
+the suite still passes, but a 4.2-point margin means the allocator considers ice and frost
+interchangeable on the vortex boss, which is not what the test is asserting.
+
+**What it bought.** Vortex on `Phoenix/Remielle/Velina` falls 95.3 -> 76.3 against an unchanged
+26.0 of abloom, so the ratio goes 4.8x -> 3.8x. Teams above raw L4 200 fall from 295 to 234
+(-21%) and the maximum from 339 to 319.
+
+**Rankings are preserved.** Of 67,003 adjacent team pairs across all bosses, 1,929 invert — but
+only **6** invert where the original gap exceeded one rank band. The rest are within-band
+shuffles, which is what a band means. The six are listed in the commit; all are vortex teams
+losing to non-vortex teams, which is the intended direction. Calibration re-certified with the
+anomaly anchor moving only 576.7 -> 575.7.
+
+**A test was pinning the constant, and it should not have been.** Mechanics TEST 28's second
+assertion compared a team holding an element donor against one without, so the donor also brought
+a fresh disorder partner and an extra proc — it measured dilution NET of those, and passed only
+while `VORTEX_BASE` was big enough for dilution to dominate. It was never testing the pooling
+rule (assertion 1 does that), and the thing it *was* asserting — that adding a fire agent to
+Promeia/Velina lowers the team's damage — is probably false in game, which is why triple-anomaly
+teams exist. It now reads the pooled tier the payout actually used (4.0 / 3.0 / 2.5 for {ice},
+{ice,fire}, {ice,electric}) and is immune to the constant. Mutation-checked against a `max` pool.
+
+**A note that has since been overtaken.** This entry originally closed by warning that shrinking
+vortex was not licence to retune the L4 soft cap, because the cap's bite on the top anomaly teams
+had barely moved. That turned out to be right about the measurement and wrong about the
+conclusion: the cap was removed outright a day later, for reasons that had nothing to do with
+vortex. See [known pitfalls](known-pitfalls.md).
+
+### The L4 soft cap is removed, and the supportless rule moves to the structure factor
+
+Owner's argument, and it is the one that settled it: the cap was introduced to prevent runaway
+L4 scoring, and **it stopped doing that job**. What it was actually holding up was a structural
+judgement — that a supportless team should not outrank its supported counterpart — enforced from
+a damage-magnitude layer one step away from where that judgement belongs.
+
+**The decisive objection is the ceiling.** The curve asymptoted at an L4 of 350. That number is
+fixed and the roster is not, so every release pushed the top of the ladder deeper into the
+compressed region and made a new mechanic worth less on arrival. Phoenix is the witness: raising
+her signature buff by a third bought **1.5 points**. An engine whose job is ranking new releases
+cannot have a fixed ceiling on mechanical contribution — that is a defect with a predictable
+trajectory, not a tuning preference.
+
+**The second objection is that it hid mistakes**, and this one produced a name. With the cap off,
+the engine ranked Astra below Soukaku behind Nangong/Miyabi — an obviously wrong answer that had
+been damped into a 0.3-point margin for as long as the cap existed. The root cause was a
+pseudo-role promotion making an A-rank support a full third carry, fixed properly in `[PRED-02]`.
+
+**Only one of the six surfaced failures was about structure.** That measurement is what stopped
+the first repair attempt: hardening the supportless factor alone made things worse (six failures
+became ten) because a flat factor also punishes supportless teams that should rank well. Two more
+were a real mispricing (Sunna's unmodelled anomaly buff), one was a badly-shaped absolute ceiling,
+and one was a parity band whose constant had been sized *net of the compression*.
+
+**What actually replaced it: one constant.** `STRUCTURE.NO_SUPPORT` from 0.80 to 0.75, in the
+structure layer. It works because the affected team's cohesion is exactly 1.0, so the structure
+factor is its whole multiplier. 8,430 rows moved, all downward, zero exceptions — every mover was
+classified no-support.
+
+**Two ideas were measured and rejected**, and both deserve recording because they look right:
+
+* **Scaling the supportless penalty by how much buff weight the team lands.** Owner's idea, and
+  the intuition is sound — three bare carries supply nothing, a stunner-dense line supplies
+  plenty. It does not survive: among genuinely supportless teams it runs **backwards** on the
+  owner's own Miyabi ladder, because Nangong is a buff-rich stunner whose buffs all land.
+* **Reinstating the compression scoped to supportless teams only.** Rejected outright by the
+  owner. The cap is the wrong mechanism, not the wrongly-scoped one, and a scoped version would
+  re-create the same ceiling for any future composition that hit it.
+
+**What stays broken, deliberately.** Two supportless floors are red and held in `KNOWN_RED`.
+`Lighter/Promeia/Burnice` misses by 2.8 and its floor should be recalibrated rather than the
+factor softened to protect one odd composition. `Trigger/SAnby/Cissia` misses by more and is not
+a trustworthy boundary at all — see known-pitfalls on why a SAnby, Seed or Cissia team cannot be
+used to size a constant.

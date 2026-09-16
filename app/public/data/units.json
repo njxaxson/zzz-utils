@@ -1078,8 +1078,9 @@
         "join": ["ice", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
-            "stats": { "am": 1.5, "ap": 1 },
-            "pseudoRole": [{"role":"anomaly","when":{ "hasUnit": "miyabi" }}],
+            "stats": { "am": 1.5, "ap": 1, "atk": 1 },
+            "damage": { "basic": { "cases": [ { "when": { "allOf": [{ "hasUnit": "miyabi" }, { "othersDisorder": false }] }, "value": 1 }, { "value": 0 } ] } },
+            "pseudoRole": [{"role":"anomaly","when":{ "allOf": [{ "hasUnit": "miyabi" }, { "othersDisorder": false }] }}],
             "archetypes" : { "intended" : ["attack", "anomaly"], "avoid": ["armorer", "rupture"] },
             "buffs": { "atk": 3, "ice": 3 },
             "utility": { "quick-assists": true }
@@ -1103,7 +1104,17 @@
         "mechanics": {
             "archetypes" : { "intended" : ["attack", "anomaly"], "avoid": ["armorer"] },
             "damage": { "basic": 1 },
-            "buffs": { "atk": 3, "stun-multiplier": 2 },
+            "buffs": {
+                "atk": 3,
+                "stun-multiplier": 2,
+                "anomaly": {
+                    "optional": true,
+                    "cases": [
+                        { "when": { "countTag": "anomaly", "minCount": 1 }, "value": 2 },
+                        { "value": 0 }
+                    ]
+                }
+            },
             "utility": { "veils": 3, "daze": 2, "quick-assists" : true, "heal:team": true }
         },
         "faction": "Angels of Delusion",

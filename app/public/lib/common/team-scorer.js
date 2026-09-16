@@ -148,8 +148,9 @@ const SHILL_MATCH_BONUS = 8;
 // A stun shill satisfied by a stunless carry rather than a stunner: the requirement is met
 // without spending a slot on one, so the freed slot takes a second support instead. Calibrated
 // against what that replacement support would have contributed, plus the solo-carry bonus the
-// shape used to collect in full. [ARCH-01]
-const STUNLESS_SHILL_CREDIT = 53;
+// shape used to collect in full. Re-derived when the L4 soft cap was removed — its old sizing
+// was quoted net of that compression. [ARCH-01]
+const STUNLESS_SHILL_CREDIT = 64;
 
 // BURST THROUGHPUT: what a unit dumps into a stun window, as a SUM over the instruments it can
 // fire there, not a MAX (the same ordinal means different things on different keys — see
@@ -220,7 +221,7 @@ const VORTEX_TIERS = {
     "physical:honedEdge" : 0.8
 };
 const VORTEX_DEFAULT_TIER = 0.001;
-const VORTEX_BASE = 15;
+const VORTEX_BASE = 12;
 // Minimum primary DPS vortex tier for full team vortex bonuses. Below this threshold,
 // vortex bonuses are proportionally discounted — the team lacks a vortex-focused carry.
 const VORTEX_PRIMARY_MIN = 1.0;
@@ -270,7 +271,6 @@ const CONDITIONAL_BUFF_PENALTY_MULT = 35;
 // Floor for codependencyFactor: what a codependent unit is still worth with its composition
 // need entirely unmet. Not zero — Remielle off triple-anomaly keeps her double ultimate.
 const CODEPENDENCY_FLOOR = 0.25;
-const L4_SOFT_CAP = 250;
 const POLARITY_VORTEX_DISCOUNT = 0.35;
 // Needs exempt from L5 cohesion penalties — deliberate, not an L4/L5 inconsistency. Ultimates
 // and chains arrive naturally and almost nothing can provision them, so reward the upside
@@ -576,8 +576,38 @@ function unitProvidesIdentifier(u, ident) {
     return w(u.mechanics?.utility?.[ident]) > 0;
 }
 
+// Do the members of this team OTHER than `self` already disorder with each other?
+//
+// This is the backfill question. Soukaku is Miyabi's ice partner only when nobody else is doing
+// that job — beside Vivian or Nangong you are not running her for disorders at all, you are
+// running her to buff ice and attack. Asked about the OTHERS, never about self, which is what
+// keeps it out of a cycle: Soukaku's own element never enters the answer.
+//
+// Element-level, not role-level, so the two units a role count gets wrong come out right:
+// Remielle is anomaly-tagged but is lumen and procs nothing, and Velina's wind makes a VORTEX
+// with Miyabi rather than a disorder. Neither is a disorder partner, so Soukaku still backfills
+// beside them. Variant-aware, because frost and plain ice genuinely disorder. [PRED-02]
+function othersFormDisorder(self, team) {
+    const elements = new Set();
+    for (const unit of team) {
+        if (unit === self) continue;
+        for (const el of getProcElements(unit)) {
+            if (el.split(':')[0] === 'wind') continue;
+            elements.add(el);
+        }
+    }
+    return elements.size >= 2;
+}
+
 function evaluatePredicate(when, ctx) {
     if (!when) return true;
+    // Every other key is a single question; `allOf` is the only way to ask two. [PRED-02]
+    if (when.allOf !== undefined) return when.allOf.every(c => evaluatePredicate(c, ctx));
+    if (when.othersDisorder !== undefined) {
+        // Reads RESOLVED roles, so it is deferred to the second activation pass.
+        if (ctx.deferResolved) return false;
+        return othersFormDisorder(ctx.self, ctx.team || []) === when.othersDisorder;
+    }
     if (when.hasUnit !== undefined) return (ctx.team || []).some(u => unitMatchesIdentifier(u, when.hasUnit));
     if (when.notPresent !== undefined) return !(ctx.team || []).some(u => unitMatchesIdentifier(u, when.notPresent));
     if (when.provisions !== undefined) return (ctx.team || []).some(u => unitProvidesIdentifier(u, when.provisions));
@@ -717,6 +747,8 @@ function computeConditionalBuffPenalty(supplier, team) {
     let totalPenalty = 0;
     for (const [buffKey, spec] of Object.entries(buffs)) {
         if (!isTeamScopedConditional(spec)) continue;
+        // `optional: true` says this buff not firing is not a failure of the unit. [PRED-01]
+        if (spec.optional === true) continue;
         const maxLevel = maxConditionalValue(spec);
         if (maxLevel <= 0) continue;
         const resolved = resolveConditionalValue(spec, { team, self: supplier, consumer: null });
@@ -732,9 +764,9 @@ function pseudoRoleName(entry) {
     return typeof entry === 'string' ? entry : entry?.role;
 }
 
-function isPseudoRoleActive(entry, team) {
+function isPseudoRoleActive(entry, team, self = null, deferResolved = false) {
     if (typeof entry === 'string') return true;
-    return evaluatePredicate(entry.when, { team, self: null, consumer: null });
+    return evaluatePredicate(entry.when, { team, self, consumer: null, deferResolved });
 }
 
 export function getEffectiveRoles(unit) {
@@ -753,7 +785,7 @@ export function getEffectiveRoles(unit) {
     return roles;
 }
 
-function computeActivatedRoles(unit, team) {
+function computeActivatedRoles(unit, team, deferResolved = false) {
     const roles = [];
     for (const role of ['attack', 'anomaly', 'rupture', 'armorer', 'stun', 'support', 'defense']) {
         if (unit.tags.includes(role)) roles.push(role);
@@ -763,7 +795,7 @@ function computeActivatedRoles(unit, team) {
         for (const entry of pseudoRole) {
             const name = pseudoRoleName(entry);
             if (!name || roles.includes(name)) continue;
-            if (!isPseudoRoleActive(entry, team)) continue;
+            if (!isPseudoRoleActive(entry, team, unit, deferResolved)) continue;
             roles.push(name);
         }
     }
@@ -1913,6 +1945,8 @@ function getBuffRelevance(key, consumer) {
             return scale;
         }
         case 'buildup':
+            // Lumen procs nothing, so a proc-RATE buff cannot land on it. [BUFF-07]
+            if (isNativeLumen(consumer)) return 0;
             return roles.includes('anomaly') ? 1 : 0;
         case 'sheer':
             if (consumer.mechanics?.scaling?.sheer) return 1;
@@ -2263,6 +2297,11 @@ function computeBuffUtilization(supplier, team, out = null) {
     const conditionalReach = {};
     for (const [key, spec] of Object.entries(supplier.mechanics?.buffs ?? {})) {
         if (!isTeamScopedConditional(spec)) continue;
+        // An `optional` conditional is measured at what it RESOLVED to, not at its maximum, so a
+        // team that cannot trigger it does not read it as a buff that failed to land. Without
+        // this the unmet buff becomes the unit's flagship offering and misses, which costs far
+        // more than the penalty the flag already waives. [PRED-01]
+        if (spec.optional === true) continue;
         const full = maxConditionalValue(spec);
         if (full <= 0) continue;
         conditionalReach[key] = { full, ratio: Math.min(1, w(buffs[key]) / full) };
@@ -3393,7 +3432,9 @@ function scoreBaselineAffinity(supplier, consumer, debug, options = {}) {
     // Anomaly BUILDUP buffs (Yuzuha, Nangong, Remielle, Velina) → anomaly agents.
     // Buildup is the rate at which procs accrue. It is NOT proc damage — that is
     // `buffs["anomaly:<element>"]`, a separate key. [BUFF-05]
-    if (supplierBuffs.buildup && consumerRoles.includes('anomaly')) {
+    // Lumen is excluded: buildup is a buff to how fast PROCS land, and Remielle fills no gauge
+    // and procs nothing at all. Same reasoning as [LUM-02], different key. [BUFF-07]
+    if (supplierBuffs.buildup && consumerRoles.includes('anomaly') && !isNativeLumen(consumer)) {
         // Flat. The gate is the whole question — does this consumer proc anomalies at all — and
         // once it passes, a buildup buff is a buildup buff. It used to be multiplied by an
         // invented "anomaly affinity" weight read off the consumer's `scaling.am`/`scaling.ap`,
@@ -4337,11 +4378,12 @@ function scoreAdditionalSynergies(team, debug) {
 const STRUCTURE_FACTOR = new Map([
     [STRUCTURE.CONVENTIONAL_BONUS, 1.0],
     [STRUCTURE.UNCONVENTIONAL_VIABLE, 0.85],
-    // Harsher than merely-unconventional. Calibrated against the Miyabi ladder: at 0.85 the
-    // supportless `Nangong/Miyabi/Vivian` still outranked supported teams on all four bosses
-    // (tightest margin needed 0.812 on Marionettes), because its raw L4 synergy is large enough to
-    // survive the demotion. 0.80 clears all four with margin.
-    [STRUCTURE.NO_SUPPORT, 0.80],
+    // Harsher than merely-unconventional, and the ONLY thing holding the supportless judgement
+    // now that L4 is uncompressed. Sized against the Miyabi ladder: `Nangong/Miyabi/Vivian` has
+    // cohesion 1.0, so this factor IS its whole multiplier. 0.75 is the mildest value that puts
+    // it back under its supported counterpart, and it keeps 0.05 of margin above 0.70 where the
+    // wasted-vortex anti-pattern starts breaking. [PIPE-02]
+    [STRUCTURE.NO_SUPPORT, 0.75],
     // See the STRUCTURE.NO_STUN_* comment. 0.92 puts `Billy/Pan Yinhu/Lucia` at 336.8 on
     // Priest, clearing `Dialyn/Billy/Lucia` (365.8) by 29 — a real gap rather than the 0.3
     // it had. 0.75 for the attacker case is harsher than merely-unconventional 0.85 because
@@ -4667,8 +4709,15 @@ export function scoreTeamForBoss(team, boss, options = {}) {
     const baseScore = lenient ? 250 : 175;
     let score = baseScore;
 
+    // Roles resolve in TWO passes. Pass one answers every predicate that reads raw tags or unit
+    // identity — which is all of them except the disorder backfill. Pass two re-answers, with
+    // pass one's roles visible, so `othersDisorder` can see a promotion that pass one made.
+    // Nangong promoting to anomaly beside Miyabi is exactly what demotes Soukaku. [PRED-02]
     for (const unit of team) {
-        unit._activatedRoles = computeActivatedRoles(unit, team);
+        unit._activatedRoles = computeActivatedRoles(unit, team, true);
+    }
+    for (const unit of team) {
+        unit._activatedRoles = computeActivatedRoles(unit, team, false);
     }
     // Resolve conditional damage values (e.g. Pyrois's ultimate:strong under wind anomaly) once
     // against the team, after roles are known. Damage is always team-scoped (a unit's own output),
@@ -4781,15 +4830,10 @@ export function scoreTeamForBoss(team, boss, options = {}) {
     if (bossResult.disqualified) { cleanupRoles(); if (trace) trace.disqualified = true; return -1; }
     score += bossResult.score;
 
-    // Layer 4: Mechanical Synergy (with diminishing returns via hyperbolic soft cap)
+    // Layer 4: Mechanical Synergy. NOT compressed — see documentation/notes/adjudications.md.
     const antiRupture = getBossAnti(boss).includes('rupture');
-    const rawL4 = scoreMechanicalSynergy(team, debug, { antiRupture, boss });
-    const L4_PASSTHROUGH = 100;
-    const adjustedL4 = rawL4 > L4_PASSTHROUGH
-        ? L4_PASSTHROUGH + (rawL4 - L4_PASSTHROUGH) * L4_SOFT_CAP / (rawL4 - L4_PASSTHROUGH + L4_SOFT_CAP)
-        : rawL4;
+    const adjustedL4 = scoreMechanicalSynergy(team, debug, { antiRupture, boss });
     score += adjustedL4;
-    if (debug && rawL4 !== adjustedL4) console.log(`    L4 soft cap: raw ${rawL4.toFixed(1)} → adjusted ${adjustedL4.toFixed(1)}`);
 
     // Layer 5: Additional Synergies
     const l5 = scoreAdditionalSynergies(team, debug);
@@ -4830,7 +4874,9 @@ export function scoreTeamForBoss(team, boss, options = {}) {
         trace.contention = contentionAdj;
         trace.l2 = l2;
         trace.l3 = bossResult.score;
-        trace.l4raw = rawL4;
+        // Identical to `l4` now that the layer is uncompressed. Kept so score-dump's
+        // column set, and every dump already on disk, stay comparable.
+        trace.l4raw = adjustedL4;
         trace.l4 = adjustedL4;
         trace.l5 = l5;
         trace.archetype = archetype;

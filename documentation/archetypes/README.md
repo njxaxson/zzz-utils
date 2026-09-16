@@ -65,9 +65,13 @@ They cut across the archetypes above.
 `STUNLESS_SHILL_CREDIT` is worth far more than the plain shill match because a stunless carry
 meets a stun-shill requirement without spending a team slot on a stunner — the freed slot takes
 a second support instead. Sized at roughly what that replacement support contributes
-end-to-end: for Ye Shunguong/Zhao/Sunna on Thrall, Zhao is worth ~27 after the L4 element
-modifier and soft cap, plus ~21 of L2 tier/rank. Reachable only by a stunner-free team holding a
-stunless unit on a stun-shill boss — today that is Ye Shunguong on Thrall and butcher:raging.
+end-to-end: for Ye Shunguong/Zhao/Sunna on Thrall, Zhao is worth what he contributes after the
+L4 element modifier, plus his L2 tier and rank. **Re-derived when the L4 soft cap was removed** —
+the old figure was quoted net of that compression, so its basis disappeared with the cap rather
+than by accident. The target did not change: the two archetypes land within one rank band of each
+other on Thrall, with the dedicated stunner line still the better of the two.
+
+Reachable only by a stunner-free team holding a stunless unit on a stun-shill boss — today that is Ye Shunguong on Thrall and butcher:raging.
 Primary calibration dial for the stunless archetype; raising it makes stunless carries compete
 with stunner lines.
 

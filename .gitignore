@@ -61,3 +61,8 @@ archive/
 
 # Score dumps produced by score-dump.mjs (large TSV, regenerated per phase)
 matchups/
+
+# Resolved issues are kept locally for review, not committed.
+# Move a closed issue into documentation/issues/resolved/ rather than deleting it;
+# delete it from there once you have read it. See documentation/issues/README.md.
+documentation/issues/resolved/

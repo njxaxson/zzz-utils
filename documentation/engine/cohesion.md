@@ -147,13 +147,17 @@ ice STUNNER's element is not the same as buffing the carry's.
 ### [COH-03] Delivery is priced at the square root of the L4 coefficient
 
 `MULT`'s values are L4 PAIR-TERM coefficients, not a damage scale — L4 multiplies them by a
-consumer weight and then soft-caps the whole layer at 100, so a 116x spread between sheer (81.0
-to Yixuan) and ATK (0.7) is survivable there. Cohesion has no such cap: used raw, that spread
-made every ATK support read 26-83% utilization and every sheer/ultimate support saturate.
+consumer weight and sums many of them, so a 116x spread between sheer (81.0 to Yixuan) and ATK
+(0.7) is survivable there. Cohesion is a single measure with no such summing: used raw, that
+spread made every ATK support read 26-83% utilization and every sheer/ultimate support saturate.
+
+(The original wording said L4 "soft-caps the whole layer at 100", which was true when it was
+written. The cap is gone, and the argument does not depend on it — what makes L4 tolerant of the
+spread is that it adds many terms together, not that it compressed the total.)
 
 `scaleImpact` therefore uses the SQUARE ROOT of the L4 coefficient. A support's share of a
-team's damage is not linear in its pair coefficient, because L4 is one capped layer among
-several. A buff worth `IMPACT_UNIT` still maps to exactly 1.0, so the anchor is unmoved and only
+team's damage is not linear in its pair coefficient, because L4 is one layer among several and
+one pair term among many within it. A buff worth `IMPACT_UNIT` still maps to exactly 1.0, so the anchor is unmoved and only
 the spread compresses — sheer to 2.1x and ATK to 0.6x rather than 4.5x and 0.35x.
 
 

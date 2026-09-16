@@ -23,9 +23,13 @@ anomaly-quantity scaling, [diametric synergy](diametric-synergy.md), an on-eleme
 off-element modifier, and the conditional
 [under-activation penalty](../data-model/predicates.md).
 
-The total passes through a **hyperbolic soft cap**: low scores pass through untouched, high
-scores compress. That preserves mid-range differentiation while preventing runaway mechanical
-stacking.
+The total is **not compressed**. It used to pass through a hyperbolic soft cap, on the reasoning
+that this preserved mid-range differentiation while preventing runaway mechanical stacking. The
+cap was removed — its ceiling was fixed while the roster is not, so it made the engine
+progressively worse at separating new top-end units, and it was burying mispricings rather than
+preventing them. See [known pitfalls](../notes/known-pitfalls.md) before proposing anything
+shaped like it. The supportless judgement it had been quietly enforcing now lives in the
+structure factor, `[PIPE-02]`.
 
 ## Principles that govern L4
 

@@ -2,5 +2,8 @@ Consider availability accepting true/false/date
 
 CLI commands to limit units by release 
 
+Engine code is mutative at the unit level, which is bad practice. Better to create a wrapping UnitContext object that contains the unit and a scratchpad alongside it. 
+
+
 
 

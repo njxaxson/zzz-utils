@@ -170,3 +170,32 @@ dealer — `team.filter(isDPS).length === 1`, so an off-field sub-DPS stops the 
 solo carry — overshot: Yanagi went from 0.7 behind to 14.3 ahead and the Burnice entry failed
 instead. That is the shape of a re-litigated adjudication rather than a resized constant, and it
 is why the change that shipped was the magnitude.
+
+### [PIPE-02] The supportless factor is the whole judgement now
+
+`STRUCTURE_FACTOR` for the no-support tier is **0.75**, and since the L4 soft cap was removed it
+is the only thing enforcing "a supportless team never beats its supported counterpart".
+
+The cap used to do that job, from the wrong layer. When it went, `Nangong/Miyabi/Vivian` — a
+stunner and two anomaly carries with nobody supporting them — beat its supported counterpart
+`Miyabi/Vivian/Nicole` by **29 points** on Butcher and 33 on Marionettes.
+
+**0.75 is the mildest value that fixes it**, and the factor really is the whole lever here:
+`Nangong/Miyabi/Vivian` has a cohesion of exactly 1.0, so its structure factor *is* its entire
+multiplier. Below **0.70** the wasted-vortex anti-pattern (rankings TEST 62) starts breaking, so
+0.75 keeps real margin on the other side.
+
+Measured: **8,430 team-boss rows moved, every one of them downward, zero exceptions** — every
+mover was classified no-support.
+
+**Two floors went red and both were left red on purpose.** `Lighter/Promeia/Burnice` misses its
+floor by 2.8; the owner's call is to recalibrate the floor rather than soften the factor to
+protect one odd composition. `Trigger/SAnby/Cissia` misses by more, and it is not a trustworthy
+boundary at all — see [known pitfalls](../notes/known-pitfalls.md) on why a SAnby, Seed or Cissia
+team cannot be used to size a constant.
+
+**What was tried and rejected.** Scaling the penalty by how much buff weight the team actually
+lands looked promising and does not survive: among genuinely supportless teams the measure runs
+**backwards** on the owner's own Miyabi ladder, because Nangong is a buff-rich stunner whose
+buffs all land. And re-introducing a compression curve scoped to supportless teams was rejected
+outright by the owner — the cap is the wrong mechanism, not merely the wrongly-scoped one.

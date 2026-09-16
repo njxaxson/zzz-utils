@@ -1180,7 +1180,7 @@ async function main() {
             return trace;
         };
 
-        // Promeia is ice (4.5). Pools: {ice, electric} = 2.75, {ice, fire} = 3.25, {ice} = 4.5.
+        // Promeia is ice (4.0). Pools: {ice, electric} = 2.5, {ice, fire} = 3.0, {ice} = 4.0.
         const weak = measure([velina, promeia, donor('electric')]);
         const mid  = measure([velina, promeia, donor('fire')]);
         const pure = measure([velina, promeia, nicole]);
@@ -1194,10 +1194,39 @@ async function main() {
         assert(weak.l4raw < mid.l4raw,
             `a weaker element in the pool must dilute it: {ice, electric} scored ` +
             `${weak.l4raw.toFixed(1)} but {ice, fire} scored ${mid.l4raw.toFixed(1)}`);
-        assert(mid.l4raw < pure.l4raw,
-            `adding ANY second element to a pure ice pool must dilute it: {ice, fire} scored ` +
-            `${mid.l4raw.toFixed(1)} but {ice} alone scored ${pure.l4raw.toFixed(1)}. Equal ` +
-            `values mean the tier is back to a max over the pool.`);
+        // "Any second element dilutes a pure pool" is asserted on the POOLED TIER, not on a
+        // team score. Comparing a team holding a donor against one without cannot be clean: the
+        // donor also brings a fresh disorder partner and an extra proc, so an l4raw comparison
+        // measures dilution NET of those. It held only while VORTEX_BASE was big enough for
+        // dilution to dominate, which made this assertion a hidden pin on that constant rather
+        // than a test of the pooling rule. Read the tier the payout actually used instead.
+        const pooledTier = (team, carry) => {
+            const realLog = console.log;
+            const lines = [];
+            console.log = (...a) => lines.push(a.join(' '));
+            try { scoreTeamForBoss(team, boss, { debug: true }); }
+            finally { console.log = realLog; }
+            const marker = `Vortex bonus: ${carry} `;
+            const TIER = '(tier ';
+            for (const line of lines) {
+                const at = line.indexOf(marker);
+                if (at < 0) continue;
+                const t = line.indexOf(TIER, at);
+                if (t < 0) continue;
+                return parseFloat(line.slice(t + TIER.length));
+            }
+            assert(false, `no vortex payout line for ${carry} — fixture is not producing a vortex`);
+        };
+        const weakTier = pooledTier([velina, promeia, donor('electric')], 'Promeia');
+        const midTier  = pooledTier([velina, promeia, donor('fire')], 'Promeia');
+        const pureTier = pooledTier([velina, promeia, nicole], 'Promeia');
+        assert(weakTier < midTier && midTier < pureTier,
+            `the pooled tier must fall as weaker elements join it: {ice} read ${pureTier}, ` +
+            `{ice, fire} read ${midTier}, {ice, electric} read ${weakTier}. Under a MAX model ` +
+            `all three would read ice's own tier.`);
+        assert(Math.abs(pureTier - midTier) > 1e-9,
+            `adding ANY second element must dilute a pure pool: {ice} read ${pureTier} and ` +
+            `{ice, fire} read ${midTier}. Equal values mean the tier is back to a max.`);
 
         // Part 2 — [VTX-02]. Nangong/Miyabi/Velina pools ether (2.0) with frost (0.8) for a mean
         // of 1.4, which CLEARS VORTEX_PRIMARY_MIN (1.0). The wasted-vortex cohesion charge must
@@ -1211,6 +1240,172 @@ async function main() {
             `wasted-vortex charge that Nangong/Promeia/Velina (${npv.teamwork.toFixed(3)}) does ` +
             `not, even though its POOLED tier of 1.4 clears VORTEX_PRIMARY_MIN. Equal multipliers ` +
             `mean the gate is reading the pool instead of the carry's own element.`);
+    });
+
+    // TEST 29: a conditional buff can declare that not firing is not a failure.
+    //
+    // A team-scoped conditional buff is normally charged when it lands below its maximum — the
+    // squared-gap penalty. That is right for Remielle and Phoenix, whose conditional buff IS the
+    // codependency: a Remielle who is the only anomaly agent has failed at the thing she is for.
+    //
+    // It is wrong for a generalist support who merely happens to help anomaly teams. `optional`
+    // is how the data says so. Both halves are asserted, because a test that only checks the
+    // opt-out cannot tell "the flag works" from "the penalty stopped firing entirely". [PRED-01]
+    run('TEST 29: an `optional` conditional buff is not charged for failing to fire', () => {
+        const boss = withBosses(bosses, 'Neutral').find(Boolean);
+        assert(boss, 'synthetic neutral boss not found');
+        const find = (n) => {
+            const u = allUnits.find(x => x.name === n);
+            assert(u, `fixture unit ${n} not found`);
+            return u;
+        };
+        // An attack team with no native anomaly agent, so a countTag-gated buff cannot fire.
+        const base = [find('Lighter'), find('Ellen'), find('Astra')];
+        const plain = scoreTeamForBoss(base, boss, {});
+        assert(plain > 0, `fixture team must be viable, got ${plain}`);
+
+        // Same team, but the support carries a conditional buff whose condition fails.
+        const withConditional = (extra) => {
+            const astra = base[2];
+            const clone = {
+                ...astra,
+                mechanics: {
+                    ...astra.mechanics,
+                    buffs: {
+                        ...astra.mechanics.buffs,
+                        anomaly: { cases: [
+                            { when: { countTag: 'anomaly', minCount: 1 }, value: 3 },
+                            { value: 0 },
+                        ], ...extra },
+                    },
+                },
+            };
+            return scoreTeamForBoss([base[0], base[1], clone], boss, {});
+        };
+
+        const charged = withConditional({});
+        const exempt = withConditional({ optional: true });
+
+        // Half one: without the flag, the unmet conditional costs real points.
+        assert(charged < plain - 1,
+            `a team-scoped conditional that cannot fire must still be charged: ${charged.toFixed(1)} ` +
+            `against ${plain.toFixed(1)} without the buff. Equal scores mean the penalty stopped ` +
+            `firing at all and the other half of this test proves nothing.`);
+
+        // Half two: with the flag, it costs nothing — the team scores as if the buff were absent.
+        assert(Math.abs(exempt - plain) < 1e-9,
+            `an \`optional\` conditional that cannot fire must cost nothing: ${exempt.toFixed(1)} ` +
+            `against ${plain.toFixed(1)} without the buff.`);
+    });
+
+    // TEST 30: Soukaku promotes to anomaly only when she is BACKFILLING a disorder partner.
+    //
+    // The game fact: Soukaku is the non-frost ice partner Miyabi disorders with, and she is only
+    // played that way when nobody else is doing that job. Beside Vivian or Nangong you are not
+    // running her for disorders — you are running her to buff ice and attack. She used to promote
+    // beside Miyabi unconditionally, which made an A-rank support a full third carry: Nangong paid
+    // her 27.1 where he pays Astra 0, and she outscored Astra behind Nangong/Miyabi by 0.3.
+    //
+    // The predicate asks whether the OTHER two members disorder with each other, which is what
+    // keeps it out of a cycle — Soukaku's own element never enters the answer. It is asked in
+    // ELEMENT terms rather than role terms, which is what gets the lumen and wind rows right.
+    // [PRED-02]
+    run('TEST 30: Soukaku plays anomaly only when nobody else partners Miyabi', () => {
+        const boss = withBosses(bosses, 'Butcher').find(Boolean);
+        assert(boss, 'Butcher fixture boss not found');
+
+        // Does Soukaku actually react on this team? The disorder line is printed per agent, so
+        // its presence IS her promotion — a far more direct read than the score.
+        const soukakuReacts = (spec) => {
+            const parsed = scoreForTeamString(spec, allUnits, { preview: true })[0];
+            assert(parsed, `fixture must parse to a legal team: ${spec}`);
+            const real = console.log;
+            const lines = [];
+            console.log = (...a) => lines.push(a.join(' '));
+            try { scoreTeamForBoss(parsed.team, boss, { debug: true }); }
+            finally { console.log = real; }
+            return lines.some(l => /Implicit disorder: Soukaku/.test(l));
+        };
+
+        // BACKFILLING — she is the only disorder partner Miyabi has, so she must promote.
+        for (const [spec, why] of [
+            ['Miyabi/Soukaku/Yuzuha', 'Yuzuha lands no anomaly at all'],
+            ['Miyabi/Remielle/Soukaku', 'Remielle is lumen and procs nothing'],
+            ['Miyabi/Velina/Soukaku', 'Velina is wind, so she vortexes rather than disorders'],
+        ]) {
+            assert(soukakuReacts(spec),
+                `${spec}: Soukaku must still play the disorder partner — ${why}. A role COUNT ` +
+                `gets these wrong; the predicate has to ask in element terms.`);
+        }
+
+        // REDUNDANT — someone else already partners Miyabi, so she stays a support.
+        for (const [spec, why] of [
+            ['Nangong/Miyabi/Soukaku', 'Nangong promotes to anomaly and covers it'],
+            ['Miyabi/Vivian/Soukaku', 'Vivian is a native anomaly agent'],
+        ]) {
+            assert(!soukakuReacts(spec),
+                `${spec}: Soukaku must NOT be promoted — ${why}, so she is being run to buff ` +
+                `ice and attack, not to generate disorders.`);
+        }
+
+        // The consequence that started this: behind Nangong and Miyabi, Astra must clearly win.
+        const score = (spec) => scoreTeamForBoss(
+            scoreForTeamString(spec, allUnits, { preview: true })[0].team, boss, {});
+        const astra = score('Nangong/Miyabi/Astra'), souk = score('Nangong/Miyabi/Soukaku');
+        assert(astra > souk + 20,
+            `Astra (${astra.toFixed(1)}) must clearly beat Soukaku (${souk.toFixed(1)}) behind ` +
+            `Nangong/Miyabi, where Soukaku is redundant as a disorder partner.`);
+
+        // ...and the backfill case must not be collateral damage.
+        const backfill = score('Miyabi/Soukaku/Yuzuha'), noPartner = score('Miyabi/Astra/Yuzuha');
+        assert(backfill > noPartner,
+            `Miyabi/Soukaku/Yuzuha (${backfill.toFixed(1)}) must beat Miyabi/Astra/Yuzuha ` +
+            `(${noPartner.toFixed(1)}) — with no other ice partner, Soukaku's promotion is the ` +
+            `whole point of her and must survive this change.`);
+    });
+
+    // TEST 31: a buildup buff reaches anomaly agents, and never reaches lumen.
+    //
+    // `buffs.buildup` buffs how fast anomaly PROCS land. Remielle is lumen: she fills no gauge
+    // and procs nothing at all, so there is no rate to raise. She is anomaly-TAGGED, though,
+    // which is what let a role check pay her — Velina was handing her 3.2 for a buff she cannot
+    // use. Same shape as [LUM-02] on a different key.
+    //
+    // The other half is the ruling that buildup does NOT scale by how much damage the consumer
+    // deals, unlike `atk` in the same function. Owner: buildup defines proc RATE, not damage,
+    // and it helps an anomaly teammate alongside Harumasa who only cares about the NUMBER of
+    // procs. As long as it lands, it works. Do not re-litigate this. [BUFF-07]
+    run('TEST 31: buildup buffs reach anomaly agents but never lumen', () => {
+        const boss = withBosses(bosses, 'Neutral').find(Boolean);
+        assert(boss, 'synthetic neutral boss not found');
+        const find = (n) => {
+            const u = allUnits.find(x => x.name === n);
+            assert(u, `fixture unit ${n} not found`);
+            return u;
+        };
+        const pairLines = (team, from, to) => {
+            const real = console.log;
+            const lines = [];
+            console.log = (...a) => lines.push(a.join(' '));
+            try { scoreTeamForBoss(team, boss, { debug: true }); }
+            finally { console.log = real; }
+            const start = lines.findIndex(l => l.includes(`${from} → ${to}:`));
+            if (start < 0) return [];
+            const rest = lines.slice(start + 1);
+            const end = rest.findIndex(l => /pair total|→/.test(l));
+            return rest.slice(0, end < 0 ? 0 : end);
+        };
+
+        // Velina supplies buildup. Aria procs; Remielle does not.
+        const team = [find('Aria'), find('Remielle'), find('Velina')];
+        const toAria = pairLines(team, 'Velina', 'Aria');
+        const toRem = pairLines(team, 'Velina', 'Remielle');
+
+        assert(toAria.some(l => /buildup:/.test(l)),
+            `Velina's buildup must reach Aria, who procs anomalies. Lines were: ${JSON.stringify(toAria)}`);
+        assert(!toRem.some(l => /buildup:/.test(l)),
+            `Velina's buildup must NOT reach Remielle — she is lumen and procs nothing, so there ` +
+            `is no rate to buff. Lines were: ${JSON.stringify(toRem)}`);
     });
     // Summary
     console.log('');

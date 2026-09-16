@@ -129,6 +129,9 @@ Populated during the comment pass. One row per tag, newest last within a prefix.
 | `[ANOM-01]` | `../concepts/anomaly-reactions.md` | Abloom is damage AND a reaction; `ABLOOM_BONUS` is capped by the Miyabi ladder, not by principle |
 | `[CODEP-02]` | `../recommendations/codependency-gating.md` | `anomalyProcSupply` mirrors team-scorer's anomaly-quantity rule, not `buffs.buildup` |
 | `[PULL-01]` | `../recommendations/partner-ladder.md` | The partner ladder block in `pull-engine.js` is this whole page in code |
+| `[PRED-01]` | `../data-model/predicates.md` | `optional` — a conditional buff allowed not to fire, and why waiving the penalty alone is not enough |
+| `[PRED-02]` | `../data-model/predicates.md` | `allOf`, `othersDisorder`, and two-pass role activation — the Soukaku backfill |
 | `[PULL-02]` | `../recommendations/pull-engine.md` | The codependency/ladder penalty is per unit, not per card |
 | `[BUCK-01]` | `../bucketing/deadly-assault.md` | The rank band 0.011/4.5 is derived from one Thrall & Sobek allocation case |
 | `[PIPE-01]` | `../engine/layers.md` | The solo-carry bonus is sized against the mechanics it sits beside |
+| `[PIPE-02]` | `../engine/layers.md` | The supportless structure factor is the whole judgement now the L4 cap is gone |

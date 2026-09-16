@@ -235,6 +235,20 @@ against Aria's 1.0.
 buff is, and folding it in made a buff that lands on nobody twice as expensive to whiff — it cost
 `Nangong/Ye Shunguong/Sunna` **99 points**. See `[BUFF-04]`.
 
+**Lumen never receives a buildup buff.** It buffs how fast procs land, and Remielle fills no
+gauge and procs nothing at all — there is no rate to raise. She is anomaly-*tagged*, which is
+what let a role check pay her: Velina was handing her 3.2 for a buff she cannot use. Same ruling
+as `[LUM-02]`, different key. Mechanics TEST 31 pins it, and 469 team-boss rows moved when it
+landed, every one of them a Remielle team holding a buildup supplier.
+
+**Buildup does NOT scale by how much damage the consumer deals**, and this is settled — do not
+re-open it. `atk` twenty lines away *is* damage-scaled, so the asymmetry looks like an oversight
+and is not. Owner: buildup defines proc **rate**, not damage, and it helps an anomaly teammate
+standing beside Harumasa, who only cares about the *number* of procs his teammates land. As long
+as the buff lands, it works. The question was asked when a pseudo-anomaly support was collecting
+a full carry's buildup value; the answer was that the support's promotion was the bug, not the
+buff's pricing. See `[PRED-02]`.
+
 `buffs.vortex` is **flat**, not tier-scaled. Owner: Velina's vortex buff raises the final
 post-calculation damage of the vortex regardless of how it was caused — a flat percentage, not
 something tiered by element or AP. Tier-scaling it charged the element a third time and the

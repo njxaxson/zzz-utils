@@ -68,8 +68,10 @@ exactly this case.
 Dialyn's ultimates feed both YSG and Yixuan, so cheapening the ultimates need lowers her value
 on both bosses at once.
 
-Worse, the L4 soft cap damps reductions harder on the team that sits deeper into the cap. So the
-discount can shrink the *wrong* marginal faster and move the allocation the wrong way.
+There used to be a second half to this trap: the L4 soft cap damped reductions harder on the team
+sitting deeper into the cap, so a discount could shrink the *wrong* marginal faster and move the
+allocation the wrong way. **That half is gone with the cap** — L4 is no longer compressed, so a
+reduction is worth the same wherever it lands. The first half stands on its own.
 
 > Reallocation comes from raising the alternative, not from cheapening the contended resource.
 

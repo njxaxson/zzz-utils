@@ -108,8 +108,11 @@ Mastery appetite — converts nothing however much Mastery she has. See
 ## Tier values are compressed before they are paid
 
 A tier is a **damage** ratio out of the game. A team's **value** is not linear in one damage
-channel — the score sums many channels and then soft-caps — so the spread is compressed at the
-square root before payout, anchored at 2.
+channel — the score sums many channels, and one of them running away does not make the team that
+much better — so the spread is compressed at the square root before payout, anchored at 2.
+
+(This used to say "and then soft-caps". The L4 soft cap is gone; the argument never rested on it,
+only on the summing.)
 
 This is the same argument, and the same shape, that buff delivery already uses: `scaleImpact`
 prices a buff at the square root of its L4 coefficient because a support's share of a team's
