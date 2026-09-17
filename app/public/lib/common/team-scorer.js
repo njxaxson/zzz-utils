@@ -137,7 +137,9 @@ const BOSS_WEAK = {
     // player out of everything but dodge/parry/assist and arrives without the usual telegraph,
     // so timing it is a large part of a good clear. Armorers intercept it and reduce it to a
     // simple quicktime event. Bonus only — a team with no armorer is never penalized for it.
-    CONTROL_QUICKTIME: 10,
+    // Sits deliberately just above the rest of this family (STUN/FREEZE 15, CD_DEBUFF 16): at 10
+    // it was ~2% of a ~450 raw score, too thin for "a large part of a good clear". [ARM-02]
+    CONTROL_QUICKTIME: 17,
 };
 
 // Second armorer adds much less (one interceptor already covers the fight); third adds nothing.
@@ -145,6 +147,11 @@ const ARMORER_CONTROL_FALLOFF = [1, 0.25, 0];
 
 // Boss shill credit: the boss's mechanics reward a specific role or archetype.
 const SHILL_MATCH_BONUS = 8;
+// A TITLED on-element carry on a boss that shills a DIFFERENT DPS archetype. Titled units are
+// worth more off-shill than ordinary ones, so the credit is real -- but it must never exceed the
+// credit for actually matching the shill, or a titled carry prefers the wrong boss. Derived from
+// SHILL_MATCH_BONUS rather than written as a literal so the two cannot drift apart again. [ARCH-05]
+const TITLED_OFF_SHILL_BONUS = SHILL_MATCH_BONUS / 2;
 // A stun shill satisfied by a stunless carry rather than a stunner: the requirement is met
 // without spending a slot on one, so the freed slot takes a second support instead. Calibrated
 // against what that replacement support would have contributed, plus the solo-carry bonus the
@@ -3352,8 +3359,8 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
             if (debug) console.log(`    ${unit.name} on-element (${getElementVariant(unit)}): +${bonus}${wkFactor < 1 ? ` (partial ×${wkFactor})` : ''}${reactionDisabled ? ' (reaction-disabled)' : ''}${onElementDPSCount > 1 ? ' (diminished)' : ''}`);
 
             if (isTitled(unit) && bossShill && DPS_ROLES.includes(bossShill) && !unit.tags.includes(bossShill)) {
-                score += 15;
-                if (debug) console.log(`    ${unit.name} titled on-element vs shill mismatch: +15`);
+                score += TITLED_OFF_SHILL_BONUS;
+                if (debug) console.log(`    ${unit.name} titled on-element vs shill mismatch: +${TITLED_OFF_SHILL_BONUS}`);
             }
         }
     }

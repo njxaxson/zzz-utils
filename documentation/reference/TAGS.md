@@ -90,10 +90,12 @@ Populated during the comment pass. One row per tag, newest last within a prefix.
 | `[LUM-02]` | `../concepts/lumen.md` | No proc-damage buff reaches lumen, by any route |
 | `[DISO-01]` | `../concepts/disorder-supply.md` | Do not net polarity provision against element-cycling supply |
 | `[ARM-01]` | `../concepts/armorer-laceration-gash-maim.md` | Defense shred is a full-value armorer lever, not a `pen`-tier one |
+| `[ARM-02]` | `../concepts/armorer-laceration-gash-maim.md` | `CONTROL_QUICKTIME` is 17, just above the rest of its family |
 | `[ARCH-01]` | `../archetypes/README.md` | Stunless shill credit sizing |
 | `[ARCH-02]` | `../archetypes/README.md` | Primary carry selection ignores pseudo-DPS |
 | `[ARCH-03]` | `../archetypes/README.md` | The monoshock calibration override |
 | `[ARCH-04]` | `../archetypes/README.md` | Archetype fit calibration (`intended` = 0, `avoid` = -40); notes a stale comment contradiction |
+| `[ARCH-05]` | `../archetypes/README.md` | The titled off-shill bonus is half the shill bonus, and used to be double it |
 | `[BUFF-01]` | `../data-model/buffs-and-debuffs.md` | Supplier buffs a damage type the consumer deals — not a need/provision channel |
 | `[BUFF-02]` | `../data-model/buffs-and-debuffs.md` | Anomaly crit-damage efficiency is 30%, not 0% |
 | `[BUFF-03]` | `../data-model/buffs-and-debuffs.md` | Chain damage buff priced on its own dial, not the provision rate |
@@ -140,3 +142,6 @@ Populated during the comment pass. One row per tag, newest last within a prefix.
 | `[AOD-01]` | `../data-model/unit-object.md` | Angels of Delusion are declared, not modelled; `CONJUNCTIVE_SYNERGY_BONUS` re-derived 55 → 45 against them |
 | `[PULL-03]` | `../recommendations/mechanics-fit-score.md` | The recovery debuff reads the scorer's burst model, not a MAX over `damage` values |
 | `[GAP-01]` | `../recommendations/coverage-and-gaps.md` | An element covered only by a sub-DPS gets its own reason line, not "no DPS options" |
+| `[CAL-01]` | `../engine/calibration.md` | The synthetic neutral boss is not in the fitting corpus |
+| `[CAL-02]` | `../engine/calibration.md` | Archetype pooling, and why the map is a second staleness axis |
+| `[CAL-03]` | `../engine/calibration.md` | `MIN_SELF_ANCHOR_CARRIES` is 3 |

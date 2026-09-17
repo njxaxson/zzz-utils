@@ -113,6 +113,23 @@ The rule to carry forward: **a linear retune is absorbed by calibration; a chang
 term is not.** Now that anchors are computed on uncompressed output, there is no non-linear term
 left in Layer 4 for a future change to disturb.
 
+### The exception: a pooled archetype is not self-absorbing
+
+The argument above rests on `factor[a] = 400 / anchor[a]` — an archetype's factor is derived from
+its own anchor, so when one moves the other follows. A **pooled** archetype breaks that identity on
+purpose: it takes its host's factor, not one derived from its own ceiling. Armorer is pooled into
+attack; see [calibration](calibration.md).
+
+For a pooled archetype the absorption fails in both directions:
+
+* Retune the pooled archetype's own output and its calibrated scores move, so its strength labels
+  move with them.
+* Retune the **host's** ceiling and the pooled archetype rescales with no change of its own at all.
+
+So the full rule is: a linear retune is absorbed for a self-anchoring archetype, is not absorbed for
+a pooled one, and a non-linear change is absorbed for neither. Check the `pools` map in
+`calibration.json` before assuming a retune is free.
+
 Thresholds still move if the engine gains one. Read them from the file; do not memorise them.
 
 ## DPS bucketing

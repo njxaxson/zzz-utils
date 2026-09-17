@@ -1,40 +1,57 @@
 {
-  "generated": "2026-09-17T07:01:57.432Z",
+  "generated": "2026-09-17T09:59:53.959Z",
   "method": "linear",
   "target": 400,
   "k": 10,
-  "anchorRule": "top-K mean, global across all bosses, excluding teams containing a boss favored unit",
-  "engineFingerprint": "48a6e45d2ecb96db7e35d4e43e31e27540ac073a9295947f637bb14bba88b32e",
+  "anchorRule": "top-K mean, global across all real bosses (the synthetic neutral boss is a diagnostic reference and is excluded), excluding teams containing a boss favored unit; archetypes listed in `pools` do not anchor themselves - their scores join the host pool and they take the host factor",
+  "pools": {
+    "armorer": "attack"
+  },
+  "engineFingerprint": "d9c9f619148cc02c328069d477e7e27c657560e1be01cdd422495f635147bd65",
   "corpus": {
     "teams": 6897,
-    "bosses": 20,
-    "totalPairs": 137940,
-    "viablePairs": 67062
+    "bosses": 19,
+    "totalPairs": 131043,
+    "viablePairs": 60879
   },
   "archetypes": {
     "anomaly": {
-      "anchor": 629,
-      "factor": 0.63596,
-      "n": 17576,
-      "excluded": 1226
+      "anchor": 628.6,
+      "factor": 0.636304,
+      "n": 15737,
+      "excluded": 1226,
+      "anchorPoolN": 14511,
+      "distinctCarries": 12
     },
     "rupture": {
-      "anchor": 559.9,
-      "factor": 0.714388,
-      "n": 12822,
-      "excluded": 48
+      "anchor": 557.2,
+      "factor": 0.717849,
+      "n": 11595,
+      "excluded": 48,
+      "anchorPoolN": 11547,
+      "distinctCarries": 5
     },
     "armorer": {
-      "anchor": 401.5,
-      "factor": 0.996214,
-      "n": 2258,
-      "excluded": 168
+      "anchor": 521.3,
+      "factor": 0.767298,
+      "n": 2054,
+      "excluded": 169,
+      "anchorPoolN": 1885,
+      "distinctCarries": 1,
+      "pooledInto": "attack",
+      "selfAnchor": 402.9
     },
     "attack": {
-      "anchor": 523.5,
-      "factor": 0.764073,
-      "n": 34406,
-      "excluded": 251
+      "anchor": 521.3,
+      "factor": 0.767298,
+      "n": 31493,
+      "excluded": 251,
+      "anchorPoolN": 31242,
+      "distinctCarries": 17,
+      "pooledFrom": [
+        "armorer"
+      ],
+      "anchorFromPooled": 0
     }
   }
 }

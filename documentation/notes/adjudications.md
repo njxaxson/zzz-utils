@@ -318,6 +318,53 @@ dial is shared and is not free.
 
 ## Calibration and tuning rulings
 
+### An archetype with one carry does not get its own anchor
+
+**Ruling: pool it.** `ARCHETYPE_POOLS = { armorer: 'attack' }`.
+
+An anchor is a top-K mean, so it measures a ceiling. That is correct with a dozen carries — the
+best unit sets it and the rest sit below. With one carry the ceiling *is* that carry, so the unit is
+pinned to the target by construction and the scale stops carrying information. Armorer had 2,090
+anchor-pool teams from exactly one carry, and Claret took #1 on six of twenty bosses including
+Defiler, which shills **attack**.
+
+Rejected alternatives, and why:
+
+* *Leave it, the raw scores are fine.* They are, and that is the point — the transform was the
+  broken part. Claret topped Typhon at 390.0 on a lower raw score than the attack teams beneath her.
+* *Change the anchor rule so no single carry can set a scale* (trimmed mean, minimum distinct
+  carries in the top-K). This would also lower attack's anchor, whose top-10 is entirely Ye
+  Shunguong, and lift every non-YSG attack team. But YSG genuinely **is** attack's ceiling, and
+  mapping an archetype's ceiling to the target is the transform's whole job. Out of scope, and the
+  owner confirmed the 300-340 band for non-YSG attackers reads correctly.
+* *Auto-pool below a `distinctCarries` threshold.* The threshold is emitted and warns in both
+  directions, but it does not act. Pooling is a ruling.
+
+**Accepted costs.** A pooled archetype is not self-absorbing: retuning it moves its labels, and
+retuning its host rescales it for free. And armorer's neutral-boss p85 sits ~34% below the other
+three in `--alignment`, which is by design — the report now says so on the row, because the obvious
+reading of that gap is to undo this decision.
+
+**Side benefit worth recording:** `spec-unit.mjs` gets more honest. A speculative armorer now
+borrows attack's anchor rather than Claret's own ceiling, and the second armorer is the next use of
+that harness.
+
+### A titled carry must not prefer the wrong shill
+
+`TITLED_OFF_SHILL_BONUS` shipped as a bare literal `15` against `SHILL_MATCH_BONUS = 8`, so a titled
+on-element carry was **7 points better off on a boss shilling someone else** than on its own.
+
+**Ruling: the off-archetype credit is legitimate — titled units are worth more off-shill than
+ordinary ones — but it must be half the shill credit, not double it.** Now derived from
+`SHILL_MATCH_BONUS` so the invariant cannot be broken by editing one of them.
+
+This is consistent with the earlier DATA-001/DATA-002 ruling that moved boss favouritism out of the
+shill field into element weaknesses: `SHILL_MATCH_BONUS = 8` is deliberately a small nudge, and the
+titled bonus was the one place the field had a large effect. Raising the match bonus to fix the
+ordering was rejected for that reason.
+
+Full measurement in [ARCH-05](../archetypes/README.md).
+
 ### Rupture's mid-range being 28% below attack is not a defect
 
 A median rupture team rated 28% below a median attack team looks serious. Pulling the actual

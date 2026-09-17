@@ -53,6 +53,9 @@ The role definitions themselves live in
 [elements and roles](../concepts/elements-and-roles.md); a unit can also gain a second role at
 runtime through [pseudoRole](../data-model/pseudorole.md).
 
+The four DPS archetypes are not all calibrated the same way: one with a single carry cannot anchor
+itself, so **armorer is currently pooled into attack**. See [CAL-02](../engine/calibration.md).
+
 ## Wheelchairs
 
 [Wheelchairs](wheelchairs.md) are support pairings that uplift almost any compatible carry.
@@ -123,3 +126,33 @@ and its bite is the same on cohesive and incohesive teams alike. That is deliber
 An older comment on the constant claimed the opposite ("scaled by the teamwork multiplier, so its
 effective bite is smaller on already-incohesive teams"). It was wrong about the code and has been
 removed. If you find that phrasing anywhere else, it is stale.
+
+### [ARCH-05] The titled off-shill bonus is half the shill bonus, and used to be double it
+
+A titled carry that is on-element against a boss shilling a **different** DPS archetype collects
+`TITLED_OFF_SHILL_BONUS`. The credit is real: a Void Hunter on a boss built for somebody else is
+still worth bringing, where an ordinary carry in the same spot gets nothing.
+
+It shipped as a bare literal `15` against `SHILL_MATCH_BONUS = 8`, which made a titled carry **7
+points better off on the wrong shill than on its own**. Consequences, measured on the released
+corpus before the fix:
+
+| | best boss, before | after |
+|----|----|----|
+| Ye Shunguong | Miasmic Fiend (shill `anomaly`) 413.5 | Thrall 412.2 / Defiler 412.2 |
+| Yixuan | Miasmic Fiend 418.6 | raging Butcher 415.6, then Fiend, then Priest |
+
+Both now prefer a boss that shills their own archetype or their stunner's. 849 team-boss rows moved,
+all downward, every one containing Yixuan, Ye Shunguong, Miyabi or Remielle.
+
+Two things worth keeping:
+
+* **Remielle triggers this rule**, which is not obvious — she is lumen and no boss is lumen-weak.
+  `getElement` reads `_morphedElement` first, so Attribute Mutation makes her read as a teammate's
+  element, and beside Nangong she is on-element on every ether-weak boss. Miasma Priest is the only
+  ether-weak boss shilling a non-anomaly DPS archetype, which is where all of her movement was.
+* The constant is **derived** from `SHILL_MATCH_BONUS`, not written as a number, so the invariant
+  "off-shill credit < on-shill credit" cannot be broken again by editing one of them.
+
+Yixuan still ranks Fiend above Priest afterwards, on legitimate grounds: Fiend is weak to ether
+**and** physical, which covers Yixuan, Lucia and Dialyn, where Priest is ether-only.

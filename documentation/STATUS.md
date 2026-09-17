@@ -17,15 +17,15 @@ The engine returns **raw**. Anything comparing archetypes against each other rea
 |----|----|
 | mechanics | **34 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
 | rankings | **93 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
-| recommendations | **44 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
+| recommendations | **46 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
 | bucketing | **6 pass, 0 fail** |
 | cohesion fixture | **11/11** owner judgements hold |
-| calibration freshness | `calibration.json` matches the current engine and data fingerprint |
-| calibration certification | **CERTIFIED** — 0 within-archetype rank inversions across 60 (boss × archetype) groups and 67,062 teams |
+| calibration freshness | both files match the current engine/data fingerprint **and** the current `pools` map |
+| calibration certification | **CERTIFIED** — 0 within-archetype rank inversions across 60 (boss × archetype) groups and 67,064 teams |
 
 ```bash
 node test-mechanics.mjs && node test-rankings.mjs && node test-recommendations.mjs && node test-bucketing.mjs && node cohesion-fixture.mjs
-node generate-calibration.mjs --check
+node generate-calibration.mjs --check && node generate-calibration.mjs --check --preview
 node calibration-check.mjs
 ```
 
@@ -88,6 +88,33 @@ in the current numbers.
 
 ## What shipped last
 
+**Armorer calibration pooled into attack, plus two engine fixes**, 2026-09-17. Adding Severian
+exposed that Claret topped Typhon at 390.0 on a *lower* raw score (391.5) than the attack teams
+below her (Seed 425.4, Severian 395.1). Cause: an anchor is a top-K mean, so it measures an
+archetype's ceiling, and armorer had exactly **one** carry — its ceiling was Claret's own, pinning
+her to the 400 target by construction. Every other archetype has 5 to 17 carries.
+
+`ARCHETYPE_POOLS = { armorer: 'attack' }` folds armorer into attack's anchor pool. The pooled anchor
+was bit-identical to attack's, so anomaly/attack/rupture did not move from the pooling itself.
+
+Two defects surfaced while validating it, both fixed:
+
+* **The titled off-shill bonus was double the shill bonus.** A titled on-element carry collected a
+  bare literal `15` for a boss shilling a *different* DPS archetype against `SHILL_MATCH_BONUS = 8`
+  for its own — a net −7 for the right shill. Now derived as half. Ye Shunguong's best boss moved
+  off Miasmic Fiend onto Thrall/Defiler. See [ARCH-05](archetypes/README.md).
+* **The synthetic neutral boss was in the calibration fit**, contributing 6,185 pairs and inflating
+  every reported `n` by ~10%. Removed; it moved no anchor. See [CAL-01](engine/calibration.md).
+
+`CONTROL_QUICKTIME` also went 10 → 17 ([ARM-02](concepts/armorer-laceration-gash-maim.md)), which is
+what puts one Claret team (Trigger/Claret/Rina on Kusarikku, 354.3) into *Excellent* — armorer would
+otherwise have been the only archetype with no team in the top band.
+
+Typhon now reads Seed 326.4, Claret 325.2, Severian 303.2, under an anomaly #1 at 347.8.
+
+All five suites green with all three `KNOWN_RED` maps empty, and both calibration files certified.
+
+
 **Strength labels re-derived by hand against the post-calibration corpus**, 2026-09-17. The six
 cutoffs in `strength-rating.js` had been fitted before the anomaly overhaul and the L4 cap
 removal, and had drifted; the owner reviewed the whole corpus and re-valued them rather than
@@ -106,11 +133,19 @@ where they used to be broad:
 | Risky | 123.2 | 4.2% |
 | Bad | — | 58.8% |
 
-Measured over 60,877 viable pairs including boss variations.
+Measured over 60,879 viable pairs including boss variations. Re-measured after armorer pooling; the
+shares did not move at the reported precision.
 
-**This is not expected to recur.** The cutoffs sit on the calibrated scale, and calibration pins
-each archetype's top-10 anchor to a fixed target of 400, so an ordinary retune moves the anchor
-and the factor absorbs it. The L4 cap was the exception because compression was *non-linear* — it
+Note the two corpus sizes in play, which are **not** a discrepancy to reconcile: 60,879 is the real
+boss corpus, and `calibration.json` reports 67,064 because `calibration-check.mjs` appends its own
+synthetic neutral boss as a diagnostic reference. The *fit* excludes it — see [CAL-01].
+
+**This is not expected to recur — with one exception added since.** The cutoffs sit on the
+calibrated scale, and calibration pins each *self-anchoring* archetype's top-10 anchor to a fixed
+target of 400, so an ordinary retune moves the anchor and the factor absorbs it. A **pooled**
+archetype (armorer, today) takes its host's factor instead, so it is not self-absorbing in either
+direction: retuning it moves its own labels, and retuning its host rescales it for free. See
+[calibration](engine/calibration.md). The L4 cap was the exception because compression was *non-linear* — it
 squeezed high scores harder than low ones, so removing it rescaled the whole corpus (every
 archetype, not just anomaly) and changed the spacing between teams, which a per-archetype scalar
 cannot absorb. With anchors now computed on uncompressed output there is no non-linear term left

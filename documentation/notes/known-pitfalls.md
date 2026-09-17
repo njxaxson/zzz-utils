@@ -138,6 +138,30 @@ The fix was naming. `isLumenUnit` is deleted so no caller can retain the ambiguo
 
 # Levers that were measured and rejected — do not repeat
 
+## Calibration: a single-carry archetype cannot anchor itself
+
+Not a rejected lever — a failure mode to recognise. The anchor rule is sound and stays; it just has
+a degenerate case.
+
+`anchor = top-K mean` measures an archetype's **ceiling**, which is right when several carries
+compete for it. With one carry the ceiling is that carry's own best teams, so the factor maps that
+unit to the target no matter how it actually compares to anything else. Armorer with Claret:
+
+| | anchor | factor | distinct carries |
+|----|----|----|----|
+| anomaly | 628.6 | 0.636 | 12 |
+| attack | 521.3 | 0.767 | 17 |
+| rupture | 557.2 | 0.718 | 5 |
+| **armorer, self-anchored** | **401.5** | **0.996** | **1** |
+
+**`LOW_CONFIDENCE_N` does not catch this and never will.** Armorer had 2,090 anchor-pool teams. Size
+measures whether a sample is *noisy*; this is a sample that is *degenerate*. `distinctCarries` is the
+guard that sees it, and both are kept because neither implies the other.
+
+The tell in the wild was a boss ladder, not a number: Claret took #1 on The Defiler, which shills
+**attack**. If one unit tops bosses built for other archetypes, check its archetype's carry count
+before touching any scoring dial. Fix is `ARCHETYPE_POOLS` — see [CAL-02](../engine/calibration.md).
+
 ## Calibration: do not anchor on each archetype's global ceiling
 
 The obvious first move — divide each archetype by its own best score — **suppressed anomaly

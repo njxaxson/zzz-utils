@@ -5,6 +5,12 @@
 The fourth and newest DPS class, and a deliberate inversion of the standard model: it scales off
 DEF, receives almost no buffs, and detonates a shared meter. Claret is currently the only one.
 
+> Because she is the only one, armorer **does not get its own calibration anchor** — a top-K mean
+> over a single carry just measures that carry. Its scores are pooled into attack's anchor via
+> `ARCHETYPE_POOLS` in `generate-calibration.mjs`. **When a second armorer ships, that is the
+> decision to revisit** (the generator will warn once `distinctCarries` reaches 3). See
+> [CAL-02](../engine/calibration.md).
+
 The mechanics — Laceration, the two crit checks, Gash into Maim, the reduced-lever problem — are
 documented in full under
 [armorer, laceration, gash and maim](../concepts/armorer-laceration-gash-maim.md). This page is

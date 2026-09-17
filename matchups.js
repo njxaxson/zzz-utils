@@ -39,10 +39,9 @@ const options = parseArgs({
 // output are anchored to.
 async function main() {
     const { units: allUnits, bosses, roster } = await loadAllData();
-    // --preview (-p) can put armorer/Claret teams on the board, and armorer only has an anchor
-    // in calibration.preview.json (the released corpus has zero armorer teams to fit one from —
-    // see generate-calibration.mjs). Match generate-calibration.mjs's own --preview convention
-    // rather than loadAllData()'s default (always the released file).
+    // Match generate-calibration.mjs's own --preview convention rather than loadAllData()'s
+    // default (always the released file): under -p the board can contain unreleased units, which
+    // only the preview anchor set was fit against.
     const calibration = await loadCalibration({ preview: options.preview, required: false });
     if (!calibration) {
         console.error(`No ${options.preview ? 'calibration.preview.json' : 'calibration.json'} found — ` +

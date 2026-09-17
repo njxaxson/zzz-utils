@@ -124,3 +124,28 @@ moved, every one of them a Claret line, all upward, nothing else in the corpus t
 The immediate cause for revisiting it was TEST 71, where Trigger's lead over Roxy on
 electric-weak UCC turned out to rest on the solo-carry bonus rather than on any part of her kit.
 See [PIPE-01](../engine/layers.md#pipe-01-the-solo-carry-bonus-is-sized-against-the-mechanics-it-sits-beside).
+
+### [ARM-02] `CONTROL_QUICKTIME` is 17, just above the rest of its family
+
+A control skill locks the player out of everything but dodge/parry/assist and arrives without the
+usual telegraph. An armorer intercepts it and reduces it to a quicktime event, which is a real part
+of a good clear — and at `10` it was worth about 2% of a ~450 raw score, which did not match that
+claim. The rest of `BOSS_WEAK` sits at 4-16 (`STUN_BONUS` 15, `FREEZE_BONUS` 15, `CD_DEBUFF` 16).
+
+Six bosses declare `control`, and `vesper` declares **2**, so the bonus is paid twice there:
+
+| boss | control | shill |
+|----|----|----|
+| vesper | 2 | anomaly |
+| nightmare, sweeper, horizon, aberrant, kusa | 1 | attack / anomaly / anomaly / anomaly / armorer |
+
+Measured: 685 team-boss rows moved, all upward, every one containing Claret, confined to
+`sweeper`, `kusa`, `vesper` and `nightmare`. Horizon and Aberrant have no viable Claret team at all
+(Aberrant is `anti: [armorer]`). Claret takes #1 on none of them except Kusarikku, which shills her
+archetype and names her in `favored`.
+
+**Do not ratchet this constant again** if a later change drops Claret back under a label boundary.
+The value was chosen against a real claim about control skills, not to clear a threshold, and the
+underlying reason armorer ceilings are low is the support-feeding gap: Rina into Claret contributes
+28.8 where Lucia into Yixuan contributes 81.0, on a unit whose own data says she wants crit rate and
+defense and that Rina is her best partner. That gap is the fix when it next matters.

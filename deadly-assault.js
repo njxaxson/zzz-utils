@@ -155,8 +155,8 @@ function evaluateExplicitTeams(teamEntries, selectedBossObjects, options, calibr
 
 async function main() {
     const { units: allUnits, bosses, roster } = await loadAllData();
-    // Match generate-calibration.mjs's own --preview convention (armorer/Claret only has an
-    // anchor in the preview file) rather than loadAllData()'s default (always the released one).
+    // Match generate-calibration.mjs's own --preview convention (the preview anchor set is the
+    // only one fit against unreleased units) rather than loadAllData()'s default (always released).
     const calibration = await loadCalibration({ preview: options.preview, required: false });
     if (!calibration) {
         console.error(`No ${options.preview ? 'calibration.preview.json' : 'calibration.json'} found — ` +

@@ -25,7 +25,7 @@
  *   node calibration-check.mjs --top 20          # calibrated top-N per boss, archetype tagged
  *   node calibration-check.mjs --mix             # full per-boss top-10 archetype mix, raw vs cal
  *   node calibration-check.mjs --alignment       # neutral-boss p85 spread + per-boss p85 table
- *   node calibration-check.mjs --preview         # use calibration.preview.json (armorer/Claret)
+ *   node calibration-check.mjs --preview         # use calibration.preview.json (unreleased units)
  *   node calibration-check.mjs --json            # machine-readable, all sections
  *
  * Exit code: 0 only when certification finds zero rank inversions. Every other flag is
@@ -285,12 +285,24 @@ async function main() {
 
     if (alignment) {
         console.log(`\n--- ALIGNMENT: calibrated p${ALIGNMENT_QUANTILE * 100} on the NEUTRAL boss ---`);
-        console.log(`(no boss shill confounding here — this is what "aligned" should look like)`);
-        for (const a of archetypes) console.log(`  ${a.padEnd(8)} ${fmt(alignment.neutralP85[a])}`);
+        console.log(`(no boss shill confounding here — this is what "aligned" should look like,`);
+        console.log(` EXCEPT for rows marked pooled: a pooled archetype is calibrated against its`);
+        console.log(` host anchor, not its own, so it sits BELOW the others BY DESIGN. Do not close`);
+        console.log(` that gap by unpooling it — see "pools" in calibration.json and [CAL-02].)`);
+        for (const a of archetypes) {
+            const into = calibration.archetypes?.[a]?.pooledInto;
+            console.log(`  ${a.padEnd(8)} ${fmt(alignment.neutralP85[a])}` +
+                `${into ? `   (pooled into ${into} — divergence is by design)` : ''}`);
+        }
 
         console.log(`\n--- MATCHUP SIGNAL: calibrated p${ALIGNMENT_QUANTILE * 100} per boss ---`);
         console.log(`(divergence from the neutral-boss row above should track that boss's shill/favored,`);
         console.log(` not be uniform across bosses — uniform divergence would mean calibration is fighting L3)`);
+        const pooledCols = archetypes.filter(a => calibration.archetypes?.[a]?.pooledInto);
+        if (pooledCols.length > 0) {
+            console.log(` (pooled: ${pooledCols.map(a => `${a} into ${calibration.archetypes[a].pooledInto}`).join(', ')}`
+                + ` — read these against their host column, not against the other archetypes)`);
+        }
         console.log(`boss            ${archetypes.map(a => a.padEnd(8)).join('')}`);
         for (const p of alignment.perBoss) {
             console.log(`${p.boss.padEnd(16)}${archetypes.map(a => fmt(p[a]).padStart(7) + ' ').join('')}`);
