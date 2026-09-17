@@ -31,10 +31,12 @@ thing that will make the rest make sense, and [GLOSSARY.md](GLOSSARY.md) defines
 | Deciding whether something is already settled | [adjudications](notes/adjudications.md) — do not re-litigate these |
 | About to try something clever | [known pitfalls](notes/known-pitfalls.md) — it may already have been measured and rejected |
 | Wondering what is broken right now | [STATUS.md](STATUS.md) and [issues/open](issues/open/) |
+| Wondering when and why something changed | [CHANGELOG.md](CHANGELOG.md) |
 
 ## The map
 
-**[STATUS.md](STATUS.md)** — test state, what is open, what shipped last.
+**[STATUS.md](STATUS.md)** — current state only: test state, what is open, what is deferred.
+**[CHANGELOG.md](CHANGELOG.md)** — what shipped, newest first. History, not status.
 **[GLOSSARY.md](GLOSSARY.md)** — one-line definitions.
 
 ### `concepts/` — game domain
