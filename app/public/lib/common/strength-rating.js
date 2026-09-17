@@ -1,19 +1,16 @@
 const DPS_TAGS = ['attack', 'anomaly', 'rupture', 'armorer'];
 
-// Re-derived against the CALIBRATED score (see lib/calibration.js / generate-calibration.mjs) —
-// the old 375/300/195/145 cutoffs were fit to a raw-score corpus that topped out around 713 and
-// were badly archetype-skewed (anomaly's bigger raw numbers, not better teams, filled
-// "Excellent"). These six cutoffs were chosen against the full released corpus (19 real bosses,
+// Derived against the CALIBRATED score (see lib/calibration.js / generate-calibration.mjs)
+// These six cutoffs were chosen against the full released corpus (19 real bosses,
 // ~55.5k viable (boss, team) pairs) and checked boss-by-boss and archetype-by-archetype before
-// being fixed — see documentation/engine/calibration.md. Regenerate calibration.json before touching
-// these; they are calibrated-scale numbers, not raw ones.
+// being fixed — see documentation/engine/calibration.md.
 const STRENGTH_TIERS = [
-    { min: 354.4, label: 'Excellent', cssClass: 'strength-excellent', color: '#00e676' },
-    { min: 299.7, label: 'Great',     cssClass: 'strength-great',     color: '#64dd17' },
-    { min: 229.0, label: 'Good',      cssClass: 'strength-good',      color: '#00d4aa' },
-    { min: 203.4, label: 'OK',        cssClass: 'strength-ok',        color: '#ffca28' },
-    { min: 189.5, label: 'Tough',     cssClass: 'strength-tough',     color: '#ff9800' },
-    { min: 157.3, label: 'Risky',     cssClass: 'strength-risky',     color: '#ff5252' },
+    { min: 353.3, label: 'Excellent', cssClass: 'strength-excellent', color: '#00e676' },
+    { min: 318.2, label: 'Great',     cssClass: 'strength-great',     color: '#64dd17' },
+    { min: 291.3, label: 'Good',      cssClass: 'strength-good',      color: '#00d4aa' },
+    { min: 172.7, label: 'OK',        cssClass: 'strength-ok',        color: '#ffca28' },
+    { min: 134.4, label: 'Tough',     cssClass: 'strength-tough',     color: '#ff9800' },
+    { min: 123.2, label: 'Risky',     cssClass: 'strength-risky',     color: '#ff5252' },
     { min: -Infinity, label: 'Bad',   cssClass: 'strength-bad',       color: '#b71c1c' },
 ];
 
