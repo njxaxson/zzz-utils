@@ -18,13 +18,14 @@
  * anomaly should win. Measured and rejected: restricting only to `shillIntensity > 3` bosses
  * (183 rows) is not enough; excluding every `favored` team (1,463 rows) is what closes the gap.
  *
- * ALSO MEASURED AND REJECTED: computing the anchor on pre-L4-cap scores. The cap distorts each
- * archetype's top-10 anchor by 3.83% (anomaly) / 1.33% (attack) / 5.02% (rupture) — enough to
- * matter against a ~2.3% cross-archetype margin — but removing that distortion makes anomaly's
- * anchor grow MORE than attack's or rupture's (anomaly's own top teams sit deepest in cap
- * territory), which shrinks anomaly's factor and flips the very cases the exclusion rule fixed
- * (Fiend's #1, sweeper's mix). The cap stays untouched, and anchors are computed on the engine's
- * actual (post-cap) output.
+ * HISTORICAL, now moot: there used to be an argument here about whether to compute the anchor on
+ * pre-L4-cap scores. The cap distorted each archetype's top-10 anchor by 3.83% (anomaly) / 1.33%
+ * (attack) / 5.02% (rupture), and undoing that distortion was measured and rejected because it
+ * shrank anomaly's factor and flipped the very cases the favored-exclusion rule fixed. The cap
+ * was removed outright in 2026-09-15, so anchors are now computed on uncompressed output and the
+ * question no longer arises. Kept because the SHAPE of that argument still applies to any future
+ * non-linear term: a distortion you can measure is not automatically one you should remove, and
+ * the sign of the correction is not knowable from its size.
  *
  * Usage:
  *   node generate-calibration.mjs                    # writes app/public/data/calibration.json

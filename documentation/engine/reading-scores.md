@@ -86,12 +86,34 @@ Interpretively: the top band is a near-optimal matchup; *Great* and *Good* clear
 for endgame content.
 
 These cutoffs are on the **calibrated** scale, and they were re-derived there rather than
-translated from the old raw ones. The previous five bands were fitted to a corpus that topped
-out far higher, and handed the top label to anomaly teams on the strength of their bigger
-numbers rather than their merit.
+translated from the old raw ones. The bands before that were fitted to a corpus that topped out
+far higher, and handed the top label to anomaly teams on the strength of their bigger numbers
+rather than their merit.
 
-Thresholds shift whenever the engine is retuned or calibration is regenerated. Read them from
-the file; do not memorise them.
+They were re-derived a second time after the anomaly overhaul and the L4 cap removal. The top
+three labels came out **much** narrower than before — Excellent, Great and Good together cover
+under 2% of viable (boss, team) pairs, where *OK* alone covers about 21%. Read that as intended:
+the top band is a near-optimal matchup, not a good one.
+
+### Why this is not a recurring chore
+
+The cutoffs sit on the calibrated scale, and calibration pins every archetype's top-10 anchor to a
+**fixed target of 400** — `factor[a] = 400 / anchor[a]`. An ordinary retune moves the anchor and
+the factor moves with it, so calibrated scores stay put by construction. That is the whole job of
+the transform, and it means these thresholds do **not** need revisiting every time a constant
+changes.
+
+Removing the L4 cap was the exception, and instructive about which changes are. Compression was
+**non-linear**: it squeezed high scores harder than low ones, so undoing it rescaled the entire
+corpus — every archetype, not just anomaly — and changed the *spacing* between teams rather than
+only the magnitude. A per-archetype scalar cannot absorb that, so it surfaced as a genuine shift
+in where the labels landed and the cutoffs had to be re-derived by hand.
+
+The rule to carry forward: **a linear retune is absorbed by calibration; a change to a non-linear
+term is not.** Now that anchors are computed on uncompressed output, there is no non-linear term
+left in Layer 4 for a future change to disturb.
+
+Thresholds still move if the engine gains one. Read them from the file; do not memorise them.
 
 ## DPS bucketing
 

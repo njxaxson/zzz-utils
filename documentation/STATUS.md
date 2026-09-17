@@ -3,7 +3,7 @@
 Where things stand. Everything here is measured, not remembered — if you change the engine,
 re-run the commands and update the numbers.
 
-**Last verified:** 2026-09-16.
+**Last verified:** 2026-09-17.
 
 ## Scores come on two scales
 
@@ -81,10 +81,40 @@ to read and delete when ready, not deleting it yourself. The durable reasoning l
 
 ## For release
 
-**Nothing is release-blocking.** Every rankings complaint is closed, and the two open items are
-data tuning rather than engine defects.
+**Nothing is release-blocking, and nothing is outstanding.** Every rankings complaint is closed,
+all three `KNOWN_RED` maps are empty, and the strength labels have been re-derived against the
+post-calibration corpus. What remains is the six deferred issues above, none of which is a defect
+in the current numbers.
 
 ## What shipped last
+
+**Strength labels re-derived by hand against the post-calibration corpus**, 2026-09-17. The six
+cutoffs in `strength-rating.js` had been fitted before the anomaly overhaul and the L4 cap
+removal, and had drifted; the owner reviewed the whole corpus and re-valued them rather than
+rescaling the old set.
+
+The reshaping is substantial and deliberate — the top three labels are now genuinely exclusive
+where they used to be broad:
+
+| label | cutoff | share of viable (boss, team) pairs |
+|----|----|----|
+| Excellent | 353.3 | 0.2% |
+| Great | 318.2 | 0.5% |
+| Good | 291.3 | 0.9% |
+| OK | 172.7 | 21.3% |
+| Tough | 134.4 | 14.1% |
+| Risky | 123.2 | 4.2% |
+| Bad | — | 58.8% |
+
+Measured over 60,877 viable pairs including boss variations.
+
+**This is not expected to recur.** The cutoffs sit on the calibrated scale, and calibration pins
+each archetype's top-10 anchor to a fixed target of 400, so an ordinary retune moves the anchor
+and the factor absorbs it. The L4 cap was the exception because compression was *non-linear* — it
+squeezed high scores harder than low ones, so removing it rescaled the whole corpus (every
+archetype, not just anomaly) and changed the spacing between teams, which a per-archetype scalar
+cannot absorb. With anchors now computed on uncompressed output there is no non-linear term left
+in Layer 4 to cause it again. See [reading scores](engine/reading-scores.md).
 
 **The Angels of Delusion are declared, not modelled**, 2026-09-16. `Nangong/Aria/Sunna` was
 underpriced by about 150 points against the two premier anomaly teams, and that is *sensible* —
@@ -193,9 +223,6 @@ removing the cap did not by itself change that; Aria also fell below Promeia, wh
 caused. Both were closed the next day by the ladder entry above — *not* by anything shaped like
 the cap, and the prediction recorded here at the time (that no repricing of Phoenix's kit could
 close a half-tier L2 deficit) was measured under the cap and expired with it.
-
-**Not yet done:** the six calibrated cutoffs in `strength-rating.js` drifted harsher (Good 9.9% →
-8.1% of the corpus) and have not been re-derived.
 
 **`VORTEX_BASE` re-derived, 15 to 12**, 2026-09-14. A vortex was worth about five times a full
 abloom engine, and the scalar in front of the vortex model had never been re-derived after phase 2
