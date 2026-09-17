@@ -33,3 +33,26 @@ Titled first, then tier, then accumulated fit against the owned carry roster.
 
 The two engines are supposed to agree on relevance rules and mostly do. There is at least one
 place they currently do not — see `documentation/issues/` for what is filed.
+
+## Code notes
+
+### [PULL-03] The recovery debuff reads the scorer's burst model
+
+A recovery debuff is worth what the extra window length buys, so it is priced against the
+consumer's burst. This used to be a `Math.max` over the consumer's `mechanics.damage` values,
+floored at 1 — the exact anti-pattern
+[damage-and-burst](../data-model/damage-and-burst.md) records as "the real content of a whole
+issue": it picks the biggest *number*, not the biggest *instrument*, and `chain: 3` and
+`ultimate:strong: 3` are four rungs apart.
+
+In practice it saturated at 3 for nearly every carry, so it paid a flat rate and the real
+differentiation came from whatever generic stunner terms happened to land beside it. The visible
+symptom was a stunner pairing with a carry it has nothing to do with: Severian, whose only
+damage keys are `ultimate:strong: 2` and `chain: 3`, cleared the 15-point synergy threshold
+against Nangong on exactly 9 points of recovery × 3 plus 6 points of generic daze, and the pull
+engine reported "Severian has mechanical synergy with your Nangong". On the burst model he is a
+1.33, the pair lands at 10 and never qualifies.
+
+It now calls `getMaxBurstWeight` and mirrors the scorer's recovery branch — burst plus chains
+scaling, totalize, and recovery scaling. The scorer's greed bonus is deliberately left out: it
+is gated on team context this heuristic does not have.

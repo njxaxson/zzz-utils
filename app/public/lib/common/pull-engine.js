@@ -14,7 +14,8 @@ import {
     resolveConditionalValue,
     isConditionalSpec,
     isTeamScopedConditional,
-    maxConditionalValue
+    maxConditionalValue,
+    getMaxBurstWeight
 } from './team-scorer.js';
 import { getTeams, isValidTeam } from './team-builder.js';
 
@@ -202,8 +203,10 @@ function mechanicsFitScore(supplier, consumer) {
     // `dmg` is deliberately not scored — see mechanics-fit-score.md.
     if (w(sDebuf.defense) > 0 && isDPS && !isRupDPS) score += w(sDebuf.defense) * (isArmDPS ? 6 : 3);
     if (w(sDebuf.recovery) > 0 && isDPS) {
-        const burst = Math.max(1, ...Object.values(cDamage).map(v => typeof v === 'number' ? v : 1));
-        score += w(sDebuf.recovery) * burst;
+        // Mirrors the scorer's recovery branch; greed is left out because it needs a team. [PULL-03]
+        const effectiveBurst = getMaxBurstWeight(consumer) + w(cScaling.chains)
+            + w(cDamage.totalize) * 2 + w(cScaling.recovery);
+        score += w(sDebuf.recovery) * effectiveBurst;
     }
     const isStunless = cMech.utility?.stunless === true;
     if (!isStunless && (isAtkDPS || isRupDPS || isArmDPS)) {
@@ -694,7 +697,7 @@ export function analyze(allUnits, unitStates, ownedUnits, { maxRecommendations =
     detectStunnerElementGap(gaps, ownedStunners, elementQuality, unownedLimitedS, sortWithDPS);
     detectSubdpsGap(gaps, dpsQuality, ownedSubdps, unownedLimitedS, sortWithDPS, ownedUnits);
     detectAnomalyPartnerGap(gaps, ownedUnits, ownedDPS, ownedSubdps, unownedLimitedS, dpsQuality);
-    detectElementGaps(gaps, elementQuality, unownedLimitedS, sortWithDPS);
+    detectElementGaps(gaps, elementQuality, ownedByElement, unownedLimitedS, sortWithDPS);
     detectSynergies(gaps, ownedUnits, unownedLimitedS, unitByName, ownedByName, dpsQuality, elementQuality);
     const unitGapScoreOverrides = new Map(); // individual unit scores for mech-synergy gaps
     detectMechanicalSynergies(gaps, ownedUnits, unownedLimitedS, dpsQuality, elementQuality, unitGapScoreOverrides);
@@ -1272,7 +1275,7 @@ function detectAnomalyPartnerGap(gaps, ownedUnits, ownedDPS, ownedSubdps, unowne
     // Refringe benefits are emergent from scoring. No lumen-specific gap needed.
 }
 
-function detectElementGaps(gaps, elementQuality, unownedLimitedS, sortCandidatesFn) {
+function detectElementGaps(gaps, elementQuality, ownedByElement, unownedLimitedS, sortCandidatesFn) {
     for (const el of ELEMENTS) {
         // Lumen agents deal a teammate's element via Attribute Mutation — there is no
         // "lumen elemental damage" and no boss has lumen weakness, so the gap is meaningless.
@@ -1300,7 +1303,11 @@ function detectElementGaps(gaps, elementQuality, unownedLimitedS, sortCandidates
             );
         }
 
-        const reason = quality === 0
+        // Element quality counts primary carries only, so say which kind of zero this is. [GAP-01]
+        const hasSubdpsOnly = quality === 0 && (ownedByElement[el] || []).some(u => isSubdps(u));
+        const reason = hasSubdpsOnly
+            ? `You have ${capitalize(el)} sub-DPS agents but no primary ${capitalize(el)} DPS to lead your teams`
+            : quality === 0
             ? `You have no DPS options for ${capitalize(el)} content`
             : `Your ${capitalize(el)} DPS is borderline — a premium option would significantly improve coverage`;
 

@@ -73,7 +73,7 @@ isn't something else**, it becomes a tag.
 | `DIAM` | `../engine/diametric-synergy.md` |
 | `CAL` | `../engine/calibration.md` |
 | `READ` | `../engine/reading-scores.md` |
-| `PULL` | `../recommendations/pull-engine.md`, or `../recommendations/partner-ladder.md` for ladder-specific notes |
+| `PULL` | `../recommendations/pull-engine.md`, or `../recommendations/partner-ladder.md` for ladder-specific notes and `../recommendations/mechanics-fit-score.md` for fit-score ones |
 | `GAP` | `../recommendations/coverage-and-gaps.md` |
 | `CODEP` | `../recommendations/codependency-gating.md` |
 | `BUCK` | `../bucketing/deadly-assault.md` |
@@ -138,3 +138,5 @@ Populated during the comment pass. One row per tag, newest last within a prefix.
 | `[PIPE-02]` | `../engine/layers.md` | The supportless structure factor is the whole judgement now the L4 cap is gone |
 | `[PIPE-03]` | `../engine/layers.md` | A `join` that mandates a second carry — why it waives rather than grants |
 | `[AOD-01]` | `../data-model/unit-object.md` | Angels of Delusion are declared, not modelled; `CONJUNCTIVE_SYNERGY_BONUS` re-derived 55 → 45 against them |
+| `[PULL-03]` | `../recommendations/mechanics-fit-score.md` | The recovery debuff reads the scorer's burst model, not a MAX over `damage` values |
+| `[GAP-01]` | `../recommendations/coverage-and-gaps.md` | An element covered only by a sub-DPS gets its own reason line, not "no DPS options" |

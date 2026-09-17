@@ -54,3 +54,19 @@ gate a unit out for lacking a partner the scorer is happily scoring.
 **No armorer sub-DPS exists yet.** `pull-engine.js` carries a TODO for the bucket and the
 detector that will be needed when one ships. Until then an armorer sub-DPS would simply not be
 bucketed.
+
+## Code notes
+
+### [GAP-01] An element with only a sub-DPS is not an element with nothing
+
+Element quality counts primary carries only, so a roster holding Velina — a T0 wind anomaly
+sub-DPS — reports wind quality 0, the same number a roster with no wind unit at all reports.
+The gap itself is real (there is no wind carry to lead a team) but the reason line said "You
+have no DPS options for Wind content", which the player can see is false.
+
+The element detector now distinguishes the two zeroes the same way `detectDPSGaps` already did
+for archetypes, and says "You have Wind sub-DPS agents but no primary Wind DPS to lead your
+teams". The score is unchanged: the missing carry is the same size of gap either way.
+
+The roster assessment summary still folds this into "lacks Wind element coverage". That is a
+statement about carries and is left as is.

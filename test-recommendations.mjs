@@ -836,6 +836,50 @@ await runTest(46, 'Electric DPS coverage improves when Claret is added to roster
         `Electric coverage should improve when Claret is added — before: ${electric0}, after: ${electric1}`);
 });
 
+await runTest(47, 'An element covered only by a sub-DPS is not reported as having no options', () => {
+    // Velina is a T0 wind anomaly SUB-DPS. Element quality counts primary carries only, so
+    // wind reads 0 either way — but the reason line must not claim there is nothing. [GAP-01]
+    const withVelina = ['Miyabi', 'Velina', 'Nangong', 'Astra', 'Nicole', 'Anby'];
+    const { unitStates: s1, ownedUnits: o1 } = buildSyntheticRoster(allUnits, withVelina);
+    const r1 = analyze(allUnits, s1, o1, { maxRecommendations: 20 });
+    const windGap = r1.allGaps.find(g => g.id === 'element-wind');
+    assert(windGap, 'a wind element gap should still fire — there is no primary wind carry');
+    assert(!/no DPS options/i.test(windGap.reason),
+        `wind reason must not claim no options while Velina is owned; got: "${windGap.reason}"`);
+    assert(/sub-DPS/i.test(windGap.reason),
+        `wind reason should name the sub-DPS; got: "${windGap.reason}"`);
+
+    // Without any wind unit the original wording is still the right one.
+    const noWind = ['Miyabi', 'Nangong', 'Astra', 'Nicole', 'Anby'];
+    const { unitStates: s0, ownedUnits: o0 } = buildSyntheticRoster(allUnits, noWind);
+    const r0 = analyze(allUnits, s0, o0, { maxRecommendations: 20 });
+    const windGap0 = r0.allGaps.find(g => g.id === 'element-wind');
+    assert(windGap0 && /no DPS options/i.test(windGap0.reason),
+        `a wind-less roster should still read "no DPS options"; got: "${windGap0?.reason}"`);
+});
+
+await runTest(48, 'A carry whose only burst is a chain attack earns no recovery-debuff synergy', () => {
+    // Severian's damage is `ultimate:strong: 2` + `chain: 3`. A MAX over those values read 3 —
+    // the same as a 6000% ultimate — which paid Nangong's recovery debuff enough to clear the
+    // synergy threshold and print "Severian has mechanical synergy with your Nangong". [PULL-03]
+    const severian = unitByName(allUnits, 'Severian');
+    if (!severian) return;
+    const roster = ['Miyabi', 'Velina', 'Nangong', 'Astra', 'Nicole', 'Anby'];
+    const { unitStates, ownedUnits } = buildSyntheticRoster(allUnits, roster);
+    const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 30 });
+
+    const claimsNangong = result.allGaps.some(g =>
+        /Severian/.test(g.reason || '') && /Nangong/.test(g.reason || '')
+    );
+    assert(!claimsNangong,
+        'no gap should claim Severian has mechanical synergy with Nangong');
+
+    // The wind gap itself is legitimate and Severian should still be suggested for it.
+    const windGap = result.allGaps.find(g => g.id === 'element-wind');
+    assert(windGap?.units?.some(u => u.id === 'severian'),
+        'Severian should still be a wind DPS candidate');
+});
+
 // Tests that are red ON PURPOSE. Same contract as test-mechanics.mjs's and test-rankings.mjs's
 // KNOWN_RED: exits 0 only
 // when the failing set is EXACTLY this map's keys — exits 1 the instant an entry starts
