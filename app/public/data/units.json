@@ -1029,6 +1029,26 @@
         "species": "thiren:dog:half"
     },
     {
+        "id": "severian",
+        "name": "Severian",
+        "image": "./assets/characters/severian.webp",
+        "rank": "S",
+        "limited": true,
+        "released": "3.3",
+        "tier": 0.5,
+        "available": false,
+        "tags": ["attack", "wind", "assist:defensive"],
+        "join": ["stun", "support", "faction"],
+        "synergy": { "units": [], "tags": [], "avoid": [] },
+        "mechanics": {
+            "damage": { "ultimate:strong": 2, "chain": 3 }
+        },
+        "faction": "PubSec",
+        "displayText": "Seth's older brother and Cissia's boss, who frequently refers to him as a demon.",
+        "gender": "male",
+        "species": "thiren:dog:half"
+    },
+    {
         "id": "sigrid",
         "name": "Sigrid",
         "image": "./assets/characters/sigrid.webp",
