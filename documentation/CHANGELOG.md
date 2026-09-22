@@ -3,6 +3,34 @@
 What shipped, newest first. This file is history — nothing here is a statement about the
 current state of the engine. For that, see [STATUS.md](STATUS.md).
 
+**Scoring resolves onto a `UnitContext`; `units.json` data is now read-only**, 2026-09-22. The
+engine wrote seven resolved values — activated roles, conditional damage, conditional on-field
+state, effective AP, proc input, proc damage, the lumen morph target — straight onto the unit
+objects parsed from `units.json`, then removed them again in a `cleanupRoles()` closure called by
+hand on four exit paths. Those objects are parsed once per process and shared by every team, so a
+pass was writing to state roughly 7,000 other teams read.
+
+`scoreTeamForBoss` now wraps the team in `UnitContext`es at the single public entry and hands them
+to `scoreTeamContexts`, which is the pass proper and the target of both morph-search recursions.
+`cleanupRoles` and its four call sites are gone. See [unit context](engine/unit-context.md),
+[CTX-01](engine/unit-context.md).
+
+Three things this removes: parallel scoring was impossible while workers shared 62 unit objects; a
+throw mid-pass left stale roles for the *next* call to read, since there was no `try/finally`; and
+nothing pinned the cleanup, so a fifth early return would have leaked silently.
+
+Behaviour-neutral, proved rather than assumed: the `score-dump.mjs` corpus is **byte-identical**
+across all 137,942 rows, and a regenerated `calibration.json` changed only in `generated` and
+`engineFingerprint` — every anchor identical. Certification still reads 0 within-archetype rank
+inversions over 60 groups and 67,064 teams.
+
+Pinned by TEST 35 and by the five suites deep-freezing the roster after load (`deepFreeze` in
+`lib/data.js`), so any surviving write throws instead of landing. The freeze is deliberately not in
+`loadUnits` — mutating the roster in memory and re-scoring stays available to ad-hoc CLI scripts.
+
+Incidentally ~2x faster end to end (`score-dump.mjs` 27.4s → 9–16s on a noisy machine): ~550,000
+`delete`s against shared hot objects were forcing V8 to drop them into dictionary mode.
+
 **Armorer calibration pooled into attack, plus two engine fixes**, 2026-09-17. Adding Severian
 exposed that Claret topped Typhon at 390.0 on a *lower* raw score (391.5) than the attack teams
 below her (Seed 425.4, Severian 395.1). Cause: an anchor is a top-K mean, so it measures an

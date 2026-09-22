@@ -28,7 +28,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-import { loadAllData } from './lib/data.js';
+import { loadAllData, deepFreeze } from './lib/data.js';
 import { parseTeams } from './lib/team-parser.js';
 import { filterBosses } from './lib/boss-filter.js';
 import { scoreTeamForBoss } from './app/public/lib/common/team-scorer.js';
@@ -125,6 +125,9 @@ function checkEntry(entry, bosses, allUnits) {
 
 async function main() {
     const { units: allUnits, bosses } = await loadAllData();
+    // Frozen so any write to a unit throws instead of landing silently. The engine
+    // resolves onto a UnitContext and must never touch `units.json` data. [CTX-01]
+    deepFreeze(allUnits);
     const fixturePath = join(HERE, 'cohesion-fixture.json');
     const fixture = JSON.parse(readFileSync(fixturePath, 'utf8'));
 

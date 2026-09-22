@@ -65,6 +65,7 @@ isn't something else**, it becomes a tag.
 | `BOSS` | `../data-model/boss-object.md` |
 | `WEAK` | `../data-model/boss-object.md` |
 | `PIPE` | `../engine/layers.md` |
+| `CTX` | `../engine/unit-context.md` |
 | `FIELD` | `../data-model/pseudorole.md` |
 | `COMP` | `../engine/l4-components.md` |
 | `ULT` | `../engine/ultimates-two-channel.md` |
@@ -145,3 +146,4 @@ Populated during the comment pass. One row per tag, newest last within a prefix.
 | `[CAL-01]` | `../engine/calibration.md` | The synthetic neutral boss is not in the fitting corpus |
 | `[CAL-02]` | `../engine/calibration.md` | Archetype pooling, and why the map is a second staleness axis |
 | `[CAL-03]` | `../engine/calibration.md` | `MIN_SELF_ANCHOR_CARRIES` is 3 |
+| `[CTX-01]` | `../engine/unit-context.md` | Resolving onto the unit was shared mutable state, and nothing pinned the cleanup |

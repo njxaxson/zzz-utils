@@ -12,6 +12,24 @@ export { ELEMENTS, DPS_ROLES };
 export const SUPPORT_ROLE = "support";
 export const NON_DPS_ROLES = ["defense", "stun", "support"];
 
+// THE UNIT CONTEXT
+
+/**
+ * A unit plus the values one scoring pass resolves against its team. `units.json` data is
+ * read-only: every `_`-prefixed field the engine resolves is written here, never onto the unit.
+ *
+ * The source fields are COPIED, so a context is interface-identical to a unit — which is what
+ * lets every helper duck-type and go on serving raw units off a scored team. [CTX-01]
+ */
+export class UnitContext {
+    constructor(unit) {
+        // Re-wrapping takes the underlying unit, not another pass's working.
+        const source = unit instanceof UnitContext ? unit.unit : unit;
+        Object.assign(this, source);
+        this.unit = source;
+    }
+}
+
 const MULT = {
     NEED_FULFILLMENT: 7,
     // Per greed unit squeezed out of the stun window; see getBurstContention.
@@ -4725,6 +4743,14 @@ function checkSynergyAvoid(team, { lenient = false, debug = false } = {}) {
 // MAIN SCORING FUNCTION
 
 export function scoreTeamForBoss(team, boss, options = {}) {
+    // Wrap ONCE, here, at the only public entry. Everything below resolves onto the contexts and
+    // then throws them away, so `units.json` data is never written to. [CTX-01]
+    return scoreTeamContexts(team.map(u => new UnitContext(u)), boss, options);
+}
+
+// The pass proper. `team` is an array of UnitContexts, and the morph search below re-enters HERE
+// rather than through `scoreTeamForBoss`, so one set of contexts serves the whole search.
+function scoreTeamContexts(team, boss, options = {}) {
     // `trace`, when supplied, is an object this call fills with the per-layer contributions.
     // It is pure observability — nothing read back out of it affects the score — and exists so
     // `score-dump.mjs` can attribute a score movement to a layer without re-running `--debug`
@@ -4741,7 +4767,7 @@ export function scoreTeamForBoss(team, boss, options = {}) {
         let bestCombo = null;
         const tryMorphCombinations = (idx) => {
             if (idx === lumenUnits.length) {
-                const s = scoreTeamForBoss(team, boss, { ...options, debug: false, trace: null });
+                const s = scoreTeamContexts(team, boss, { ...options, debug: false, trace: null });
                 if (s > bestScore) {
                     bestScore = s;
                     bestCombo = lumenUnits.map(u => u._morphedElement ?? null);
@@ -4764,7 +4790,7 @@ export function scoreTeamForBoss(team, boss, options = {}) {
         // whichever morph happened to be tried last would not describe the score returned.
         if (!debug && !trace) return bestScore;
         lumenUnits.forEach((u, i) => { u._morphedElement = bestCombo[i]; });
-        const traced = scoreTeamForBoss(team, boss, options);
+        const traced = scoreTeamContexts(team, boss, options);
         lumenUnits.forEach(u => { delete u._morphedElement; });
         return traced;
     }
@@ -4816,27 +4842,17 @@ export function scoreTeamForBoss(team, boss, options = {}) {
         if (lumenLabels.length > 0) console.log(`Lumen morph: ${lumenLabels.join(', ')}`);
     }
 
-    // `_morphedElement` is deliberately NOT cleared here — the morph search above owns its whole
-    // lifecycle. Clearing it from the inner pass wiped an outer lumen unit's target mid-search
-    // whenever a team held two of them.
-    const cleanupRoles = () => {
-        for (const u of team) {
-            delete u._activatedRoles;
-            delete u._resolvedDamage;
-            delete u._resolvedOnfield;
-            delete u._effectiveAP;
-            delete u._procDamage;
-            delete u._procInput;
-        }
-    };
+    // Nothing resolved above is cleared: it lives on the contexts, which this call discards.
+    // The morph search's own `delete` stays — `isUnmorphedLumen` reads it as the recursion
+    // terminator, not as hygiene. [CTX-01]
 
     // Layer 1: Disqualifications
     const disq = checkDisqualifications(team, boss, debug);
-    if (disq < 0) { cleanupRoles(); if (trace) trace.disqualified = true; return disq; }
+    if (disq < 0) { if (trace) trace.disqualified = true; return disq; }
 
     // Synergy avoid check (near-disqualification)
     const avoidResult = checkSynergyAvoid(team, { lenient, debug });
-    if (avoidResult === -1) { cleanupRoles(); if (trace) trace.disqualified = true; return -1; }
+    if (avoidResult === -1) { if (trace) trace.disqualified = true; return -1; }
     score += avoidResult;
 
     // Layer 1.5: Team Structure (feeds into teamwork multiplier, not additive)
@@ -4890,7 +4906,7 @@ export function scoreTeamForBoss(team, boss, options = {}) {
 
     // Layer 3: Boss Matchup
     const bossResult = scoreBossMatchup(team, boss, { lenient, debug });
-    if (bossResult.disqualified) { cleanupRoles(); if (trace) trace.disqualified = true; return -1; }
+    if (bossResult.disqualified) { if (trace) trace.disqualified = true; return -1; }
     score += bossResult.score;
 
     // Layer 4: Mechanical Synergy. NOT compressed — see documentation/notes/adjudications.md.
@@ -4956,7 +4972,6 @@ export function scoreTeamForBoss(team, boss, options = {}) {
         console.log(`${'='.repeat(60)}\n`);
     }
 
-    cleanupRoles();
     return score;
 }
 

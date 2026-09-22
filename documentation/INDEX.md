@@ -20,6 +20,7 @@ thing that will make the rest make sense, and [GLOSSARY.md](GLOSSARY.md) defines
 | Changing **disorders** | [disorder supply](concepts/disorder-supply.md) + [known pitfalls](notes/known-pitfalls.md) |
 | Changing the **teamwork multiplier** | [teamwork multiplier](engine/teamwork-multiplier.md) + [known pitfalls](notes/known-pitfalls.md) |
 | Changing anything in `team-scorer.js` | [layers](engine/layers.md) first — to know which layer owns the change |
+| Resolving a new per-team value onto a unit | [unit context](engine/unit-context.md) — it goes on the context, never on `units.json` data |
 | Working out why a team scores as it does | [reading scores](engine/reading-scores.md), then the relevant [archetype](archetypes/README.md) |
 | Comparing scores across archetypes | [reading scores](engine/reading-scores.md) and [calibration](engine/calibration.md) — check which scale you are holding |
 | Working on pull recommendations | [pull engine](recommendations/pull-engine.md) |
@@ -79,6 +80,7 @@ defined by slot count rather than by carry:
 
 [Design premise](engine/design-premise.md) ·
 [layers](engine/layers.md) ·
+[unit context](engine/unit-context.md) ·
 [L4 components](engine/l4-components.md) ·
 [ultimates two-channel](engine/ultimates-two-channel.md) ·
 [cohesion](engine/cohesion.md) ·

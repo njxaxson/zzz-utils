@@ -7,13 +7,13 @@ re-run the commands and update the numbers.
 change belongs in [CHANGELOG.md](CHANGELOG.md); anything that explains a settled ruling belongs
 in [notes/adjudications.md](notes/adjudications.md) behind a tag.
 
-**Last verified:** 2026-09-17.
+**Last verified:** 2026-09-22.
 
 ## Test status
 
 | Suite | State |
 |----|----|
-| mechanics | **34 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
+| mechanics | **35 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
 | rankings | **93 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
 | recommendations | **46 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
 | bucketing | **6 pass, 0 fail** |
@@ -59,5 +59,6 @@ labels, and [calibration](engine/calibration.md) for the anchors.
 
 ## What shipped last
 
-**Armorer calibration pooled into attack, plus two engine fixes**, 2026-09-17.
+**Scoring resolves onto a `UnitContext`; `units.json` data is now read-only**, 2026-09-22.
+Behaviour-neutral: byte-identical corpus, identical calibration anchors.
 Full history in [CHANGELOG.md](CHANGELOG.md).

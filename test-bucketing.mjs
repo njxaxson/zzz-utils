@@ -5,7 +5,7 @@
 // ALLOCATIONS and rank-band structure, never absolute scores, so the suite survives
 // recalibration. Run: node test-bucketing.mjs [-1 -4 ...]. Exit code 0 if all (specified) pass.
 
-import { loadUnits, loadBosses } from './lib/data.js';
+import { loadUnits, loadBosses, deepFreeze } from './lib/data.js';
 import { filterBosses } from './lib/boss-filter.js';
 import { buildTeams } from './lib/team-pipeline.js';
 import { scoreTeamForBoss } from './app/public/lib/common/team-scorer.js';
@@ -125,7 +125,9 @@ function shouldRun(n) {
     return testFilters.length === 0 || testFilters.includes(n);
 }
 
-const allUnits = await loadUnits();
+// Frozen so any write to a unit throws instead of landing silently. The engine
+// resolves onto a UnitContext and must never touch `units.json` data. [CTX-01]
+const allUnits = deepFreeze(await loadUnits());
 const allBosses = await loadBosses();
 let passed = 0;
 let failed = 0;

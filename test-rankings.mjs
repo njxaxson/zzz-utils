@@ -20,7 +20,7 @@
  * boss-dependent and not suitable for hard automation.
  */
 
-import { loadAllData } from './lib/data.js';
+import { loadAllData, deepFreeze } from './lib/data.js';
 import { scoreTeamForBoss, resolveBossVariation, getBossResistances } from './app/public/lib/common/team-scorer.js';
 import { NEUTRAL_BOSS, assert, makeAllViableTeamEntries, filterIncludeOneOf, getTopViableTeams, scoreForTeamString, scoreMapForBoss, withBosses } from './lib/scoring-test-utils.js';
 import { rankBandEpsilon } from './app/public/lib/common/team-builder.js';
@@ -61,6 +61,9 @@ async function main() {
     }
 
     const { units: allUnits, bosses: bossesRaw, roster } = await loadAllData();
+    // Frozen so any write to a unit throws instead of landing silently. The engine
+    // resolves onto a UnitContext and must never touch `units.json` data. [CTX-01]
+    deepFreeze(allUnits);
     const bosses = [...bossesRaw, { ...NEUTRAL_BOSS }];
     const allTeamEntries = makeAllViableTeamEntries(allUnits, roster);
 

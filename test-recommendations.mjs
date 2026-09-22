@@ -1,7 +1,7 @@
 // test-recommendations.mjs — assertion-based regression tests for the pull recommendations engine.
 // Run: node test-recommendations.mjs [-1 -11 ...]. Exit code 0 if all (specified) tests pass.
 
-import { loadUnits } from './lib/data.js';
+import { loadUnits, deepFreeze } from './lib/data.js';
 import {
     analyze,
     isSubdps,
@@ -57,7 +57,9 @@ function shouldRun(n) {
     return testFilters.length === 0 || testFilters.includes(n);
 }
 
-const allUnits = await loadUnits();
+// Frozen so any write to a unit throws instead of landing silently. The engine
+// resolves onto a UnitContext and must never touch `units.json` data. [CTX-01]
+const allUnits = deepFreeze(await loadUnits());
 let passed = 0;
 let failed = 0;
 const failures = [];        // test numbers that failed, for the KNOWN_RED check at the end

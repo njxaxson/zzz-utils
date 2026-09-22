@@ -20,8 +20,8 @@
  * boss-dependent and not suitable for hard automation.
  */
 
-import { loadAllData } from './lib/data.js';
-import { chargeableElementArms, getBasicDamage, getBasicDamageBaseline, getMaxBurstWeight, quickAssistCohesionWeight, scoreTeamForBoss, resolveBossVariation, resolveConditionalValue, getEffectiveScaling, effectiveDisorderSupply, effectiveDisorderWeakSupply, getChainMagnitude } from './app/public/lib/common/team-scorer.js';
+import { loadAllData, deepFreeze } from './lib/data.js';
+import { chargeableElementArms, getBasicDamage, getBasicDamageBaseline, getMaxBurstWeight, quickAssistCohesionWeight, scoreTeamForBoss, resolveBossVariation, resolveConditionalValue, getEffectiveScaling, effectiveDisorderSupply, effectiveDisorderWeakSupply, getChainMagnitude, UnitContext, isDPS, isStun, isSupport, isOnField, getElement, getEffectiveRoles, hasSubDPSRole } from './app/public/lib/common/team-scorer.js';
 import { filterBosses } from './lib/boss-filter.js';
 import { NEUTRAL_BOSS, assert, makeAllViableTeamEntries, filterIncludeOneOf, getTopViableTeams, scoreForTeamString, scoreMapForBoss, withBosses } from './lib/scoring-test-utils.js';
 
@@ -46,6 +46,9 @@ async function main() {
     }
 
     const { units: allUnits, bosses: bossesRaw, roster } = await loadAllData();
+    // Frozen so any write to a unit throws instead of landing silently. The engine
+    // resolves onto a UnitContext and must never touch `units.json` data. [CTX-01]
+    deepFreeze(allUnits);
     const bosses = [...bossesRaw, { ...NEUTRAL_BOSS }];
     const allTeamEntries = makeAllViableTeamEntries(allUnits, roster);
 
@@ -1593,6 +1596,63 @@ async function main() {
             `[${qualifiers.map(u => u.name).join(', ')}]. If that is intended, update this test ` +
             `and re-measure — the rule moves every double-carry team the new unit appears on.`);
     });
+    // TEST 35: scoring resolves onto a UnitContext and never writes to `units.json` data
+    //
+    // The engine used to hang `_activatedRoles`, `_resolvedDamage` and four more off the shared
+    // unit objects, cleaning them off again on each of four exit paths. Nothing pinned that, and
+    // there was no try/finally — a throw mid-scoring left stale roles on the roster for the NEXT
+    // call to read. This test pins the replacement. [CTX-01]
+    run('TEST 35: scoring resolves onto a UnitContext, leaving units.json data untouched', () => {
+        const RESOLVED = ['_activatedRoles', '_resolvedDamage', '_resolvedOnfield',
+                          '_effectiveAP', '_procInput', '_procDamage', '_morphedElement'];
+
+        // (1) The roster this suite scores against is frozen (see main()). Were any path still
+        //     writing to a unit, every test above would already have thrown — so state the
+        //     premise rather than leaving it implicit, or this test could pass on a thawed
+        //     roster and prove nothing.
+        assert(Object.isFrozen(allUnits[0]) && Object.isFrozen(allUnits[0].tags),
+            'the roster must be deep-frozen for this test to mean anything');
+
+        // (2) Score a broad sample, INCLUDING a lumen team. The morph search is the one place
+        //     that writes re-entrantly, across recursive calls, and it owns `_morphedElement`
+        //     outside the bulk resolution — so a sample without Remielle would not reach it.
+        const lumenEntries = filterIncludeOneOf(allTeamEntries, ['Remielle']);
+        assert(lumenEntries.length > 0,
+            'no lumen team in the corpus — the morph path is the re-entrant one and must be covered');
+        const sample = [...allTeamEntries.slice(0, 40), ...lumenEntries.slice(0, 20)];
+        for (const boss of bosses.slice(0, 3)) {
+            for (const { team } of sample) scoreTeamForBoss(team, boss, { lenient: true });
+        }
+        const dirty = allUnits.filter(u => RESOLVED.some(k => Object.hasOwn(u, k)));
+        assert(dirty.length === 0,
+            'scoring left resolved fields on units.json data: ' +
+            dirty.map(u => `${u.name} [${RESOLVED.filter(k => Object.hasOwn(u, k)).join(', ')}]`).join('; '));
+
+        // (3) A disqualified team returns early. Each early return used to carry its own
+        //     hand-written cleanup call, and that is the shape a fifth one would have got wrong.
+        const illegal = [allUnits[0], allUnits[0], allUnits[0]];
+        scoreTeamForBoss(illegal, bosses[0]);
+        assert(!RESOLVED.some(k => Object.hasOwn(allUnits[0], k)),
+            'an early return left resolved fields on a unit');
+
+        // (4) A context is interface-identical to its unit. That is what lets the pull engine and
+        //     the UI go on calling the exported helpers with RAW units: with nothing resolved, a
+        //     context and its unit must answer every one of them the same way.
+        for (const u of allUnits) {
+            const ctx = new UnitContext(u);
+            assert(ctx.unit === u, `${u.name}: ctx.unit must be the source object`);
+            assert(new UnitContext(ctx).unit === u,
+                `${u.name}: re-wrapping a context must take its unit, not nest`);
+            for (const [label, f] of [['isDPS', isDPS], ['isStun', isStun], ['isSupport', isSupport],
+                                      ['isOnField', isOnField], ['getElement', getElement],
+                                      ['hasSubDPSRole', hasSubDPSRole]]) {
+                assert(f(ctx) === f(u), `${u.name}: ${label} differs between context and unit`);
+            }
+            assert(getEffectiveRoles(ctx).join(',') === getEffectiveRoles(u).join(','),
+                `${u.name}: getEffectiveRoles differs between context and unit`);
+        }
+    });
+
     // Summary
     console.log('');
 

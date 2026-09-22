@@ -1,6 +1,7 @@
 # Role Activation Ripple Effects
 
-Activated roles are computed once per team, cached on the unit, and then cleaned up. Because a
+Activated roles are computed once per team and cached on that team's
+[unit contexts](unit-context.md), never on the unit itself. Because a
 [pseudo-role](../data-model/pseudorole.md) *is* a role, activating one ripples across every
 layer of the pipeline. This page is the checklist.
 
