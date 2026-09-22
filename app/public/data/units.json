@@ -757,13 +757,7 @@
         "mechanics": {
             "stats": { "am": 2.5, "ap": 2.5 },
             "damage": { "abloom": 3 },
-            "buffs": {
-                "anomaly": { "cases": [
-                    { "when": { "countTag": "anomaly", "minCount": 3 }, "value": 4 },
-                    { "when": { "countTag": "anomaly", "minCount": 2 }, "value": 2 },
-                    { "value": 0 }
-                ] }
-            },
+            "buffs": { "anomaly": 4 },
             "utility": { "heal:self": true },
             "scaling": { "am": 3, "codependent": true }
         },

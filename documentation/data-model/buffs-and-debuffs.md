@@ -184,8 +184,9 @@ sit on it, all silent:
   compiles, the tests pass, and the feature does nothing.
 * **`teamProcDamageBuff` iterates raw values** and `w()` returns 0 for an object. Phoenix's buff
   is a `{ cases: [...] }` spec, so a raw read drops her whole mechanic. It resolves the spec.
-* **`getBuffRelevance` must widen to the bare key**, or Phoenix's flagship buff is charged at
-  relevance 0 in cohesion.
+* **`getBuffRelevance` must widen to the bare key**. Without it, the original conditional flagship
+buff in Phoenix's beta kit would have been charged at relevance 0 in cohesion. (The condition was 
+since removed and replaced with an unconditional buff.)
 
 Gated on the **team** landing the element rather than on the consumer's own element: the buff is
 partly about the state of the target, so a teammate hitting an afflicted enemy benefits. That is

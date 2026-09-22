@@ -77,8 +77,9 @@ carry, so a correctly routed narrow buff is never charged as unlanded.
 A team-scoped conditional buff is normally charged when it lands below its maximum: a squared
 gap, subtracted straight from the team's Layer 4 total with nothing damping it.
 
-That is right for Remielle and Phoenix, whose conditional buff **is** the codependency — a
-Remielle who is the only anomaly agent on the team has failed at the thing she is for.
+That is right for Remielle and early-beta Phoenix, whose conditional buff **is** the codependency — a
+Remielle who is the only anomaly agent on the team has failed at the thing she is for. (Phoenix's
+conditional buff was replaced with an unconditional buff in later beta releases.)
 
 It is wrong for a generalist support who merely happens to help anomaly teams. `optional: true`
 on the spec is how the data says so. Sunna is the first user: without it, her anomaly buff would

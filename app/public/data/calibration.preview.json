@@ -1,5 +1,5 @@
 {
-  "generated": "2026-09-17T10:00:14.549Z",
+  "generated": "2026-09-22T06:34:07.799Z",
   "method": "linear",
   "target": 400,
   "k": 10,
@@ -7,20 +7,20 @@
   "pools": {
     "armorer": "attack"
   },
-  "engineFingerprint": "d9c9f619148cc02c328069d477e7e27c657560e1be01cdd422495f635147bd65",
+  "engineFingerprint": "7e999aa1486a1b398369d01829fba32b28a0a75aabda3e34fe4959c208dfbbc7",
   "corpus": {
     "teams": 8052,
     "bosses": 19,
     "totalPairs": 152988,
-    "viablePairs": 71746
+    "viablePairs": 71778
   },
   "archetypes": {
     "anomaly": {
       "anchor": 628.6,
       "factor": 0.636304,
-      "n": 17527,
+      "n": 17559,
       "excluded": 1351,
-      "anchorPoolN": 16176,
+      "anchorPoolN": 16208,
       "distinctCarries": 13
     },
     "rupture": {
