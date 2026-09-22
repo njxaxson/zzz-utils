@@ -19,6 +19,7 @@ import { isPrimaryDps, unitFingerprint, getTeamDpsBuckets } from './app/public/l
 import { solveDeadlyAssault } from './app/public/lib/common/deadly-assault-solver.js';
 import { rawScorePassesFilter } from './lib/score-filter.js';
 import { calibrate } from './lib/calibration.js';
+import { filterByUpdate } from './lib/version-filter.js';
 
 const DISPLAY_LIMIT = 5;
 
@@ -68,7 +69,8 @@ const options = parseArgs({
         '  node deadly-assault.js -m -b butch,ucc,pomp     Personal roster',
         '  node deadly-assault.js -q "?roster=..." -10     Share URL, top 10',
         '  node deadly-assault.js -b butch,ucc,pomp -s 300 Teams per boss must CALIBRATE >= 300',
-        '  node deadly-assault.js -b butch,ucc,pomp -d     Debug: top teams, DPS buckets, missing-DPS check'
+        '  node deadly-assault.js -b butch,ucc,pomp -d     Debug: top teams, DPS buckets, missing-DPS check',
+        '  node deadly-assault.js -b butch,ucc,pomp -v 1.0 Only agents/bosses released by version 1.0'
     ].join('\n')
 });
 
@@ -154,7 +156,9 @@ function evaluateExplicitTeams(teamEntries, selectedBossObjects, options, calibr
 }
 
 async function main() {
-    const { units: allUnits, bosses, roster } = await loadAllData();
+    const { units: allUnitsRaw, bosses: bossesRaw, roster } = await loadAllData();
+    const allUnits = filterByUpdate(allUnitsRaw, options.version);
+    const bosses = filterByUpdate(bossesRaw, options.version);
     // Match generate-calibration.mjs's own --preview convention (the preview anchor set is the
     // only one fit against unreleased units) rather than loadAllData()'s default (always released).
     const calibration = await loadCalibration({ preview: options.preview, required: false });
@@ -165,6 +169,10 @@ async function main() {
     }
     applyShareUrl(options, allUnits);
     resolveOptions(options, allUnits);
+
+    if (options.version) {
+        console.log(`Version filter: through ${options.version} (${allUnits.length} units, ${bosses.length} bosses)\n`);
+    }
 
     // ============================================================================
     // BOSS SELECTION

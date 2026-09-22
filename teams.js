@@ -11,20 +11,23 @@ import { applyShareUrl } from './lib/share-url.js';
 import { resolveOptions } from './lib/unit-resolver.js';
 import { buildAvailableUnits } from './lib/roster-builder.js';
 import { getTeams } from './app/public/lib/common/team-builder.js';
+import { filterByUpdate } from './lib/version-filter.js';
 
 const options = parseArgs({
     name: 'teams.js',
     description: 'Generates valid team combinations with customizable filters.',
-    options: ['depth', 'onlyMine', 'preview', 'debug', 'units', 'exclude', 'include', 'flex', 'query', 'flat'],
+    options: ['depth', 'onlyMine', 'preview', 'debug', 'units', 'exclude', 'include', 'flex', 'query', 'flat', 'version'],
     examples: [
         '  node teams.js                     Full roster with hardcoded filters',
         '  node teams.js -m                  Personal roster only',
-        '  node teams.js -u "Miyabi,Astra,Nicole"   Specific units'
+        '  node teams.js -u "Miyabi,Astra,Nicole"   Specific units',
+        '  node teams.js -v 1.0              Only units released by version 1.0'
     ].join('\n')
 });
 
 async function main() {
-    const allUnits = await loadUnits();
+    const allUnitsRaw = await loadUnits();
+    const allUnits = filterByUpdate(allUnitsRaw, options.version);
     const roster = await loadRoster();
 
     applyShareUrl(options, allUnits);

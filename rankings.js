@@ -21,6 +21,7 @@ import { parseTeams } from './lib/team-parser.js';
 import { scoreTeamForBoss, getBossWeaknesses, getBossShill } from './app/public/lib/common/team-scorer.js';
 import { rawScorePassesFilter } from './lib/score-filter.js';
 import { ELEMENTS } from './app/public/lib/common/constants.js';
+import { filterByUpdate } from './lib/version-filter.js';
 
 const DPS_TAGS = ['attack', 'anomaly', 'rupture', 'armorer'];
 const MATCHUPS_DIR = join(process.cwd(), 'matchups');
@@ -28,7 +29,7 @@ const MATCHUPS_DIR = join(process.cwd(), 'matchups');
 const options = parseArgs({
     name: 'rankings.js',
     description: 'Writes matchups/<unit>.csv ladders: one column per boss, top -n teams per agent, best first.',
-    options: ['depth', 'onlyMine', 'preview', 'debug', 'units', 'exclude', 'include', 'flex', 'bosses', 'omit', 'query', 'teams', 'rank', 'element', 'tsv', 'clean'],
+    options: ['depth', 'onlyMine', 'preview', 'debug', 'units', 'exclude', 'include', 'flex', 'bosses', 'omit', 'query', 'teams', 'rank', 'element', 'tsv', 'clean', 'version'],
     defaults: { depth: 3 },
     examples: [
         '  node rankings.js                    Native S-rank DPS agents, top 3 teams each',
@@ -37,7 +38,8 @@ const options = parseArgs({
         '  node rankings.js --clean             Clear stale .csv/.tsv first, then write',
         '  node rankings.js -m                  Whole roster, filtered to personal roster',
         '  node rankings.js -R S                Whole roster, filtered to S-rank',
-        '  node rankings.js :Alice :Miyabi       Only Alice and Miyabi'
+        '  node rankings.js :Alice :Miyabi       Only Alice and Miyabi',
+        '  node rankings.js -v 1.0               Only agents/bosses released by version 1.0'
     ].join('\n')
 });
 
@@ -126,7 +128,9 @@ function buildScoredTeams(allUnits, roster, filteredBosses, previewOverride) {
 }
 
 async function main() {
-    const { units: allUnits, bosses, roster } = await loadAllData();
+    const { units: allUnitsRaw, bosses: bossesRaw, roster } = await loadAllData();
+    const allUnits = filterByUpdate(allUnitsRaw, options.version);
+    const bosses = filterByUpdate(bossesRaw, options.version);
     applyShareUrl(options, allUnits);
     resolveOptions(options, allUnits);
 
@@ -167,7 +171,12 @@ async function main() {
         options.onlyMine || options.rank || options.element || selectedAgentNames
     );
 
-    if (!options.omit) console.log("===== Rankings - Per-Agent Boss Ladders =====\n");
+    if (!options.omit) {
+        console.log("===== Rankings - Per-Agent Boss Ladders =====\n");
+        if (options.version) {
+            console.log(`Version filter: through ${options.version} (${allUnits.length} units, ${bosses.length} bosses)\n`);
+        }
+    }
 
     let filteredBosses = bosses;
     if (options.bosses) {

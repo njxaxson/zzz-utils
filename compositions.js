@@ -17,6 +17,7 @@ import { parseTeams } from './lib/team-parser.js';
 import { scoreTeamForBoss } from './app/public/lib/common/team-scorer.js';
 import { rawScorePassesFilter } from './lib/score-filter.js';
 import { ELEMENTS } from './app/public/lib/common/constants.js';
+import { filterByUpdate } from './lib/version-filter.js';
 
 // A team's line lists only its best-scoring bosses, grouped by identical
 // score (e.g. "Thrall, Defiler: 516.6; Nightmare: 513.6" is 2 groups).
@@ -25,7 +26,7 @@ const TOP_SCORE_GROUPS = 2;
 const options = parseArgs({
     name: 'compositions.js',
     description: 'Shows top scored teams per agent, pivoted across all bosses.',
-    options: ['depth', 'onlyMine', 'preview', 'debug', 'units', 'exclude', 'include', 'flex', 'bosses', 'omit', 'query', 'teams', 'rank', 'element'],
+    options: ['depth', 'onlyMine', 'preview', 'debug', 'units', 'exclude', 'include', 'flex', 'bosses', 'omit', 'query', 'teams', 'rank', 'element', 'version'],
     defaults: { depth: 3 },
     examples: [
         '  node compositions.js                    All agents, top 3 teams each',
@@ -35,7 +36,8 @@ const options = parseArgs({
         '  node compositions.js -m                  Personal roster only',
         '  node compositions.js -i "Ye Shunguong"   Teams must include Ye Shunguong',
         '  node compositions.js -b thrall,defiler   Score against Thrall and Defiler only',
-        '  node compositions.js :Alice :Miyabi      Only show sections for Alice and Miyabi'
+        '  node compositions.js :Alice :Miyabi      Only show sections for Alice and Miyabi',
+        '  node compositions.js -v 1.0              Only agents/bosses released by version 1.0'
     ].join('\n')
 });
 
@@ -54,7 +56,9 @@ function groupBossScores(bossScores) {
 }
 
 async function main() {
-    const { units: allUnits, bosses, roster } = await loadAllData();
+    const { units: allUnitsRaw, bosses: bossesRaw, roster } = await loadAllData();
+    const allUnits = filterByUpdate(allUnitsRaw, options.version);
+    const bosses = filterByUpdate(bossesRaw, options.version);
     applyShareUrl(options, allUnits);
     resolveOptions(options, allUnits);
 
@@ -106,6 +110,9 @@ async function main() {
 
     if (!options.omit) {
         console.log("===== Team Compositions - By Agent =====\n");
+        if (options.version) {
+            console.log(`Version filter: through ${options.version} (${allUnits.length} units, ${bosses.length - 1} bosses)\n`);
+        }
     }
 
     let teamEntries;

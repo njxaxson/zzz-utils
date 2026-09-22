@@ -13,6 +13,7 @@ import {
     analyze, tierToQuality, qualityLabel, getBestTier, getUnitElement,
     isSubdps, capitalize, DPS_ARCHETYPES, ELEMENTS
 } from './app/public/lib/common/pull-engine.js';
+import { filterByUpdate } from './lib/version-filter.js';
 
 const options = parseArgs({
     name: 'pull-debug.js',
@@ -26,12 +27,14 @@ const options = parseArgs({
         '  node pull-debug.js -Miyabi            Remove Miyabi from roster',
         '  node pull-debug.js +Orphie            Add Orphie to roster',
         '  node pull-debug.js -m +Astra          Personal roster + add Astra',
-        '  node pull-debug.js -q "?roster=eJwN..."  Roster from share URL'
+        '  node pull-debug.js -q "?roster=eJwN..."  Roster from share URL',
+        '  node pull-debug.js -v 1.0             Only units released by version 1.0'
     ].join('\n')
 });
 
 async function main() {
-    const allUnits = await loadUnits();
+    const allUnitsRaw = await loadUnits();
+    const allUnits = filterByUpdate(allUnitsRaw, options.version);
     const roster = await loadRoster();
 
     applyShareUrl(options, allUnits);

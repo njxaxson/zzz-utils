@@ -5,12 +5,16 @@
 
 import { parseArgs } from './lib/cli.js';
 import { loadBosses } from './lib/data.js';
+import { filterByUpdate } from './lib/version-filter.js';
 
-parseArgs({
+const options = parseArgs({
     name: 'bosses.js',
     description: 'Displays bosses grouped by elemental weakness and by favored DPS archetype.',
-    options: [],
-    examples: '  node bosses.js     Show bosses by elemental weakness and archetype'
+    options: ['version'],
+    examples: [
+        '  node bosses.js         Show bosses by elemental weakness and archetype',
+        '  node bosses.js -v 1.0  Only bosses released by version 1.0'
+    ].join('\n')
 });
 
 function printGroups(map, order) {
@@ -25,7 +29,7 @@ function printGroups(map, order) {
 }
 
 async function main() {
-    const bosses = await loadBosses();
+    const bosses = filterByUpdate(await loadBosses(), options.version);
     const byElement = {};
     const byArchetype = {};
 

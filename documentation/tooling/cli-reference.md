@@ -19,6 +19,7 @@ Each script enables a subset. Two scripts — `pulled.js` and `tiers.js` — ena
 | `--only-mine` | `-m` | Use the personal roster from `roster.json` |
 | `--preview` | `-p` | Include unreleased (`available: false`) units |
 | `--units` | `-u` | Unit whitelist |
+| `--version` | `-v` | Filter units/bosses to those released by this update or earlier (e.g. `1.0`) |
 | `--exclude` | `-x` | Unit blacklist |
 | `--flex` | `-f` | Universal units that may join any team |
 | `--rank` | `-R` | Filter by rank, S or A |
@@ -47,6 +48,7 @@ Each script enables a subset. Two scripts — `pulled.js` and `tiers.js` — ena
 | `pull-debug.js` | Runs the [pull engine](../recommendations/pull-engine.md) from the CLI |
 | `pulled.js` | Roster by mindscape and weapon. No flags |
 | `tiers.js` | Units by tier. No flags |
+| `bosses.js` | Bosses grouped by elemental weakness and favored DPS archetype. Only enables `--version` |
 | `rankings.js` | Per-agent CSV of top teams, one column per boss that agent cares about — element-weak, shill match, or explicitly favored. Writes `matchups/<agent>.csv`. Carries no scores, so it diffs as a pure ordering artifact. Enables `--tsv` and `--clean` |
 | `reformat-units.mjs` | Normalises `units.json` formatting |
 

@@ -16,6 +16,7 @@ import { parseTeams } from './lib/team-parser.js';
 import { scoreTeamForBoss, getBossWeaknesses, getBossResistances, getBossShill, getBossAnti, getBossAssists } from './app/public/lib/common/team-scorer.js';
 import { rawScorePassesFilter } from './lib/score-filter.js';
 import { calibrate } from './lib/calibration.js';
+import { filterByUpdate } from './lib/version-filter.js';
 
 const options = parseArgs({
     name: 'matchups.js',
@@ -28,7 +29,8 @@ const options = parseArgs({
         '  node matchups.js -q "?roster=eJwN..."     From share URL',
         '  node matchups.js -i Miyabi                Teams must include Miyabi',
         '  node matchups.js -s 300                   Only teams CALIBRATED >= 300 vs each boss',
-        '  node matchups.js -r 20 120                Calibrated scores between 20 and 120 (inclusive)'
+        '  node matchups.js -r 20 120                Calibrated scores between 20 and 120 (inclusive)',
+        '  node matchups.js -v 1.0                   Only agents/bosses released by version 1.0'
     ].join('\n')
 });
 
@@ -38,7 +40,9 @@ const options = parseArgs({
 // for reference, since raw is what the four-suite verification loop and the engine's own debug
 // output are anchored to.
 async function main() {
-    const { units: allUnits, bosses, roster } = await loadAllData();
+    const { units: allUnitsRaw, bosses: bossesRaw, roster } = await loadAllData();
+    const allUnits = filterByUpdate(allUnitsRaw, options.version);
+    const bosses = filterByUpdate(bossesRaw, options.version);
     // Match generate-calibration.mjs's own --preview convention rather than loadAllData()'s
     // default (always the released file): under -p the board can contain unreleased units, which
     // only the preview anchor set was fit against.
@@ -71,6 +75,9 @@ async function main() {
     // ============================================================================
     if(!options.omit) {
         console.log("===== Team Matchups - All Bosses =====\n");
+        if (options.version) {
+            console.log(`Version filter: through ${options.version} (${allUnits.length} units, ${bosses.length - 1} bosses)\n`);
+        }
         console.log(`Full roster: ${allUnits.length} characters\n`);
     }
     let teamEntries;
