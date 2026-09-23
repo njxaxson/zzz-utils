@@ -13,6 +13,8 @@ brings nothing to the damage side of a rupture team.
 Norma is strong in this slot for a specific reason: she converts sheer buffs into personal
 ATK, so buffs aimed at the carry are not wasted on her.
 
+Lycaon is also a good stunner when using ice rupture units (e.g. Yidhari). 
+
 ## Contrast with the armorer
 
 Rupture and [armorer](../concepts/armorer-laceration-gash-maim.md) look similar — both have a
@@ -23,10 +25,12 @@ away.
 ## Evolution
 
 * 2.0
-  * The rupture class is introduced with grandmaster-tier Yixuan, who dominates season 2 as one of the strongest DPS agents in the game, comparable to Miyabi.  A-rank defense unit Pan is added as initial rupture support; Ju Fufu is a new stunner designed to be best-in-class for Yixuan; although not for long.
+  * The rupture class is introduced with grandmaster-tier Yixuan, who dominates season 2 as one of the strongest DPS agents in the game, comparable to Miyabi.  
+  * A-rank defense unit Pan is added as initial rupture support. 
+  * Ju Fufu is a new stunner designed to be best-in-class for Yixuan; although not for long.
   * Koleda and Lucy are retrofitted to join with rupture agents, just to give players some team building options - but both are underwhelming for rupture teams.
 * 2.3
-  * Lucia and Yidhari are released, alongside A-rank Komano as a low-cost rupture alternative. Lucia is still the premier rupture support agent.  Yidhari pairs well with Lycaon.
+  * Lucia and Yidhari are released, alongside A-rank Komano as a low-cost rupture alternative. Lucia is the premier rupture support agent, a position she still holds today.  Yidhari pairs well with Lycaon.
 * 2.4
   * Dialyn and Banyue are released. Dialyn outclasses every stunner in the game and instantly becomes best-in-slot for every attack and rupture team, completely supplanting Ju Fufu except on fire-weak bosses. Banyue caters to playskill-intensive members of the fanbase and, while good, is easily the lower end of the S-rank rupture options.
 * 2.6
@@ -37,9 +41,4 @@ away.
   * Norma is released and is uniquely compatible with Lucia and Pan, making her an alternative to the highly demanded Dialyn on rupture teams.
 * 3.2
   * Roxy is released, providing another rupture-compatible stunner; although she is more closely aligned with armorers.
-
-    \
-
-  \
-
-
+  

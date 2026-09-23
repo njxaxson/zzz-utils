@@ -1,6 +1,8 @@
 # Armorer
 
-**Shape:** builder + armorer + a shred or crit-rate support. Explicitly **not** double support.
+**Shape:** Currently too early to definitively say, but usually stun + armorer + suitable support, 
+or double-stun and armorer. There is some indication that once more armorer units are released, 
+dual-armorer teams will be likely.
 
 The fourth and newest DPS class, and a deliberate inversion of the standard model: it scales off
 DEF, receives almost no buffs, and detonates a shared meter. Claret is currently the only one.
@@ -72,5 +74,7 @@ buff at all**, which matters exactly because so little else can reach them.
     no CD scaling.
   * Roxy releases in the same patch, intended as an armorer-centric stunner.
   * Koleda receives a potential vision unlock that cements her as the best stun alternative to Roxy.
-
+* 3.4
+  * There is speculation that Sunbringer will be a fire armorer in this future release, although there is little 
+  concrete evidence to indicate that this is certain. 
 

@@ -42,7 +42,7 @@ This matters for element resistance. A stunner whose element is resisted is *pen
 * 1.3
   * Lighter releases and becomes best-in-slot for Ellen and Soldier 11.
 * 1.6
-  * Trigger and A-rank Pulchra are released along with SAnby to form aftershock team **Trigger/SAnby/Pulchra**,
+  * Trigger and A-rank Pulchra are released along with SAnby to form aftershock team **Trigger/SAnby/Pulchra**.
   * While aftershock-centric teams peter out, Trigger remains a solid stunner. Her defense shred later turns out to matter far more to armorers than to the aftershock teams he was built for.
 * 2.0
   * Ju Fufu is introduced with the rupture class, designed as best-in-class for Yixuan. It does
@@ -59,9 +59,10 @@ This matters for element resistance. A stunner whose element is resisted is *pen
     overnight.
 * 3.0
   * Norma releases, uniquely compatible with Lucia and Pan, and becomes the alternative to the
-    heavily contested Dialyn on rupture teams.
+    heavily contested Dialyn on rupture teams. Her focus on chain attacks makes her the new best stunner 
+    for Evelyn and Starlight Billy, and for the attacker Sigrid who will be released in the next patch. 
 * 3.2
   * Roxy releases as an armorer-centric stunner who also works well for attack agents that benefit from wind anomaly procs.
-  * Koleda is retrofitted to join with armorers and receives a potential vision unlock with buffs that increase her wider relevance.
+  * Koleda is retrofitted to join with armorers and receives a potential vision unlock with buffs that increase her wider relevance, but mostly classify her as an standard alternative to Roxy for armorer teams. 
 
 

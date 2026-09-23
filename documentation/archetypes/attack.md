@@ -7,17 +7,12 @@ ultimates, and most of that damage lands inside a stun window — so the team ne
 create the window, and someone to amplify what happens inside it.
 
 The support slot is interchangeable with most defense units; defenders in this game have essentially
-
-become alternate supports that happen to hit slightly harder (see [elements and roles](../concepts/elements-and-roles.md)). One original
-
-defense unit, Ben, preceded this design decision.
+become alternate supports that happen to hit slightly harder (see [elements and roles](../concepts/elements-and-roles.md)). One original defense unit, Ben, preceded this design decision.
 
 One canonical support pairing here is Astra + Nicole. That is a [wheelchair](wheelchairs.md), not a fixed template —
-
 it scores well because of the buffs those two supply, and would stop scoring well if those buffs changed.
 
 Now that there are more supports and stronger stunners, this wheelchair is not as dominant as it was,
-
 with many attackers preferring a strong stunner like Dialyn or Norma (etc.) and Sunna as the support agent.
 
 ## Evolution
@@ -37,7 +32,7 @@ with many attackers preferring a strong stunner like Dialyn or Norma (etc.) and 
   * The first limited S-rank support agent is released, Astra, followed by new fire attack agent Evelyn. **Lighter/Evelyn/Astra** is the new dominant premium fire team.
   * Players realize the strength of running Nicole+Astra alongside a DPS and a new double-support wheelchair opens up some attack options, although most are running Miyabi/Astra/Nicole over attack options for this wheelchair.
 * 1.6
-  * SAnby is released alongside A-rank Pulchra, followed by Trigger to make the new aftershock team, Trigger/SAnby/Pulchra.  SAnby is extremely buggy, so much that the playerbase sees her as a failure. Harumasa’s dash attacks are retrofitted as aftershock to maybe work with SAnby, but he still doesn’t takes off and his best team is Trigger/Harumasa/Astra.
+  * SAnby is released alongside A-rank Pulchra, followed by Trigger to make the new aftershock team, Trigger/SAnby/Pulchra.  SAnby is extremely buggy, so much that the playerbase sees her as a failure. Harumasa’s dash attacks are retrofitted as aftershock to maybe work with SAnby, but he still doesn’t take off and his best team is Trigger/Harumasa/Astra.
 * 1.7
   * Hugo is released, creating a new style of attack team for his totalize mechanic: double-stunner attack teams. Hugo is seen both as a niche appeal to the female player demographic and sits in Miyabi’s shadow.
 * 2.0
@@ -52,7 +47,7 @@ with many attackers preferring a strong stunner like Dialyn or Norma (etc.) and 
 * 2.4
   * Dialyn is released and becomes instant best-in-class stunner for attack and rupture teams.
 * 2.5
-  * Ye Shunguong is released, along with Zhao who is given away for free.  She instantaneously becomes the dominant DPS in the game, far surpassing the average player’s damage output of previous void hunter Miyabi and grandmaster Yixuan. However, she is tied to an ether-veil gimmick so that she is heavily bound to either Sunna or Zhao in order to be effective; a strategy intended to limit her interactions with future units. **Dialyn/YSG/Sunna** and **YSG/Zhao/Sunnna** become the premier attack teams.
+  * Ye Shunguong is released, along with Zhao who is given away for free.  She instantaneously becomes the dominant DPS in the game, far surpassing the average player’s damage output of previous void hunter Miyabi and grandmaster Yixuan. However, she is tied to an ether-veil gimmick so that she is heavily bound to either Sunna or Zhao in order to be effective; a strategy intended to limit her interactions with future units. **Dialyn/YSG/Zhao** and **Astra/YSG/Zhao** become the premier attack teams until Sunna is released in the next patch.
   * Ellen, Soldier 11, and SAnby receive potential vision unlocks to significantly improve their kits. SAnby in particular receives a very good set of buffs and finally sets her in place as a suitably strong electric attack agent, with her best team still being Trigger/SAnby/Orphie.  Ellen’s unlock keeps her viable but not more than that. Soldier 11 is now viable at lower mindscapes but extremely powerful at higher mindscapes.
 * 2.6
   * Harumasa gets a potential vision unlock that helps make him a bit easier to play and increase his damage. He is still challenging to wield and still achieves underwhelming results.
@@ -70,8 +65,9 @@ with many attackers preferring a strong stunner like Dialyn or Norma (etc.) and 
   * Nekomata receives a potential vision unlock that catapults her from being underwhelming to being particularly powerful for a standard S-rank. At high mindscapes, she can even compete with YSG’s damage output on certain bosses.
   * Zhu Yuan is added to the 50/50 loss pool, cementing her as no longer likely to receive any buffs.
 * 3.2
-  * Koleda receives a potential vision unlock that helps her be more relevant to attack teams.
+  * Koleda receives a potential vision unlock that helps her be more relevant to attack teams, although her unlock is mostly intended to slot her on armorer compositions rather than attack. 
+* 3.3
+  * Severian is revealed as a wind attack agent with strong burst damage and a lot of unique dodge and parry abilities. 
 
-  \
 
 
