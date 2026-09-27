@@ -259,7 +259,7 @@
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "buffs" : { "laceration": 3 },
-            "scaling": { "buffs" : 0, "cd" : 1 }
+            "scaling": { "buffs" : 0 }
         },
         "faction": "Flint Workshop",
         "displayText": "Goth Barbie is the first armorer unit and craves crit rate and defense. Her favorite support is Rina P6.",
@@ -947,7 +947,8 @@
             "buffs": {
                 "stun-multiplier": 2,
                 "laceration": { "cases": [ { "when": { "role": "armorer" }, "value": 2 }, { "value": 0 } ] },
-                "cd":         { "cases": [ { "when": { "role": "armorer" }, "value": 0 }, { "value": 3 } ] }
+                "cd":         { "cases": [ { "when": { "role": "armorer" }, "value": 0 }, { "value": 3 } ] },
+                "dmg": 1
             },
             "debuffs": { "recovery": 2 },
             "utility": { "anomaly:wind": 1 },

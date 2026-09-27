@@ -18,6 +18,9 @@ documented in full under
 [armorer, laceration, gash and maim](../concepts/armorer-laceration-gash-maim.md). This page is
 about what the *team* looks like.
 
+Armorer agents do not use energy like attackers, anomaly, stun, support, or defense classes. Instead
+they have an analogue called sharpness, and so they do not benefit from energy regeneration.  
+
 ## Why the team shape is unusual
 
 Two facts drive it, and they push in the same direction.

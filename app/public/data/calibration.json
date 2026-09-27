@@ -1,5 +1,5 @@
 {
-  "generated": "2026-09-22T10:32:52.609Z",
+  "generated": "2026-09-27T07:50:37.927Z",
   "method": "linear",
   "target": 400,
   "k": 10,
@@ -7,7 +7,7 @@
   "pools": {
     "armorer": "attack"
   },
-  "engineFingerprint": "5b852585629d155fd22241926cf2cf730cc823ace97d76d73c1820e03d41b2e6",
+  "engineFingerprint": "8f476b8b7c0a0df4b49b9a3ce120cd93adc2050cfec306a7bba1195672a60e7e",
   "corpus": {
     "teams": 6897,
     "bosses": 19,
@@ -39,7 +39,7 @@
       "anchorPoolN": 1885,
       "distinctCarries": 1,
       "pooledInto": "attack",
-      "selfAnchor": 402.9
+      "selfAnchor": 401
     },
     "attack": {
       "anchor": 521.3,

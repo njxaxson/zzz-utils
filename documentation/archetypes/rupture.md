@@ -6,6 +6,16 @@ Rupture carries deal Sheer damage, which **ignores enemy defense**. The immediat
 for team-building is that defense shred and PEN are worthless here — a Nicole or a Trigger
 brings nothing to the damage side of a rupture team.
 
+Another characteristic of rupture agents is that the drain some of their own HP to fuel attacks, 
+which is why most of them also have built-in self-healing. Yixuan is the exception; instead she
+simply redistributes HP whenever she ultimates to equalize the team's health; potentially losing
+some of her own HP to give to others. 
+
+Rupture agents do not use energy like attackers, anomaly, stun, support, or defense classes. Instead
+they have an analogue called adrenaline, and so they do not benefit from energy regeneration.  
+Rupture agents can often refuel their adrenaline over time or with attacks; Yixuan in particular can
+refuel her adrenaline frequently and rarely runs out. 
+
 ## Stunner ordering
 
 > Dialyn or Norma > Ju Fufu or Koleda P6
