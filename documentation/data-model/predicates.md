@@ -19,6 +19,14 @@ the scorer: the pull engine carried a fork that understood three keys and silent
 | `{ "role": "<role>" }` | The **consumer receiving the value** has that effective role |
 | `{ "provisions": "<something>" }` | A teammate provisions the designated thing |
 
+### `countTag` on an element
+
+Element names are tags, so `countTag` can ask about an element. Because self is counted, a
+wind unit asking for *one other* wind teammate writes `minCount: 2` — Severian's
+`{ "countTag": "wind", "minCount": 2 }`. It reads raw tags, so a lumen unit morphed into wind
+does not count. That is the owner's ruling for Severian, and it is why the predicate is
+`countTag` rather than `hasUnit: "<role>:wind"`, which would see the morph.
+
 ### Identifier forms for `hasUnit` / `notPresent`
 
 * A plain id — `"miyabi"` — matches that unit by id.
@@ -70,6 +78,14 @@ armorers and `cd` to everybody else, expressed as two cases in one kit.
 Recipient-scoped values are **exempt** from the under-activation penalty. A per-recipient buff
 is never "under-activated" — utilisation resolves it to the best value that actually reaches a
 carry, so a correctly routed narrow buff is never charged as unlanded.
+
+### Self-targeted buffs are never charged either
+
+A buff written with `target: "self"` is exempt from the under-activation penalty whatever its
+predicate reads. Severian's passive is team-scoped (`countTag`), and he is still not charged for
+lacking a wind teammate: it is a bonus for him, not the thing he is for. Its predicates resolve
+with the owner as both `self` and the recipient. See
+[buffs and debuffs](buffs-and-debuffs.md#who-receives-a-buff-target).
 ## Code notes
 
 ### [PRED-01] `optional` — a conditional buff that is allowed not to fire

@@ -118,6 +118,50 @@ team-wide figure therefore let a support "do her job" by buffing the stunner.
 `buffs.<key>.cases` — Remielle's gated ATK — the designer gated it deliberately, so it is the
 unit's identity by construction. See [predicates](predicates.md).
 
+## Who receives a buff: `target`
+
+By default, a buff goes to the unit's **teammates** and never to the unit itself. Some kits buff
+their owner instead. Severian is the first: when another teammate is wind, *he* gets +30% crit
+damage. Roxy does not get it, and neither does his support.
+
+That is written on the buff spec, the same way `optional` is:
+
+```json
+"buffs": {
+  "cd": {
+    "target": "self",
+    "cases": [
+      { "when": { "countTag": "wind", "minCount": 2 }, "value": 2 },
+      { "value": 0 }
+    ]
+  }
+}
+```
+
+| `target` | Who receives it |
+|----|----|
+| *(absent)* | Teammates only. Every buff before Severian |
+| `"self"` | The declaring unit only |
+
+Nothing else is defined. `"all"` (teammates **and** self) is the natural next value, and is also
+the way around the one limit here: a key holds one spec, so a unit cannot give teammates `cd`
+**and** give itself `cd` today.
+
+The unconditional form is `{ "target": "self", "value": 2 }`.
+
+What a self-targeted buff does, and does not do:
+
+| | |
+|----|----|
+| Pays its owner | Exactly what the same buff from a teammate would pay |
+| Reaches teammates | Never |
+| Counts in the owner's buff utilisation | No — it is not something the unit brings to the team |
+| Charged when it does not fire | No. Severian without a wind teammate simply lacks the bonus |
+| Shown on the character summary | No. The free-form description is where a human notes it |
+
+Only crit rate and crit damage can be self-targeted for now. Any other key, an unknown `target`,
+or `optional` on a self-targeted buff throws rather than scoring silently as 0. See `[BUFF-09]`.
+
 ## Code notes
 
 ### [BUFF-01] Supplier buffs a damage type the consumer deals
@@ -261,7 +305,8 @@ consumer's Mastery appetite a second.
 own kit, where the buff scales that consumer's own vortex.
 
 The engine's universal rule is that a supplier is not its own consumer — `chain:extra` is kept
-out of `utility.chains` for exactly this reason, see `[ULT-01]`. The vortex payout deliberately
+out of `utility.chains` for exactly this reason, see `[ULT-01]`. The one declared exception is a
+buff written with `target: "self"`, see `[BUFF-09]`. The vortex payout deliberately
 breaks it, because Jane really does buff her own assault procs in game and the vortex is built on
 them. But a unit's own damage is already priced through AP and proc rate; this channel exists to
 value what a unit brings to **others**.
@@ -274,3 +319,45 @@ self-buffing — at `PROC_BUFF_VORTEX_SCALE: 0` the two were identical to the de
 **The value is not anchored.** 0.15 is where the Burnice/Jane rung lands, and 0.0 is arguably
 more principled (it is what every other self-provision gets). Owner call, recorded as a known
 weakness rather than dressed up.
+
+### [BUFF-09] A self-targeted buff is split off once, and priced like a teammate's
+
+**The Severian case.** His passive gives *himself* crit damage beside another wind unit. The
+engine had no way to say that. The L4 pair loop never pairs a unit with itself. A conditional
+`stats` or `scaling` value reads as 0 — and a conditional `scaling.cd` would have silently
+deleted his attack-baseline crit weight on every team.
+
+**Split once, where every reader already looks.** `buffs` is read raw in 19 places in the scorer:
+cohesion utilisation, the "does this unit contribute buffs" check, the under-activation penalty,
+L2's wasted-DPS-buff charge, L3's crit-damage supply, baseline affinity, need fulfilment. Teaching
+each of them to skip a self-targeted spec is 19 chances to miss one silently. Instead the
+`UnitContext` constructor splits the map: the context's `mechanics.buffs` holds only the
+teammate buffs, and the self specs move to `_selfBuffSpecs`. Every scorer reader is then correct
+by construction. The pull engine and the UI work on raw units, so they go through
+`getTeammateBuffs` / `getSelfBuffSpecs`, which answer the same way for a raw unit or a context.
+
+The two readers that would have gone wrong worst were in the pull engine:
+
+* the conditional-buff tag rule would have read his wind case as a team need, and cut every
+  non-wind stunner's fit for him to a fifth;
+* the dependency check would have told a Severian owner to pull Roxy or Velina before he can work.
+
+**Priced like a teammate's, by one function.** `priceStatBuff` prices a crit buff whoever supplies
+it. The self term lands in the owner's incoming L4 total, before codependency, diametric and the
+boss-element modifier, so it is scaled exactly as Roxy's own crit-damage buff is.
+
+| Severian's team, neutral boss | Self term |
+|----|----|
+| Roxy / Severian / Sunna | +2.8 |
+| Dialyn / Severian / Sunna | 0 — no wind teammate, and no charge either |
+
+**What it does not achieve.** Crit damage is a cheap stat in this engine, so +2.8 is small against
+the things that separate stunners. Dialyn pays Severian 29.3 in free ultimates alone. The
+owner-stated ladder is Roxy over Norma on wind-weak bosses (it holds, rankings TEST 95) and Roxy
+comparable to Norma on neutral (it does not: Norma still leads by about 10). The neutral half is
+not tracked as an issue, by owner decision.
+
+Mechanics TEST 36 pins the behaviour. Its central assertion is equivalence: raising Roxy's own
+crit-damage buff by 2 pays Severian exactly what his self term pays him. That fails if the buff
+leaks to teammates, and fails if it is priced any other way. Recommendations TEST 49 pins the
+pull-engine half.

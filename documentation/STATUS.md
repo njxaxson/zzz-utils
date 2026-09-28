@@ -7,15 +7,15 @@ re-run the commands and update the numbers.
 change belongs in [CHANGELOG.md](CHANGELOG.md); anything that explains a settled ruling belongs
 in [notes/adjudications.md](notes/adjudications.md) behind a tag.
 
-**Last verified:** 2026-09-22.
+**Last verified:** 2026-09-27.
 
 ## Test status
 
 | Suite | State |
 |----|----|
-| mechanics | **35 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
-| rankings | **93 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
-| recommendations | **46 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
+| mechanics | **36 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
+| rankings | **94 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
+| recommendations | **47 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
 | bucketing | **6 pass, 0 fail** |
 | cohesion fixture | **11/11** owner judgements hold |
 | calibration freshness | both files match the current engine/data fingerprint **and** the current `pools` map |

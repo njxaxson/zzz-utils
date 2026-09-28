@@ -12,7 +12,8 @@ import {
     checkTeamDependencies,
     DPS_ARCHETYPES,
     hasDPSRole,
-    getPrimaryDPSArchetype
+    getPrimaryDPSArchetype,
+    mechanicsFitScore
 } from './app/public/lib/common/pull-engine.js';
 
 function assert(cond, msg) {
@@ -880,6 +881,32 @@ await runTest(48, 'A carry whose only burst is a chain attack earns no recovery-
     const windGap = result.allGaps.find(g => g.id === 'element-wind');
     assert(windGap?.units?.some(u => u.id === 'severian'),
         'Severian should still be a wind DPS candidate');
+});
+
+await runTest(49, 'A self-targeted buff credits only the teammate who switches it on', () => {
+    // Severian's `buffs.cd` targets himself and fires beside another wind unit. Roxy earns that
+    // fit; Dialyn and Norma do not, and his wind case must not read as a teammate conditional
+    // (a 0.2 fit discount on every non-wind stunner, or an unmet codependency). [PULL-04]
+    const severian = unitByName(allUnits, 'Severian');
+    if (!severian) return;
+    const { buffs: _drop, ...bareMechanics } = severian.mechanics;
+    const stripped = { ...severian, mechanics: bareMechanics };
+    const [roxy, dialyn, norma] = ['Roxy', 'Dialyn', 'Norma'].map(n => unitByName(allUnits, n));
+
+    assert(mechanicsFitScore(roxy, severian) > mechanicsFitScore(roxy, stripped),
+        `Roxy's fit for Severian must include his passive: ${mechanicsFitScore(roxy, severian)} vs ${mechanicsFitScore(roxy, stripped)}`);
+    for (const s of [dialyn, norma]) {
+        assert(mechanicsFitScore(s, severian) === mechanicsFitScore(s, stripped),
+            `${s.name}'s fit for Severian must not move: ${mechanicsFitScore(s, severian)} vs ${mechanicsFitScore(s, stripped)}`);
+    }
+
+    // The dependency check only runs for codependent units, so ask it about a codependent clone —
+    // otherwise this half passes whatever the accessor does.
+    const codep = u => ({ ...u, mechanics: { ...u.mechanics, scaling: { ...u.mechanics.scaling, codependent: true } } });
+    const { ownedUnits } = buildSyntheticRoster(allUnits, ['Dialyn', 'Astra', 'Nicole']);
+    const deps = JSON.stringify(checkTeamDependencies(codep(severian), ownedUnits, allUnits));
+    const depsBare = JSON.stringify(checkTeamDependencies(codep(stripped), ownedUnits, allUnits));
+    assert(deps === depsBare, `a self-targeted buff must not create a team dependency: ${deps} vs ${depsBare}`);
 });
 
 // Tests that are red ON PURPOSE. Same contract as test-mechanics.mjs's and test-rankings.mjs's

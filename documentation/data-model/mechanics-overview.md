@@ -31,7 +31,7 @@ Values above 3 exist where a unit is deliberately off the conventional scale —
 | `elementalVariant` | Alternate anomaly-gauge tracking | [elements](../concepts/elements-and-roles.md) |
 | `onfield` | Explicit on-field demand override | [pseudoRole](pseudorole.md) |
 | `damage` | Distinctive damage types this unit deals | [damage and burst](damage-and-burst.md) |
-| `buffs` | What it buffs for teammates | [buffs and debuffs](buffs-and-debuffs.md) |
+| `buffs` | What it buffs for teammates — or, with `target: "self"`, for itself | [buffs and debuffs](buffs-and-debuffs.md) |
 | `debuffs` | What it debuffs on enemies | [buffs and debuffs](buffs-and-debuffs.md) |
 | `utility` | Non-stat contributions | [utility](utility.md) |
 | `scaling` | What it benefits *from* | [scaling](scaling.md) |

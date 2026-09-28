@@ -105,6 +105,7 @@ Populated during the comment pass. One row per tag, newest last within a prefix.
 | `[BUFF-06]` | `../data-model/buffs-and-debuffs.md` | A damage-type buff is rated by how central the type is to its kit |
 | `[BUFF-07]` | `../data-model/buffs-and-debuffs.md` | Three anomaly buffs, three gates, all flat — "anomaly affinity" was an engine invention |
 | `[BUFF-08]` | `../data-model/buffs-and-debuffs.md` | A proc-damage buff landing on its own owner counts at 15% |
+| `[BUFF-09]` | `../data-model/buffs-and-debuffs.md` | A self-targeted buff (`target: "self"`) is split off on the context and priced like a teammate's — the Severian case |
 | `[COH-01]` | `../engine/cohesion.md` | A unit PLAYING support is judged as one, even with a DPS tag (Remielle/Orphie/Cissia) |
 | `[COH-02]` | `../engine/cohesion.md` | The element-buff menu, and why only Lighter can be moved by it |
 | `[COH-03]` | `../engine/cohesion.md` | Delivery is priced at the square root of the L4 coefficient |
@@ -142,6 +143,7 @@ Populated during the comment pass. One row per tag, newest last within a prefix.
 | `[PIPE-03]` | `../engine/layers.md` | A `join` that mandates a second carry — why it waives rather than grants |
 | `[AOD-01]` | `../data-model/unit-object.md` | Angels of Delusion are declared, not modelled; `CONJUNCTIVE_SYNERGY_BONUS` re-derived 55 → 45 against them |
 | `[PULL-03]` | `../recommendations/mechanics-fit-score.md` | The recovery debuff reads the scorer's burst model, not a MAX over `damage` values |
+| `[PULL-04]` | `../recommendations/mechanics-fit-score.md` | A carry's self-targeted buff is credited to the teammate who switches it on |
 | `[GAP-01]` | `../recommendations/coverage-and-gaps.md` | An element covered only by a sub-DPS gets its own reason line, not "no DPS options" |
 | `[CAL-01]` | `../engine/calibration.md` | The synthetic neutral boss is not in the fitting corpus |
 | `[CAL-02]` | `../engine/calibration.md` | Archetype pooling, and why the map is a second staleness axis |

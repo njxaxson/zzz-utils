@@ -1,4 +1,4 @@
-import { getElement, isSRank, isLimited, isARank } from '../common/team-scorer.js';
+import { getElement, isSRank, isLimited, isARank, getTeammateBuffs } from '../common/team-scorer.js';
 import { ELEMENTS } from '../common/constants.js';
 
 let allUnits = [];
@@ -335,32 +335,33 @@ function buildSynergyLine(unit) {
         parts.push(`<span class="mech-label">Pseudo-role:</span> ${roleText}`);
     }
 
-    // Buffs
+    // Buffs — a self-targeted buff is the unit's own passive and is not listed. [BUFF-09]
+    const teamBuffs = getTeammateBuffs(unit);
     const buffs = [];
-    if (mechanics.buffs) {
-        if (mechanics.buffs.atk) buffs.push(formatMechanic('Attack', mechanics.buffs.atk));
-        if (mechanics.buffs.buildup) buffs.push(formatMechanic('Anomaly Buildup', mechanics.buffs.buildup));
-        if (mechanics.buffs.ap) buffs.push(formatMechanic('Anomaly Proficiency', mechanics.buffs.ap));
-        if (mechanics.buffs.am) buffs.push(formatMechanic('Anomaly Mastery', mechanics.buffs.am));
-        if (mechanics.buffs.aftershock) buffs.push(formatMechanic('Aftershock', mechanics.buffs.aftershock));
-        if (mechanics.buffs.abloom) buffs.push(formatMechanic('Abloom', mechanics.buffs.abloom));
-        if (mechanics.buffs.chain) buffs.push(formatMechanic('Chain Attacks', mechanics.buffs.chain));
-        if (mechanics.buffs.sheer) buffs.push(formatMechanic('Sheer Damage', mechanics.buffs.sheer));
-        if (mechanics.buffs.def) buffs.push(formatMechanic('DEF', mechanics.buffs.def));
-        if (mechanics.buffs.pen) buffs.push(formatMechanic('PEN', mechanics.buffs.pen));
-        if (mechanics.buffs['stun-multiplier']) buffs.push(formatMechanic('Stun Multiplier', mechanics.buffs['stun-multiplier']));
-        if (mechanics.buffs.cr) buffs.push(formatMechanic('Crit Rate', mechanics.buffs.cr));
-        if (mechanics.buffs.cd) buffs.push(formatMechanic('Crit Damage', mechanics.buffs.cd));
-        if (mechanics.buffs.dmg) buffs.push(formatMechanic('General Damage', mechanics.buffs.dmg));
-        if (mechanics.buffs.disorders) buffs.push(formatMechanic('Disorders', mechanics.buffs.disorders));
-        if (mechanics.buffs.vortex) buffs.push(formatMechanic('Vortex', mechanics.buffs.vortex));
+    if (teamBuffs) {
+        if (teamBuffs.atk) buffs.push(formatMechanic('Attack', teamBuffs.atk));
+        if (teamBuffs.buildup) buffs.push(formatMechanic('Anomaly Buildup', teamBuffs.buildup));
+        if (teamBuffs.ap) buffs.push(formatMechanic('Anomaly Proficiency', teamBuffs.ap));
+        if (teamBuffs.am) buffs.push(formatMechanic('Anomaly Mastery', teamBuffs.am));
+        if (teamBuffs.aftershock) buffs.push(formatMechanic('Aftershock', teamBuffs.aftershock));
+        if (teamBuffs.abloom) buffs.push(formatMechanic('Abloom', teamBuffs.abloom));
+        if (teamBuffs.chain) buffs.push(formatMechanic('Chain Attacks', teamBuffs.chain));
+        if (teamBuffs.sheer) buffs.push(formatMechanic('Sheer Damage', teamBuffs.sheer));
+        if (teamBuffs.def) buffs.push(formatMechanic('DEF', teamBuffs.def));
+        if (teamBuffs.pen) buffs.push(formatMechanic('PEN', teamBuffs.pen));
+        if (teamBuffs['stun-multiplier']) buffs.push(formatMechanic('Stun Multiplier', teamBuffs['stun-multiplier']));
+        if (teamBuffs.cr) buffs.push(formatMechanic('Crit Rate', teamBuffs.cr));
+        if (teamBuffs.cd) buffs.push(formatMechanic('Crit Damage', teamBuffs.cd));
+        if (teamBuffs.dmg) buffs.push(formatMechanic('General Damage', teamBuffs.dmg));
+        if (teamBuffs.disorders) buffs.push(formatMechanic('Disorders', teamBuffs.disorders));
+        if (teamBuffs.vortex) buffs.push(formatMechanic('Vortex', teamBuffs.vortex));
 
         // Elemental buffs
-        if (mechanics.buffs.ice) buffs.push(formatElementalMechanic('Ice Damage', mechanics.buffs.ice, 'ice'));
-        if (mechanics.buffs.fire) buffs.push(formatElementalMechanic('Fire Damage', mechanics.buffs.fire, 'fire'));
-        if (mechanics.buffs.electric) buffs.push(formatElementalMechanic('Electric Damage', mechanics.buffs.electric, 'electric'));
-        if (mechanics.buffs.ether) buffs.push(formatElementalMechanic('Ether Damage', mechanics.buffs.ether, 'ether'));
-        if (mechanics.buffs.physical) buffs.push(formatElementalMechanic('Physical Damage', mechanics.buffs.physical, 'physical'));
+        if (teamBuffs.ice) buffs.push(formatElementalMechanic('Ice Damage', teamBuffs.ice, 'ice'));
+        if (teamBuffs.fire) buffs.push(formatElementalMechanic('Fire Damage', teamBuffs.fire, 'fire'));
+        if (teamBuffs.electric) buffs.push(formatElementalMechanic('Electric Damage', teamBuffs.electric, 'electric'));
+        if (teamBuffs.ether) buffs.push(formatElementalMechanic('Ether Damage', teamBuffs.ether, 'ether'));
+        if (teamBuffs.physical) buffs.push(formatElementalMechanic('Physical Damage', teamBuffs.physical, 'physical'));
     }
     if (buffs.length > 0) {
         parts.push(`<span class="mech-label">Buffs:</span> ${buffs.join(', ')}`);

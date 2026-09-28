@@ -9,6 +9,10 @@ team-wide bonuses are added on top.
 anomaly buffs to anomaly agents; DEF buffs to DEF scalers; defense and element debuffs to
 damage contributors; stun infrastructure to window-dependent carries.
 
+**Plus one term that is not a pair.** A unit whose kit buffs *itself* — Severian's crit damage
+beside another wind unit — adds that buff to what its teammates pour into it, priced exactly as a
+teammate's would be. See `[BUFF-09]` in [buffs and debuffs](../data-model/buffs-and-debuffs.md).
+
 **Need Fulfilment** — the supplier provides something the consumer explicitly *scales* with.
 The highest-value category, and where `replaces` and
 `converts` apply.

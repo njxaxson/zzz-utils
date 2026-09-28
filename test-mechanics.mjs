@@ -21,7 +21,7 @@
  */
 
 import { loadAllData, deepFreeze } from './lib/data.js';
-import { chargeableElementArms, getBasicDamage, getBasicDamageBaseline, getMaxBurstWeight, quickAssistCohesionWeight, scoreTeamForBoss, resolveBossVariation, resolveConditionalValue, getEffectiveScaling, effectiveDisorderSupply, effectiveDisorderWeakSupply, getChainMagnitude, UnitContext, isDPS, isStun, isSupport, isOnField, getElement, getEffectiveRoles, hasSubDPSRole } from './app/public/lib/common/team-scorer.js';
+import { chargeableElementArms, getBasicDamage, getBasicDamageBaseline, getMaxBurstWeight, quickAssistCohesionWeight, scoreTeamForBoss, resolveBossVariation, resolveConditionalValue, getEffectiveScaling, effectiveDisorderSupply, effectiveDisorderWeakSupply, getChainMagnitude, UnitContext, getTeammateBuffs, getSelfBuffSpecs, isDPS, isStun, isSupport, isOnField, getElement, getEffectiveRoles, hasSubDPSRole } from './app/public/lib/common/team-scorer.js';
 import { filterBosses } from './lib/boss-filter.js';
 import { NEUTRAL_BOSS, assert, makeAllViableTeamEntries, filterIncludeOneOf, getTopViableTeams, scoreForTeamString, scoreMapForBoss, withBosses } from './lib/scoring-test-utils.js';
 
@@ -1651,6 +1651,61 @@ async function main() {
             assert(getEffectiveRoles(ctx).join(',') === getEffectiveRoles(u).join(','),
                 `${u.name}: getEffectiveRoles differs between context and unit`);
         }
+    });
+
+    // TEST 36: a self-targeted buff reaches its owner only, priced as the same teammate buff
+    //
+    // Severian's passive gives HIMSELF crit damage beside another wind unit. Spelled as a
+    // `buffs.cd` with `target: "self"`, it must pay him exactly what a teammate's `cd: 2` would,
+    // reach nobody else, and cost nothing when it does not fire. [BUFF-09]
+    run('TEST 36: a self-targeted buff reaches its owner only, priced as the same teammate buff', () => {
+        const byName = name => allUnits.find(u => u.name === name);
+        const severian = byName('Severian'), roxy = byName('Roxy');
+        const dialyn = byName('Dialyn'), sunna = byName('Sunna');
+        const { buffs: _drop, ...bareMechanics } = severian.mechanics;
+        const stripped = { ...severian, mechanics: bareMechanics };
+        const run1 = team => { const trace = {}; const score = scoreTeamForBoss(team, NEUTRAL_BOSS, { trace }); return { score, ...trace }; };
+
+        // (1) The data says what the test is about: nothing for teammates, one self-targeted cd.
+        assert(Object.keys(getTeammateBuffs(severian)).length === 0,
+            'Severian hands his teammates no buffs');
+        assert(getSelfBuffSpecs(severian).cd !== undefined,
+            'Severian aims a crit-damage buff at himself');
+
+        // (2) Fires beside a wind teammate, and not beside a non-wind one.
+        const withRoxy = run1([roxy, severian, sunna]), withRoxyBare = run1([roxy, stripped, sunna]);
+        assert(withRoxy.l4raw > withRoxyBare.l4raw,
+            `beside Roxy the self term must pay: ${withRoxy.l4raw.toFixed(2)} vs ${withRoxyBare.l4raw.toFixed(2)}`);
+        const withDialyn = run1([dialyn, severian, sunna]), withDialynBare = run1([dialyn, stripped, sunna]);
+        assert(withDialyn.score === withDialynBare.score,
+            `without a wind teammate the passive must be free, not charged: ` +
+            `${withDialyn.score.toFixed(2)} vs ${withDialynBare.score.toFixed(2)}`);
+
+        // (3) The trigger is the ELEMENT, not Roxy. Re-tag her off wind and the term goes away.
+        const fireRoxy = { ...roxy, tags: roxy.tags.map(t => t === 'wind' ? 'fire' : t) };
+        const fr = run1([fireRoxy, severian, sunna]), frBare = run1([fireRoxy, stripped, sunna]);
+        assert(fr.l4raw === frBare.l4raw,
+            `a non-wind Roxy must not switch the passive on: ${fr.l4raw.toFixed(2)} vs ${frBare.l4raw.toFixed(2)}`);
+
+        // (4) Priced exactly as the same buff from a teammate: raising Roxy's own cd by 2 pays the
+        //     stripped Severian what his self term pays him. A self buff that leaked to teammates
+        //     would pay more than this; one that was not priced like a buff would pay differently.
+        const roxyPlus2 = { ...roxy, mechanics: { ...roxy.mechanics, buffs: { ...roxy.mechanics.buffs,
+            cd: { cases: roxy.mechanics.buffs.cd.cases.map(c => ({ ...c, value: c.value > 0 ? c.value + 2 : c.value })) } } } };
+        const viaTeammate = run1([roxyPlus2, stripped, sunna]).l4raw - withRoxyBare.l4raw;
+        const viaSelf = withRoxy.l4raw - withRoxyBare.l4raw;
+        assert(Math.abs(viaSelf - viaTeammate) < 1e-9,
+            `self term ${viaSelf.toFixed(4)} must equal a teammate's cd:2 into Severian, ${viaTeammate.toFixed(4)}`);
+
+        // (5) It charges nothing: cohesion and the teamwork multiplier do not see it.
+        assert(withRoxy.teamwork === withRoxyBare.teamwork,
+            `the self buff must not move the teamwork multiplier: ${withRoxy.teamwork} vs ${withRoxyBare.teamwork}`);
+
+        // (6) A spec the engine cannot price is refused, never silently scored as 0.
+        const bogus = { ...severian, mechanics: { ...severian.mechanics, buffs: { cd: { target: 'bogus', value: 2 } } } };
+        let threw = false;
+        try { scoreTeamForBoss([roxy, bogus, sunna], NEUTRAL_BOSS); } catch { threw = true; }
+        assert(threw, 'an unknown buff target must throw');
     });
 
     // Summary

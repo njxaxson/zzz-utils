@@ -94,7 +94,7 @@
             "utility": { "quick-assists": 3, "chains": 2, "heal:team": true, "rotations": "limited" }
         },
         "faction": "Stars of Lyra",
-        "displayText": "The best generalist support in the game, Astra can round out any team.",
+        "displayText": "The best generalist support in the game, Astra can round out nearly any team outside of armorers.",
         "gender": "female",
         "species": "human"
     },
@@ -242,7 +242,7 @@
             "scaling": { "buffs": 2 }
         },
         "faction": "PubSec",
-        "displayText": "Snake girl is an electric sub-DPS primarily designed to work with Seed.",
+        "displayText": "Snake girl is a surprisingly versatile electric DPS or sub-DPS who can hypercarry or work alongside Seed.",
         "gender": "female",
         "species": "thiren:snake:half"
     },
@@ -364,7 +364,7 @@
             "scaling": { "pen": true, "anomaly:electric" : 1 }
         },
         "faction": "Belobog Heavy Industries",
-        "displayText": "Gearhead who throws electric grenades, Grace is typically used as an anomaly sub-DPS when you don't have a better alternative - but at P6, she can actually be quite good when paired with a wind anomaly like Velina.",
+        "displayText": "Gearhead who throws electric grenades. At P6, Grace can actually be quite good when paired with a wind anomaly like Velina.",
         "gender": "female",
         "species": "human"
     },
@@ -426,7 +426,7 @@
             "buffs": { "anomaly:physical": 3 }
         },
         "faction": "PubSec",
-        "displayText": "Sensuous rat lady is an older physical anomaly unit that remains a fan favorite. She has unique synergy with the vortex mechanic.",
+        "displayText": "Sensuous rat lady is an older physical anomaly unit that remains a fan favorite. She likes being paired with Alice or Velina.",
         "gender": "female",
         "species": "thiren:rat:half"
     },
@@ -475,7 +475,7 @@
             "utility": { "daze": 1 }
         },
         "faction": "Belobog Heavy Industries",
-        "displayText": "CEO of Belobog, this maniac likes to smash things. Has the fastest stun rate of any agent. Her upgraded kit delivers a large general-damage buff, plus a P6 that buffs armorers laceration and everyone else a nice crit damage buff.",
+        "displayText": "CEO of Belobog, this maniac likes to smash things. Has the fastest stun rate of any agent. One of the only stunners fit for armorers.",
         "gender": "female",
         "species": "human"
     },
@@ -515,7 +515,7 @@
             "scaling": { "buffs": 1 }
         },
         "faction": "Sons of Calydon",
-        "displayText": "The original coolest man alive. Excellent stun unit that buffs fire and ice damage.",
+        "displayText": "The original coolest man alive. Great stun unit that buffs fire and ice damage.",
         "gender": "male",
         "species": "human"
     },
@@ -539,7 +539,7 @@
             "scaling": { "hp": 3 }
         },
         "faction": "Spook Shack",
-        "displayText": "Goat lady is GOAT support for rupture teams. Not so useful for attackers or anomaly, though.",
+        "displayText": "Goat lady is GOAT support for rupture teams. Not so useful for other DPS archetypes, though.",
         "gender": "female",
         "species": "thiren:goat:half"
     },
@@ -645,7 +645,7 @@
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {},
         "faction": "Cunning Hares",
-        "displayText": "Cat girl was the bane of 50/50s everywhere, but with her potential vision buffs, she gains a join on support and becomes considerably more useful.",
+        "displayText": "Cat girl boasts one of the best potential vision unlocks in the game: at P6, she goes from being mediocre to being great.",
         "gender": "female",
         "species": "thiren:cat:half"
     },
@@ -762,7 +762,7 @@
             "scaling": { "am": 3, "codependent": true }
         },
         "faction": "Krampus",
-        "displayText": "Murphy's law magnet, or just run-of-the-mill klutz? Strongly favors triple-anomaly team compositions alongside Remielle.",
+        "displayText": "Murphy's law magnet, or just run-of-the-mill klutz? Best-in-slot alongside Velina and Remielle, but not great with disorder teams.",
         "gender": "female",
         "species": "human"
     },
@@ -850,7 +850,7 @@
             }
         },
         "faction": "Phaethon",
-        "displayText" : "Proxy made manifest? We shall see! This unit is received as part of the story.",
+        "displayText" : "Proxy made manifest? We shall see! This unit is unlocked as players progress through the story.",
         "gender": "androgynous",
         "species": "etheric-other"
     },
@@ -869,7 +869,7 @@
             "buffs": { "stun-multiplier": 2 }
         },
         "faction": "PubSec",
-        "displayText": "On-field electric stun agent is surprisingly good for Yixuan, even though they have no natural team alliance.",
+        "displayText": "Older on-field electric stun agent is surprisingly good for Yixuan, even though they have no natural team alliance.",
         "gender": "female",
         "species": "robot"
     },
@@ -956,7 +956,7 @@
         },
         "faction": "Flint Workshop",
         "available": false,
-        "displayText": "Generalized wind stun agent designed to work best with Claret, but also has interesting synergy with Pyrois and Harumasa.",
+        "displayText": "Generalized wind stun agent designed to work best with armorers like Claret, but also has interesting synergy with Pyrois, Sigrid, Severian and Harumasa.",
         "gender": "female",
         "species": "elf"
     },
@@ -977,7 +977,7 @@
             "scaling": { "codependent": true, "buffs": 3 }
         },
         "faction": "Silver Squad",
-        "displayText": "Premier electric DPS, Silver Soldier Anby wants aftershock teammates like Trigger and Orphie to maximize her damage potential.",
+        "displayText": "The iconic ZZZ character, Silver Soldier Anby wants aftershock teammates like Trigger and Orphie to maximize her damage potential.",
         "gender": "female",
         "species": "human:clone"
     },
@@ -1036,10 +1036,13 @@
         "join": ["stun", "support", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
-            "damage": { "ultimate:strong": 2, "chain": 3 }
+            "damage": { "ultimate:strong": 2, "chain": 3 },
+            "buffs": {
+                "cd": { "target": "self", "cases": [ { "when": { "countTag": "wind", "minCount": 2 }, "value": 2 }, { "value": 0 } ] }
+            }
         },
         "faction": "PubSec",
-        "displayText": "Seth's older brother and Cissia's boss, who frequently refers to him as a demon.",
+        "displayText": "Seth's older brother and Cissia's boss, who frequently refers to him as a demon. He gets boosted when he has a fellow wind-element teammate.",
         "gender": "male",
         "species": "thiren:dog:half"
     },
@@ -1059,7 +1062,7 @@
             "scaling": { "chains" : 3, "anomaly:wind": 1, "greedy": 1 }
         },
         "faction": "Airspace Patrol Department",
-        "displayText": "Horse lady with spear.",
+        "displayText": "Horse lady with spear is a strong ice attack agent and one of the best attackers in the game.",
         "gender": "female",
         "species": "thiren:horse:half"
     },
@@ -1157,7 +1160,7 @@
             "utility": { "quick-assists": true }
         },
         "faction": "Obol Squad",
-        "displayText": "Off-field electric aftershock stun agent that can shred defense with her W-engine.",
+        "displayText": "Off-field electric aftershock stun agent that can shred defense with her W-engine, Trigger is an excellent general stun agent and one of the few who works well with armorers.",
         "gender": "female",
         "species": "human"
     },
@@ -1183,7 +1186,7 @@
             "scaling": { "er": 3 }
         },
         "faction": "External Strategy Department",
-        "displayText" : "Tall anomaly gentlelady sub-DPS with oversized fan creates on-field tornado traps. Pairs well with Jane, Burnice, Aria and Promeia.",
+        "displayText" : "Tall anomaly gentlelady sub-DPS with oversized fan creates on-field tornado traps. A powerhouse that pairs well with Jane, Burnice, Aria and Promeia.",
         "gender": "female",
         "species": "elf"
     },
@@ -1233,7 +1236,7 @@
             "scaling": { "pen": true }
         },
         "faction": "Section 6",
-        "displayText": "Premier electric anomaly agent, this disorder-generation queen is great teammate for Miyabi. Suitable both as a primary or secondary DPS.",
+        "displayText": "Although an electric anomaly agent, this disorder-generation queen is still good and is a great teammate for Miyabi. Suitable both as a primary or secondary DPS.",
         "gender": "female",
         "species": "human"
     },
@@ -1321,7 +1324,7 @@
             "scaling": { "ap": 2 }
         },
         "faction": "Spook Shack",
-        "displayText": "Hands-down the best support agent for anomaly teams. Her smug face can even change her element to match a teammate.",
+        "displayText": "Hands-down the best support agent for anomaly teams. Her smug face can even change her element to match a teammate. Remielle has supplanted her in some cases but she is still top-tier.",
         "gender": "female",
         "species": "human"
     },

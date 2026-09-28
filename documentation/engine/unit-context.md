@@ -2,8 +2,8 @@
 
 `units.json` data is **read-only**. A scoring pass resolves seven values against the team it is
 scoring — activated roles, conditional damage, conditional on-field state, effective AP, proc
-input, proc damage, and a lumen morph target — and every one of them is written onto a
-`UnitContext`, never onto the unit.
+input, proc damage, and a lumen morph target — plus a unit's own self-targeted buffs, and every
+one of them is written onto a `UnitContext`, never onto the unit.
 
 ```javascript
 export class UnitContext {
@@ -33,12 +33,21 @@ in `expandFactionJoins`, and `evaluatePredicate` reads `u.tags` and `u.id` strai
 members. A prototype-delegating or getter-based wrapper would have lost those own properties to
 the spread and silently disqualified every faction-join team.
 
+## The one thing a context holds differently from its unit
+
+A context's `mechanics.buffs` holds only the buffs the unit hands its **teammates**. Buffs written
+with `target: "self"` are split off in the constructor into `_selfBuffSpecs`, and resolved per
+team into `_resolvedSelfBuffs`. Every buff reader inside a scoring pass is therefore correct
+without knowing self-targeted buffs exist. Code outside a pass reads raw units, so it goes
+through `getTeammateBuffs` / `getSelfBuffSpecs`, which answer the same way for a raw unit or a
+context. See `[BUFF-09]`.
+
 ## What the `_` prefix means now
 
 `_activatedRoles`, `_resolvedDamage`, `_resolvedOnfield`, `_effectiveAP`, `_procInput`,
-`_procDamage` and `_morphedElement` are **context fields**. The prefix marks them as resolved for
-one pass rather than declared in the data; a raw unit never has them, which is exactly what the
-fallback branches test for.
+`_procDamage`, `_morphedElement`, `_selfBuffSpecs` and `_resolvedSelfBuffs` are **context
+fields**. The prefix marks them as resolved for one pass rather than declared in the data; a
+raw unit never has them, which is exactly what the fallback branches test for.
 
 ## Code notes
 

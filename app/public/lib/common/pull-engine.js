@@ -15,7 +15,9 @@ import {
     isConditionalSpec,
     isTeamScopedConditional,
     maxConditionalValue,
-    getMaxBurstWeight
+    getMaxBurstWeight,
+    getTeammateBuffs,
+    getSelfBuffSpecs
 } from './team-scorer.js';
 import { getTeams, isValidTeam } from './team-builder.js';
 
@@ -149,7 +151,8 @@ function w(value) {
 }
 
 // Lightweight L4-style pairwise fit: how well supplier's buffs/debuffs/utility serve consumer.
-function mechanicsFitScore(supplier, consumer) {
+// Exported for test-recommendations.mjs; not part of the page-facing API.
+export function mechanicsFitScore(supplier, consumer) {
     let score = 0;
     const cTags = consumer.tags;
     const cMech = consumer.mechanics || {};
@@ -169,7 +172,7 @@ function mechanicsFitScore(supplier, consumer) {
     // Conditional buffs resolve to what THIS consumer would receive (mechanics-fit-score.md).
     const fitCtx = { team: [supplier, consumer], self: supplier, consumer };
     const sBuf = {};
-    for (const [key, spec] of Object.entries(supplier.mechanics?.buffs || {})) {
+    for (const [key, spec] of Object.entries(getTeammateBuffs(supplier))) {
         sBuf[key] = resolveConditionalValue(spec, fitCtx);
     }
     const sDebuf = {};
@@ -191,12 +194,17 @@ function mechanicsFitScore(supplier, consumer) {
     if (w(sBuf.sheer) > 0 && isRupDPS) score += w(sBuf.sheer) * 5;
     // Laceration is to armorers what sheer is to rupture (Claret, Koleda, Roxy supply it).
     if (w(sBuf.laceration) > 0 && isArmDPS) score += w(sBuf.laceration) * 5;
-    const crW = w(sBuf.cr), cdW = w(sBuf.cd);
     // Armorers value CR highly; CD is worthless for them unless explicit cd scaling is declared.
-    if (crW > 0) score += crW * (isAnoDPS ? 0.3 : isArmDPS ? 3 : 2);
     const cScalingCd = w(cScaling.cd);
-    if (cdW > 0 && (!isArmDPS || cScalingCd > 0)) {
-        score += cdW * (isArmDPS ? Math.min(1, cScalingCd / 2) : isAnoDPS ? 0.3 : 2);
+    const critFit = {
+        cr: isAnoDPS ? 0.3 : isArmDPS ? 3 : 2,
+        cd: isArmDPS ? (cScalingCd > 0 ? Math.min(1, cScalingCd / 2) : 0) : isAnoDPS ? 0.3 : 2,
+    };
+    for (const key of ['cr', 'cd']) score += w(sBuf[key]) * critFit[key];
+    // The consumer's own self-targeted buff, when this supplier is what switches it on. [PULL-04]
+    const ownCtx = { team: [supplier, consumer], self: consumer, consumer };
+    for (const [key, spec] of Object.entries(getSelfBuffSpecs(consumer))) {
+        score += resolveConditionalValue(spec, ownCtx) * (critFit[key] ?? 0);
     }
     // Armorer premium on PEN/defense shred, mirroring the scorer's resolveBaselineWeight.
     if (w(sBuf.pen) > 0 && isDPS && !isRupDPS) score += w(sBuf.pen) * (isArmDPS ? 4 : 2);
@@ -277,7 +285,7 @@ const mechanicDamageClass = (key) => {
     // mechanics-fit-score.md.
     if (score > 0) {
         const condBuffTags = new Set();
-        for (const spec of Object.values(consumer.mechanics?.buffs || {})) {
+        for (const spec of Object.values(getTeammateBuffs(consumer))) {
             if (!isConditionalSpec(spec)) continue;
             for (const c of spec.cases) {
                 if (c.when?.countTag) condBuffTags.add(c.when.countTag);
@@ -323,7 +331,7 @@ export function checkTeamDependencies(candidate, ownedUnits, allUnits) {
     let hasUnmetDependency = false;
     let cannotActivateBuffs = false;
 
-    const selfBuffs = candidate.mechanics?.buffs || {};
+    const selfBuffs = getTeammateBuffs(candidate);
     const selfUtil = candidate.mechanics?.utility || {};
 
     // Step 1: specialist scaling provider check
@@ -341,7 +349,7 @@ export function checkTeamDependencies(candidate, ownedUnits, allUnits) {
         const supplies = isAnomalyQuantity
             ? (u => anomalyProcSupply(u) > 0)
             : (u => {
-                const buf = u.mechanics?.buffs || {};
+                const buf = getTeammateBuffs(u);
                 const debuf = u.mechanics?.debuffs || {};
                 const util = u.mechanics?.utility || {};
                 return Math.max(w(buf[key]), w(debuf[key]), w(util[key])) >= scalingW;
@@ -371,7 +379,7 @@ export function checkTeamDependencies(candidate, ownedUnits, allUnits) {
 
     // Step 1b: conditional buff feasibility (codependency-gating.md check 2). At or below
     // half max activation the unit can't function; partial still flags for a 1-level drop.
-    const candBuffs = candidate.mechanics?.buffs || {};
+    const candBuffs = getTeammateBuffs(candidate);
     for (const [buffKey, spec] of Object.entries(candBuffs)) {
         if (isTeamScopedConditional(spec)) {
             const maxLevel = maxConditionalValue(spec);
@@ -530,7 +538,7 @@ function demoteRung(rung) {
 // The tag this candidate needs N of, or null if it declares no such conditional buff.
 function ladderCountTag(candidate) {
     if (!candidate.mechanics?.scaling?.codependent) return null;
-    for (const spec of Object.values(candidate.mechanics?.buffs || {})) {
+    for (const spec of Object.values(getTeammateBuffs(candidate))) {
         if (!isTeamScopedConditional(spec)) continue;
         if (maxConditionalValue(spec) <= 0) continue;
         const tag = spec.cases.map(c => c.when?.countTag).find(Boolean);
@@ -1508,7 +1516,7 @@ function detectMechanicalSynergies(gaps, ownedUnits, unownedLimitedS, dpsQuality
         // Hybrid units like Remielle both consume owned non-DPS support AND supply buffs
         // to owned DPS, so they're evaluated as both consumer and supplier.
         const isHybridSupplier = isDPSCandidate && (
-            Object.values(candidate.mechanics?.buffs || {}).some(isConditionalSpec) ||
+            Object.values(getTeammateBuffs(candidate)).some(isConditionalSpec) ||
             (Array.isArray(candidate.mechanics?.pseudoRole) &&
              candidate.mechanics.pseudoRole.some(e => (typeof e === 'string' ? e : e?.role) === 'support'))
         );

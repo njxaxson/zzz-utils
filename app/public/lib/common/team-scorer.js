@@ -27,7 +27,44 @@ export class UnitContext {
         const source = unit instanceof UnitContext ? unit.unit : unit;
         Object.assign(this, source);
         this.unit = source;
+        // Self-targeted buffs leave the teammate view here, so no buff reader can route them. [BUFF-09]
+        const { teammate, self } = splitBuffs(source.mechanics?.buffs);
+        if (self) {
+            this.mechanics = { ...source.mechanics, buffs: teammate };
+            if (!teammate) delete this.mechanics.buffs;
+            this._selfBuffSpecs = self;
+        }
     }
+}
+
+// Split a buffs map by `target`: absent = teammates, "self" = the declaring unit only. [BUFF-09]
+// Either half is null when empty. Throws on a spec the engine would otherwise silently score as 0.
+function splitBuffs(buffs) {
+    let teammate = null, self = null;
+    for (const [key, spec] of Object.entries(buffs || {})) {
+        const target = spec !== null && typeof spec === 'object' ? spec.target : undefined;
+        if (target === undefined) {
+            (teammate ??= {})[key] = spec;
+            continue;
+        }
+        if (target !== 'self') throw new Error(`buffs.${key}: unknown target "${target}"`);
+        if (!SELF_BUFF_KEYS.has(key)) throw new Error(`buffs.${key}: target "self" is not priced for this key`);
+        if (spec.optional !== undefined) throw new Error(`buffs.${key}: "optional" is meaningless on a self-targeted buff`);
+        (self ??= {})[key] = Array.isArray(spec.cases) ? { cases: spec.cases } : spec.value;
+    }
+    return { teammate, self };
+}
+
+// The buffs a unit hands its teammates — self-targeted specs excluded. Raw unit or context.
+export function getTeammateBuffs(unit) {
+    if (unit instanceof UnitContext) return unit.mechanics?.buffs || {};
+    return splitBuffs(unit.mechanics?.buffs).teammate || {};
+}
+
+// The buff specs a unit aims at itself, with the `target` wrapper removed. Raw unit or context.
+export function getSelfBuffSpecs(unit) {
+    if (unit instanceof UnitContext) return unit._selfBuffSpecs || {};
+    return splitBuffs(unit.mechanics?.buffs).self || {};
 }
 
 const MULT = {
@@ -3479,6 +3516,26 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
 
 // --- Baseline Affinity ---
 
+// One price for a crit buff, whoever supplies it — a teammate or the unit's own kit. [BUFF-09]
+const STAT_BUFF_MULT = { cr: MULT.CR_BUFF, cd: MULT.CD_BUFF };
+const SELF_BUFF_KEYS = new Set(Object.keys(STAT_BUFF_MULT));
+
+function priceStatBuff(key, weight, consumer) {
+    const cw = resolveBaselineWeight(consumer, key);
+    return cw > 0 ? w(weight) * cw * STAT_BUFF_MULT[key] : 0;
+}
+
+// A unit's own self-targeted buffs, priced exactly as the same buff from a teammate. [BUFF-09]
+function scoreSelfBuffs(unit, debug) {
+    let score = 0;
+    for (const [key, weight] of Object.entries(unit._resolvedSelfBuffs || {})) {
+        const val = priceStatBuff(key, weight, unit);
+        if (debug && val > 0) console.log(`      ${unit.name} (self): ${key}: ${val.toFixed(1)}`);
+        score += val;
+    }
+    return score;
+}
+
 function scoreBaselineAffinity(supplier, consumer, debug, options = {}) {
     let score = 0;
     // Resolve conditional buff/debuff values against THIS (supplier, consumer) pair so
@@ -3641,23 +3698,13 @@ function scoreBaselineAffinity(supplier, consumer, debug, options = {}) {
         }
     }
 
-    // CR buffs → attackers and rupture
-    if (supplierBuffs.cr) {
-        const cw = resolveBaselineWeight(consumer, 'cr');
-        if (cw > 0) {
-            const val = w(supplierBuffs.cr) * cw * MULT.CR_BUFF;
+    // CR and CD buffs → attackers and rupture
+    for (const key of ['cr', 'cd']) {
+        if (!supplierBuffs[key]) continue;
+        const val = priceStatBuff(key, supplierBuffs[key], consumer);
+        if (val > 0) {
             score += val;
-            dbg('cr', val);
-        }
-    }
-
-    // CD buffs → attackers and rupture
-    if (supplierBuffs.cd) {
-        const cw = resolveBaselineWeight(consumer, 'cd');
-        if (cw > 0) {
-            const val = w(supplierBuffs.cd) * cw * MULT.CD_BUFF;
-            score += val;
-            dbg('cd', val);
+            dbg(key, val);
         }
     }
 
@@ -4126,6 +4173,9 @@ function scoreMechanicalSynergy(team, debug, options = {}) {
             }
             if (debug) console.log(`        pair total: ${pairTotal.toFixed(1)}`);
         }
+
+        // What the unit's kit gives itself joins what its teammates give it. [BUFF-09]
+        consumerTotal += scoreSelfBuffs(consumer, debug);
 
         // Everything the team pours INTO a codependent unit is worth less when its
         // composition need is unmet — buffs it cannot convert are not buffs.
@@ -4813,6 +4863,10 @@ function scoreTeamContexts(team, boss, options = {}) {
     // so consumer context isn't needed. Damage-reading helpers prefer `_resolvedDamage`.
     for (const unit of team) {
         unit._resolvedDamage = resolveValueMap(unit.mechanics?.damage, { team, self: unit, consumer: null });
+        // A self-targeted buff's recipient is its owner. [BUFF-09]
+        if (unit._selfBuffSpecs) {
+            unit._resolvedSelfBuffs = resolveValueMap(unit._selfBuffSpecs, { team, self: unit, consumer: unit });
+        }
         // `onfield` may be conditional — Burnice stands off-field normally and on-field when she
         // is the carry beside Velina. Resolved raw so the 'shared' state survives. [FIELD-01]
         if (unit.mechanics?.onfield !== undefined) {

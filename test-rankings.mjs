@@ -2324,6 +2324,36 @@ async function main() {
             `AoD averages ${mean.toFixed(1)} against the better reference, further back than the ` +
             `owner's 15-20 point target. Raise CONJUNCTIVE_SYNERGY_BONUS or add a declaration.`);
     });
+
+    // TEST 95: Severian's stunner on wind-weak bosses — Roxy over Norma.
+    //
+    // Owner-stated before any scores were shown: behind Severian, Roxy beats Norma on wind-weak
+    // bosses. This pins the LADDER, not the mechanism — the Thrall and Astra margins already
+    // held narrowly before his wind passive existed. Mechanics TEST 36 proves the passive. [BUFF-09]
+    run('TEST 95: Severian prefers Roxy over Norma on wind-weak bosses', () => {
+        let checked = 0;
+        for (const b of withBosses(bosses, 'Thrall,Scorched')) {
+            for (const support of ['Sunna', 'Astra']) {
+                const roxy = `Roxy / Severian / ${support}`, norma = `Norma / Severian / ${support}`;
+                const m = scoreMapForBoss(scoreForTeamString(
+                    `Roxy/Severian/${support},Norma/Severian/${support}`, allUnits, { preview: true }), b);
+                assert(m.get(roxy) > 0 && m.get(norma) > 0,
+                    `${b.name}: both ${roxy} and ${norma} must be viable for this rung to mean anything`);
+                assert(m.get(roxy) > m.get(norma),
+                    `${b.name}: ${roxy} (${m.get(roxy)?.toFixed(1)}) > ${norma} (${m.get(norma)?.toFixed(1)})`);
+                checked++;
+            }
+        }
+        assert(checked === 4, `expected 4 wind-weak rungs, checked ${checked} — this test has gone vacuous`);
+
+        // Where the boss resists fire, Norma is out and Roxy is Severian's stunner outright.
+        for (const b of withBosses(bosses, 'Typhon,Discordant')) {
+            const m = scoreMapForBoss(scoreForTeamString(
+                'Roxy/Severian/Sunna,Norma/Severian/Sunna', allUnits, { preview: true }), b);
+            assert(m.get('Roxy / Severian / Sunna') > 0 && !(m.get('Norma / Severian / Sunna') > 0),
+                `${b.name}: Roxy/Severian/Sunna must be viable and Norma/Severian/Sunna must not`);
+        }
+    });
     // Summary
     console.log('');
 

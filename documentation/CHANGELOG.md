@@ -3,6 +3,50 @@
 What shipped, newest first. This file is history — nothing here is a statement about the
 current state of the engine. For that, see [STATUS.md](STATUS.md).
 
+**Severian's wind passive: a buff can target its own unit**, 2026-09-27. Severian's beta kit gives
+*himself* +30% crit damage whenever another teammate is wind — no proc needed, just the element.
+The engine had no way to say that: a buff always went to teammates, and a conditional stat or
+scaling value read as 0. A buff spec can now carry `target: "self"`:
+
+```json
+"cd": { "target": "self", "cases": [ { "when": { "countTag": "wind", "minCount": 2 }, "value": 2 }, { "value": 0 } ] }
+```
+
+It pays its owner exactly what the same buff from a teammate would, reaches nobody else, and costs
+nothing when it does not fire. Only native wind counts; a lumen unit morphed into wind does not.
+The pull engine credits it to the teammate who switches it on, so Roxy's fit for Severian rises
+and Dialyn's and Norma's do not. The character summary does not list it; the unit's description is
+where a human notes it. See [BUFF-09](data-model/buffs-and-debuffs.md) and
+[PULL-04](recommendations/mechanics-fit-score.md).
+
+Priced faithfully as a `cd: 2`, by owner decision. That is small, and the ladder shows it (raw
+score, Severian's stunner):
+
+| Boss | Norma / Sunna | Roxy / Sunna, before → after | Norma / Astra | Roxy / Astra, before → after |
+|----|----|----|----|----|
+| Neutral | 343.2 | 329.9 → 332.7 | 339.9 | 326.4 → 329.2 |
+| Thrall (wind-weak) | 387.4 | 389.1 → 392.3 | 381.8 | 383.3 → 386.5 |
+| Scorched (wind-weak) | 347.4 | 381.1 → 384.3 | 373.8 | 375.3 → 378.5 |
+| Typhon, Discordant (wind-weak) | not viable | 378.1 → 381.3, 427.1 → 430.3 | not viable | 375.3 → 378.5 |
+
+The owner-stated target is Roxy over Norma on wind-weak bosses — it holds, now by about 5 on
+Thrall instead of 1.5, and rankings TEST 95 pins it — and Roxy comparable to Norma on neutral. **The
+neutral half is not met.** Norma still leads by about 10.5, and by owner decision that is not
+tracked as an issue. Dialyn is out of reach for any crit buff: her free ultimates alone pay Severian
+29.3.
+
+Proved in two steps. The context split and the shared crit-buff pricing, with no data change, left
+the `score-dump.mjs` corpus **byte-identical** across all 161,040 rows. Severian's data then moved
+**614 rows, every one up, L4 only, zero exceptions**. Those are exactly the viable teams holding
+Severian beside Roxy or Velina: 614 of 614 moved. `calibration.json` changed only in `generated`
+and `engineFingerprint`. `calibration.preview.json` was already stale at HEAD from earlier commits,
+and was regenerated. Its anchor changes match a regeneration at HEAD exactly, so none of them are
+this change. Both files certify at 0 within-archetype rank inversions.
+
+Pinned by mechanics TEST 36, rankings TEST 95 and recommendations TEST 49. TEST 36 and 49 were
+mutation-checked: removing `target`, or bypassing the accessor at either of the two pull-engine
+reads that mattered, turns them red.
+
 **Scoring resolves onto a `UnitContext`; `units.json` data is now read-only**, 2026-09-22. The
 engine wrote seven resolved values — activated roles, conditional damage, conditional on-field
 state, effective AP, proc input, proc damage, the lumen morph target — straight onto the unit

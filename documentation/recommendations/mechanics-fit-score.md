@@ -25,6 +25,9 @@ specialist synergies that are the whole point of the ranking.
 specific tag — Remielle needing anomaly teammates — then a supplier *without* that tag is heavily
 discounted. It is occupying a slot that should go to someone who activates the buff.
 
+A buff the consumer aims at **itself** is not one of these. Severian's wind passive is written
+with `target: "self"`, so it never triggers the discount — see [PULL-04].
+
 ## Candidate sorting
 
 Titled first, then tier, then accumulated fit against the owned carry roster.
@@ -56,3 +59,22 @@ engine reported "Severian has mechanical synergy with your Nangong". On the burs
 It now calls `getMaxBurstWeight` and mirrors the scorer's recovery branch — burst plus chains
 scaling, totalize, and recovery scaling. The scorer's greed bonus is deliberately left out: it
 is gated on team context this heuristic does not have.
+
+### [PULL-04] A carry's self-targeted buff is credited to the teammate who switches it on
+
+Severian gives himself crit damage when another teammate is wind. Asked how well Roxy fits him,
+the pull engine now counts that passive, because Roxy is what turns it on. Dialyn and Norma do not
+switch it on, and their fit for him is unchanged. It is priced with the same per-point crit
+weights as a teammate's crit buff, resolved against the two-unit team this heuristic already uses.
+
+Every read of a unit's buffs in `pull-engine.js` goes through `getTeammateBuffs`, which leaves the
+self-targeted ones out. Two reads would otherwise have gone wrong:
+
+* the anti-synergy rule above would have read his wind case as a team need and cut every
+  non-wind stunner's fit for him to a fifth — Dialyn from 8.7 to 2;
+* the dependency check would have told a codependent unit with such a buff to pull a wind
+  teammate before it can work.
+
+Recommendations TEST 49 pins both, and was checked by breaking each read in turn. See
+[`[BUFF-09]`](../data-model/buffs-and-debuffs.md).
+
