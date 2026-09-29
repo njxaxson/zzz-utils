@@ -3,12 +3,12 @@
  * Generates and filters team combinations based on user roster and filters
  */
 
-import { getTeams, sortTeamByRole, getTeamLabel } from '../common/team-builder.js';
-import { scoreTeamForBoss, isDPS, isStun, isSupport, isDefense, getElement, hasSubDPSRole } from '../common/team-scorer.js';
-import { calibrate } from '../common/calibration.js';
+import { sortTeamByRole, getTeamLabel } from '../common/team-builder.js';
+import { isDPS, isStun, isSupport, isDefense, getElement, hasSubDPSRole } from '../common/team-scorer.js';
+import { getRosterUnits, buildRosterTeams, scoreCalibrated, NEUTRAL_BOSS } from '../common/team-pool.js';
+import { createUnitCard } from '../common/team-card.js';
 import {
-    initRoster, getUnitStates, getAllUnits, getCalibration,
-    getInitials, getUnitElement, getCharacterImageUrl
+    initRoster, getUnitStates, getAllUnits, getCalibration
 } from '../common/roster-ui.js';
 import { ELEMENTS, DPS_ROLES } from '../common/constants.js';
 
@@ -508,10 +508,7 @@ function buildTeams() {
 
     setTimeout(() => {
         try {
-            const allTeams = getTeams(availableUnits);
-
-            let teams = Object.entries(allTeams)
-                .filter(([label, team]) => team.length === 3)
+            let teams = Object.entries(buildRosterTeams(availableUnits))
                 .map(([label, team]) => ({ label, team }));
 
             teams = applyUserFilters(teams);
@@ -532,15 +529,7 @@ function buildTeams() {
 }
 
 function getAvailableUnits() {
-    const allUnits = getAllUnits();
-    const unitStates = getUnitStates();
-    return allUnits.filter(unit => {
-        const state = unitStates[unit.id];
-        return state.owned;
-    }).map(unit => ({
-        ...unit,
-        numericId: undefined
-    }));
+    return getRosterUnits(getAllUnits(), getUnitStates());
 }
 
 function applyUserFilters(teams) {
@@ -604,28 +593,17 @@ function selectBestTeams(teams, availableUnits, calibration) {
     const availableElements = getAvailableElements(availableUnits);
     const availableDpsTypes = getAvailableDpsTypes(availableUnits);
 
-    // Use a neutral boss for global scoring (no element bias)
-    const neutralBoss = {
-        name: 'neutral',
-        weaknesses: [],
-        resistances: [],
-        shill: null,
-        anti: [],
-        favored: [],
-        assists: 0
-    };
-
     // Step 1: score all teams into one calibrated `scoredTeams` list spanning every archetype.
     // The third-pass empty-cell backfill and step 4's padding walk both compare across
     // archetypes using this same order, so it must be calibrated — not raw — or a busier
     // archetype crowds out an equally-good team from a smaller one. See documentation/engine/calibration.md.
-    const scoredTeams = teams.map(({ label, team }) => {
-        const trace = {};
-        const raw = scoreTeamForBoss(team, neutralBoss, { lenient: true, trace });
-        const score = raw > 0 ? calibrate(raw, trace.carryArchetype, calibration) : raw;
-        return { label, team, score, raw, archetype: trace.carryArchetype };
-    }).filter(t => t.raw > 0)
-      .sort((a, b) => b.score - a.score);
+    const scoredTeams = teams
+        .map(({ label, team }) => {
+            const scored = scoreCalibrated(team, NEUTRAL_BOSS, { lenient: true }, calibration);
+            return scored && { label, team, ...scored };
+        })
+        .filter(Boolean)
+        .sort((a, b) => b.score - a.score);
     
     // Step 2: Build grid by finding highest-ranked teams for each archetype
     const grid = {};
@@ -986,7 +964,7 @@ function capitalizeFirst(str) {
 }
 
 function createTeamCard(team, compact = false) {
-    const unitsHtml = team.map(unit => createTeamUnitCard(unit)).join('');
+    const unitsHtml = team.map(unit => createUnitCard(unit, { className: 'team-unit' })).join('');
     
     // Get badges using new logic (skip badges in compact/grid mode - they're implicit from position)
     const badges = [];
@@ -1011,23 +989,6 @@ function createTeamCard(team, compact = false) {
                 ${unitsHtml}
             </div>
             ${badges.length > 0 ? `<div class="team-card-info">${badges.join('')}</div>` : ''}
-        </div>
-    `;
-}
-
-function createTeamUnitCard(unit) {
-    const element = getUnitElement(unit);
-    const initials = getInitials(unit.name);
-    const imageUrl = getCharacterImageUrl(unit.id);
-    
-    const avatarHtml = imageUrl 
-        ? `<img class="unit-avatar" src="${imageUrl}" alt="${unit.name}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="unit-initials" style="display:none">${initials}</span>`
-        : `<span class="unit-initials">${initials}</span>`;
-    
-    return `
-        <div class="team-unit element-${element}" title="${unit.name}">
-            ${avatarHtml}
-            <span class="unit-name">${unit.name}</span>
         </div>
     `;
 }

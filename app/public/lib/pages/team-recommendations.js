@@ -4,19 +4,13 @@
  * then find the top teams from the user's roster.
  */
 
-import { 
-    getTeams, 
-    sortTeamByRole, 
-    getTeamLabel,
-    extendTeamsWithUniversalUnits
-} from '../common/team-builder.js';
-import { scoreTeamForBoss } from '../common/team-scorer.js';
 import { isSubdps } from '../common/pull-engine.js';
 import { createStrengthLabelHtml } from '../common/strength-rating.js';
-import { calibrate } from '../common/calibration.js';
+import { getRosterUnits, buildRosterTeams, scoreTeamsForBoss, requireCalibration } from '../common/team-pool.js';
+import { createUnitCard } from '../common/team-card.js';
 import {
     initRoster, getUnitStates, getAllUnits, getCalibration,
-    getInitials, getUnitElement, getCharacterImageUrl, getUniversalUnitNames
+    getUniversalUnitNames
 } from '../common/roster-ui.js';
 import { ELEMENTS, DPS_ROLES } from '../common/constants.js';
 
@@ -304,15 +298,7 @@ function showError(message) {
 // ============================================================================
 
 function getAvailableUnits() {
-    const allUnits = getAllUnits();
-    const unitStates = getUnitStates();
-    return allUnits.filter(unit => {
-        const state = unitStates[unit.id];
-        return state.owned;
-    }).map(unit => ({
-        ...unit,
-        numericId: undefined
-    }));
+    return getRosterUnits(getAllUnits(), getUnitStates());
 }
 
 function runRecommendations() {
@@ -342,85 +328,24 @@ function runRecommendations() {
     }, 50);
 }
 
-// This page ranks teams of every archetype against ONE custom boss, so the ranking/filtering/
-// display score is CALIBRATED — same reasoning as matchups.js and deadly-assault.js. Returns
-// null for a non-viable team so callers can `if (!scored) continue` without a separate raw<=0
-// check.
-function scoreCalibrated(team, boss, scoreOptions, calibration) {
-    const trace = {};
-    const raw = scoreTeamForBoss(team, boss, { ...scoreOptions, trace });
-    if (raw <= 0 || trace.disqualified) return null;
-    return { raw, score: calibrate(raw, trace.carryArchetype, calibration), archetype: trace.carryArchetype };
-}
-
 function calculateRecommendations() {
     const availableUnits = getAvailableUnits();
     const universalUnitNames = getUniversalUnitNames();
     const boss = buildCustomBoss();
 
-    const calibration = getCalibration();
-    if (!calibration) {
-        throw new Error('Calibration data failed to load — refresh the page. If this persists, ' +
-            'calibration.json may be missing (run: node generate-calibration.mjs).');
-    }
+    // Ranks teams of every archetype against ONE custom boss, so scores are CALIBRATED.
+    const calibration = requireCalibration(getCalibration());
 
     console.group('Custom Boss Recommendations');
     console.log('Boss config:', boss);
     console.log('Available units:', availableUnits.length);
     console.log('Universal units:', universalUnitNames);
     
-    const allTeams = getTeams(availableUnits);
+    const threeCharTeams = buildRosterTeams(availableUnits, universalUnitNames);
+    console.log('Total 3-person teams:', Object.keys(threeCharTeams).length);
     
-    const twoCharTeams = {};
-    const threeCharTeams = {};
-    for (const label in allTeams) {
-        const team = allTeams[label];
-        if (team.length === 2) {
-            twoCharTeams[label] = team;
-        } else if (team.length === 3) {
-            threeCharTeams[label] = team;
-        }
-    }
-    
-    const universalUnitObjects = availableUnits.filter(u => universalUnitNames.includes(u.name));
-    if (universalUnitObjects.length > 0) {
-        extendTeamsWithUniversalUnits(twoCharTeams, threeCharTeams, universalUnitObjects);
-    }
-    
-    const teamLabels = Object.keys(threeCharTeams);
-    console.log('Total 3-person teams:', teamLabels.length);
-    
-    // Score teams
-    let viableTeams = [];
-    let usedLenient = false;
-
-    for (const label of teamLabels) {
-        const team = threeCharTeams[label];
-        const scored = scoreCalibrated(team, boss, {}, calibration);
-        if (scored) {
-            viableTeams.push({ label, team, ...scored });
-        }
-    }
-
-    console.log('Viable teams (strict):', viableTeams.length);
-
-    // Fallback to lenient mode
-    if (viableTeams.length === 0) {
-        console.log('No strict results, trying lenient mode...');
-        usedLenient = true;
-
-        for (const label of teamLabels) {
-            const team = threeCharTeams[label];
-            const scored = scoreCalibrated(team, boss, { lenient: true }, calibration);
-            if (scored) {
-                viableTeams.push({ label, team, ...scored });
-            }
-        }
-
-        console.log('Viable teams (lenient):', viableTeams.length);
-    }
-    
-    viableTeams.sort((a, b) => b.score - a.score);
+    const { viable: viableTeams, usedLenient } = scoreTeamsForBoss(threeCharTeams, boss, calibration);
+    console.log(`Viable teams (${usedLenient ? 'lenient' : 'strict'}):`, viableTeams.length);
     
     console.log('Top teams:', viableTeams.slice(0, 5).map(t => `${t.label} (${t.score.toFixed(1)}, raw ${t.raw.toFixed(1)}, ${t.archetype ?? 'none'})`));
     console.groupEnd();
@@ -490,7 +415,7 @@ function displayResults(results) {
 }
 
 function createResultRow(entry, index) {
-    const teamHtml = entry.team.map(unit => createResultUnitCard(unit)).join('');
+    const teamHtml = entry.team.map(unit => createUnitCard(unit)).join('');
     
     return `
         <div class="recommendation-row">
@@ -502,23 +427,6 @@ function createResultRow(entry, index) {
                 ${createStrengthLabelHtml(entry.score, entry.team)}
             </div>
             <div class="recommendation-score">${Math.round(entry.score)}</div>
-        </div>
-    `;
-}
-
-function createResultUnitCard(unit) {
-    const element = getUnitElement(unit);
-    const initials = getInitials(unit.name);
-    const imageUrl = getCharacterImageUrl(unit.id);
-    
-    const avatarHtml = imageUrl 
-        ? `<img class="unit-avatar" src="${imageUrl}" alt="${unit.name}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="unit-initials" style="display:none">${initials}</span>`
-        : `<span class="unit-initials">${initials}</span>`;
-    
-    return `
-        <div class="result-unit-card element-${element}" title="${unit.name}">
-            ${avatarHtml}
-            <span class="unit-name">${unit.name}</span>
         </div>
     `;
 }

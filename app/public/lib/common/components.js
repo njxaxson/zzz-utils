@@ -11,6 +11,7 @@ const PAGE_TITLES = {
     'team-recommendations': 'Team Recommendations',
     'disc-calculator': 'Disc Calculator',
     'character-summary': 'Character Summary',
+    'agent-detail': 'Agent Teams',
     'tier-list': 'Tier List'
 };
 

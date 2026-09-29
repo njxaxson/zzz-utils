@@ -280,7 +280,9 @@ function buildCard(unit) {
         ${avatarHtml}
         <div class="char-identity">
             <div class="char-name-row">
-                <div class="char-name">${unit.name}</div>
+                ${isPreview
+                    ? `<div class="char-name">${unit.name}</div>`
+                    : `<a class="char-name char-name-link" href="agent-detail.html?agents=${unit.id}" title="Teams built around ${unit.name}">${unit.name}</a>`}
                 ${titledBadge}
             </div>
             <div class="char-subtitle">${rankHtml} · ${faction}</div>

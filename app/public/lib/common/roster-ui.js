@@ -18,6 +18,7 @@ let allUnits = [];
 let unitStates = {};
 let rosterOpen = true;
 let sharedRosterMode = false;
+let hasSavedRoster = false;
 let calibration = null;
 
 let _options = {
@@ -25,7 +26,8 @@ let _options = {
     pageUrl: '',
     onStateChange: null,
     shareUrlGenerator: null,
-    lockedUnits: []
+    lockedUnits: [],
+    collapseKnownRoster: false
 };
 
 // ============================================================================
@@ -41,6 +43,8 @@ let _options = {
  * @param {Function} opts.onStateChange - Callback when roster state changes (for page-specific saves)
  * @param {Function} opts.shareUrlGenerator - Custom (unitStates, allUnits) => string; defaults to generateShareUrl
  * @param {string[]} opts.lockedUnits - Unit IDs that are force-owned and non-toggleable
+ * @param {boolean} opts.collapseKnownRoster - Start collapsed when a saved or shared roster exists;
+ *        the drawer's open state on this page is then not persisted to other pages
  */
 export async function initRoster(opts = {}) {
     _options = { ..._options, ...opts };
@@ -165,6 +169,7 @@ function loadRosterFromLocalStorage() {
     try {
         const saved = localStorage.getItem(ROSTER_STORAGE_KEY);
         if (saved) {
+            hasSavedRoster = true;
             const data = JSON.parse(saved);
             if (data.unitStates) {
                 for (const unitId in data.unitStates) {
@@ -285,7 +290,10 @@ function updateCategoryCount(category, filterFn) {
 
 function applySectionStates() {
     const rosterSection = document.getElementById('roster-section');
-    if (rosterSection) rosterSection.open = rosterOpen;
+    if (!rosterSection) return;
+    rosterSection.open = _options.collapseKnownRoster
+        ? !(sharedRosterMode || hasSavedRoster)
+        : rosterOpen;
 }
 
 // ============================================================================
@@ -427,7 +435,7 @@ function handleCategoryAction(e) {
 }
 
 function handleRosterToggle(e) {
-    rosterOpen = e.target.open;
+    if (!_options.collapseKnownRoster) rosterOpen = e.target.open;
     notifyStateChange();
 }
 

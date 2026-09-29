@@ -35,10 +35,10 @@ function createTierCard(unit) {
         : `<span class="unit-initials">${initials}</span>`;
 
     return `
-        <div class="unit-card element-${element}" title="${unit.name}">
+        <a class="unit-card element-${element}" href="agent-detail.html?agents=${unit.id}" title="Teams built around ${unit.name}">
             ${avatarHtml}
             <span class="unit-name">${unit.name}</span>
-        </div>
+        </a>
     `;
 }
 

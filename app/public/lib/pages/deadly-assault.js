@@ -3,20 +3,17 @@
  * Finds optimal team allocations for 3 DA bosses
  */
 
-import {
-    getTeams, sortTeamByRole, getTeamLabel,
-    extendTeamsWithUniversalUnits, teamsOverlap
-} from '../common/team-builder.js';
 import { scoreTeamForBoss, getBossWeaknesses, getBossShill, resolveBossVariation } from '../common/team-scorer.js';
 import { createStrengthLabelHtml } from '../common/strength-rating.js';
-import { calibrate } from '../common/calibration.js';
+import { getRosterUnits, buildRosterTeams, scoreCalibrated, scoreTeamsForBoss, requireCalibration } from '../common/team-pool.js';
+import { createUnitCard, getWeaknessGradientClass } from '../common/team-card.js';
 import {
     decodeBosses, getBossesFromUrl, generateShareUrlWithBosses,
     encodeBossVariations, decodeBossVariations, getBossVariationsFromUrl
 } from '../common/roster-share.js';
 import {
     initRoster, getUnitStates, getAllUnits, getCalibration,
-    getInitials, getUnitElement, getCharacterImageUrl, getUniversalUnitNames
+    getInitials, getUniversalUnitNames
 } from '../common/roster-ui.js';
 import { isPrimaryDps, unitFingerprint, teamDpsFingerprint } from '../common/dps-buckets.js';
 import { solveDeadlyAssault } from '../common/deadly-assault-solver.js';
@@ -236,20 +233,6 @@ function getBossImageUrl(bossId) {
     return boss.image;
 }
 
-function getWeaknessGradientClass(weaknesses) {
-    if (!weaknesses || weaknesses.length === 0) {
-        return 'weakness-physical'; // default fallback
-    }
-    
-    if (weaknesses.length === 1) {
-        return `weakness-${weaknesses[0]}`;
-    }
-    
-    // For two weaknesses, sort alphabetically to match CSS class naming
-    const sorted = [...weaknesses].sort();
-    return `weakness-${sorted[0]}-${sorted[1]}`;
-}
-
 // Event Handling
 
 function setupEventListeners() {
@@ -460,15 +443,7 @@ function showError(message) {
 // Optimization Algorithm
 
 function getAvailableUnits() {
-    const allUnits = getAllUnits();
-    const unitStates = getUnitStates();
-    return allUnits.filter(unit => {
-        const state = unitStates[unit.id];
-        return state.owned;
-    }).map(unit => ({
-        ...unit,
-        numericId: undefined
-    }));
+    return getRosterUnits(getAllUnits(), getUnitStates());
 }
 
 function runOptimization() {
@@ -498,24 +473,12 @@ function runOptimization() {
     }, 50);
 }
 
-// Deadly Assault compares teams of DIFFERENT archetypes across 3 bosses at once (banding,
-// totalScore sum, perBossFloor), so every `.score` here must be CALIBRATED, not raw. Mirrors
-// the CLI's deadly-assault.js and team-recommendations.js. Returns null for a non-viable team.
-function scoreCalibrated(team, boss, scoreOptions, calibration) {
-    const trace = {};
-    const raw = scoreTeamForBoss(team, boss, { ...scoreOptions, trace });
-    if (raw <= 0 || trace.disqualified) return null;
-    return { raw, score: calibrate(raw, trace.carryArchetype, calibration), archetype: trace.carryArchetype };
-}
-
 function calculateOptimalTeams() {
     const availableUnits = getAvailableUnits();
     const universalUnitNames = getUniversalUnitNames();
-    const calibration = getCalibration();
-    if (!calibration) {
-        throw new Error('Calibration data failed to load — refresh the page. If this persists, ' +
-            'calibration.json may be missing (run: node generate-calibration.mjs).');
-    }
+    // Deadly Assault compares teams of DIFFERENT archetypes across 3 bosses at once (banding,
+    // totalScore sum, perBossFloor), so every `.score` here must be CALIBRATED, not raw.
+    const calibration = requireCalibration(getCalibration());
     const selectedBossObjects = selectedBosses
         .map(id => {
             const boss = allBosses.find(b => b.id === id);
@@ -538,28 +501,7 @@ function calculateOptimalTeams() {
     console.log('🌟 Universal Units:', universalUnitNames);
     console.log('👹 Selected Bosses:', selectedBossObjects.map(b => b.name));
     
-    const allTeams = getTeams(availableUnits);
-    
-    const twoCharTeams = {};
-    const threeCharTeams = {};
-    for (const label in allTeams) {
-        const team = allTeams[label];
-        if (team.length === 2) {
-            twoCharTeams[label] = team;
-        } else if (team.length === 3) {
-            threeCharTeams[label] = team;
-        }
-    }
-    
-    console.log('🔢 Teams before universal extension:');
-    console.log(`   2-person teams: ${Object.keys(twoCharTeams).length}`);
-    console.log(`   3-person teams: ${Object.keys(threeCharTeams).length}`);
-    
-    const universalUnitObjects = availableUnits.filter(u => universalUnitNames.includes(u.name));
-    if (universalUnitObjects.length > 0) {
-        extendTeamsWithUniversalUnits(twoCharTeams, threeCharTeams, universalUnitObjects);
-    }
-    
+    const threeCharTeams = buildRosterTeams(availableUnits, universalUnitNames);
     const teamLabels = Object.keys(threeCharTeams);
     
     console.log('🔢 Teams after universal extension:');
@@ -569,69 +511,33 @@ function calculateOptimalTeams() {
     const viableTeamsByBoss = {};
     
     for (const boss of selectedBossObjects) {
-        viableTeamsByBoss[boss.name] = [];
-        
         console.group(`👹 Scoring teams for: ${boss.name}`);
         console.log('   Weaknesses:', getBossWeaknesses(boss));
         console.log('   Resistances:', boss.mechanics?.resistances ?? []);
         console.log('   Shill:', boss.mechanics?.shill || 'none');
         console.log('   Anti:', boss.mechanics?.anti || 'none');
         
-        const disqualifiedTeams = [];
+        const { viable, disqualified: disqualifiedTeams, usedLenient } =
+            scoreTeamsForBoss(threeCharTeams, boss, calibration);
+        viableTeamsByBoss[boss.name] = viable;
         
-        // First pass: normal scoring
-        for (const label of teamLabels) {
-            const team = threeCharTeams[label];
-            const scored = scoreCalibrated(team, boss, {}, calibration);
-
-            if (scored) {
-                viableTeamsByBoss[boss.name].push({ label, team, ...scored });
-            } else {
-                disqualifiedTeams.push({ label, score: 0, team });
-            }
-        }
-        
-        console.log(`   ✅ Viable teams: ${viableTeamsByBoss[boss.name].length}`);
+        console.log(`   ✅ Viable teams: ${usedLenient ? 0 : viable.length}`);
         console.log(`   ❌ Disqualified teams: ${disqualifiedTeams.length}`);
         
-        if (disqualifiedTeams.length > 0 && viableTeamsByBoss[boss.name].length === 0) {
+        if (usedLenient && disqualifiedTeams.length > 0) {
             console.log('   🔍 Debugging disqualified teams:');
             for (const dt of disqualifiedTeams.slice(0, 5)) {
                 const debugResult = scoreTeamForBoss(dt.team, boss, { debug: true });
                 console.log(`      ${dt.label}:`, debugResult);
             }
-        }
-        
-        if (viableTeamsByBoss[boss.name].length > 0) {
-            console.log('   Top viable teams:');
-            const topViable = [...viableTeamsByBoss[boss.name]]
-                .sort((a, b) => b.score - a.score)
-                .slice(0, 5);
-            console.table(topViable.map(t => ({ label: t.label, score: t.score.toFixed(1), raw: t.raw.toFixed(1), archetype: t.archetype })));
-        }
-        
-        if (disqualifiedTeams.length > 0 && viableTeamsByBoss[boss.name].length === 0) {
             console.log('   All teams were disqualified. Sample disqualified teams:');
             console.table(disqualifiedTeams.slice(0, 10).map(t => ({ label: t.label, score: t.score })));
+            console.log(`   ⚠️ No viable teams - lenient mode viable teams: ${viable.length}`);
+        } else if (viable.length > 0) {
+            console.log('   Top viable teams:');
+            console.table(viable.slice(0, 5).map(t => ({ label: t.label, score: t.score.toFixed(1), raw: t.raw.toFixed(1), archetype: t.archetype })));
         }
         
-        // Fallback: lenient mode if no viable teams
-        if (viableTeamsByBoss[boss.name].length === 0) {
-            console.log('   ⚠️ No viable teams - trying lenient mode...');
-            
-            for (const label of teamLabels) {
-                const team = threeCharTeams[label];
-                const scored = scoreCalibrated(team, boss, { lenient: true }, calibration);
-
-                if (scored) {
-                    viableTeamsByBoss[boss.name].push({ label, team, ...scored, lenient: true });
-                }
-            }
-            
-            console.log(`   Lenient mode viable teams: ${viableTeamsByBoss[boss.name].length}`);
-        }
-        
-        viableTeamsByBoss[boss.name].sort((a, b) => b.score - a.score);
         console.groupEnd();
     }
     
@@ -780,7 +686,7 @@ function createResultSlide(combo, index, bosses) {
     const columnsHtml = combo.assignments.map(assignment => {
         const boss = bosses.find(b => b.name === assignment.boss);
         const weaknessClass = getWeaknessGradientClass(getBossWeaknesses(boss));
-        const teamHtml = assignment.team.map(unit => createResultUnitCard(unit)).join('');
+        const teamHtml = assignment.team.map(unit => createUnitCard(unit)).join('');
         const imageUrl = getBossImageUrl(boss.id);
         const initials = getInitials(boss.shortName);
         
@@ -810,24 +716,6 @@ function createResultSlide(combo, index, bosses) {
             <div class="result-columns">
                 ${columnsHtml}
             </div>
-        </div>
-    `;
-}
-
-function createResultUnitCard(unit) {
-    const element = getUnitElement(unit);
-    const initials = getInitials(unit.name);
-    const imageUrl = getCharacterImageUrl(unit.id);
-    
-    // Use image if available, fallback to initials
-    const avatarHtml = imageUrl 
-        ? `<img class="unit-avatar" src="${imageUrl}" alt="${unit.name}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="unit-initials" style="display:none">${initials}</span>`
-        : `<span class="unit-initials">${initials}</span>`;
-    
-    return `
-        <div class="result-unit-card element-${element}" title="${unit.name}">
-            ${avatarHtml}
-            <span class="unit-name">${unit.name}</span>
         </div>
     `;
 }

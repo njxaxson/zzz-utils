@@ -302,7 +302,7 @@
             "resistances": ["ice"],
             "shill": "armorer",
             "anti": ["anomaly"],
-            "assists": 2,
+            "assists": 3,
             "chainParry": true,
             "control": 1
         }

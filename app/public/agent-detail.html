@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Choose a Zenless Zone Zero agent and see the best teams you can build around them from your roster, with their strongest boss matchups.">
+    <meta name="robots" content="index, follow">
+    <meta name="theme-color" content="#0a0a0f">
+    <link rel="canonical" href="https://njxaxson.github.io/zzz-utils/agent-detail.html">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="ZZZ Utils">
+    <meta property="og:title" content="ZZZ Agent Teams">
+    <meta property="og:description" content="See the best teams you can build around any Zenless Zone Zero agent, with their strongest boss matchups">
+    <meta property="og:url" content="https://njxaxson.github.io/zzz-utils/agent-detail.html">
+    <meta property="og:image" content="https://njxaxson.github.io/zzz-utils/assets/sitelogo.png">
+    <meta property="og:locale" content="en_US">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="ZZZ Agent Teams">
+    <meta name="twitter:description" content="See the best teams you can build around any Zenless Zone Zero agent, with their strongest boss matchups.">
+    <meta name="twitter:image" content="https://njxaxson.github.io/zzz-utils/assets/sitelogo.png">
+    <title>ZZZ Agent Teams</title>
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@graph": [
+            {
+                "@type": "WebApplication",
+                "name": "ZZZ Agent Teams",
+                "url": "https://njxaxson.github.io/zzz-utils/agent-detail.html",
+                "description": "Choose a Zenless Zone Zero agent and see the best teams you can build around them from your roster, with their strongest boss matchups.",
+                "applicationCategory": "GameApplication",
+                "operatingSystem": "Any",
+                "inLanguage": "en",
+                "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+                "about": {
+                    "@type": "VideoGame",
+                    "name": "Zenless Zone Zero",
+                    "alternateName": "ZZZ",
+                    "publisher": {
+                        "@type": "Organization",
+                        "name": "HoYoverse"
+                    }
+                },
+                "author": {
+                    "@type": "Person",
+                    "name": "njxaxson"
+                }
+            },
+            {
+                "@type": "BreadcrumbList",
+                "itemListElement": [
+                    { "@type": "ListItem", "position": 1, "name": "ZZZ Utils", "item": "https://njxaxson.github.io/zzz-utils/" },
+                    { "@type": "ListItem", "position": 2, "name": "Agent Teams", "item": "https://njxaxson.github.io/zzz-utils/agent-detail.html" }
+                ]
+            }
+        ]
+    }
+    </script>
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+    <link rel="stylesheet" href="styles/style.css">
+    <!-- Pako compression library for roster sharing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+    <style>
+        .ad-focus-section { margin-top: 1rem; }
+
+        /* Focus tiles: sized like the Deadly Assault boss cards. */
+        .ad-slots {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            align-items: flex-start;
+        }
+        .ad-tile {
+            position: relative;
+            width: 150px;
+            display: flex;
+            flex-direction: column;
+            border: 3px solid var(--border-color);
+            border-radius: 10px;
+            overflow: hidden;
+            background: var(--bg-secondary);
+            cursor: pointer;
+            transition: border-color 0.2s, transform 0.2s;
+        }
+        .ad-tile:hover { transform: translateY(-2px); border-color: var(--accent-primary); }
+        .ad-tile.picking { border-color: var(--accent-primary); }
+        .ad-tile.element-fire { border-color: var(--element-fire); }
+        .ad-tile.element-ice { border-color: var(--element-ice); }
+        .ad-tile.element-electric { border-color: var(--element-electric); }
+        .ad-tile.element-physical { border-color: var(--element-physical); }
+        .ad-tile.element-ether { border-color: var(--element-ether); }
+        .ad-tile.element-wind { border-color: var(--element-wind); }
+        .ad-tile.element-lumen { border-color: var(--element-lumen); }
+        .ad-tile-avatar {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.3);
+        }
+        .ad-tile-img { width: 100%; height: 100%; object-fit: cover; }
+        .ad-tile-initials { font-size: 1.5rem; font-weight: 700; }
+        .ad-tile-name {
+            padding: 0.4rem 0.3rem;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .ad-tile-badge {
+            position: absolute;
+            bottom: 6px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 0.15rem 0.45rem;
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid var(--warning);
+            border-radius: 3px;
+            color: var(--warning);
+            font-size: 0.6rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+        .ad-tile-clear {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            width: 32px;
+            height: 32px;
+            border: none;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.65);
+            color: white;
+            font-size: 0.9rem;
+            cursor: pointer;
+        }
+        .ad-tile-clear:hover { background: rgba(0, 0, 0, 0.9); }
+
+        .ad-tile-add {
+            border-style: dashed;
+            background: transparent;
+        }
+        .ad-tile-add .ad-tile-avatar { background: transparent; }
+        .ad-tile-add .ad-tile-name { background: transparent; color: var(--text-secondary); }
+        .ad-tile-plus { font-size: 2.5rem; font-weight: 300; color: var(--text-muted); }
+        .ad-tile-add.primary { border-color: var(--accent-primary); }
+        .ad-tile-add.primary .ad-tile-plus,
+        .ad-tile-add.primary .ad-tile-name { color: var(--accent-primary); }
+        /* A teammate is optional: keep its tile small and quiet. */
+        .ad-tile-add:not(.primary) { width: 96px; opacity: 0.7; }
+        .ad-tile-add:not(.primary):hover { opacity: 1; }
+        .ad-tile-add:not(.primary) .ad-tile-plus { font-size: 1.6rem; }
+        .ad-tile-add:not(.primary) .ad-tile-name { font-size: 0.65rem; white-space: normal; line-height: 1.2; }
+
+        /* Picker */
+        .ad-picker {
+            margin-top: 0.75rem;
+            padding: 0.75rem;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+        }
+        .ad-picker-top {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+        .ad-picker-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            white-space: nowrap;
+        }
+        .ad-picker-search {
+            flex: 1;
+            min-width: 0;
+            height: 34px;
+            padding: 0 0.6rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 0.9rem;
+        }
+        .ad-picker-close {
+            width: 34px;
+            height: 34px;
+            flex-shrink: 0;
+            border: none;
+            border-radius: 50%;
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 1rem;
+            cursor: pointer;
+        }
+        .ad-picker-close:hover { background: var(--bg-secondary); color: var(--text-primary); }
+        .ad-picker-filters {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.35rem 0.9rem;
+            margin-top: 0.5rem;
+        }
+        .ad-filter-group { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+        .ad-filter {
+            padding: 0.2rem 0.55rem;
+            min-height: 28px;
+            background: transparent;
+            border: 1px solid var(--border-color);
+            border-radius: 999px;
+            color: var(--text-secondary);
+            font-family: inherit;
+            font-size: 0.75rem;
+            text-transform: capitalize;
+            cursor: pointer;
+        }
+        .ad-filter:hover { color: var(--text-primary); border-color: var(--text-muted); }
+        .ad-filter.active { background: var(--accent-primary); border-color: var(--accent-primary); color: var(--bg-primary); font-weight: 600; }
+        .ad-filter.element-fire.active { background: var(--element-fire); border-color: var(--element-fire); color: white; }
+        .ad-filter.element-ice.active { background: var(--element-ice); border-color: var(--element-ice); }
+        .ad-filter.element-electric.active { background: var(--element-electric); border-color: var(--element-electric); color: white; }
+        .ad-filter.element-physical.active { background: var(--element-physical); border-color: var(--element-physical); }
+        .ad-filter.element-ether.active { background: var(--element-ether); border-color: var(--element-ether); color: white; }
+        .ad-filter.element-wind.active { background: var(--element-wind); border-color: var(--element-wind); }
+        .ad-filter.element-lumen.active { background: var(--element-lumen); border-color: var(--element-lumen); }
+        .ad-picker-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(58px, 1fr));
+            gap: 0.35rem;
+            margin-top: 0.6rem;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .ad-pick {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.15rem;
+            padding: 0.2rem;
+            background: none;
+            border: 1px solid transparent;
+            border-radius: 6px;
+            color: var(--text-secondary);
+            font-family: inherit;
+            font-size: 0.6rem;
+            cursor: pointer;
+            min-width: 0;
+        }
+        .ad-pick:hover:not(:disabled) { border-color: var(--text-muted); color: var(--text-primary); }
+        .ad-pick:disabled { opacity: 0.25; cursor: not-allowed; }
+        .ad-pick img, .ad-pick .ad-pick-initials {
+            width: 46px;
+            height: 46px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid var(--border-color);
+        }
+        .ad-pick .ad-pick-initials {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            background: var(--bg-secondary);
+        }
+        .ad-pick.element-fire img { border-color: var(--element-fire); }
+        .ad-pick.element-ice img { border-color: var(--element-ice); }
+        .ad-pick.element-electric img { border-color: var(--element-electric); }
+        .ad-pick.element-physical img { border-color: var(--element-physical); }
+        .ad-pick.element-ether img { border-color: var(--element-ether); }
+        .ad-pick.element-wind img { border-color: var(--element-wind); }
+        .ad-pick.element-lumen img { border-color: var(--element-lumen); }
+        .ad-pick-name {
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .ad-picker-empty {
+            grid-column: 1 / -1;
+            padding: 0.75rem;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .ad-picker-hint {
+            margin-top: 0.6rem;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+        .ad-picker-hint strong { color: var(--text-secondary); }
+        .ad-tip {
+            margin-bottom: 1rem;
+            padding: 0.6rem 0.9rem;
+            background: rgba(0, 212, 170, 0.08);
+            border: 1px solid rgba(0, 212, 170, 0.3);
+            border-radius: 6px;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+        .ad-tip strong { color: var(--accent-secondary); }
+
+        /* Results. Unit cards and boss tiles share one size (--ad-tile). */
+        .ad-rows {
+            --ad-tile: 120px;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        .ad-row {
+            display: grid;
+            grid-template-columns: auto minmax(0, 1fr);
+            gap: 1.5rem;
+            align-items: center;
+            padding: 1rem 1.25rem;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-left-width: 4px;
+            border-radius: 8px;
+        }
+        /* Row tint = the team's best matchup band. */
+        .ad-row.ad-band-excellent { border-left-color: #00e676; background: linear-gradient(90deg, rgba(0, 230, 118, 0.16), rgba(0, 230, 118, 0.02) 60%), var(--bg-tertiary); }
+        .ad-row.ad-band-great     { border-left-color: #64dd17; background: linear-gradient(90deg, rgba(100, 221, 23, 0.14), rgba(100, 221, 23, 0.02) 60%), var(--bg-tertiary); }
+        .ad-row.ad-band-good      { border-left-color: #00d4aa; background: linear-gradient(90deg, rgba(0, 212, 170, 0.12), rgba(0, 212, 170, 0.02) 60%), var(--bg-tertiary); }
+        .ad-row.ad-band-ok        { border-left-color: #ffca28; }
+        .ad-row.ad-band-tough     { border-left-color: #ff9800; }
+        .ad-row.ad-band-risky,
+        .ad-row.ad-band-bad       { border-left-color: #ff5252; }
+
+        .ad-row-team {
+            display: flex;
+            gap: 0.5rem;
+            padding-right: 1.5rem;
+            border-right: 1px solid rgba(255, 255, 255, 0.14);
+            align-self: stretch;
+            align-items: center;
+        }
+        .ad-row-bosses {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+        .ad-row-matchups { min-width: 0; }
+        .ad-bosses-label { display: none; }
+
+        .ad-row .result-unit-card,
+        .ad-row .result-boss-tile {
+            width: var(--ad-tile);
+            flex-direction: column;
+            border-width: 2px;
+            border-radius: 8px;
+        }
+        .ad-row .result-unit-card .unit-avatar,
+        .ad-row .result-unit-card .unit-initials {
+            width: 100%;
+            height: auto;
+            aspect-ratio: 1;
+        }
+        .ad-row .result-unit-card .unit-name,
+        .ad-row .result-boss-tile .boss-name {
+            display: block;
+            padding: 0.3rem 0.25rem;
+            font-size: 0.7rem;
+            line-height: 1.2;
+            font-weight: 600;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .ad-row .result-boss-avatar { position: relative; }
+        .ad-row .ad-variation-badge { top: 6px; bottom: auto; font-size: 0.5rem; }
+        .ad-row .result-boss-tile .ad-boss-rating {
+            position: absolute;
+            bottom: 6px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 0.15rem 0.5rem;
+            background: rgba(0, 0, 0, 0.82);
+            border-radius: 3px;
+            font-size: 0.62rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        @media (max-width: 768px) {
+            .ad-slots { gap: 0.5rem; }
+            /* Three tiles must fit on one line: a third of the row minus two 0.5rem gaps. */
+            .ad-tile { width: min(120px, calc((100% - 1rem) / 3)); }
+            .ad-tile-add:not(.primary) { width: 80px; }
+        }
+
+        /* Narrow: team above bosses, divided by a rule; both on the same grid. */
+        @media (max-width: 900px) {
+            .ad-rows { --ad-tile: 104px; gap: 1.75rem; }
+            .ad-row {
+                grid-template-columns: minmax(0, 1fr);
+                gap: 0;
+                padding: 0;
+                overflow: hidden;
+                border-width: 2px 1px 1px 1px;
+                border-top-width: 4px;
+                border-left-width: 1px;
+            }
+            .ad-row.ad-band-excellent { border-color: rgba(0, 230, 118, 0.45); border-top-color: #00e676; }
+            .ad-row.ad-band-great     { border-color: rgba(100, 221, 23, 0.45); border-top-color: #64dd17; }
+            .ad-row.ad-band-good      { border-color: rgba(0, 212, 170, 0.45); border-top-color: #00d4aa; }
+            /* Team: its own darker panel, cut off from the bosses by a solid rule. */
+            .ad-row-team {
+                padding: 0.85rem;
+                background: rgba(0, 0, 0, 0.35);
+                border-right: none;
+                border-bottom: 2px solid rgba(255, 255, 255, 0.3);
+            }
+            .ad-row-matchups { padding: 0.75rem 0.85rem 0.85rem; }
+            .ad-bosses-label {
+                display: block;
+                margin-bottom: 0.5rem;
+                font-size: 0.65rem;
+                font-weight: 700;
+                letter-spacing: 0.12em;
+                text-transform: uppercase;
+                color: var(--text-muted);
+            }
+            .ad-row-team,
+            .ad-row-bosses {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, var(--ad-tile));
+                gap: 0.5rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .ad-row-team,
+            .ad-row-bosses { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.4rem; }
+            .ad-row-team { padding: 0.7rem; }
+            .ad-row-matchups { padding: 0.65rem 0.7rem 0.75rem; }
+            .ad-row .result-unit-card,
+            .ad-row .result-boss-tile { width: auto; }
+            .ad-row .result-unit-card .unit-name,
+            .ad-row .result-boss-tile .boss-name { font-size: 0.62rem; }
+            .ad-row .result-boss-tile .ad-boss-rating { font-size: 0.55rem; padding: 0.1rem 0.35rem; }
+        }
+
+        @media (max-width: 480px) {
+            .ad-tile-add:not(.primary) { width: 72px; }
+            .ad-picker { padding: 0.6rem; }
+            .ad-picker-title { display: none; }
+            .ad-picker-grid { grid-template-columns: repeat(auto-fill, minmax(54px, 1fr)); max-height: 260px; }
+            .ad-pick img, .ad-pick .ad-pick-initials { width: 42px; height: 42px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container extra-wide">
+        <div id="header-container"></div>
+
+        <main>
+            <div id="roster-container"></div>
+
+            <section class="ad-focus-section">
+                <h2>Build Around</h2>
+                <p class="section-description">Choose an agent to see the best teams you can build around them from your roster. Add a teammate to narrow it down.</p>
+                <div class="ad-slots" id="ad-slots"></div>
+                <div class="ad-picker" id="ad-picker" hidden>
+                    <div class="ad-picker-top">
+                        <span class="ad-picker-title" id="ad-picker-title">Choose an agent</span>
+                        <input type="search" class="ad-picker-search" id="ad-picker-search" placeholder="Search" autocomplete="off">
+                        <button type="button" class="ad-picker-close" id="ad-picker-close" aria-label="Close">✕</button>
+                    </div>
+                    <div class="ad-picker-filters" id="ad-picker-filters"></div>
+                    <div class="ad-picker-grid" id="ad-picker-grid"></div>
+                    <div class="ad-picker-hint" id="ad-picker-hint" hidden></div>
+                </div>
+            </section>
+
+            <section class="action-section">
+                <div id="validation-errors" class="validation-errors" style="display: none;"></div>
+                <button id="run-btn" class="run-btn">Find Teams</button>
+            </section>
+
+            <section class="results-section" id="ad-results" style="display: none;">
+                <div class="results-header">
+                    <h2>Best Teams</h2>
+                    <span class="results-count" id="ad-results-count"></span>
+                </div>
+                <div id="ad-results-body"></div>
+            </section>
+        </main>
+
+        <div id="footer-container"></div>
+    </div>
+
+    <script type="module">
+        import { loadSharedComponents } from './lib/common/components.js';
+        loadSharedComponents('agent-detail');
+    </script>
+    <script type="module" src="lib/pages/agent-detail.js"></script>
+</body>
+</html>

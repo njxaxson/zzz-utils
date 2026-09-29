@@ -3,6 +3,19 @@
 What shipped, newest first. This file is history — nothing here is a statement about the
 current state of the engine. For that, see [STATUS.md](STATUS.md).
 
+**Agent Teams page**, 2026-09-29. `agent-detail.html` takes a focus agent, plus up to two
+optional teammates (via `?agents=a,b,c`, which is also linked from each Character Summary name and Tier List card).
+Find Teams lists up to **5** roster teams containing them. A team earns a boss tile by placing in
+the **top 3 among those teams** for that boss and reaching at least **Good**. Tiles are ordered by
+band, then shill match (a boss that shills the team's carry archetype comes first), then score.
+Comparisons stay within one boss ([reading scores](engine/reading-scores.md)). If nothing reaches
+Good, it shows the best available instead. No engine or data change.
+
+The browser pipeline that turns a roster into teams and scores them, which used to be copied into
+three pages, now lives in `lib/common/team-pool.js`, and the unit card lives in
+`lib/common/team-card.js`. Team Builder, Team Recommendations and Deadly Assault render
+**byte-identical** results before and after the move.
+
 **Severian's wind passive: a buff can target its own unit**, 2026-09-27. Severian's beta kit gives
 *himself* +30% crit damage whenever another teammate is wind — no proc needed, just the element.
 The engine had no way to say that: a buff always went to teammates, and a conditional stat or
