@@ -1,5 +1,5 @@
 {
-  "generated": "2026-09-29T17:34:53.463Z",
+  "generated": "2026-09-29T17:49:57.383Z",
   "method": "linear",
   "target": 400,
   "k": 10,
@@ -7,7 +7,7 @@
   "pools": {
     "armorer": "attack"
   },
-  "engineFingerprint": "66b50e7d49a2b205951bd0c879643dac416226b0d440d62cf812e9a3ed69758e",
+  "engineFingerprint": "6965a24954fef7d7f345f4b3764de97f4dc1b3faf8e6fada2e2bef6b7dd407cd",
   "corpus": {
     "teams": 8052,
     "bosses": 19,

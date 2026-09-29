@@ -955,7 +955,6 @@
             "scaling": { "er": 4, "anomaly:wind": 1 }
         },
         "faction": "Flint Workshop",
-        "available": false,
         "displayText": "Generalized wind stun agent designed to work best with armorers like Claret, but also has interesting synergy with Pyrois, Sigrid, Severian and Harumasa.",
         "gender": "female",
         "species": "elf"

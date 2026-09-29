@@ -1946,6 +1946,7 @@ async function main() {
         let checked = 0;
         for (const [supported, dualCarry] of pairs) {
             for (const boss of bosses) {
+                if(boss.mechanics?.assists > 2) continue; //skip bosses where Astra isn't viable
                 const a = scoreSpec(supported, boss);
                 const b = scoreSpec(dualCarry, boss);
                 if (a.score <= 0 && b.score <= 0) continue;

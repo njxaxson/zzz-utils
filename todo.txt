@@ -1,2 +1,3 @@
 Consider availability accepting true/false/date
 
+The team results display on the various pages is inconsistent and should be cleaned up, especially team recommendations 
