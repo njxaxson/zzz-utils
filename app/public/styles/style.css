@@ -4309,7 +4309,7 @@ a.unit-card {
 
 .tier-list-grid {
     display: grid;
-    grid-template-columns: auto 2fr 1fr 1fr;
+    grid-template-columns: auto 2.3fr 1fr 1fr;
     gap: 0;
     background: transparent;
     border-radius: 8px;
