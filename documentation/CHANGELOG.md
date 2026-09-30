@@ -38,6 +38,14 @@ Measured across seven rosters before and after: Velina rises to High everywhere 
 unowned; the only rating tiers that moved are the two narrow anomaly rosters; every other
 mover traces to a removed Depth card or a dropped illegal synergy pair.
 
+**Results display unified across five pages**, 2026-09-30. Team Builder, Team Recommendations,
+Deadly Assault Matchups, Agent Teams and Pull Recommendations now share one card: a coloured
+accent (strength band, pull priority or element) and a darker panel of square portrait tiles.
+Mobile no longer shows pill-style unit bars; every unit is a tile. Deadly Assault rows read boss,
+strength, team, with a cropped boss banner on phones so all three bosses fit one screen. The
+shared CSS is the `.result-card` section of `style.css`; conventions and the rejected
+alternatives are in [ux/](ux/README.md). Display only: no engine, data or scoring change.
+
 **Agent Teams page**, 2026-09-29. `agent-detail.html` takes a focus agent, plus up to two
 optional teammates (via `?agents=a,b,c`, which is also linked from each Character Summary name and Tier List card).
 Find Teams lists up to **5** roster teams containing them. A team earns a boss tile by placing in

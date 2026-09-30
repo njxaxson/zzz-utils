@@ -5,7 +5,7 @@
  */
 
 import { isSubdps } from '../common/pull-engine.js';
-import { createStrengthLabelHtml } from '../common/strength-rating.js';
+import { createStrengthLabelHtml, getStrengthRating } from '../common/strength-rating.js';
 import { getRosterUnits, buildRosterTeams, scoreTeamsForBoss, requireCalibration } from '../common/team-pool.js';
 import { createUnitCard } from '../common/team-card.js';
 import {
@@ -416,17 +416,20 @@ function displayResults(results) {
 
 function createResultRow(entry, index) {
     const teamHtml = entry.team.map(unit => createUnitCard(unit)).join('');
+    const band = getStrengthRating(entry.score, entry.team).label.toLowerCase();
     
     return `
-        <div class="recommendation-row">
-            <div class="recommendation-rank">#${index + 1}</div>
+        <div class="recommendation-row result-card band-${band}">
+            <div class="recommendation-meta">
+                <div class="recommendation-rank">#${index + 1}</div>
+                <div class="recommendation-strength">
+                    ${createStrengthLabelHtml(entry.score, entry.team)}
+                </div>
+                <div class="recommendation-score">${Math.round(entry.score)}</div>
+            </div>
             <div class="recommendation-team">
                 ${teamHtml}
             </div>
-            <div class="recommendation-strength">
-                ${createStrengthLabelHtml(entry.score, entry.team)}
-            </div>
-            <div class="recommendation-score">${Math.round(entry.score)}</div>
         </div>
     `;
 }

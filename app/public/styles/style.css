@@ -30,6 +30,11 @@
     --success: #00d4aa;
     --warning: #ffaa00;
     --error: #ff4444;
+
+    /* Result cards: dark tile panel and the two rules that cut a card into sections */
+    --panel-dark: rgba(0, 0, 0, 0.35);
+    --rule-soft: rgba(255, 255, 255, 0.14);
+    --rule-strong: rgba(255, 255, 255, 0.3);
     
     /* Element colors - Primary */
     --element-fire: #c44125;
@@ -93,6 +98,69 @@ main {
     display: flex;
     flex-direction: column;
     gap: 2rem;
+}
+
+/* Page body narrower than the header/footer, for pages whose content is a single column. */
+main.main-narrow {
+    max-width: 880px;
+    margin: 0 auto;
+}
+
+/* Deadly Assault rows carry a bigger boss tile, so they need a little more room. */
+main.main-narrow.main-da {
+    max-width: 940px;
+}
+
+/* ============================================================================
+   RESULT CARDS (shared)
+   One card per result: Team Builder element cards, Team Recommendations,
+   Deadly Assault, Agent Teams, Pull Recommendations. The accent is a band
+   (team strength, pull priority, or element) set through --band variables;
+   pages add only layout. See documentation/ux/result-cards.md.
+   ============================================================================ */
+
+.result-card {
+    background:
+        linear-gradient(90deg,
+            rgba(var(--band-rgb, 0, 0, 0), var(--band-tint, 0)),
+            rgba(var(--band-rgb, 0, 0, 0), calc(var(--band-tint, 0) / 8)) 60%),
+        var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-left: 4px solid var(--band, var(--border-color));
+    border-radius: 8px;
+}
+
+/* Strength bands (Team Recommendations, Deadly Assault, Agent Teams) */
+.band-excellent { --band: #00e676; --band-rgb: 0, 230, 118; --band-tint: 0.16; --band-edge: rgba(0, 230, 118, 0.45); }
+.band-great     { --band: #64dd17; --band-rgb: 100, 221, 23; --band-tint: 0.14; --band-edge: rgba(100, 221, 23, 0.45); }
+.band-good      { --band: #00d4aa; --band-rgb: 0, 212, 170; --band-tint: 0.12; --band-edge: rgba(0, 212, 170, 0.45); }
+.band-ok        { --band: #ffca28; }
+.band-tough     { --band: #ff9800; }
+.band-risky,
+.band-bad       { --band: #ff5252; }
+
+/* Pull priority (Pull Recommendations) */
+.pull-rec-card.priority-high   { --band: #39FF14; --band-rgb: 57, 255, 20; --band-tint: 0.10; --band-edge: rgba(57, 255, 20, 0.35); }
+.pull-rec-card.priority-medium { --band: #27AE60; --band-rgb: 39, 174, 96; --band-tint: 0.10; --band-edge: rgba(39, 174, 96, 0.4); }
+.pull-rec-card.priority-low    { --band: #6B8E6B; }
+
+/* Element (Team Builder) */
+.result-card.element-fire     { --band: var(--element-fire); }
+.result-card.element-ice      { --band: var(--element-ice); }
+.result-card.element-electric { --band: var(--element-electric); }
+.result-card.element-physical { --band: var(--element-physical); }
+.result-card.element-ether    { --band: var(--element-ether); }
+.result-card.element-wind     { --band: var(--element-wind); }
+.result-card.element-lumen    { --band: var(--element-lumen); }
+
+/* Mobile: the band moves to a top bar; the outline takes the band's soft edge colour. */
+@media (max-width: 600px) {
+    .result-card {
+        overflow: hidden;
+        border-color: var(--band-edge, var(--border-color));
+        border-width: 4px 1px 1px 1px;
+        border-top-color: var(--band, var(--border-color));
+    }
 }
 
 /* ============================================================================
@@ -2113,13 +2181,6 @@ a.unit-card {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-    transition: all 0.2s;
-}
-
-.team-card:hover {
-    border-color: var(--accent-primary);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .team-card-units {
@@ -2185,118 +2246,30 @@ a.unit-card {
     text-align: center;
 }
 
-/* Team info badges */
-.team-card-info {
-    display: flex;
-    gap: 0.3rem;
-    justify-content: center;
-    flex-wrap: wrap;
-}
-
-.team-badge {
-    font-size: 0.6rem;
-    font-weight: 600;
-    padding: 0.15rem 0.4rem;
-    border-radius: 3px;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-}
-
-.team-badge.element-badge {
-    background: rgba(255, 255, 255, 0.1);
-    color: var(--text-secondary);
-}
-
-.team-badge.element-badge.fire { background: var(--element-fire); color: white; }
-.team-badge.element-badge.ice { background: var(--element-ice); color: #1a1a26; }
-.team-badge.element-badge.electric { background: var(--element-electric); color: white; }
-.team-badge.element-badge.physical { background: var(--element-physical); color: #1a1a26; }
-.team-badge.element-badge.ether { background: var(--element-ether); color: white; }
-.team-badge.element-badge.wind { background: var(--element-wind); color: #1a1a26; }
-.team-badge.element-badge.lumen { background: var(--element-lumen); color: #1a1a26; }
-
-.team-badge.role-badge {
-    background: rgba(0, 212, 170, 0.2);
-    color: var(--accent-secondary);
-}
-
 /* ============================================================================
-   TEAM GRID LAYOUT (Element rows x DPS type columns)
+   TEAM GRID LAYOUT (one card per element; DPS types as labelled rows inside it)
    ============================================================================ */
 
 .team-grid-container {
     display: flex;
     flex-direction: column;
-    gap: 0;
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    overflow-x: auto;
+    gap: 1.25rem;
     grid-column: 1 / -1; /* Span all columns when inside CSS grid */
     width: 100%;
 }
 
-.team-grid-header {
-    display: flex;
-    background: var(--bg-tertiary);
-    border-bottom: 1px solid var(--border-color);
-}
-
-.grid-corner {
-    width: 80px;
-    min-width: 80px;
-    padding: 0.5rem;
-    border-right: 1px solid var(--border-color);
-}
-
-.grid-header-cell {
-    flex: 1;
-    min-width: 180px;
-    padding: 0.6rem 0.5rem;
-    text-align: center;
-    font-family: 'Orbitron', sans-serif;
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--text-secondary);
-    border-right: 1px solid var(--border-color);
-}
-
-.grid-header-cell:last-child {
-    border-right: none;
-}
-
-/* DPS type headers - use consistent teal/cyan color */
-.grid-header-cell.dps-attack,
-.grid-header-cell.dps-anomaly,
-.grid-header-cell.dps-rupture {
-    color: var(--text-primary);
-}
-
 .team-grid-row {
-    display: flex;
-    border-bottom: 1px solid var(--border-color);
-}
-
-.team-grid-row:last-child {
-    border-bottom: none;
+    overflow: hidden;
 }
 
 .grid-row-label {
-    width: 80px;
-    min-width: 80px;
-    padding: 0.75rem 0.5rem;
-    display: flex;
-    align-items: flex-start;
-    justify-content: center;
-    padding-top: 1rem;
+    padding: 0.6rem 1rem;
     font-family: 'Rajdhani', sans-serif;
-    font-size: 0.8rem;
+    font-size: 1rem;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.03em;
-    border-right: 1px solid var(--border-color);
-    background: var(--bg-tertiary);
+    letter-spacing: 0.06em;
+    border-bottom: 1px solid var(--rule-soft);
 }
 
 .grid-row-label.element-fire { color: var(--element-fire-light); }
@@ -2307,112 +2280,81 @@ a.unit-card {
 .grid-row-label.element-wind { color: var(--element-wind-light); }
 .grid-row-label.element-lumen { color: var(--element-lumen-light); }
 
+/* One DPS type: label on the left, its teams beside it (wrapping). */
 .grid-cell {
-    flex: 1;
-    min-width: 180px;
-    padding: 0.5rem;
-    display: flex;
-    align-items: flex-start;
-    justify-content: center;
-    border-right: 1px solid var(--border-color);
-    background: var(--bg-secondary);
+    display: grid;
+    grid-template-columns: 6rem minmax(0, 1fr);
+    gap: 0.75rem;
+    align-items: start;
+    padding: 0.85rem 1rem;
+    background: var(--panel-dark);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.grid-cell:last-child {
-    border-right: none;
-}
+.grid-cell:last-child { border-bottom: none; }
 
-.grid-cell-empty {
+.grid-cell-label {
+    padding-top: 0.35rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
     color: var(--text-muted);
-    font-size: 1.2rem;
 }
 
 .grid-cell-teams {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    width: 100%;
-}
-
-/* Compact team card for grid */
-.team-card-compact {
-    padding: 0.4rem;
-    margin: 0;
-}
-
-.team-card-compact .team-card-units {
-    gap: 0.25rem;
-}
-
-.team-card-compact .team-unit {
-    width: 55px;
-}
-
-.team-card-compact .team-unit .unit-name {
-    font-size: 0.45rem;
-}
-
-/* Additional teams section */
-.additional-teams {
-    margin-top: 1.5rem;
-    grid-column: 1 / -1; /* Span all columns when inside CSS grid */
-}
-
-.additional-teams-header {
-    font-family: 'Rajdhani', sans-serif;
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: var(--text-secondary);
-    margin-bottom: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
-
-.additional-teams-grid {
     display: flex;
     flex-wrap: wrap;
     gap: 0.75rem;
 }
 
-/* Responsive grid adjustments */
-@media (max-width: 900px) {
-    .grid-corner,
-    .grid-row-label {
-        width: 60px;
-        min-width: 60px;
-        font-size: 0.7rem;
-    }
-    
-    .team-card-compact .team-unit {
-        width: 45px;
-    }
-    
-    .team-card-compact .team-unit .unit-name {
-        font-size: 0.4rem;
-    }
+/* Compact team card for grid */
+.team-card-compact {
+    padding: 0.5rem;
+    margin: 0;
+    background: var(--bg-tertiary);
 }
 
+.team-card-compact .team-card-units {
+    display: grid;
+    grid-template-columns: repeat(3, 100px);
+    gap: 0.4rem;
+}
+
+.team-card-compact .team-unit {
+    width: auto;
+}
+
+.team-card-compact .team-unit .unit-name {
+    padding: 0.3rem 0.25rem;
+    font-size: 0.7rem;
+    line-height: 1.2;
+}
+
+/* Mobile: label above its teams; tiles share the card width. */
 @media (max-width: 600px) {
-    .team-grid-container {
-        overflow-x: auto;
-    }
-    
-    .team-grid-header {
-        min-width: 500px;
-    }
-}
+    .team-grid-container { gap: 1.75rem; }
 
-@media (max-width: 768px) {
-    .team-unit {
-        width: 60px;
+    .grid-cell {
+        display: block;
+        padding: 0.7rem;
     }
+
+    .grid-cell-label {
+        margin-bottom: 0.5rem;
+        padding-top: 0;
+    }
+
+    .grid-cell-teams { flex-direction: column; gap: 0.6rem; }
+
+    .team-card-compact .team-card-units {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .team-card-compact .team-unit .unit-name { font-size: 0.62rem; }
 }
 
 @media (max-width: 480px) {
-    .team-unit {
-        width: 55px;
-    }
-    
     .team-unit .unit-initials {
         font-size: 1rem;
     }
@@ -2573,19 +2515,6 @@ a.unit-card {
     letter-spacing: 0.05em;
 }
 
-.result-columns {
-    display: flex;
-    gap: 2rem;
-    justify-content: center;
-}
-
-.result-column {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.75rem;
-}
-
 /* Result boss tile */
 .result-boss-tile {
     width: 170px;
@@ -2666,14 +2595,6 @@ a.unit-card {
 .result-boss-tile.weakness-lumen-physical { background: linear-gradient(135deg, var(--element-lumen) 35%, var(--element-physical) 65%); }
 .result-boss-tile.weakness-lumen-wind { background: linear-gradient(135deg, var(--element-lumen) 35%, var(--element-wind) 65%); }
 
-/* Result team stack */
-.result-team-stack {
-    display: flex;
-    flex-direction: row;
-    justify-content: center;
-    gap: 0.5rem;
-}
-
 /* Result unit cards */
 .result-unit-card {
     width: 80px;
@@ -2751,43 +2672,7 @@ a.unit-card {
 .strength-risky { color: #ff5252; background: rgba(255, 82, 82, 0.12); }
 .strength-bad   { color: #b71c1c; background: rgba(183, 28, 28, 0.12); }
 
-/* Strength label in recommendation rows */
-.recommendation-strength {
-    min-width: 4rem;
-    flex-shrink: 0;
-    text-align: center;
-}
-
-/* Strength label in DA result columns */
-.result-column .strength-label {
-    margin-top: 0.3rem;
-}
-
 /* Carousel mobile responsiveness - use fluid sizing */
-@media (max-width: 900px) {
-    .result-columns {
-        gap: 1rem;
-        flex-wrap: wrap;
-    }
-    
-    .result-column {
-        flex: 1 1 auto;
-        min-width: 0;
-    }
-    
-    .result-boss-tile {
-        width: clamp(100px, 18vw, 150px);
-    }
-    
-    .result-unit-card {
-        width: clamp(55px, 10vw, 75px);
-    }
-    
-    .result-team-stack {
-        gap: 0.35rem;
-    }
-}
-
 @media (max-width: 768px) {
     .carousel-btn {
         width: 36px;
@@ -2797,26 +2682,6 @@ a.unit-card {
     
     .carousel-slide {
         padding: 1rem 0.75rem;
-    }
-    
-    .result-columns {
-        gap: 0.75rem;
-    }
-    
-    .result-boss-tile {
-        width: clamp(90px, 22vw, 130px);
-    }
-    
-    .result-boss-tile .boss-initials {
-        font-size: 1.1rem;
-    }
-    
-    .result-unit-card {
-        width: clamp(50px, 13vw, 70px);
-    }
-    
-    .result-unit-card .unit-name {
-        font-size: 0.5rem;
     }
 }
 
@@ -2839,107 +2704,156 @@ a.unit-card {
         font-size: 0.9rem;
         margin-bottom: 1rem;
     }
-    
-    .result-columns {
-        flex-direction: column;
-        gap: 1.25rem;
-        align-items: center;
-    }
-    
-    .result-column {
-        flex-direction: row;
-        flex-wrap: wrap;
-        align-items: flex-start;
-        gap: 0.25rem 0.75rem;
-        width: 100%;
-        max-width: 320px;
-    }
-    
-    .result-column .strength-label {
-        flex-basis: 100%;
-        text-align: center;
-    }
-    
-    .result-boss-tile {
-        width: 90px;
-        flex-shrink: 0;
-    }
-    
-    .result-boss-tile .boss-name {
-        font-size: 0.65rem;
-        padding: 0.3rem 0.2rem;
-    }
-    
-    .result-team-stack {
-        flex-direction: column;
-        gap: 0.35rem;
-        flex: 1;
-        min-width: 0;
-    }
-    
-    .result-unit-card {
-        width: 100%;
-        max-width: none;
-        flex-direction: row;
-        border-radius: 6px;
-        border-width: 2px;
-    }
-    
-    .result-unit-card .unit-avatar {
-        width: 40px;
-        height: 40px;
-        aspect-ratio: 1;
-        flex-shrink: 0;
-    }
-    
-    .result-unit-card .unit-initials {
-        width: 40px;
-        height: 40px;
-        font-size: 1rem;
-        flex-shrink: 0;
-    }
-    
-    .result-unit-card .unit-name {
-        flex: 1;
-        min-width: 0;
-        padding: 0.25rem 0.5rem;
-        font-size: 0.7rem;
-        text-align: left;
-        display: flex;
-        align-items: center;
-    }
 }
 
 @media (max-width: 480px) {
     .carousel-slide {
         padding: 0.5rem;
     }
-    
-    .result-column {
-        gap: 0.5rem;
-        max-width: 280px;
+}
+
+/* ============================================================================
+   DEADLY ASSAULT RESULT ROWS: one row per boss = boss tile | strength | 3 unit tiles
+   ============================================================================ */
+
+.da-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.da-row {
+    --da-tile: 120px;
+    --da-boss: 150px;
+    display: grid;
+    grid-template-columns: var(--da-boss) auto repeat(3, var(--da-tile));
+    column-gap: 0.5rem;
+    align-items: center;
+    justify-content: center;
+    padding: 0.9rem 1.1rem;
+}
+
+/* Strength sits between the boss and the team. */
+.da-row-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    align-self: stretch;
+    min-width: 6rem;
+    margin: 0 0.6rem;
+    padding: 0 0.5rem;
+}
+
+.da-row .strength-label { font-size: 0.8rem; padding: 0.25rem 0.7rem; }
+
+.da-row > .result-boss-tile .boss-name { font-size: 0.8rem; padding: 0.4rem 0.3rem; }
+
+/* The team wrapper disappears so the unit tiles share the row's grid. */
+.da-row-team { display: contents; }
+
+.da-row .result-boss-tile,
+.da-row .result-unit-card {
+    width: auto;
+    flex-direction: column;
+    border-width: 2px;
+    border-radius: 8px;
+}
+
+.da-row .result-unit-card .unit-avatar,
+.da-row .result-unit-card .unit-initials {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1;
+    font-size: 1.5rem;
+}
+
+.da-row .result-unit-card .unit-name,
+.da-row .result-boss-tile .boss-name {
+    display: block;
+    flex: none;
+    padding: 0.3rem 0.25rem;
+    font-size: 0.7rem;
+    line-height: 1.2;
+    font-weight: 600;
+    text-align: center;
+}
+
+@media (max-width: 768px) {
+    .da-row { --da-tile: 100px; --da-boss: 124px; }
+    .da-row-meta { min-width: 4.5rem; padding: 0 0.4rem; }
+}
+
+/* Mobile: a boss banner (weakness-coloured) with the strength beside it, the three unit tiles beneath. */
+@media (max-width: 600px) {
+    /* Prev/next float over the slide's title bar so the tiles get the full width. */
+    .carousel { position: relative; }
+    .carousel-btn {
+        position: absolute;
+        top: 0.55rem;
+        z-index: 2;
+        width: 30px;
+        height: 30px;
+        font-size: 1.1rem;
     }
-    
-    .result-boss-tile {
-        width: 75px;
+    .carousel-prev { left: 0.5rem; }
+    .carousel-next { right: 0.5rem; }
+    .carousel-slide { padding: 0.75rem 0.6rem; }
+    .result-label { margin-bottom: 0.75rem; }
+
+    /* Compact so all three boss rows fit one phone screen: the boss is a wide, full-width
+       tile (big enough that its art stays crisp) with the strength badge over its corner. */
+    .da-rows { gap: 1.75rem; }
+    .da-row { grid-template-columns: minmax(0, 1fr); gap: 0.5rem; padding: 0.6rem; }
+
+    .da-row > .result-boss-tile,
+    .da-row-meta { grid-area: 1 / 1; }
+
+    .da-row > .result-boss-tile { position: relative; }
+    .da-row > .result-boss-tile .result-boss-avatar { aspect-ratio: auto; height: 76px; }
+    .da-row > .result-boss-tile .boss-avatar-img { object-position: 50% 22%; }
+    .da-row > .result-boss-tile .boss-name {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        padding: 0.25rem 0.6rem;
+        background: linear-gradient(0deg, rgba(0, 0, 0, 0.8), rgba(0, 0, 0, 0));
+        font-size: 0.8rem;
+        text-align: left;
     }
-    
-    .result-boss-tile .boss-name {
-        font-size: 0.55rem;
+
+    .da-row-meta {
+        z-index: 1;
+        justify-self: end;
+        align-self: start;
+        min-width: 0;
+        margin: 0.4rem;
+        padding: 0;
     }
-    
-    .result-boss-tile .boss-initials {
-        font-size: 0.9rem;
+    .da-row .strength-label { font-size: 0.75rem; background-color: rgba(0, 0, 0, 0.75); }
+
+    /* Team: its own darker panel, cut off from the boss by a solid rule (as on Agent Teams). */
+    .da-row-team {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.4rem;
+        margin: 0.1rem -0.6rem -0.6rem;
+        padding: 0.55rem 0.6rem;
+        background: var(--panel-dark);
+        border-top: 2px solid var(--rule-strong);
     }
-    
-    .result-unit-card .unit-avatar,
-    .result-unit-card .unit-initials {
-        width: 35px;
-        height: 35px;
-    }
-    
-    .result-unit-card .unit-name {
-        font-size: 0.65rem;
+
+    /* Unit names overlay the portrait rather than adding a bar beneath it. */
+    .da-row .result-unit-card { position: relative; }
+    .da-row .result-unit-card .unit-name {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        padding: 0.2rem 0.1rem;
+        background: rgba(0, 0, 0, 0.7);
+        font-size: 0.6rem;
     }
 }
 
@@ -3298,39 +3212,41 @@ a.unit-card {
 .recommendations-list {
     display: flex;
     flex-direction: column;
-    gap: 0.6rem;
+    gap: 0.75rem;
 }
 
 .recommendation-row {
-    display: flex;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
     align-items: center;
-    gap: 1rem;
-    padding: 0.75rem 1rem;
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    transition: border-color 0.15s;
+    gap: 1.25rem;
+    padding: 1rem 1.25rem;
 }
 
-.recommendation-row:hover {
-    border-color: var(--accent-primary);
+/* Rank, strength and score stacked in a column beside the tiles. */
+.recommendation-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 5.5rem;
+    padding-right: 1.25rem;
+    border-right: 1px solid var(--rule-soft);
+    align-self: stretch;
+    justify-content: center;
 }
 
 .recommendation-rank {
     font-family: 'Orbitron', sans-serif;
-    font-size: 0.9rem;
+    font-size: 1.3rem;
     font-weight: 700;
     color: var(--accent-secondary);
-    min-width: 2.5rem;
     text-align: center;
-    flex-shrink: 0;
 }
 
-.recommendation-team {
-    display: flex;
-    gap: 0.5rem;
-    flex: 1;
-    justify-content: center;
+.recommendation-strength {
+    min-width: 0;
+    text-align: center;
 }
 
 .recommendation-score {
@@ -3338,72 +3254,81 @@ a.unit-card {
     font-size: 0.85rem;
     font-weight: 400;
     color: var(--text-secondary);
-    min-width: 3rem;
-    text-align: right;
-    flex-shrink: 0;
+    text-align: center;
 }
 
-/* Reuse result-unit-card styles from DA page for consistency */
+.recommendation-team {
+    --rec-tile: 120px;
+    display: flex;
+    gap: 0.5rem;
+}
 
+/* Full-size tiles: same portrait-over-name tile as the Agent Teams page. */
+.recommendation-team .result-unit-card {
+    width: var(--rec-tile);
+    border-width: 2px;
+}
+
+.recommendation-team .result-unit-card .unit-name {
+    padding: 0.3rem 0.25rem;
+    font-size: 0.7rem;
+    line-height: 1.2;
+}
+
+@media (max-width: 768px) {
+    .recommendation-team { --rec-tile: 104px; }
+}
+
+/* Mobile: rank / strength / score header over a darker panel of three tiles. */
 @media (max-width: 600px) {
+    .recommendations-list { gap: 1.75rem; }
+
     .recommendation-row {
-        flex-wrap: wrap;
-        gap: 0.5rem;
-        padding: 0.6rem 0.75rem;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0;
+        padding: 0;
     }
 
-    .recommendation-rank {
-        font-size: 0.8rem;
-        min-width: 2rem;
+    .recommendation-meta {
+        flex-direction: row;
+        justify-content: space-between;
+        min-width: 0;
+        padding: 0.55rem 0.75rem;
+        border-right: none;
+        align-self: auto;
     }
+
+    .recommendation-rank { font-size: 0.85rem; }
+    .recommendation-score { font-size: 0.8rem; min-width: 2rem; }
 
     .recommendation-team {
-        flex: 1 1 100%;
-        order: 3;
-    }
-
-    .recommendation-score {
-        font-size: 0.75rem;
-        margin-left: auto;
-    }
-
-    .recommendation-strength {
-        order: 4;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.4rem;
+        padding: 0.7rem;
+        background: var(--panel-dark);
+        border-top: 1px solid var(--rule-soft);
     }
 
     .recommendation-team .result-unit-card {
-        width: 100%;
-        max-width: none;
-        flex-direction: row;
-        border-radius: 6px;
-        border-width: 2px;
+        width: auto;
+        flex-direction: column;
     }
 
-    .recommendation-team .result-unit-card .unit-avatar {
-        width: 40px;
-        height: 40px;
-        flex-shrink: 0;
-    }
-
+    .recommendation-team .result-unit-card .unit-avatar,
     .recommendation-team .result-unit-card .unit-initials {
-        width: 40px;
-        height: 40px;
-        font-size: 1rem;
-        flex-shrink: 0;
+        width: 100%;
+        height: auto;
+        aspect-ratio: 1;
+        font-size: 1.5rem;
     }
 
     .recommendation-team .result-unit-card .unit-name {
-        flex: 1;
-        padding: 0.25rem 0.5rem;
-        font-size: 0.7rem;
-        text-align: left;
-        display: flex;
-        align-items: center;
-    }
-
-    .recommendation-team {
-        flex-direction: column;
-        gap: 0.35rem;
+        display: block;
+        flex: none;
+        padding: 0.3rem 0.2rem;
+        font-size: 0.62rem;
+        text-align: center;
     }
 
     .element-toggles,
@@ -3916,81 +3841,6 @@ a.unit-card {
         display: none !important;
     }
 
-    /* 2. Team Builder Grid - Stacked Layout */
-    .team-grid-header {
-        display: none;
-    }
-
-    .team-grid-row {
-        flex-direction: column;
-        min-width: 0 !important; /* Override potential min-width from other queries */
-    }
-
-    .grid-row-label {
-        width: 100%;
-        text-align: left;
-        padding: 0.5rem 1rem;
-        border-right: none;
-        border-bottom: 1px solid var(--border-color);
-        /* Switch from sticky-left to sticky-top for vertical scrolling context */
-        position: sticky;
-        left: auto;
-        top: 0; 
-        z-index: 10;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-        min-width: 0;
-    }
-
-    .grid-cell {
-        width: 100%;
-        border-right: none;
-        border-bottom: 1px solid var(--border-color);
-        min-width: 0 !important; /* Ensure content can shrink */
-        padding-top: 1.8rem; /* Space for label */
-        position: relative;
-        justify-content: flex-start; /* Align content to start */
-    }
-
-    /* Pseudo-labels for stacked cells */
-    .grid-cell:nth-child(2)::before {
-        content: "ATTACK";
-        position: absolute;
-        top: 0.4rem;
-        left: 0.5rem;
-        font-family: 'Orbitron', sans-serif;
-        font-size: 0.65rem;
-        color: var(--text-secondary);
-        font-weight: 700;
-        opacity: 0.7;
-        letter-spacing: 0.05em;
-    }
-
-    .grid-cell:nth-child(3)::before {
-        content: "ANOMALY";
-        position: absolute;
-        top: 0.4rem;
-        left: 0.5rem;
-        font-family: 'Orbitron', sans-serif;
-        font-size: 0.65rem;
-        color: var(--text-secondary);
-        font-weight: 700;
-        opacity: 0.7;
-        letter-spacing: 0.05em;
-    }
-
-    .grid-cell:nth-child(4)::before {
-        content: "RUPTURE";
-        position: absolute;
-        top: 0.4rem;
-        left: 0.5rem;
-        font-family: 'Orbitron', sans-serif;
-        font-size: 0.65rem;
-        color: var(--text-secondary);
-        font-weight: 700;
-        opacity: 0.7;
-        letter-spacing: 0.05em;
-    }
-
     /* 3. Deadly Assault Boss Tiles - Smaller Grid */
     .boss-grid {
         grid-template-columns: repeat(auto-fill, minmax(85px, 1fr));
@@ -4139,11 +3989,10 @@ a.unit-card {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.2rem;
-    width: 64px;
+    width: 84px;
     flex-shrink: 0;
-    padding: 0.35rem 0.25rem 0.45rem;
-    border-radius: 6px;
+    overflow: hidden;
+    border-radius: 8px;
     border: 2px solid var(--border-color);
     background: var(--bg-secondary);
 }
@@ -4165,40 +4014,44 @@ a.unit-card {
 }
 
 .banner-tile-avatar {
-    width: 38px;
-    height: 38px;
-    border-radius: 50%;
+    width: 100%;
+    aspect-ratio: 1;
     object-fit: cover;
+    display: block;
 }
 
 .banner-tile-initials {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 38px;
-    height: 38px;
-    border-radius: 50%;
-    background: var(--bg-tertiary);
+    width: 100%;
+    aspect-ratio: 1;
+    background: rgba(255, 255, 255, 0.05);
     font-family: 'Orbitron', sans-serif;
-    font-size: 0.65rem;
+    font-size: 1rem;
     font-weight: 700;
     color: var(--text-primary);
 }
 
 .banner-tile-name {
-    font-size: 0.58rem;
-    color: var(--text-primary);
+    width: 100%;
+    padding: 0.25rem 0.2rem 0.1rem;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    font-size: 0.65rem;
+    font-weight: 600;
     text-align: center;
     line-height: 1.1;
+    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    max-width: 100%;
 }
 
 .banner-tile-verdict {
+    width: 100%;
+    padding: 0 0.2rem 0.25rem;
+    background: rgba(0, 0, 0, 0.7);
+    text-align: center;
     font-family: 'Orbitron', sans-serif;
     font-size: 0.55rem;
     font-weight: 700;
@@ -4211,31 +4064,15 @@ a.unit-card {
 .banner-unit-tile.verdict-low .banner-tile-verdict { color: #6B8E6B; }
 .banner-unit-tile.verdict-no .banner-tile-verdict { color: #e74c3c; }
 
-/* Recommendation Cards */
+/* Recommendation Cards: text on top, a darker panel of portrait tiles beneath
+   (same paradigm as Agent Teams); the accent colour is the pull priority. */
 .pull-rec-card {
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border-color);
-    border-left: 4px solid;
-    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 0.75rem;
+}
+
+.rec-body {
     padding: 1rem 1.25rem;
-    margin-bottom: 1rem;
-    transition: border-color 0.15s;
-}
-
-.pull-rec-card:hover {
-    border-color: var(--accent-primary);
-}
-
-.pull-rec-card.priority-high {
-    border-left-color: #39FF14;
-}
-
-.pull-rec-card.priority-medium {
-    border-left-color: #27AE60;
-}
-
-.pull-rec-card.priority-low {
-    border-left-color: #6B8E6B;
 }
 
 .rec-header {
@@ -4285,7 +4122,7 @@ a.unit-card {
 .rec-reasons {
     list-style: disc;
     padding-left: 1.2rem;
-    margin: 0 0 0.75rem 0;
+    margin: 0;
 }
 
 .rec-reason {
@@ -4294,24 +4131,25 @@ a.unit-card {
     line-height: 1.4;
 }
 
-/* Recommended Unit List */
+/* Recommended units: portrait tiles in their own darker panel. */
 .rec-unit-list {
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
+    padding: 0.85rem 1.25rem;
+    background: var(--panel-dark);
+    border-top: 1px solid var(--rule-soft);
 }
 
 .rec-unit {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.25rem;
-    width: 70px;
-    padding: 0.4rem;
-    border-radius: 6px;
-    border: 2px solid;
+    width: 100px;
+    border-radius: 8px;
+    border: 2px solid var(--border-color);
     background: var(--bg-secondary);
     position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
 }
 
 .rec-unit.element-fire { border-color: var(--element-fire); }
@@ -4323,61 +4161,44 @@ a.unit-card {
 .rec-unit.element-lumen { border-color: var(--element-lumen); }
 
 .rec-unit .unit-avatar {
-    width: 44px;
-    height: 44px;
-    border-radius: 50%;
+    width: 100%;
+    aspect-ratio: 1;
     object-fit: cover;
+    display: block;
 }
 
 .rec-unit .unit-initials {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 44px;
-    height: 44px;
-    border-radius: 50%;
-    background: var(--bg-tertiary);
+    width: 100%;
+    aspect-ratio: 1;
+    background: rgba(255, 255, 255, 0.05);
     font-family: 'Orbitron', sans-serif;
-    font-size: 0.8rem;
+    font-size: 1.1rem;
     font-weight: 700;
     color: var(--text-primary);
 }
 
 .rec-unit .unit-name {
-    font-size: 0.65rem;
-    color: var(--text-primary);
+    padding: 0.3rem 0.25rem;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    font-size: 0.7rem;
+    font-weight: 600;
+    line-height: 1.2;
     text-align: center;
-    line-height: 1.1;
-    width: 100%;
-    white-space: normal;
+    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
 }
 
-/* Upcoming Badge */
-.upcoming-badge {
-    position: absolute;
-    top: -6px;
-    right: -6px;
-    background: var(--accent-secondary);
-    color: var(--bg-primary);
-    font-size: 0.5rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    padding: 1px 4px;
-    border-radius: 3px;
-    white-space: nowrap;
-}
-
+/* Banner availability badges sit inside the tile's top corner. */
+.upcoming-badge,
 .available-badge {
     position: absolute;
-    top: -6px;
-    right: -6px;
-    background: #27ae60;
+    top: 4px;
+    right: 4px;
     color: var(--bg-primary);
     font-size: 0.5rem;
     font-weight: 700;
@@ -4387,6 +4208,9 @@ a.unit-card {
     border-radius: 3px;
     white-space: nowrap;
 }
+
+.upcoming-badge { background: var(--accent-secondary); }
+.available-badge { background: #27ae60; }
 
 /* Starter Locked Unit Card */
 .unit-card.starter-locked {
@@ -4406,20 +4230,6 @@ a.unit-card {
 
 /* Pull Recommendations Responsive */
 @media (max-width: 768px) {
-    .rec-unit {
-        width: 62px;
-    }
-
-    .rec-unit .unit-avatar,
-    .rec-unit .unit-initials {
-        width: 38px;
-        height: 38px;
-    }
-
-    .rec-unit .unit-name {
-        font-size: 0.6rem;
-    }
-
     .roster-assessment-card {
         padding: 1rem;
     }
@@ -4434,20 +4244,33 @@ a.unit-card {
         flex-wrap: wrap;
     }
 
-    .rec-unit {
-        width: 56px;
-        padding: 0.3rem;
+    /* Banner strip: wrap instead of side-scrolling. Each group stacks, its tiles on a 3-column grid. */
+    .banner-tiles-inner { overflow-x: visible; padding: 0.75rem; }
+    .banner-tiles-row { flex-direction: column; align-items: stretch; gap: 1rem; }
+    .banner-tiles-group { flex-shrink: 1; align-items: stretch; }
+    .banner-tiles-strip {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.4rem;
+        padding-bottom: 0;
+    }
+    .banner-unit-tile { width: auto; }
+
+    .pull-rec-card { margin-bottom: 1.75rem; }
+
+    .rec-body { padding: 0.85rem; }
+
+    .rec-unit-list {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.4rem;
+        padding: 0.7rem;
+        border-top-width: 2px;
+        border-top-color: var(--rule-strong);
     }
 
-    .rec-unit .unit-avatar,
-    .rec-unit .unit-initials {
-        width: 34px;
-        height: 34px;
-    }
-
-    .pull-rec-card {
-        padding: 0.75rem 1rem;
-    }
+    .rec-unit { width: auto; }
+    .rec-unit .unit-name { font-size: 0.62rem; }
 }
 
 @media (max-width: 480px) {
@@ -4461,21 +4284,6 @@ a.unit-card {
 
     .input-row, .pity-row {
         grid-template-columns: 1fr;
-    }
-
-    .rec-unit {
-        width: 52px;
-    }
-
-    .rec-unit .unit-avatar,
-    .rec-unit .unit-initials {
-        width: 30px;
-        height: 30px;
-        font-size: 0.65rem;
-    }
-
-    .rec-unit .unit-name {
-        font-size: 0.55rem;
     }
 }
 

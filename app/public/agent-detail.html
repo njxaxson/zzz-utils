@@ -319,25 +319,13 @@
             gap: 1.5rem;
             align-items: center;
             padding: 1rem 1.25rem;
-            background: var(--bg-tertiary);
-            border: 1px solid var(--border-color);
-            border-left-width: 4px;
-            border-radius: 8px;
         }
-        /* Row tint = the team's best matchup band. */
-        .ad-row.ad-band-excellent { border-left-color: #00e676; background: linear-gradient(90deg, rgba(0, 230, 118, 0.16), rgba(0, 230, 118, 0.02) 60%), var(--bg-tertiary); }
-        .ad-row.ad-band-great     { border-left-color: #64dd17; background: linear-gradient(90deg, rgba(100, 221, 23, 0.14), rgba(100, 221, 23, 0.02) 60%), var(--bg-tertiary); }
-        .ad-row.ad-band-good      { border-left-color: #00d4aa; background: linear-gradient(90deg, rgba(0, 212, 170, 0.12), rgba(0, 212, 170, 0.02) 60%), var(--bg-tertiary); }
-        .ad-row.ad-band-ok        { border-left-color: #ffca28; }
-        .ad-row.ad-band-tough     { border-left-color: #ff9800; }
-        .ad-row.ad-band-risky,
-        .ad-row.ad-band-bad       { border-left-color: #ff5252; }
 
         .ad-row-team {
             display: flex;
             gap: 0.5rem;
             padding-right: 1.5rem;
-            border-right: 1px solid rgba(255, 255, 255, 0.14);
+            border-right: 1px solid var(--rule-soft);
             align-self: stretch;
             align-items: center;
         }
@@ -406,19 +394,16 @@
                 gap: 0;
                 padding: 0;
                 overflow: hidden;
-                border-width: 2px 1px 1px 1px;
-                border-top-width: 4px;
-                border-left-width: 1px;
+                border-color: var(--band-edge, var(--border-color));
+                border-width: 4px 1px 1px 1px;
+                border-top-color: var(--band, var(--border-color));
             }
-            .ad-row.ad-band-excellent { border-color: rgba(0, 230, 118, 0.45); border-top-color: #00e676; }
-            .ad-row.ad-band-great     { border-color: rgba(100, 221, 23, 0.45); border-top-color: #64dd17; }
-            .ad-row.ad-band-good      { border-color: rgba(0, 212, 170, 0.45); border-top-color: #00d4aa; }
             /* Team: its own darker panel, cut off from the bosses by a solid rule. */
             .ad-row-team {
                 padding: 0.85rem;
-                background: rgba(0, 0, 0, 0.35);
+                background: var(--panel-dark);
                 border-right: none;
-                border-bottom: 2px solid rgba(255, 255, 255, 0.3);
+                border-bottom: 2px solid var(--rule-strong);
             }
             .ad-row-matchups { padding: 0.75rem 0.85rem 0.85rem; }
             .ad-bosses-label {

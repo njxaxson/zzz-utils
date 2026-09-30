@@ -465,7 +465,7 @@ function createRow(row) {
     const best = getStrengthRating(row.tiles[0].score, row.team);
     const teamHtml = row.team.map(unit => createUnitCard(unit)).join('');
     return `
-        <div class="ad-row ad-band-${best.label.toLowerCase()}">
+        <div class="ad-row result-card band-${best.label.toLowerCase()}">
             <div class="ad-row-team">${teamHtml}</div>
             <div class="ad-row-matchups">
                 <div class="ad-bosses-label">Best against</div>

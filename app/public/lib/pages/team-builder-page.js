@@ -922,15 +922,8 @@ function createTeamGrid(teams) {
     
     let html = '<div class="team-grid-container">';
     
-    html += '<div class="team-grid-header">';
-    html += '<div class="grid-corner"></div>'; // Empty corner cell
-    for (const dpsType of displayDpsTypes) {
-        html += `<div class="grid-header-cell dps-${dpsType}">${capitalizeFirst(dpsType)}</div>`;
-    }
-    html += '</div>';
-    
     for (const element of displayElements) {
-        html += '<div class="team-grid-row">';
+        html += `<div class="team-grid-row result-card element-${element}">`;
         
         html += `<div class="grid-row-label element-${element}">${capitalizeFirst(element)}</div>`;
         
@@ -938,16 +931,15 @@ function createTeamGrid(teams) {
             const key = `${element}-${dpsType}`;
             const cellTeams = teamsByCell[key] || [];
             
+            if (cellTeams.length === 0) continue;
+            
             html += '<div class="grid-cell">';
-            if (cellTeams.length > 0) {
-                html += '<div class="grid-cell-teams">';
-                for (const teamData of cellTeams) {
-                    html += createTeamCard(teamData.team, true);
-                }
-                html += '</div>';
-            } else {
-                html += '<div class="grid-cell-empty">—</div>';
+            html += `<div class="grid-cell-label">${capitalizeFirst(dpsType)}</div>`;
+            html += '<div class="grid-cell-teams">';
+            for (const teamData of cellTeams) {
+                html += createTeamCard(teamData.team);
             }
+            html += '</div>';
             html += '</div>';
         }
         
@@ -963,32 +955,14 @@ function capitalizeFirst(str) {
     return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
-function createTeamCard(team, compact = false) {
+function createTeamCard(team) {
     const unitsHtml = team.map(unit => createUnitCard(unit, { className: 'team-unit' })).join('');
     
-    // Get badges using new logic (skip badges in compact/grid mode - they're implicit from position)
-    const badges = [];
-    
-    if (!compact) {
-        const teamElements = getTeamElements(team);
-        for (const element of teamElements) {
-            badges.push(`<span class="team-badge element-badge ${element}">${element}</span>`);
-        }
-        
-        const dpsType = getTeamDpsType(team);
-        if (dpsType) {
-            badges.push(`<span class="team-badge role-badge">${dpsType}</span>`);
-        }
-    }
-    
-    const cardClass = compact ? 'team-card team-card-compact' : 'team-card';
-    
     return `
-        <div class="${cardClass}">
+        <div class="team-card team-card-compact">
             <div class="team-card-units">
                 ${unitsHtml}
             </div>
-            ${badges.length > 0 ? `<div class="team-card-info">${badges.join('')}</div>` : ''}
         </div>
     `;
 }

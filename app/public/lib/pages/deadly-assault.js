@@ -4,7 +4,7 @@
  */
 
 import { scoreTeamForBoss, getBossWeaknesses, getBossShill, resolveBossVariation } from '../common/team-scorer.js';
-import { createStrengthLabelHtml } from '../common/strength-rating.js';
+import { createStrengthLabelHtml, getStrengthRating } from '../common/strength-rating.js';
 import { getRosterUnits, buildRosterTeams, scoreCalibrated, scoreTeamsForBoss, requireCalibration } from '../common/team-pool.js';
 import { createUnitCard, getWeaknessGradientClass } from '../common/team-card.js';
 import {
@@ -683,29 +683,32 @@ function goToResult(index) {
 }
 
 function createResultSlide(combo, index, bosses) {
-    const columnsHtml = combo.assignments.map(assignment => {
+    const rowsHtml = combo.assignments.map(assignment => {
         const boss = bosses.find(b => b.name === assignment.boss);
         const weaknessClass = getWeaknessGradientClass(getBossWeaknesses(boss));
         const teamHtml = assignment.team.map(unit => createUnitCard(unit)).join('');
         const imageUrl = getBossImageUrl(boss.id);
         const initials = getInitials(boss.shortName);
+        const band = getStrengthRating(assignment.score, assignment.team).label.toLowerCase();
         
         const avatarHtml = imageUrl
             ? `<img class="boss-avatar-img" src="${imageUrl}" alt="${boss.shortName}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="boss-initials" style="display:none">${initials}</span>`
             : `<span class="boss-initials">${initials}</span>`;
         
         return `
-            <div class="result-column">
+            <div class="da-row result-card band-${band}">
                 <div class="result-boss-tile ${weaknessClass}">
                     <div class="result-boss-avatar">
                         ${avatarHtml}
                     </div>
                     <div class="boss-name">${boss.shortName}</div>
                 </div>
-                <div class="result-team-stack">
+                <div class="da-row-meta">
+                    ${createStrengthLabelHtml(assignment.score, assignment.team, { lenient: assignment.lenient })}
+                </div>
+                <div class="da-row-team">
                     ${teamHtml}
                 </div>
-                ${createStrengthLabelHtml(assignment.score, assignment.team, { lenient: assignment.lenient })}
             </div>
         `;
     }).join('');
@@ -713,8 +716,8 @@ function createResultSlide(combo, index, bosses) {
     return `
         <div class="carousel-slide">
             <div class="result-label">Option #${index + 1}</div>
-            <div class="result-columns">
-                ${columnsHtml}
+            <div class="da-rows">
+                ${rowsHtml}
             </div>
         </div>
     `;

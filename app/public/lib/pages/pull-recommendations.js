@@ -392,12 +392,14 @@ function createRecommendationCard(rec, activeSet, upcomingSet) {
     const reasonsHtml = `<ul class="rec-reasons">${allReasons.map(r => `<li class="rec-reason">${r}</li>`).join('')}</ul>`;
 
     return `
-        <div class="pull-rec-card priority-${priorityClass}">
-            <div class="rec-header">
-                <span class="priority-badge priority-${priorityClass}">${rec.priority}</span>
-                <span class="rec-title">${rec.title}</span>
+        <div class="pull-rec-card result-card priority-${priorityClass}">
+            <div class="rec-body">
+                <div class="rec-header">
+                    <span class="priority-badge priority-${priorityClass}">${rec.priority}</span>
+                    <span class="rec-title">${rec.title}</span>
+                </div>
+                ${reasonsHtml}
             </div>
-            ${reasonsHtml}
             <div class="rec-unit-list">
                 ${unitsHtml}
             </div>
