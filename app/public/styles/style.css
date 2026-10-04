@@ -4309,7 +4309,8 @@ a.unit-card {
 
 .tier-list-grid {
     display: grid;
-    grid-template-columns: auto 2.3fr 1fr 1fr;
+    /* Floors fit the fullest cell per column (6 / 4 / 3 / 3 tiles) on one row. */
+    grid-template-columns: auto minmax(390px, 1.9fr) minmax(265px, 1.3fr) minmax(203px, 1fr) minmax(203px, 1fr);
     gap: 0;
     background: transparent;
     border-radius: 8px;
@@ -4347,7 +4348,7 @@ a.unit-card {
 }
 
 .tier-label-cell {
-    padding: 0.75rem 1rem;
+    padding: 0.75rem 0.6rem;
     display: flex;
     align-items: center;
     justify-content: flex-start;
@@ -4374,10 +4375,10 @@ a.unit-card {
 .tier-label[data-tier="4"]   { color: #994444; }
 
 .tier-cell {
-    padding: 0.75rem;
+    padding: 0.5rem;
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
+    gap: 0.4rem;
     align-items: flex-start;
     align-content: flex-start;
     min-height: 70px;
@@ -4412,7 +4413,14 @@ a.unit-card {
 
 /* Cards link to Agent Teams, so they keep the shared pointer and hover lift. */
 .tier-list-grid .unit-card {
-    width: 70px;
+    width: 56px;
+}
+
+/* Below this the floors no longer fit, so the columns flex and wrap. */
+@media (max-width: 1200px) {
+    .tier-list-grid {
+        grid-template-columns: auto 1.9fr 1.3fr 1fr 1fr;
+    }
 }
 
 @media (max-width: 900px) {

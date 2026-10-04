@@ -1,14 +1,15 @@
 /**
  * Tier List Page
- * Renders agents in a grid: columns = DPS / Stun / Support, rows = tier levels.
+ * Renders agents in a grid: columns = Crit DPS / Anomaly DPS / Stun / Support, rows = tier levels.
  */
 
-import { ELEMENTS, DPS_ROLES } from '../common/constants.js';
+import { ELEMENTS } from '../common/constants.js';
 
 const TIERS = ['0', '0.5', '1', '1.5', '2', '2.5', '3', '3.5', '4'];
 
 const COLUMNS = [
-    { id: 'dps', label: 'DPS', matchFn: unit => hasRole(unit, DPS_ROLES) },
+    { id: 'crit', label: 'Crit DPS', matchFn: unit => hasRole(unit, ['attack', 'rupture', 'armorer']) },
+    { id: 'anomaly', label: 'Anomaly DPS', matchFn: unit => hasRole(unit, ['anomaly']) },
     { id: 'stun', label: 'Stun', matchFn: unit => hasRole(unit, ['stun']) },
     { id: 'support', label: 'Support', matchFn: unit => hasRole(unit, ['support', 'defense']) }
 ];

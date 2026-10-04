@@ -18,23 +18,15 @@ disqualified if one is handed to the scorer directly.
 ## Flex Units
 
 Some units can be classified as a “flex” unit. This means that the user has decided that 
-
 the benefits of a unit are sufficient even if their additional ability isn’t activated. 
-
 Flex units can tack on to a fully legal two-person team (where A joins on B *and* B joins on A) 
-
 to form a three-person team. 
 
 The default flex unit is Nicole, whose value as a defense shredder is considerably more
-
 significant than her token additional ability. For example, Trigger/Harumasa are a fully 
-
 legal duo (Trigger joins on electric Harumasa, Harumasa joins on stun Trigger), and so 
-
 Nicole (designated by the user as a flex unit, enabled by default) can form the third teammate
-
 in Trigger/Harumasa/Nicole, where the combined defense shred between Trigger and Nicole
-
 is inherently very strong. 
 
 ## The `faction` token
