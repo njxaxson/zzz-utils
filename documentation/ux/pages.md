@@ -26,7 +26,7 @@ Prev/next buttons float over the slide title on mobile so the tiles get the full
 
 The reference design. Desktop: team on the left, that team's best bosses on the right, divided
 by a hairline. Mobile (≤900px): team panel (darker, solid rule beneath), then the boss list.
-Accent: the team's best matchup band. Its styles are inline in `agent-detail.html`.
+Accent: the team's best matchup band. Its styles live in the `AGENT TEAMS PAGE` section of `style.css`.
 
 ## Pull Recommendations
 

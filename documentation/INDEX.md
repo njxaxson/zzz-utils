@@ -27,6 +27,7 @@ thing that will make the rest make sense, and [GLOSSARY.md](GLOSSARY.md) defines
 | Working on gap detection or coverage | [coverage and gaps](recommendations/coverage-and-gaps.md) |
 | Working on Deadly Assault allocation | [deadly assault](bucketing/deadly-assault.md) |
 | Changing how results **look** (cards, tiles, spacing, mobile) | [ux/README](ux/README.md), then the page in [ux/pages](ux/pages.md) |
+| Adding a page, or changing colours, fonts, `<head>` meta or base styles | [ux/style-guide](ux/style-guide.md) |
 | About to restyle a layout that seems obviously better | [ux/decisions](ux/decisions.md) — several have been tried and rejected |
 | Running or debugging a CLI script | [CLI reference](tooling/cli-reference.md) |
 | **Verifying a change** | [verification loop](tooling/verification-loop.md) and [measuring a change](tooling/measuring-a-change.md) |
@@ -110,6 +111,7 @@ defined by slot count rather than by carry:
 ### `ux/` — how results look
 
 [Overview](ux/README.md) ·
+[style guide](ux/style-guide.md) ·
 [result cards](ux/result-cards.md) ·
 [tiles](ux/tiles.md) ·
 [responsive](ux/responsive.md) ·

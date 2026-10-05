@@ -5,12 +5,10 @@
 Traditional anomaly [wheelchairs](wheelchairs.md) are strongly *sub*optimal for Remielle. She
 wants two more anomaly agents, not a stunner and a buffer, because her damage comes from
 [rebounding teammate procs](../concepts/lumen.md) but also because the caliber of her capabilities is explicitly dependent 
-
 on having a triple-anomaly agent team composition. Without two other native anomaly members 
-
 (i.e. not pseudoanomalies) on the team, Remielle is significantly hamstrung. 
 
-## Remielle has two tracks
+## Remielle has two main tracks
 
 Vivian and Velina are the only *fully dedicated* anomaly sub-DPS units in the game — everyone
 else is conditional — so each anchors one track.
@@ -25,7 +23,7 @@ channels. Disorders get a dedicated team-wide need computation
 ([disorder supply](../concepts/disorder-supply.md)); vortex and abloom go through the
 ordinary buff and damage-need channels.
 
-Burnice is an less-optimal alternative to Vivian for disorder-based compositions; e.g. Miyabi/Burnice/Remielle.
+Burnice is a slightly less optimal alternative to Vivian for disorder-based compositions; e.g. Miyabi/Burnice/Remielle. Grace is also occassionally used as a disorder-based sub-DPS when there is no other dedicated off-field anomaly agent. 
 
 ## Third-slot ordering on the Velina track
 

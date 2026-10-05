@@ -8,6 +8,7 @@ results display. The scoring side is in [`../engine/`](../engine/); none of this
 | Adding or restyling a results card | [result-cards](result-cards.md) |
 | Touching a unit or boss tile, or its image | [tiles](tiles.md) |
 | Changing widths, breakpoints or spacing | [responsive](responsive.md) |
+| Adding a page, or touching colours, fonts, `<head>` or base styles | [style-guide](style-guide.md) |
 | Working on one specific page | [pages](pages.md) |
 | About to try a layout that feels obvious | [decisions](decisions.md) — several have already been tried and rejected |
 
