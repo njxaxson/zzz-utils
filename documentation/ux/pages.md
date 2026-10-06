@@ -28,6 +28,10 @@ The reference design. Desktop: team on the left, that team's best bosses on the 
 by a hairline. Mobile (≤900px): team panel (darker, solid rule beneath), then the boss list.
 Accent: the team's best matchup band. Its styles live in the `AGENT TEAMS PAGE` section of `style.css`.
 
+Unowned agents: the popup picker lists owned agents only, but any agent already in the focus bar
+(e.g. via `?agents=` from another page) is treated as owned for the search, so the page answers
+"what teams could I build if I had this agent". Such tiles keep the "Not owned" badge.
+
 ## Pull Recommendations
 
 Three parts: the Roster Health card, the banner strip, and the recommendation cards.

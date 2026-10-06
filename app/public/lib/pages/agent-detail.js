@@ -53,7 +53,7 @@ async function loadData() {
         setupEventListeners();
         renderSlots();
         // A deep link should land on results, not on an unpressed button.
-        if (getActiveFocus().length > 0) runSearch({ scroll: false });
+        if (focusIds.length > 0) runSearch({ scroll: false });
     } catch (error) {
         console.error('Failed to load data:', error);
         showError('Failed to load data. Refresh the page to try again.');
@@ -107,8 +107,11 @@ function isOwned(id) {
     return !!getUnitStates()[id]?.owned;
 }
 
-function getActiveFocus() {
-    return focusIds.filter(isOwned);
+// Focus agents count as roster members even when unowned, so a deep link can ask "what if I had this agent".
+function getEffectiveStates() {
+    const states = { ...getUnitStates() };
+    for (const id of focusIds) states[id] = { ...states[id], owned: true };
+    return states;
 }
 
 function teamHasAll(team, ids) {
@@ -126,7 +129,7 @@ function getFlexTip(activeFocus, currentCount) {
     const notFlex = activeFocus.filter(id => !isFlex(id) && !NO_FLEX_TIP_TAGS.some(t => getUnit(id).tags.includes(t)));
     if (notFlex.length === 0) return null;
     const flexNames = [...getUniversalUnitNames(), ...notFlex.map(id => getUnit(id).name)];
-    const units = getRosterUnits(getAllUnits(), getUnitStates());
+    const units = getRosterUnits(getAllUnits(), getEffectiveStates());
     const withFlex = Object.values(buildRosterTeams(units, flexNames))
         .filter(team => teamHasAll(team, activeFocus)).length;
     const gain = withFlex - currentCount;
@@ -143,7 +146,7 @@ function createFlexTipHtml(tip) {
 const FLEX_HOW = 'Open Your Roster and right-click the agent, or use Mode: Mark Flex on mobile.';
 
 function getRosterTeams() {
-    return buildRosterTeams(getRosterUnits(getAllUnits(), getUnitStates()), getUniversalUnitNames());
+    return buildRosterTeams(getRosterUnits(getAllUnits(), getEffectiveStates()), getUniversalUnitNames());
 }
 
 // Bosses, one entry per enabled variation as well (mirrors Deadly Assault).
@@ -342,7 +345,7 @@ function renderPicker() {
 
     const query = document.getElementById('ad-picker-search').value.trim().toLowerCase();
     // The new pick must be able to team with everyone except the slot being replaced.
-    const others = getActiveFocus().filter(id => id !== focusIds[pickingSlot]);
+    const others = focusIds.filter(id => id !== focusIds[pickingSlot]);
     const teams = Object.values(getRosterTeams()).filter(team => teamHasAll(team, others));
     const joinable = new Set(teams.flatMap(team => team.map(u => u.id)));
 
@@ -414,13 +417,9 @@ function showResults(countText, bodyHtml, { scroll }) {
 
 function runSearch({ scroll = true } = {}) {
     hideError();
-    const activeFocus = getActiveFocus();
-    if (focusIds.length === 0) {
-        showError('Choose an agent first.');
-        return;
-    }
+    const activeFocus = [...focusIds];
     if (activeFocus.length === 0) {
-        showError(`${joinNames(focusIds.map(id => getUnit(id).name))} ${focusIds.length === 1 ? "isn't" : "aren't"} in your roster - add them first.`);
+        showError('Choose an agent first.');
         return;
     }
 
