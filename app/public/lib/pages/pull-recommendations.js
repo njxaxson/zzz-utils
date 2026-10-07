@@ -320,11 +320,11 @@ function createBannerUnitTile(unit, verdictClass) {
     const label = verdictLabel(verdictClass);
 
     return `
-        <div class="banner-unit-tile verdict-${verdictClass}" title="${unit.name}: ${label}">
+        <a class="banner-unit-tile verdict-${verdictClass}" href="agent-detail.html?agents=${unit.id}" title="${unit.name}: ${label}">
             ${avatarHtml}
             <span class="banner-tile-name">${displayName}</span>
             <span class="banner-tile-verdict">${label}</span>
-        </div>
+        </a>
     `;
 }
 
@@ -435,11 +435,11 @@ function createRecUnitCard(unit, activeSet, upcomingSet) {
     else if (onUpcomingBanner || isGameUpcoming) titleBits.push('Upcoming');
 
     return `
-        <div class="rec-unit element-${element}" title="${titleBits.join(' — ')}">
+        <a class="rec-unit element-${element}" href="agent-detail.html?agents=${unit.id}" title="${titleBits.join(' — ')}">
             ${avatarHtml}
             <span class="unit-name">${unit.name}</span>
             ${badgeHtml}
-        </div>
+        </a>
     `;
 }
 

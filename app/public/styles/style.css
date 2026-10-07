@@ -4152,6 +4152,19 @@ a.unit-card {
     flex-direction: column;
 }
 
+a.banner-unit-tile,
+a.rec-unit {
+    color: inherit;
+    text-decoration: none;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+a.banner-unit-tile:hover,
+a.rec-unit:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
 .rec-unit.element-fire { border-color: var(--element-fire); }
 .rec-unit.element-ice { border-color: var(--element-ice); }
 .rec-unit.element-electric { border-color: var(--element-electric); }
