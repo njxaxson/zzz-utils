@@ -26,6 +26,9 @@ thing that will make the rest make sense, and [GLOSSARY.md](GLOSSARY.md) defines
 | Working on pull recommendations | [pull engine](recommendations/pull-engine.md) |
 | Working on gap detection or coverage | [coverage and gaps](recommendations/coverage-and-gaps.md) |
 | Working on Deadly Assault allocation | [deadly assault](bucketing/deadly-assault.md) |
+| Working on the Deadly Assault **plan** (pins, fixed teams, share link) | [custom plans](bucketing/deadly-assault.md#custom-plans-pins), then [ux/pages](ux/pages.md#deadly-assault-matchups) |
+| Changing the **agent picker** (focus tiles and popup) | [ux/pages](ux/pages.md#agent-picker-shared) |
+| Changing **lenient mode** or what a lenient result may be labelled | [lenient mode](engine/element-resistance.md#lenient-mode) ([LEN-01..04](reference/TAGS.md)) |
 | Changing how results **look** (cards, tiles, spacing, mobile) | [ux/README](ux/README.md), then the page in [ux/pages](ux/pages.md) |
 | Adding a page, or changing colours, fonts, `<head>` meta or base styles | [ux/style-guide](ux/style-guide.md) |
 | About to restyle a layout that seems obviously better | [ux/decisions](ux/decisions.md) — several have been tried and rejected |
@@ -106,7 +109,7 @@ defined by slot count rather than by carry:
 
 ### `bucketing/` — Deadly Assault
 
-[Deadly assault](bucketing/deadly-assault.md) — marginal value, rank bands, allocation.
+[Deadly assault](bucketing/deadly-assault.md) — marginal value, rank bands, allocation, custom plans (pins).
 
 ### `ux/` — how results look
 

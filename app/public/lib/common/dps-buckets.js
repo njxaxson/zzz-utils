@@ -112,7 +112,8 @@ export function findDiverseStrategies(viableTeamsByBoss, bossNames, limit, confi
                             team: bestTriple[i].team,
                             label: bestTriple[i].label,
                             score: bestTriple[i].score,
-                            lenient: !!bestTriple[i].lenient
+                            lenient: !!bestTriple[i].lenient,
+                            unscorable: !!bestTriple[i].unscorable
                         }))
                     });
                 }

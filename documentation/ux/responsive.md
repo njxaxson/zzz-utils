@@ -29,6 +29,7 @@ were tried (see [decisions](decisions.md)). Narrow the body.
   banner strip used to scroll; it now stacks.)
 * **Tiles share the card width.** Three tiles per row, `minmax(0, 1fr)`, never a fixed pixel width.
 * **Between cards: 1.75rem.**
+* **The Deadly Assault plan inputs are exempt from the one-screen rule below.** Three rows of boss banner plus three slot tiles run about 340px each, so they scroll. They reuse the result rows' layout (banner over a dark team panel) so the two read alike, and sit above Find Optimal Teams, so results stay a screen away rather than pushed far down.
 * **Deadly Assault must fit on one phone screen.** An option is three boss rows and the user
   needs to compare all three at once. The design budget is about 210px per row, which is why the
   boss is a banner and the unit names overlay the portraits. Measure with a 375×700 window; if you

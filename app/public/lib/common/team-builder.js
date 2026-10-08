@@ -187,7 +187,7 @@ export function assignBandedRanks(teams) {
  * @param {Array} bossNames - Array of 3 boss names in order
  * @returns {Array} Sorted array of valid combinations
  */
-export function findExclusiveCombinations(viableTeamsByBoss, bossNames) {
+export function findExclusiveCombinations(viableTeamsByBoss, bossNames, topN = 20) {
     const combinations = [];
     
     const teams0 = viableTeamsByBoss[bossNames[0]] || [];
@@ -202,10 +202,9 @@ export function findExclusiveCombinations(viableTeamsByBoss, bossNames) {
     assignBandedRanks(teams2);
     
     // Limit to top N teams per boss for efficiency
-    const TOP_N = 20;
-    const top0 = teams0.slice(0, TOP_N);
-    const top1 = teams1.slice(0, TOP_N);
-    const top2 = teams2.slice(0, TOP_N);
+    const top0 = teams0.slice(0, topN);
+    const top1 = teams1.slice(0, topN);
+    const top2 = teams2.slice(0, topN);
     
     for (const t0 of top0) {
         for (const t1 of top1) {
@@ -229,9 +228,9 @@ export function findExclusiveCombinations(viableTeamsByBoss, bossNames) {
                     rankSum,
                     maxRank,
                     assignments: [
-                        { boss: bossNames[0], team: t0.team, label: t0.label, score: t0.score, rank: t0.rank, lenient: !!t0.lenient },
-                        { boss: bossNames[1], team: t1.team, label: t1.label, score: t1.score, rank: t1.rank, lenient: !!t1.lenient },
-                        { boss: bossNames[2], team: t2.team, label: t2.label, score: t2.score, rank: t2.rank, lenient: !!t2.lenient }
+                        { boss: bossNames[0], team: t0.team, label: t0.label, score: t0.score, rank: t0.rank, lenient: !!t0.lenient, unscorable: !!t0.unscorable },
+                        { boss: bossNames[1], team: t1.team, label: t1.label, score: t1.score, rank: t1.rank, lenient: !!t1.lenient, unscorable: !!t1.unscorable },
+                        { boss: bossNames[2], team: t2.team, label: t2.label, score: t2.score, rank: t2.rank, lenient: !!t2.lenient, unscorable: !!t2.unscorable }
                     ]
                 });
             }

@@ -38,6 +38,31 @@ Measured across seven rosters before and after: Velina rises to High everywhere 
 unowned; the only rating tiers that moved are the two narrow anomaly rosters; every other
 mover traces to a removed Depth card or a dropped illegal synergy pair.
 
+**Agent Teams offers unowned agents**, 2026-10-08. The picker's popup now lists agents the player
+does not own (grey ring, with an **Unowned** filter), so any agent can be a focus or teammate;
+the flag can still switch it off. Faded agents are computed for unowned candidates too, with a
+direct team-legality check (`canFormTeam`) that agrees with the team builder.
+
+**Custom Deadly Assault matchup**, 2026-10-08. The Deadly Assault page gains an optional
+**Plan your own matchup** section: pin one or two agents to a boss and the page completes the team
+from your roster; fix all three and it scores exactly that team; leave a boss empty and it chooses.
+Agents you do not own can be planned around (only where you pinned them). Plans persist, share via
+a new `plan=` link parameter (old links are unaffected), and results look exactly as before. The
+solver takes `pinsByBoss`, scores only the teams a pin allows (a fixed boss scores one), and with
+no pins runs byte-identically to before. The agent picker was extracted from Agent Teams into a
+shared component (`agent-picker.js`) and now caps the popup at 18 icons. A new **Abysmal** band
+marks a pinned team nothing can score. "Show me more creative options" is hidden while a plan is
+in use, since a plan is the player's own creativity and DPS bucketing over many pins is confusing. See [bucketing/deadly-assault](bucketing/deadly-assault.md#custom-plans-pins).
+
+**Lenient mode no longer disqualifies where the game does not**, 2026-10-08. Four strict-mode
+disqualifications become costs in lenient mode only: a stunner-less team on a stun-shill boss
+(-8, [LEN-01](engine/element-resistance.md)), one defensive assist short (free,
+[LEN-02](engine/element-resistance.md)), and a resisted or anti-typed DPS (-40 each,
+[LEN-03](engine/element-resistance.md)). A lenient result is also never labelled better than **OK**
+([LEN-04](engine/element-resistance.md)), on every page that shows a label. Strict scoring and every
+calibration anchor are unchanged (regeneration moved only the fingerprint); the new rules matter to limited rosters and to pinned
+teams on the Deadly Assault page.
+
 **Results display unified across five pages**, 2026-09-30. Team Builder, Team Recommendations,
 Deadly Assault Matchups, Agent Teams and Pull Recommendations now share one card: a coloured
 accent (strength band, pull priority or element) and a darker panel of square portrait tiles.

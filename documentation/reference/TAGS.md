@@ -138,6 +138,11 @@ Populated during the comment pass. One row per tag, newest last within a prefix.
 | `[PRED-03]` | `../data-model/predicates.md` | `hasRole`, the shared evaluator, and the no-team defaults |
 | `[PULL-02]` | `../recommendations/pull-engine.md` | The codependency/ladder penalty is per unit, not per card |
 | `[BUCK-01]` | `../bucketing/deadly-assault.md` | The rank band 0.011/4.5 is derived from one Thrall & Sobek allocation case |
+| `[BUCK-02]` | `../bucketing/deadly-assault.md` | A pinned solve widens the top-20 cut only when the normal cut finds nothing |
+| `[LEN-01]` | `../engine/element-resistance.md` | Lenient mode keeps a stunnerless team on a stun-shill boss, at a flat -8 |
+| `[LEN-02]` | `../engine/element-resistance.md` | Lenient mode allows one missing reliable defensive assist |
+| `[LEN-03]` | `../engine/element-resistance.md` | Lenient mode prices a resisted or anti-typed DPS at -40 instead of disqualifying it |
+| `[LEN-04]` | `../engine/element-resistance.md` | A lenient result is labelled no better than OK, whatever it scores |
 | `[PIPE-01]` | `../engine/layers.md` | The solo-carry bonus is sized against the mechanics it sits beside |
 | `[PIPE-02]` | `../engine/layers.md` | The supportless structure factor is the whole judgement now the L4 cap is gone |
 | `[PIPE-03]` | `../engine/layers.md` | A `join` that mandates a second carry — why it waives rather than grants |

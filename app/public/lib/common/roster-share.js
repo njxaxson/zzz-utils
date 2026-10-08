@@ -230,10 +230,11 @@ export function isSharedBossesMode() {
 }
 
 // Build a shareable URL with roster, bosses, and boss variations encoded (Deadly Assault page).
-export function generateShareUrlWithBosses(unitStates, allUnits, bossIds, bossVariations) {
+export function generateShareUrlWithBosses(unitStates, allUnits, bossIds, bossVariations, planPicks = null) {
     const encodedRoster = encodeRoster(unitStates, allUnits);
     const encodedBosses = encodeBosses(bossIds);
     const encodedVariations = bossVariations ? encodeBossVariations(bossVariations) : '';
+    const encodedPlan = planPicks ? encodePlan(planPicks, bossIds) : '';
     
     // Build URL from current location without existing params
     const url = new URL(window.location.href);
@@ -249,6 +250,10 @@ export function generateShareUrlWithBosses(unitStates, allUnits, bossIds, bossVa
 
     if (encodedVariations) {
         url.searchParams.set('bossVariants', encodedVariations);
+    }
+
+    if (encodedPlan) {
+        url.searchParams.set('plan', encodedPlan);
     }
     
     return url.toString();
@@ -285,6 +290,38 @@ export function decodeBossVariations(encoded, allBosses) {
 export function getBossVariationsFromUrl() {
     const params = new URLSearchParams(window.location.search);
     return params.get('bossVariants');
+}
+
+// Custom Deadly Assault plan: "bossId:unitId.unitId,bossId:unitId". Only the given (selected)
+// bosses are written, and only when they have picks. Old links carry no `plan` parameter.
+export function encodePlan(picks, bossIds) {
+    if (!picks) return '';
+    return bossIds
+        .filter(id => picks[id]?.length > 0)
+        .map(id => `${id}:${picks[id].join('.')}`)
+        .join(',');
+}
+
+// Decode a plan parameter into `{ bossId: unitId[] }`. Entries for unknown bosses or agents are
+// dropped, as with boss variations; the caller sanitises against the live unit list.
+export function decodePlan(encoded, allBosses) {
+    const picks = {};
+    if (!encoded) return picks;
+    for (const pair of encoded.split(',').filter(Boolean)) {
+        const colonIdx = pair.indexOf(':');
+        if (colonIdx < 0) continue;
+        const bossId = pair.slice(0, colonIdx).trim();
+        if (!allBosses.some(b => b.id === bossId)) continue;
+        const ids = pair.slice(colonIdx + 1).split('.').map(s => s.trim()).filter(Boolean);
+        if (ids.length > 0) picks[bossId] = ids;
+    }
+    return picks;
+}
+
+// Get the plan parameter from the current URL.
+export function getPlanFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('plan');
 }
 
 // Copy text to clipboard with fallback.

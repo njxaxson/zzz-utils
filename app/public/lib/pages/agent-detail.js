@@ -11,9 +11,10 @@ import {
     initRoster, getUnitStates, getAllUnits, getCalibration, isSharedMode,
     getInitials, getUnitElement, getUniversalUnitNames
 } from '../common/roster-ui.js';
-import { getRosterUnits, buildRosterTeams, scoreCalibrated, requireCalibration } from '../common/team-pool.js';
+import { getRosterUnits, buildRosterTeams, canFormTeam, scoreCalibrated, requireCalibration } from '../common/team-pool.js';
 import { createUnitCard, getWeaknessGradientClass } from '../common/team-card.js';
-import { ELEMENTS } from '../common/constants.js';
+import { createAgentPicker } from '../common/agent-picker.js';
+import { joinList } from '../common/text.js';
 
 // Constants
 
@@ -25,14 +26,13 @@ const MIN_BAND = 'Good';        // ...and reaching at least this strength band t
 const FORCED_TILES = 3;
 const MAX_TILES = 6;             // beyond this a team's boss list is noise
 const DPS_TAGS = ['attack', 'anomaly', 'rupture', 'armorer'];
-const BAND_ORDER = ['Excellent', 'Great', 'Good', 'OK', 'Tough', 'Risky', 'Bad'];
+const BAND_ORDER = ['Excellent', 'Great', 'Good', 'OK', 'Tough', 'Risky', 'Bad', 'Abysmal'];
 
 // State
 
 let allBosses = [];
 let focusIds = [];
-let pickingSlot = null;
-let pickerFilters = { rank: null, role: null, element: null };
+let picker = null;
 
 // Data Loading
 
@@ -44,14 +44,14 @@ async function loadData() {
         await initRoster({
             containerSelector: '#roster-container',
             pageUrl: 'agent-detail.html',
-            onStateChange: () => { if (pickingSlot !== null) renderPicker(); },
+            onStateChange: () => picker?.refresh(),
             shareUrlGenerator: (unitStates, allUnits) => withAgentsParam(generateShareUrl(unitStates, allUnits)),
             collapseKnownRoster: true
         });
 
         focusIds = loadInitialFocus();
-        setupEventListeners();
-        renderSlots();
+        setupPicker();
+        document.getElementById('run-btn').addEventListener('click', () => runSearch());
         // A deep link should land on results, not on an unpressed button.
         if (focusIds.length > 0) runSearch({ scroll: false });
     } catch (error) {
@@ -138,7 +138,7 @@ function getFlexTip(activeFocus, currentCount) {
 
 function createFlexTipHtml(tip) {
     if (!tip) return '';
-    const who = joinNames(tip.names);
+    const who = joinList(tip.names);
     const verb = tip.names.length === 1 ? "isn't" : "aren't";
     return `<div class="ad-tip"><strong>Tip:</strong> ${who} ${verb} FLEX. Marking ${who} FLEX in your roster adds <strong>${tip.gain}</strong> more ${tip.gain === 1 ? 'team' : 'teams'} to choose from. FLEX lets an agent complete any team, even without their additional ability. ${FLEX_HOW}</div>`;
 }
@@ -173,8 +173,8 @@ function getBossEntries() {
 
 // Scoring
 
-function bandIndex(score, team) {
-    return BAND_ORDER.indexOf(getStrengthRating(score, team).label);
+function bandIndex(score, team, lenient = false) {
+    return BAND_ORDER.indexOf(getStrengthRating(score, team, { lenient }).label);
 }
 
 // Best band first; within a band a boss that shills the team's archetype outranks a
@@ -189,7 +189,7 @@ function scoreEntry(team, entry, calibration, scoreOptions = {}) {
     return {
         entry,
         score: result.score,
-        band: bandIndex(result.score, team),
+        band: bandIndex(result.score, team, !!scoreOptions.lenient),
         shillMatch: !!result.archetype && getBossShill(entry.boss) === result.archetype,
         lenient: !!scoreOptions.lenient
     };
@@ -267,128 +267,61 @@ function explainNoTeams(activeFocus) {
     if (anyTeam.length === 0) {
         return activeFocus.length === 1
             ? `${names[0]} can't form a legal team.`
-            : `${joinNames(names)} can't be on the same team.`;
+            : `${joinList(names)} can't be on the same team.`;
     }
     const missing = new Set();
     for (const team of anyTeam) {
         for (const u of team) if (!activeFocus.includes(u.id) && !isOwned(u.id)) missing.add(u.name);
     }
     const sample = [...missing].slice(0, 4);
-    return `No one in your roster completes a team with ${joinNames(names)}.` +
-        (sample.length ? ` Agents who would: ${joinNames(sample)}${missing.size > sample.length ? ', and others' : ''}.` : '');
+    return `No one in your roster completes a team with ${joinList(names)}.` +
+        (sample.length ? ` Agents who would: ${missing.size > sample.length ? `${sample.join(', ')}, and others` : joinList(sample)}.` : '');
 }
 
-function joinNames(names) {
-    if (names.length <= 1) return names.join('');
-    return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+// Picker
+
+function setupPicker() {
+    picker = createAgentPicker({
+        getUnits: getAllUnits,
+        isOwned,
+        allowUnowned: true,
+        title: ctx => ctx.slot === 0 && ctx.ids.length <= 1 ? 'Choose an agent' : 'Add a teammate',
+        describe: describePicker
+    });
+    picker.mountSlots(document.getElementById('ad-slots'), {
+        key: 'focus',
+        max: MAX_FOCUS,
+        getIds: () => focusIds,
+        setIds: ids => { focusIds = ids; onFocusChange(); }
+    });
 }
 
-// Rendering: focus tiles
-
-function renderSlots() {
-    const tiles = focusIds.map((id, i) => createFocusTile(getUnit(id), i));
-    if (focusIds.length < MAX_FOCUS) tiles.push(createAddTile(focusIds.length));
-    document.getElementById('ad-slots').innerHTML = tiles.join('');
-}
-
-function createFocusTile(unit, index) {
-    const element = getUnitElement(unit);
-    const owned = isOwned(unit.id);
-    const picking = pickingSlot === index ? ' picking' : '';
-    const avatar = unit.image
-        ? `<img class="ad-tile-img" src="${unit.image}" alt="">`
-        : `<span class="ad-tile-initials">${getInitials(unit.name)}</span>`;
-    return `
-        <div class="ad-tile element-${element}${picking}" data-slot="${index}" role="button" tabindex="0" aria-label="Change ${unit.name}">
-            <div class="ad-tile-avatar">
-                ${avatar}
-                ${owned ? '' : '<span class="ad-tile-badge">Not owned</span>'}
-            </div>
-            <div class="ad-tile-name">${unit.name}</div>
-            <button type="button" class="ad-tile-clear" data-clear="${index}" aria-label="Remove ${unit.name}">✕</button>
-        </div>
-    `;
-}
-
-function createAddTile(index) {
-    const first = index === 0;
-    const picking = pickingSlot === index ? ' picking' : '';
-    return `
-        <div class="ad-tile ad-tile-add${first ? ' primary' : ''}${picking}" data-slot="${index}" role="button" tabindex="0">
-            <div class="ad-tile-avatar"><span class="ad-tile-plus">+</span></div>
-            <div class="ad-tile-name">${first ? 'Choose agent' : 'Add teammate'}</div>
-        </div>
-    `;
-}
-
-// Rendering: picker
-
-const FILTER_GROUPS = [
-    { key: 'rank', options: [['S', 'S-Rank'], ['A', 'A-Rank']] },
-    { key: 'role', options: [['dps', 'DPS'], ['stun', 'Stun'], ['support', 'Support'], ['defense', 'Defense']] },
-    { key: 'element', options: ELEMENTS.map(e => [e, e]) }
-];
-
-function renderPicker() {
-    const picker = document.getElementById('ad-picker');
-    picker.hidden = pickingSlot === null;
-    if (picker.hidden) return;
-
-    document.getElementById('ad-picker-title').textContent =
-        pickingSlot === 0 && focusIds.length <= 1 ? 'Choose an agent' : 'Add a teammate';
-
-    document.getElementById('ad-picker-filters').innerHTML = FILTER_GROUPS.map(group =>
-        `<div class="ad-filter-group">${group.options.map(([value, label]) =>
-            `<button type="button" class="ad-filter${group.key === 'element' ? ` element-${value}` : ''}${pickerFilters[group.key] === value ? ' active' : ''}" data-group="${group.key}" data-value="${value}">${label}</button>`
-        ).join('')}</div>`
-    ).join('');
-
-    const query = document.getElementById('ad-picker-search').value.trim().toLowerCase();
-    // The new pick must be able to team with everyone except the slot being replaced.
-    const others = focusIds.filter(id => id !== focusIds[pickingSlot]);
-    const teams = Object.values(getRosterTeams()).filter(team => teamHasAll(team, others));
+// The new pick must be able to team with everyone except the slot being replaced. A roster
+// agent is checked against the roster's teams; an agent the player lacks is checked as if they
+// had them, since no roster team contains them.
+function describePicker(ctx) {
+    const teams = Object.values(getRosterTeams()).filter(team => teamHasAll(team, ctx.others));
     const joinable = new Set(teams.flatMap(team => team.map(u => u.id)));
-
-    const units = getAllUnits()
-        .filter(u => isOwned(u.id) && !focusIds.includes(u.id))
-        .filter(matchesFilters)
-        .filter(u => !query || u.name.toLowerCase().includes(query) ||
-            (u.aliases || []).some(a => a.toLowerCase().includes(query)));
-
-    document.getElementById('ad-picker-grid').innerHTML = units.length
-        ? units.map(u => createPickTile(u, joinable.has(u.id))).join('')
-        : '<div class="ad-picker-empty">No matching agents in your roster.</div>';
-
-    const hint = document.getElementById('ad-picker-hint');
-    const faded = units.some(u => !joinable.has(u.id));
-    hint.hidden = !faded;
-    if (faded) {
-        hint.innerHTML = others.length
-            ? `<strong>Faded agents</strong> can't team with ${joinNames(others.map(id => getUnit(id).name))}. Marking either side FLEX lets them join. ${FLEX_HOW}`
-            : `<strong>Faded agents</strong> can't form a team from your roster. Marking them FLEX lets them join. ${FLEX_HOW}`;
-    }
-}
-
-function matchesFilters(unit) {
-    const { rank, role, element } = pickerFilters;
-    if (rank && unit.rank !== rank) return false;
-    if (role === 'dps' && !DPS_TAGS.some(t => unit.tags.includes(t))) return false;
-    if (role && role !== 'dps' && !unit.tags.includes(role)) return false;
-    if (element && !unit.tags.includes(element)) return false;
-    return true;
-}
-
-function createPickTile(unit, enabled) {
-    const element = getUnitElement(unit);
-    const avatar = unit.image
-        ? `<img src="${unit.image}" alt="">`
-        : `<span class="ad-pick-initials">${getInitials(unit.name)}</span>`;
-    return `
-        <button type="button" class="ad-pick element-${element}" data-pick="${unit.id}" ${enabled ? '' : 'disabled title="Can\'t team with your selection"'}>
-            ${avatar}
-            <span class="ad-pick-name">${unit.name}</span>
-        </button>
-    `;
+    const pool = getRosterUnits(getAllUnits(), getEffectiveStates());
+    const universalNames = getUniversalUnitNames();
+    const others = ctx.others.map(getUnit);
+    const unownedChecks = new Map();
+    const canJoin = unit => {
+        if (isOwned(unit.id)) return joinable.has(unit.id);
+        if (!unownedChecks.has(unit.id)) {
+            unownedChecks.set(unit.id, canFormTeam([...others, unit], pool, universalNames));
+        }
+        return unownedChecks.get(unit.id);
+    };
+    return {
+        isPickable: canJoin,
+        hint: shown => {
+            if (!shown.some(u => !canJoin(u))) return null;
+            return ctx.others.length
+                ? `<strong>Faded agents</strong> can't team with ${joinList(ctx.others.map(id => getUnit(id).name))}. Marking either side FLEX lets them join. ${FLEX_HOW}`
+                : `<strong>Faded agents</strong> can't form a team from your roster. Marking them FLEX lets them join. ${FLEX_HOW}`;
+        }
+    };
 }
 
 // Rendering: results
@@ -461,7 +394,7 @@ function renderResults(activeFocus, { rows, forced, candidates, flexTip }, scrol
 }
 
 function createRow(row) {
-    const best = getStrengthRating(row.tiles[0].score, row.team);
+    const best = getStrengthRating(row.tiles[0].score, row.team, { lenient: row.tiles[0].lenient });
     const teamHtml = row.team.map(unit => createUnitCard(unit)).join('');
     return `
         <div class="ad-row result-card band-${best.label.toLowerCase()}">
@@ -476,7 +409,7 @@ function createRow(row) {
 
 function createBossTile(tile, team) {
     const { entry } = tile;
-    const rating = getStrengthRating(tile.score, team);
+    const rating = getStrengthRating(tile.score, team, { lenient: tile.lenient });
     const weaknessClass = getWeaknessGradientClass(getBossWeaknesses(entry.boss));
     const initials = getInitials(entry.name);
     const avatar = entry.image
@@ -492,76 +425,11 @@ function createBossTile(tile, team) {
     `;
 }
 
-// Event Handling
-
-function setupEventListeners() {
-    const slots = document.getElementById('ad-slots');
-    slots.addEventListener('click', handleSlotClick);
-    slots.addEventListener('keydown', e => {
-        if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('.ad-tile')) {
-            e.preventDefault();
-            handleSlotClick(e);
-        }
-    });
-
-    document.getElementById('ad-picker-grid').addEventListener('click', e => {
-        const tile = e.target.closest('[data-pick]');
-        if (!tile || tile.disabled) return;
-        focusIds[pickingSlot] = tile.dataset.pick;
-        focusIds = focusIds.filter(Boolean);
-        closePicker();
-        onFocusChange();
-    });
-
-    document.getElementById('ad-picker-filters').addEventListener('click', e => {
-        const btn = e.target.closest('[data-group]');
-        if (!btn) return;
-        const { group, value } = btn.dataset;
-        pickerFilters[group] = pickerFilters[group] === value ? null : value;
-        renderPicker();
-    });
-
-    document.getElementById('ad-picker-search').addEventListener('input', renderPicker);
-    document.getElementById('ad-picker-close').addEventListener('click', closePicker);
-    document.getElementById('run-btn').addEventListener('click', () => runSearch());
-}
-
-function handleSlotClick(e) {
-    const clear = e.target.closest('[data-clear]');
-    if (clear) {
-        e.stopPropagation();
-        focusIds.splice(Number(clear.dataset.clear), 1);
-        pickingSlot = null;
-        renderPicker();
-        onFocusChange();
-        return;
-    }
-    const slot = e.target.closest('.ad-tile');
-    if (!slot) return;
-    const index = Number(slot.dataset.slot);
-    if (pickingSlot === index) {
-        closePicker();
-        return;
-    }
-    pickingSlot = index;
-    document.getElementById('ad-picker-search').value = '';
-    renderPicker();
-    renderSlots();
-    document.getElementById('ad-picker-search').focus({ preventScroll: true });
-}
-
-function closePicker() {
-    pickingSlot = null;
-    renderPicker();
-    renderSlots();
-}
-
 // Results describe the old selection, so they go away until Find Teams is pressed again.
 function onFocusChange() {
     saveFocus();
     hideError();
     clearResults();
-    renderSlots();
 }
 
 // Initialization

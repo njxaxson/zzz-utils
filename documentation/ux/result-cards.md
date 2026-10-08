@@ -15,13 +15,23 @@ The second class picks the accent. Page classes (`recommendation-row`, `da-row`,
 
 | Accent class | Used by | Meaning |
 |----|----|----|
-| `band-excellent` … `band-bad` | Team Recommendations, Deadly Assault, Agent Teams | Team strength, from `getStrengthRating()` in `strength-rating.js` |
+| `band-excellent` … `band-bad` (and `band-abysmal`) | Team Recommendations, Deadly Assault, Agent Teams | Team strength, from `getStrengthRating()` in `strength-rating.js` |
 | `priority-high` / `-medium` / `-low` (on `.pull-rec-card`) | Pull Recommendations | Pull priority |
 | `element-fire` … `element-lumen` (on `.result-card`) | Team Builder | The element the card groups |
 
 Tier colours come from `STRENGTH_TIERS` in `strength-rating.js`. `bad` renders as `risky` red
 because the tier's own dark red disappears on the page background. If you change a tier colour,
 change it in both places.
+
+**A lenient result never reads better than OK.** `getStrengthRating(score, team, { lenient })` holds
+the label (and so the band accent) at OK for any lenient-scored team, whatever its number, and the
+label keeps its `*`. Every page that shows a strength label passes the flag ([LEN-04](../engine/element-resistance.md)).
+
+**Abysmal** sits below Bad and is not a score band: it has no cutoff and is only returned when a
+result is flagged `unscorable`, i.e. a team the player pinned on Deadly Assault that the engine
+cannot score even leniently (no DPS, an illegal join with no valid pair, triple DPS, or two or
+more defensive assists short; see [lenient mode](../engine/element-resistance.md#lenient-mode)).
+It never shows a lenient asterisk.
 
 ## How the accent is wired
 

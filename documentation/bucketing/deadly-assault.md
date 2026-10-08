@@ -75,6 +75,36 @@ reduction is worth the same wherever it lands. The first half stands on its own.
 
 > Reallocation comes from raising the alternative, not from cheapening the contended resource.
 
+## Custom plans (pins)
+
+The Deadly Assault page lets a player propose teams per boss ([feature spec](../FEATURE%20-%20Custom%20Deadly%20Assault%20Matchup.md)).
+The solver takes this as `pinsByBoss` (`{ bossName: unitId[] }`). It is a filter on a boss's
+candidate teams, not a second allocation path:
+
+| Pins on a boss | Candidate teams |
+|----|----|
+| none | every legal team that avoids units pinned to *other* bosses |
+| 1-2 | legal teams holding the pins; if none exist, every completion from the unit pool (join legality ignored) |
+| 3 | exactly that team, legal or not |
+
+* Callers get candidates from `getCandidateTeamsForBoss` and score **only those**, so a pin cuts
+  scoring work as well as search work. `solveDeadlyAssault` re-applies the same filter in its
+  lenient retry so a pin can never be dropped.
+* An agent pinned to one boss is barred from every other boss. The same agent pinned twice is an
+  input error the page rejects (`getPlanProblems`); the solver assumes it has not happened.
+* A pinned team is judged as it stands. An illegal join is scored, not refused, and a pinned team
+  strict scoring rejects gets lenient scoring (which no longer disqualifies a stunnerless
+  team on a stun-shill boss, or a team one defensive assist short: [LEN-01], [LEN-02] in
+  [element-resistance](../engine/element-resistance.md)). A team nothing can
+  score even leniently, such as one with no DPS, is kept at 0 and flagged `unscorable` so the
+  page can say so.
+* The unit pool is the owned roster plus any pinned agent, so an unowned agent works only where
+  the player pinned them.
+* With no pins every path is the original one. CLI output was byte-identical before and after the
+  change; TEST 7 pins that.
+* A pinned solve never returns nothing: if even the lenient retry finds no non-overlapping
+  triple, one allocation is built boss by boss, most-pinned first.
+
 ## Related
 
 * [DPS bucketing](../engine/reading-scores.md#dps-bucketing) — the diversity view that sits
@@ -111,3 +141,13 @@ rank step can evict a strictly better allocation from the results entirely.
 **If this ever needs re-tuning, re-check this exact Thrall pair** — rankings TEST 3 asserts the
 shape of the band, not this case, so it will stay green while the behaviour it protects has
 drifted.
+
+### [BUCK-02] Why a pinned solve widens the top-N cut only when it finds nothing
+
+`findExclusiveCombinations` keeps the top 20 teams per boss. A pinned boss has far fewer
+distinct teams, and its best ones tend to share the same strong support, so all three lists can
+overlap on one agent and leave no non-overlapping triple at all. The first search therefore uses
+the normal cut; only an empty result retries at `PINNED_TOP_N` (60).
+
+Widening up front was measured and rejected: with a single pin it built 132,619 combinations
+instead of 4,221 for the same answer. Widening is a rescue, not a default.

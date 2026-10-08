@@ -30,7 +30,7 @@ Always use the variable; never a raw hex in a new rule unless it is a one-off ba
 | Lines | `--border-color` `#2a2a3a` · `--rule-soft` · `--rule-strong` · `--panel-dark` |
 | Elements | `--element-{fire,ice,electric,physical,ether,wind,lumen}` and a `-light` variant for text |
 
-Strength bands (`.band-excellent` … `.band-bad`) are defined with the result cards; see
+Strength bands (`.band-excellent` … `.band-bad`, plus `.band-abysmal`) are defined with the result cards; see
 [result-cards](result-cards.md).
 
 The theme is dark only. The body adds two faint radial glows (orange top-left, teal

@@ -80,6 +80,23 @@
 
             <div id="roster-container"></div>
 
+            <!-- Custom plan: pin agents to bosses before solving -->
+            <section class="da-plan-section" id="da-plan-section">
+                <div class="da-plan-header">
+                    <label class="da-plan-toggle">
+                        <input type="checkbox" id="da-plan-toggle">
+                        <span class="da-plan-switch" aria-hidden="true"></span>
+                        <span class="da-plan-toggle-text">Plan your own matchup</span>
+                    </label>
+                    <button type="button" class="da-plan-clear" id="da-plan-clear" hidden>Clear plan</button>
+                </div>
+                <p class="section-description da-plan-description" id="da-plan-description">Pick the agents you want on each boss and we'll build the rest around them.</p>
+                <div class="da-plan-body" id="da-plan-body" hidden>
+                    <p class="da-plan-help">Leave a boss empty and we choose its whole team. Pick one or two agents and we complete the team. Pick three and we score exactly that team. Agents you don't own can be planned around, but we only fill in from your roster.</p>
+                    <div class="da-plan-rows" id="da-plan-rows"></div>
+                </div>
+            </section>
+
             <!-- Validation & Run -->
             <section class="action-section">
                 <div id="validation-errors" class="validation-errors" style="display: none;"></div>

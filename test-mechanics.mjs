@@ -23,6 +23,8 @@
 import { loadAllData, deepFreeze } from './lib/data.js';
 import { chargeableElementArms, getBasicDamage, getBasicDamageBaseline, getMaxBurstWeight, quickAssistCohesionWeight, scoreTeamForBoss, resolveBossVariation, resolveConditionalValue, getEffectiveScaling, effectiveDisorderSupply, effectiveDisorderWeakSupply, getChainMagnitude, UnitContext, getTeammateBuffs, getSelfBuffSpecs, isDPS, isStun, isSupport, isOnField, getElement, getEffectiveRoles, hasSubDPSRole } from './app/public/lib/common/team-scorer.js';
 import { filterBosses } from './lib/boss-filter.js';
+import { getStrengthRating } from './app/public/lib/common/strength-rating.js';
+import { buildRosterTeams, canFormTeam } from './app/public/lib/common/team-pool.js';
 import { NEUTRAL_BOSS, assert, makeAllViableTeamEntries, filterIncludeOneOf, getTopViableTeams, scoreForTeamString, scoreMapForBoss, withBosses } from './lib/scoring-test-utils.js';
 
 // Viability / disqualification: `matchups.js` only *lists* teams with score > 0. A score <= 0
@@ -1706,6 +1708,117 @@ async function main() {
         let threw = false;
         try { scoreTeamForBoss([roxy, bogus, sunna], NEUTRAL_BOSS); } catch { threw = true; }
         assert(threw, 'an unknown buff target must throw');
+    });
+
+    // TEST 37: lenient mode tolerates ONE missing reliable defensive assist, and no more. [LEN-02]
+    run('TEST 37: lenient mode forgives one missing defensive assist; strict forgives none', () => {
+        const withAssists = n => ({ ...NEUTRAL_BOSS, mechanics: { assists: n } });
+        const rot = u => u.mechanics?.utility?.rotations === 'limited';
+        const pool = allUnits.filter(u => !u.tags.includes('preview') && !rot(u));
+
+        // A team holding exactly two defensive assists that is otherwise unremarkable.
+        let team = null;
+        search: for (let i = 0; i < pool.length; i++) for (let j = i + 1; j < pool.length; j++) for (let k = j + 1; k < pool.length; k++) {
+            const t = [pool[i], pool[j], pool[k]];
+            if (t.filter(u => u.tags.includes('assist:defensive')).length !== 2) continue;
+            if (scoreTeamForBoss(t, withAssists(2), {}) > 0 && scoreTeamForBoss(t, withAssists(3), {}) <= 0) { team = t; break search; }
+        }
+        assert(team, 'precondition: no team with exactly two reliable defensive assists found');
+        const label = team.map(u => u.name).join(' / ');
+
+        const strict = n => scoreTeamForBoss(team, withAssists(n), {});
+        const lenient = n => scoreTeamForBoss(team, withAssists(n), { lenient: true });
+
+        assert(strict(2) > 0, `${label}: meeting the requirement must score`);
+        assert(strict(3) <= 0, `${label}: strict must reject one assist short`);
+        assert(lenient(3) > 0, `${label}: lenient must score a team one assist short (2 of 3), got ${lenient(3)}`);
+        assert(lenient(4) <= 0, `${label}: lenient must still reject two assists short (2 of 4), got ${lenient(4)}`);
+
+        // Requirement 1 -> 0 holds the same way: a team with no assist at all is one short.
+        const bare = pool.filter(u => !u.tags.includes('assist:defensive'));
+        let none = null;
+        search: for (let i = 0; i < bare.length; i++) for (let j = i + 1; j < bare.length; j++) for (let k = j + 1; k < bare.length; k++) {
+            const t = [bare[i], bare[j], bare[k]];
+            if (scoreTeamForBoss(t, withAssists(0), {}) > 0) { none = t; break search; }
+        }
+        assert(none, 'precondition: no scorable team without defensive assists found');
+        assert(scoreTeamForBoss(none, withAssists(1), {}) <= 0, 'strict must reject a team with no assist when one is required');
+        assert(scoreTeamForBoss(none, withAssists(1), { lenient: true }) > 0, 'lenient must accept no assist when one is required');
+        assert(scoreTeamForBoss(none, withAssists(2), { lenient: true }) <= 0, 'lenient must reject no assist when two are required');
+    });
+
+    // TEST 38: lenient mode prices a DPS the boss resists or is anti-typed against; strict disqualifies. [LEN-03]
+    run('TEST 38: lenient mode penalises, not disqualifies, an anti-typed or resisted DPS', () => {
+        const by = n => allUnits.find(u => u.name === n);
+        const bossWith = mechanics => ({ ...NEUTRAL_BOSS, mechanics });
+        const score = (names, boss, lenient) => scoreTeamForBoss(names.map(by), boss, { lenient });
+
+        // Anti-type: Miyabi is an anomaly DPS, and Wandering Hunter is anti-anomaly. Players clear it on weakness alone.
+        const miyabi = ['Miyabi', 'Yuzuha', 'Nicole'];
+        const antiAnomaly = bossWith({ anti: ['anomaly'] });
+        assert(score(miyabi, antiAnomaly, false) <= 0, 'strict must disqualify an anti-typed DPS');
+        const lenientAnti = score(miyabi, antiAnomaly, true);
+        assert(lenientAnti > 0, `lenient must score an anti-typed DPS, got ${lenientAnti}`);
+        assert(lenientAnti < score(miyabi, bossWith({}), true),
+            `the anti-type must still cost something in lenient mode: ${lenientAnti} vs ${score(miyabi, bossWith({}), true)}`);
+
+        // Resistance: Ye Shunguong (physical) against a physical-resistant boss.
+        const ysg = ['Ye Shunguong', 'Zhao', 'Sunna'];
+        const resistsPhysical = bossWith({ resistances: ['physical'] });
+        assert(score(ysg, resistsPhysical, false) <= 0, 'strict must disqualify a DPS whose element is resisted');
+        const lenientResist = score(ysg, resistsPhysical, true);
+        assert(lenientResist > 0, `lenient must score a resisted DPS, got ${lenientResist}`);
+        assert(lenientResist < score(ysg, bossWith({}), true),
+            'the resistance must still cost something in lenient mode');
+
+    });
+
+    // TEST 39: a lenient-scored team is never labelled better than OK, whatever it scores. [LEN-04]
+    run('TEST 39: lenient results are capped at the OK label; strict and lower labels are untouched', () => {
+        const team = ['Dialyn', 'Yixuan', 'Lucia'].map(n => allUnits.find(u => u.name === n));
+        const label = (score, opts) => getStrengthRating(score, team, opts).label;
+
+        // Strict: unchanged, all the way up.
+        assert(label(500) === 'Great' || label(500) === 'Excellent', `a high strict score keeps its label, got ${label(500)}`);
+        // Lenient: anything above OK is held at OK, including scores far past Excellent.
+        for (const score of [200, 300, 330, 360, 500, 5000]) {
+            assert(label(score, { lenient: true }) === 'OK', `lenient score ${score} must label OK, got ${label(score, { lenient: true })}`);
+        }
+        // Lenient never RAISES a label: scores already at or below OK stay where they are.
+        assert(label(150, { lenient: true }) === label(150), 'a Tough score must stay Tough when lenient');
+        assert(label(10, { lenient: true }) === 'Bad', 'a Bad score must stay Bad when lenient');
+        // Unscorable outranks everything, lenient or not.
+        assert(label(0, { lenient: true, unscorable: true }) === 'Abysmal', 'unscorable must label Abysmal');
+    });
+
+    // TEST 40: the picker's direct team check agrees with the team builder it stands in for.
+    run('TEST 40: canFormTeam matches buildRosterTeams for one, two and three required agents, FLEX included', () => {
+        const names = ['Promeia', 'Remielle', 'Velina', 'Dialyn', 'Ye Shunguong', 'Sunna', 'Zhao', 'Yixuan', 'Pan Yinhu', 'Lucia', 'Nicole', 'Anby'];
+        const pool = names.map(n => allUnits.find(u => u.name === n));
+        // Candidates the pool does not contain, so the check runs for "an agent I don't own".
+        const outsiders = ['Burnice', 'Soldier 11', 'Miyabi', 'Ellen'].map(n => allUnits.find(u => u.name === n));
+        const universal = ['Nicole'];
+
+        let checked = 0;
+        const compare = required => {
+            const withRequired = [...pool, ...required.filter(r => !pool.includes(r))];
+            const truth = Object.values(buildRosterTeams(withRequired, universal))
+                .some(team => required.every(r => team.some(u => u.id === r.id)));
+            const got = canFormTeam(required, pool, universal);
+            assert(got === truth, `${required.map(u => u.name).join(' + ')}: canFormTeam=${got}, buildRosterTeams=${truth}`);
+            checked++;
+        };
+
+        for (const o of outsiders) {
+            compare([o]);
+            for (const a of pool) {
+                compare([a, o]);
+                for (const b of pool) if (a.id < b.id) compare([a, b, o]);
+            }
+        }
+        // Owned agents too, so the rule is checked on both sides of the flag.
+        for (const a of pool) for (const b of pool) if (a.id < b.id) compare([a, b]);
+        assert(checked > 300, `expected a real sweep, only checked ${checked}`);
     });
 
     // Summary

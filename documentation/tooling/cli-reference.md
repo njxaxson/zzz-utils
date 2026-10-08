@@ -65,7 +65,7 @@ Each script enables a subset. Two scripts — `pulled.js` and `tiers.js` — ena
 | `test-mechanics.mjs` | Engine-mechanics assertion suite (isolated rules, not roster rankings). Accepts a `-N` test filter |
 | `test-rankings.mjs` | Roster-ranking assertion suite (score floors/orderings/ladders). Accepts a `-N` test filter |
 | `test-recommendations.mjs` | Pull engine assertion suite |
-| `test-bucketing.mjs` | Deadly Assault allocation suite — marginal value and rank bands |
+| `test-bucketing.mjs` | Deadly Assault allocation suite — marginal value, rank bands, and custom-plan pins (fixed/pinned/unowned teams, plan validation, share-link encoding) |
 
 ### The corpus flag on `score-dump.mjs`
 

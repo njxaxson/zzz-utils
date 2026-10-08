@@ -14,6 +14,10 @@ const STRENGTH_TIERS = [
     { min: -Infinity, label: 'Bad',   cssClass: 'strength-bad',       color: '#b71c1c' },
 ];
 
+// Below Bad: a team that could not be scored at all, even leniently (a pinned team on the
+// Deadly Assault page). It has no cutoff; it is only ever reached through `unscorable`.
+const ABYSMAL_TIER = { min: -Infinity, label: 'Abysmal', cssClass: 'strength-abysmal', color: '#8d6e63' };
+
 // A would-be top-tier team without a real S-rank carry is demoted one tier — STRENGTH_TIERS[0]
 // (Excellent) down to STRENGTH_TIERS[1], whatever that tier is currently named. Kept as an index
 // reference rather than a hardcoded label so this demotion stays "one step down" if the tier
@@ -24,7 +28,12 @@ function hasARankDps(team) {
     return team.some(u => u.rank === 'A' && u.tags.some(t => DPS_TAGS.includes(t)));
 }
 
-export function getStrengthRating(score, team) {
+// Lenient scoring stretches the rules to keep a team in play (a resisted or anti-typed carry, a
+// missing stunner), so its score says "least bad", never "recommended". Whatever the number,
+// a lenient result is labelled no better than this. [LEN-04]
+const LENIENT_CEILING = STRENGTH_TIERS.find(t => t.label === 'OK');
+
+function rateScore(score, team) {
     for (const tier of STRENGTH_TIERS) {
         if (score >= tier.min) {
             if (tier === STRENGTH_TIERS[0] && team && hasARankDps(team)) {
@@ -36,8 +45,17 @@ export function getStrengthRating(score, team) {
     return STRENGTH_TIERS[STRENGTH_TIERS.length - 1];
 }
 
+export function getStrengthRating(score, team, { unscorable = false, lenient = false } = {}) {
+    if (unscorable) return ABYSMAL_TIER;
+    const rating = rateScore(score, team);
+    if (lenient && STRENGTH_TIERS.indexOf(rating) < STRENGTH_TIERS.indexOf(LENIENT_CEILING)) {
+        return LENIENT_CEILING;
+    }
+    return rating;
+}
+
 export function createStrengthLabelHtml(score, team, options = {}) {
-    const rating = getStrengthRating(score, team);
-    const suffix = options.lenient ? '*' : '';
+    const rating = getStrengthRating(score, team, { unscorable: options.unscorable, lenient: options.lenient });
+    const suffix = options.lenient && !options.unscorable ? '*' : '';
     return `<span class="strength-label ${rating.cssClass}" title="${Math.round(score)}">${rating.label}${suffix}</span>`;
 }

@@ -214,6 +214,15 @@ const TITLED_OFF_SHILL_BONUS = SHILL_MATCH_BONUS / 2;
 // was quoted net of that compression. [ARCH-01]
 const STUNLESS_SHILL_CREDIT = 64;
 
+// Lenient mode only: a stun-shill boss against a team with neither a stunner nor a stunless carry.
+// Strict mode disqualifies that team outright. [LEN-01]
+const LENIENT_MISSING_SHILL_PENALTY = -8;
+
+// Lenient mode only: each DPS the boss resists, or is anti-typed against. Strict mode disqualifies.
+// A Miyabi team clears Wandering Hunter on weakness alone, and Ye Shunguong clears a
+// physical-resistant boss. [LEN-03]
+const LENIENT_BLOCKED_DPS_PENALTY = -40;
+
 // BURST THROUGHPUT: what a unit dumps into a stun window, as a SUM over the instruments it can
 // fire there, not a MAX (the same ordinal means different things on different keys — see
 // documentation/data-model/damage-and-burst.md). Unannotated does NOT mean "no burst": every
@@ -2614,7 +2623,11 @@ function computeBuffUtilization(supplier, team, out = null) {
 // (produced by getTeams or extendTeamsWithUniversalUnits), but command-line
 // and test usage can pass arbitrary compositions. This guard prevents
 // illegal teams from receiving a score.
-function checkDisqualifications(team, boss, debug) {
+// Returns `{ disqualified, penalty }`. Strict mode only ever disqualifies. Lenient mode turns a
+// DPS the boss resists or is anti-typed against into a penalty instead. [LEN-03]
+function checkDisqualifications(team, boss, debug, lenient = false) {
+    const DQ = { disqualified: true, penalty: 0 };
+    let penalty = 0;
     const [a, b, c] = team;
     // A trio is legal if all three joins are mutually satisfied, OR if any
     // pair forms a mutual join — the odd unit out is treated as a flex slot.
@@ -2623,28 +2636,32 @@ function checkDisqualifications(team, boss, debug) {
         : isValidTeam(a, b);
     if (!isLegal) {
         if (debug) console.log('  DISQUALIFIED: Illegal team — no valid join arrangement');
-        return -1;
+        return DQ;
     }
 
     const dpsUnits = team.filter(isDPS);
 
     if (dpsUnits.length === 0) {
         if (debug) console.log('  DISQUALIFIED: No DPS unit');
-        return -1;
+        return DQ;
     }
 
     const pureDpsCount = dpsUnits.filter(u => !isEffectiveSupport(u) && !isEffectiveDefense(u) && !isStun(u)).length;
     if (pureDpsCount >= 3) {
         if (debug) console.log('  DISQUALIFIED: Triple DPS');
-        return -1;
+        return DQ;
     }
 
     const bossAnti = getBossAnti(boss);
     if (bossAnti.length > 0) {
         for (const antiType of bossAnti) {
-            if (dpsUnits.some(u => u.tags.includes(antiType))) {
-                if (debug) console.log(`  DISQUALIFIED: DPS matches boss anti-type ${antiType}`);
-                return -1;
+            for (const unit of dpsUnits.filter(u => u.tags.includes(antiType))) {
+                if (!lenient) {
+                    if (debug) console.log(`  DISQUALIFIED: DPS matches boss anti-type ${antiType}`);
+                    return DQ;
+                }
+                penalty += LENIENT_BLOCKED_DPS_PENALTY;
+                if (debug) console.log(`  ${unit.name} matches boss anti-type ${antiType} (lenient): ${LENIENT_BLOCKED_DPS_PENALTY}`);
             }
         }
     }
@@ -2664,13 +2681,21 @@ function checkDisqualifications(team, boss, debug) {
             const hasValidMorph = morphOptions.length === 0 ||
                 morphOptions.some(e => !bossResistances.includes(e));
             if (!hasValidMorph) {
-                if (debug) console.log(`  DISQUALIFIED: ${unit.name} (lumen) — all morph targets resisted`);
-                return -1;
+                if (!lenient) {
+                    if (debug) console.log(`  DISQUALIFIED: ${unit.name} (lumen) — all morph targets resisted`);
+                    return DQ;
+                }
+                penalty += LENIENT_BLOCKED_DPS_PENALTY;
+                if (debug) console.log(`  ${unit.name} (lumen) all morph targets resisted (lenient): ${LENIENT_BLOCKED_DPS_PENALTY}`);
             }
         } else {
             if (bossResistances.includes(getElement(unit))) {
-                if (debug) console.log(`  DISQUALIFIED: ${unit.name} element resisted by boss`);
-                return -1;
+                if (!lenient) {
+                    if (debug) console.log(`  DISQUALIFIED: ${unit.name} element resisted by boss`);
+                    return DQ;
+                }
+                penalty += LENIENT_BLOCKED_DPS_PENALTY;
+                if (debug) console.log(`  ${unit.name} element resisted by boss (lenient): ${LENIENT_BLOCKED_DPS_PENALTY}`);
             }
         }
     }
@@ -2684,12 +2709,14 @@ function checkDisqualifications(team, boss, debug) {
         }
         return true;
     }).length;
-    if (reliableDefAssists < effectiveAssists) {
-        if (debug) console.log(`  DISQUALIFIED: ${reliableDefAssists}/${effectiveAssists} reliable defensive assists`);
-        return -1;
+    // Lenient mode forgives exactly one missing assist (2 of 3, 1 of 2, 0 of 1). [LEN-02]
+    const requiredAssists = lenient ? Math.max(0, effectiveAssists - 1) : effectiveAssists;
+    if (reliableDefAssists < requiredAssists) {
+        if (debug) console.log(`  DISQUALIFIED: ${reliableDefAssists}/${effectiveAssists} reliable defensive assists${lenient ? ' (lenient allows one fewer)' : ''}`);
+        return DQ;
     }
 
-    return 0;
+    return { disqualified: false, penalty };
 }
 
 // LAYER 1.5: TEAM STRUCTURE
@@ -3217,14 +3244,20 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
             const stunlessException = !hasShillRole && bossShill === 'stun'
                 && team.some(u => isDPS(u) && isStunlessUnit(u));
             if (!hasShillRole && !stunlessException) {
-                if (debug) console.log(`    DISQUALIFIED: Missing required role ${bossShill}`);
-                return { score: -1, disqualified: true };
+                // Lenient keeps the team in play at a small cost. [LEN-01]
+                if (!lenient) {
+                    if (debug) console.log(`    DISQUALIFIED: Missing required role ${bossShill}`);
+                    return { score: -1, disqualified: true };
+                }
+                score += LENIENT_MISSING_SHILL_PENALTY;
+                if (debug) console.log(`    Missing required role ${bossShill} (lenient): ${LENIENT_MISSING_SHILL_PENALTY}`);
+            } else {
+                // Meeting the requirement intrinsically is not the same as meeting it with a
+                // stunner: the stunless carry satisfies it AND keeps the slot for a second support.
+                const shillCredit = stunlessException ? STUNLESS_SHILL_CREDIT : SHILL_MATCH_BONUS;
+                score += shillCredit;
+                if (debug) console.log(`    Non-DPS shill match (${bossShill})${stunlessException ? ' via stunless DPS — stunner slot not spent' : ''}: +${shillCredit}`);
             }
-            // Meeting the requirement intrinsically is not the same as meeting it with a
-            // stunner: the stunless carry satisfies it AND keeps the slot for a second support.
-            const shillCredit = stunlessException ? STUNLESS_SHILL_CREDIT : SHILL_MATCH_BONUS;
-            score += shillCredit;
-            if (debug) console.log(`    Non-DPS shill match (${bossShill})${stunlessException ? ' via stunless DPS — stunner slot not spent' : ''}: +${shillCredit}`);
         }
     }
     
@@ -4901,8 +4934,9 @@ function scoreTeamContexts(team, boss, options = {}) {
     // terminator, not as hygiene. [CTX-01]
 
     // Layer 1: Disqualifications
-    const disq = checkDisqualifications(team, boss, debug);
-    if (disq < 0) { if (trace) trace.disqualified = true; return disq; }
+    const l1 = checkDisqualifications(team, boss, debug, lenient);
+    if (l1.disqualified) { if (trace) trace.disqualified = true; return -1; }
+    score += l1.penalty;
 
     // Synergy avoid check (near-disqualification)
     const avoidResult = checkSynergyAvoid(team, { lenient, debug });

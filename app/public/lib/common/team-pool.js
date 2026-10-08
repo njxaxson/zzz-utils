@@ -5,7 +5,7 @@
  * pages can never drift apart on how a roster becomes a scored team list.
  */
 
-import { getTeams, extendTeamsWithUniversalUnits } from './team-builder.js';
+import { getTeams, extendTeamsWithUniversalUnits, isValidTeam } from './team-builder.js';
 import { scoreTeamForBoss } from './team-scorer.js';
 import { calibrate } from './calibration.js';
 
@@ -50,6 +50,30 @@ export function buildRosterTeams(units, universalUnitNames = []) {
         extendTeamsWithUniversalUnits(twoCharTeams, threeCharTeams, universalUnitObjects);
     }
     return threeCharTeams;
+}
+
+/**
+ * Can `required` (1-3 units) be on one legal team drawn from `pool`? The same rule as
+ * `buildRosterTeams` (a valid trio, or a valid pair plus a FLEX unit), but it checks one
+ * selection directly instead of building every team, so a picker can ask it per candidate.
+ * `pool` need not contain the required units.
+ */
+export function canFormTeam(required, pool, universalNames = []) {
+    const universal = new Set(universalNames);
+    const valid = team => isValidTeam(...team) ||
+        team.some((u, i) => universal.has(u.name) && isValidTeam(...team.filter((_, j) => j !== i)));
+
+    const requiredIds = new Set(required.map(u => u.id));
+    const fillers = pool.filter(u => !requiredIds.has(u.id));
+
+    const search = (need, start, chosen) => {
+        if (need === 0) return valid([...required, ...chosen]);
+        for (let i = start; i <= fillers.length - need; i++) {
+            if (search(need - 1, i + 1, [...chosen, fillers[i]])) return true;
+        }
+        return false;
+    };
+    return search(3 - required.length, 0, []);
 }
 
 // Pages compare teams of different archetypes, so `.score` is CALIBRATED; see

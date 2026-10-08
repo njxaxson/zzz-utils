@@ -6,17 +6,23 @@
 import { scoreTeamForBoss, getBossWeaknesses, getBossShill, resolveBossVariation } from '../common/team-scorer.js';
 import { createStrengthLabelHtml, getStrengthRating } from '../common/strength-rating.js';
 import { getRosterUnits, buildRosterTeams, scoreCalibrated, scoreTeamsForBoss, requireCalibration } from '../common/team-pool.js';
+import { createAgentPicker } from '../common/agent-picker.js';
+import { joinList } from '../common/text.js';
+import {
+    createEmptyPlan, isPlanEmpty, sanitizePicks, getPlanProblems, planToPins, getEffectiveUnitStates, PLAN_TEAM_SIZE
+} from '../common/custom-plan.js';
 import { createUnitCard, getWeaknessGradientClass } from '../common/team-card.js';
 import {
     decodeBosses, getBossesFromUrl, generateShareUrlWithBosses,
-    encodeBossVariations, decodeBossVariations, getBossVariationsFromUrl
+    encodeBossVariations, decodeBossVariations, getBossVariationsFromUrl,
+    decodePlan, getPlanFromUrl
 } from '../common/roster-share.js';
 import {
     initRoster, getUnitStates, getAllUnits, getCalibration,
     getInitials, getUniversalUnitNames
 } from '../common/roster-ui.js';
 import { isPrimaryDps, unitFingerprint, teamDpsFingerprint } from '../common/dps-buckets.js';
-import { solveDeadlyAssault } from '../common/deadly-assault-solver.js';
+import { solveDeadlyAssault, getCandidateTeamsForBoss } from '../common/deadly-assault-solver.js';
 
 // Constants
 
@@ -43,6 +49,11 @@ let sharedBossesMode = false;
 // Mobile touch mode for boss cards: null | "variant"
 let bossCardTouchMode = null;
 
+// Custom plan: { enabled, picks: { [bossId]: unitId[] } }. Picks outlive the toggle, so a
+// player can switch the plan off and on again without re-entering it.
+let plan = createEmptyPlan();
+let planPicker = null;
+
 // Results
 let showCreativeOptions = false;
 let lastResults = null;
@@ -57,9 +68,10 @@ async function loadData() {
         await initRoster({
             containerSelector: '#roster-container',
             pageUrl: 'deadly-assault.html',
-            onStateChange: () => savePageToStorage(),
+            onStateChange: () => { savePageToStorage(); planPicker?.refresh(); },
             shareUrlGenerator: (unitStates, allUnits) =>
-                generateShareUrlWithBosses(unitStates, allUnits, selectedBosses, selectedBossVariations)
+                generateShareUrlWithBosses(unitStates, allUnits, selectedBosses, selectedBossVariations,
+                    plan.enabled ? plan.picks : null)
         });
         
         loadBossState();
@@ -85,6 +97,10 @@ function loadBossState() {
         }
         const variationsParam = getBossVariationsFromUrl();
         selectedBossVariations = variationsParam ? decodeBossVariations(variationsParam, allBosses) : {};
+
+        // A plan in the link means the sharer was using it, so it arrives switched on.
+        const picks = sanitizePicks(decodePlan(getPlanFromUrl(), allBosses), getAllUnits(), allBosses);
+        plan = { enabled: !isPlanEmpty({ picks }), picks };
     } else {
         sharedBossesMode = false;
         loadPageFromStorage();
@@ -102,7 +118,8 @@ function savePageToStorage() {
     const data = {
         selectedBosses,
         selectedBossVariations,
-        showCreativeOptions
+        showCreativeOptions,
+        plan
     };
     localStorage.setItem(PAGE_STORAGE_KEY, JSON.stringify(data));
 }
@@ -126,6 +143,12 @@ function loadPageFromStorage() {
             if (typeof data.showCreativeOptions === 'boolean') {
                 showCreativeOptions = data.showCreativeOptions;
             }
+            if (data.plan && typeof data.plan === 'object') {
+                plan = {
+                    enabled: data.plan.enabled === true,
+                    picks: sanitizePicks(data.plan.picks, getAllUnits(), allBosses)
+                };
+            }
         }
     } catch (e) {
         console.warn('Failed to load page state:', e);
@@ -136,6 +159,7 @@ function loadPageFromStorage() {
 
 function renderPageUI() {
     renderBossSection();
+    setupPlan();
     setupEventListeners();
 }
 
@@ -233,6 +257,127 @@ function getBossImageUrl(bossId) {
     return boss.image;
 }
 
+// Custom plan
+
+function setupPlan() {
+    planPicker = createAgentPicker({
+        getUnits: getAllUnits,
+        isOwned: id => !!getUnitStates()[id]?.owned,
+        allowUnowned: true,
+        title: () => 'Choose an agent',
+        isConflict: (id, ctx) => isPlannedElsewhere(id, ctx.key)
+    });
+
+    document.getElementById('da-plan-toggle').addEventListener('change', e => {
+        plan.enabled = e.target.checked;
+        savePageToStorage();
+        renderPlan();
+    });
+    document.getElementById('da-plan-clear').addEventListener('click', () => {
+        plan.picks = {};
+        savePageToStorage();
+        renderPlan();
+    });
+    renderPlan();
+}
+
+// The same agent on two selected bosses is the one input that cannot be submitted.
+function isPlannedElsewhere(unitId, bossId) {
+    return selectedBosses.some(id => id !== bossId && (plan.picks[id] ?? []).includes(unitId));
+}
+
+function createResultBossTileHtml(boss) {
+    const weaknessClass = getWeaknessGradientClass(getBossWeaknesses(boss));
+    const imageUrl = getBossImageUrl(boss.id);
+    const initials = getInitials(boss.shortName);
+    const avatarHtml = imageUrl
+        ? `<img class="boss-avatar-img" src="${imageUrl}" alt="${boss.shortName}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="boss-initials" style="display:none">${initials}</span>`
+        : `<span class="boss-initials">${initials}</span>`;
+    return `
+        <div class="result-boss-tile ${weaknessClass}">
+            <div class="result-boss-avatar">
+                ${avatarHtml}
+            </div>
+            <div class="boss-name">${boss.shortName}</div>
+        </div>`;
+}
+
+function updateClearButton() {
+    document.getElementById('da-plan-clear').disabled = isPlanEmpty(plan);
+    updateCreativeOption();
+}
+
+// "More creative options" has nothing to offer once the player is planning (see displayResults),
+// so it is disabled and hidden while a non-empty plan is on, or for results that came from one.
+// The saved preference is left alone, so it returns when the plan is cleared.
+function updateCreativeOption() {
+    const checkbox = document.getElementById('da-variations-checkbox');
+    if (!checkbox) return;
+    const hidden = (plan.enabled && !isPlanEmpty(plan)) || !!lastResults?.planned;
+    checkbox.disabled = hidden;
+    checkbox.closest('.variations-checkbox').style.display = hidden ? 'none' : '';
+}
+
+function setPicks(bossId, ids) {
+    if (ids.length > 0) plan.picks[bossId] = ids;
+    else delete plan.picks[bossId];
+    savePageToStorage();
+    hideValidationErrors();
+    updateClearButton();
+}
+
+// Always three rows: a boss that is not chosen yet shows a placeholder and cannot take picks.
+function renderPlan() {
+    const toggle = document.getElementById('da-plan-toggle');
+    const body = document.getElementById('da-plan-body');
+    const rows = document.getElementById('da-plan-rows');
+    toggle.checked = plan.enabled;
+    body.hidden = !plan.enabled;
+    document.getElementById('da-plan-clear').hidden = !plan.enabled;
+    document.getElementById('da-plan-description').hidden = plan.enabled;
+    document.getElementById('da-plan-section').classList.toggle('active', plan.enabled);
+
+    planPicker.clearGroups();
+    rows.innerHTML = '';
+    if (!plan.enabled) {
+        updateCreativeOption();
+        return;
+    }
+
+    const bossObjects = getSelectedBossObjects();
+    for (let i = 0; i < BOSSES_REQUIRED; i++) {
+        const boss = bossObjects[i];
+        const row = document.createElement('div');
+        row.className = 'da-row result-card da-plan-row';
+        if (boss) {
+            row.innerHTML = `
+                ${createResultBossTileHtml(boss)}
+                <div class="da-plan-divider"></div>
+                <div class="da-row-team"></div>`;
+        } else {
+            row.classList.add('da-plan-row--empty');
+            row.innerHTML = `
+                <div class="result-boss-tile da-plan-boss-empty"><div class="result-boss-avatar"><span>?</span></div><div class="boss-name">Select a boss</div></div>
+                <div class="da-plan-divider"></div>
+                <div class="da-row-team"></div>`;
+        }
+        rows.appendChild(row);
+
+        const bossId = boss?.id;
+        planPicker.mountSlots(row.querySelector('.da-row-team'), {
+            key: bossId ?? `empty-${i}`,
+            getIds: () => (bossId && plan.picks[bossId]) || [],
+            setIds: ids => setPicks(bossId, ids),
+            max: PLAN_TEAM_SIZE,
+            fixedSlots: true,
+            disabled: !bossId,
+            anchorEl: row,
+            addLabel: () => 'Select agent'
+        });
+    }
+    updateClearButton();
+}
+
 // Event Handling
 
 function setupEventListeners() {
@@ -328,6 +473,7 @@ function handleBossClick(e) {
     }
     
     savePageToStorage();
+    renderPlan();
 }
 
 function handleBossRightClick(e) {
@@ -404,6 +550,7 @@ function cycleBossVariation(bossId) {
     }
 
     savePageToStorage();
+    renderPlan();
 }
 
 // Validation
@@ -415,10 +562,12 @@ function validate() {
         errors.push(`Please select exactly ${BOSSES_REQUIRED} bosses (currently ${selectedBosses.length} selected)`);
     }
     
-    const availableUnits = getAvailableUnits();
+    const availableUnits = getAvailableUnits(getActivePins());
     if (availableUnits.length < MIN_UNITS_REQUIRED) {
         errors.push(`Need at least ${MIN_UNITS_REQUIRED} available units (currently ${availableUnits.length})`);
     }
+
+    errors.push(...getPlanProblems(plan, selectedBosses, getAllUnits(), allBosses));
     
     return errors;
 }
@@ -442,8 +591,25 @@ function showError(message) {
 
 // Optimization Algorithm
 
-function getAvailableUnits() {
-    return getRosterUnits(getAllUnits(), getUnitStates());
+// The owned roster, plus any agent the plan pins (so a player can plan around one they lack).
+function getAvailableUnits(pinsByBoss = null) {
+    return getRosterUnits(getAllUnits(), getEffectiveUnitStates(getUnitStates(), pinsByBoss));
+}
+
+function getSelectedBossObjects() {
+    return selectedBosses
+        .map(id => {
+            const boss = allBosses.find(b => b.id === id);
+            if (!boss || boss.available === false) return null;
+            const variationId = selectedBossVariations[id] || null;
+            return variationId ? resolveBossVariation(boss, variationId) : boss;
+        })
+        .filter(Boolean);
+}
+
+// The solver's pins for the current plan, or null when the plan is off or empty.
+function getActivePins() {
+    return planToPins(plan, getSelectedBossObjects());
 }
 
 function runOptimization() {
@@ -474,19 +640,13 @@ function runOptimization() {
 }
 
 function calculateOptimalTeams() {
-    const availableUnits = getAvailableUnits();
+    const selectedBossObjects = getSelectedBossObjects();
+    const pinsByBoss = planToPins(plan, selectedBossObjects);
+    const availableUnits = getAvailableUnits(pinsByBoss);
     const universalUnitNames = getUniversalUnitNames();
     // Deadly Assault compares teams of DIFFERENT archetypes across 3 bosses at once (banding,
     // totalScore sum, perBossFloor), so every `.score` here must be CALIBRATED, not raw.
     const calibration = requireCalibration(getCalibration());
-    const selectedBossObjects = selectedBosses
-        .map(id => {
-            const boss = allBosses.find(b => b.id === id);
-            if (!boss || boss.available === false) return null;
-            const variationId = selectedBossVariations[id] || null;
-            return variationId ? resolveBossVariation(boss, variationId) : boss;
-        })
-        .filter(Boolean);
     const selectedBossNames = selectedBossObjects.map(b => b.name);
     
     //TODO Decide if this should remain
@@ -517,8 +677,12 @@ function calculateOptimalTeams() {
         console.log('   Shill:', boss.mechanics?.shill || 'none');
         console.log('   Anti:', boss.mechanics?.anti || 'none');
         
+        // A pinned boss scores only the teams its pins allow, not the whole roster.
+        const candidates = pinsByBoss
+            ? getCandidateTeamsForBoss({ bossName: boss.name, pinsByBoss, threeCharTeams, unitPool: availableUnits })
+            : threeCharTeams;
         const { viable, disqualified: disqualifiedTeams, usedLenient } =
-            scoreTeamsForBoss(threeCharTeams, boss, calibration);
+            scoreTeamsForBoss(candidates, boss, calibration);
         viableTeamsByBoss[boss.name] = viable;
         
         console.log(`   ✅ Viable teams: ${usedLenient ? 0 : viable.length}`);
@@ -557,7 +721,9 @@ function calculateOptimalTeams() {
             return scored ? scored.score : null;
         },
         diverseLimit: DISPLAY_LIMIT,
-        log: console.log
+        log: console.log,
+        pinsByBoss,
+        unitPool: availableUnits
     });
 
     console.log(`Combinations: ${combinations.length}, Diverse strategies: ${diverseResults.length}`);
@@ -579,7 +745,8 @@ function calculateOptimalTeams() {
         diverseResults,
         bosses: selectedBossObjects,
         totalFound: combinations.length,
-        lenientBosses
+        lenientBosses,
+        planned: !!pinsByBoss
     };
 }
 
@@ -596,10 +763,13 @@ function displayResults(results, scroll = true) {
 
     const checkbox = document.getElementById('da-variations-checkbox');
     if (checkbox) checkbox.checked = showCreativeOptions;
+    updateCreativeOption();
 
     let combos;
     let creativeDisclaimer = '';
-    if (showCreativeOptions) {
+    // A planned solve is already the player's own creativity, and DPS bucketing over many pins
+    // gives confusing results, so planned results always use the ranked view.
+    if (showCreativeOptions && !results.planned) {
         combos = results.diverseResults || [];
         creativeDisclaimer = `<div class="lenient-notice">These results prioritize roster variety &mdash; each option uses a distinct DPS lineup. Individual assignments may not be the absolute strongest possible teams.</div>`;
     } else {
@@ -621,8 +791,9 @@ function displayResults(results, scroll = true) {
             createResultSlide(combo, index, results.bosses)
         ).join('');
 
+        const lenientReason = results.planned ? 'Your plan needed' : 'Limited roster — using';
         const lenientNotice = results.lenientBosses && results.lenientBosses.length > 0
-            ? `<div class="lenient-notice">* Limited roster — using lenient scoring for ${results.lenientBosses.join(', ')}.</div>`
+            ? `<div class="lenient-notice">* ${lenientReason} lenient scoring for ${joinList(results.lenientBosses)}.</div>`
             : '';
         
         container.innerHTML = `${lenientNotice}${creativeDisclaimer}
@@ -685,26 +856,14 @@ function goToResult(index) {
 function createResultSlide(combo, index, bosses) {
     const rowsHtml = combo.assignments.map(assignment => {
         const boss = bosses.find(b => b.name === assignment.boss);
-        const weaknessClass = getWeaknessGradientClass(getBossWeaknesses(boss));
         const teamHtml = assignment.team.map(unit => createUnitCard(unit)).join('');
-        const imageUrl = getBossImageUrl(boss.id);
-        const initials = getInitials(boss.shortName);
-        const band = getStrengthRating(assignment.score, assignment.team).label.toLowerCase();
-        
-        const avatarHtml = imageUrl
-            ? `<img class="boss-avatar-img" src="${imageUrl}" alt="${boss.shortName}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="boss-initials" style="display:none">${initials}</span>`
-            : `<span class="boss-initials">${initials}</span>`;
+        const band = getStrengthRating(assignment.score, assignment.team, { unscorable: assignment.unscorable, lenient: assignment.lenient }).label.toLowerCase();
         
         return `
             <div class="da-row result-card band-${band}">
-                <div class="result-boss-tile ${weaknessClass}">
-                    <div class="result-boss-avatar">
-                        ${avatarHtml}
-                    </div>
-                    <div class="boss-name">${boss.shortName}</div>
-                </div>
+                ${createResultBossTileHtml(boss)}
                 <div class="da-row-meta">
-                    ${createStrengthLabelHtml(assignment.score, assignment.team, { lenient: assignment.lenient })}
+                    ${createStrengthLabelHtml(assignment.score, assignment.team, { lenient: assignment.lenient, unscorable: assignment.unscorable })}
                 </div>
                 <div class="da-row-team">
                     ${teamHtml}

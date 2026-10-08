@@ -52,3 +52,6 @@ One line each. Follow the link for the real treatment.
 | **Partner ladder** | A fitted stopgap letting the pull engine see partner quality. [→](recommendations/partner-ladder.md) |
 | `KNOWN_RED` | Tests that are red on purpose. All three maps are currently empty. [→](tooling/verification-loop.md) |
 | **Fingerprint** | A hash of `team-scorer.js` + `units.json` + `bosses.json` that marks calibration stale. It hashes **raw bytes**, so even a comment edit trips it. [→](engine/calibration.md) |
+| **Lenient mode** | Scoring that keeps a team in play by turning some strict disqualifications into costs. Its results are labelled no better than OK. [→](engine/element-resistance.md#lenient-mode) |
+| **Pin / fixed / free (boss)** | In a Deadly Assault plan: one or two agents required on a boss (pinned), all three chosen (fixed), or none (free). [→](bucketing/deadly-assault.md#custom-plans-pins) |
+| **Abysmal** | The label below Bad: a pinned team that cannot be scored even leniently. Not a score band. [→](ux/result-cards.md) |

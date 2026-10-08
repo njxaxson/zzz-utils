@@ -138,6 +138,7 @@ main.main-narrow.main-da {
 .band-tough     { --band: #ff9800; }
 .band-risky,
 .band-bad       { --band: #ff5252; }
+.band-abysmal   { --band: #6d4c41; }
 
 /* Pull priority (Pull Recommendations) */
 .pull-rec-card.priority-high   { --band: #39FF14; --band-rgb: 57, 255, 20; --band-tint: 0.10; --band-edge: rgba(57, 255, 20, 0.35); }
@@ -2671,6 +2672,7 @@ a.unit-card {
 .strength-tough { color: #ff9800; background: rgba(255, 152, 0, 0.12); }
 .strength-risky { color: #ff5252; background: rgba(255, 82, 82, 0.12); }
 .strength-bad   { color: #b71c1c; background: rgba(183, 28, 28, 0.12); }
+.strength-abysmal { color: #8d6e63; background: rgba(0, 0, 0, 0.35); }
 
 /* Carousel mobile responsiveness - use fluid sizing */
 @media (max-width: 768px) {
@@ -2855,6 +2857,132 @@ a.unit-card {
         background: rgba(0, 0, 0, 0.7);
         font-size: 0.6rem;
     }
+}
+
+/* ============================================================================
+   DEADLY ASSAULT PLAN (inputs): boss tile | status | 3 agent slots, in the result rows' grid
+   ============================================================================ */
+
+.da-plan-section { margin-top: 1.25rem; }
+
+.da-plan-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.da-plan-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    min-height: 44px;
+    font-weight: 600;
+    cursor: pointer;
+    user-select: none;
+}
+.da-plan-toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
+.da-plan-switch {
+    position: relative;
+    flex-shrink: 0;
+    width: 40px;
+    height: 22px;
+    border-radius: 999px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    transition: background 0.2s, border-color 0.2s;
+}
+.da-plan-switch::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    transition: transform 0.2s, background 0.2s;
+}
+.da-plan-toggle input:checked + .da-plan-switch { background: var(--accent-primary); border-color: var(--accent-primary); }
+.da-plan-toggle input:checked + .da-plan-switch::after { transform: translateX(18px); background: #fff; }
+.da-plan-toggle input:focus-visible + .da-plan-switch { outline: 2px solid var(--accent-secondary); outline-offset: 2px; }
+
+.da-plan-clear {
+    min-height: 36px;
+    padding: 0.3rem 0.8rem;
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+.da-plan-clear:hover:not(:disabled) { color: var(--text-primary); border-color: var(--text-muted); }
+.da-plan-clear:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.da-plan-help {
+    margin: 0.25rem 0 0.9rem;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.da-plan-rows { display: flex; flex-direction: column; gap: 0.75rem; }
+
+/* A hairline between boss and agents, as on the Agent Teams results. It takes the strength
+   column's place in the shared row grid. */
+.da-plan-divider {
+    align-self: stretch;
+    width: 1px;
+    margin: 0 1.1rem;
+    background: var(--rule-soft);
+}
+
+/* Agent tiles share the result rows' grid, so they size like the result unit tiles. */
+.da-plan-row .ap-tile {
+    width: auto;
+    border-width: 2px;
+    border-radius: 8px;
+}
+.da-plan-row .ap-tile-name { padding: 0.3rem 0.25rem; font-size: 0.7rem; }
+.da-plan-row .ap-tile-clear { width: 28px; height: 28px; font-size: 0.8rem; }
+.da-plan-row .ap-tile-badge { bottom: 4px; font-size: 0.5rem; padding: 0.1rem 0.3rem; }
+.da-plan-row .ap-tile-initials { font-size: 1.5rem; }
+
+/* Empty slot: same footprint as a filled one, quietly dashed. */
+.ap-tile-add.ap-tile-slot { opacity: 0.85; }
+.ap-tile-add.ap-tile-slot:hover { opacity: 1; }
+.ap-tile-add.ap-tile-slot .ap-tile-plus { font-size: 1.8rem; }
+.ap-tile-add.ap-tile-slot .ap-tile-name { font-size: 0.65rem; }
+.ap-tile.disabled { opacity: 0.3; cursor: not-allowed; pointer-events: none; }
+
+/* The same agent planned on two bosses: shown, and blocks Find Optimal Teams. */
+.ap-tile.conflict { border-color: var(--error); box-shadow: 0 0 0 2px rgba(255, 68, 68, 0.35); }
+
+/* A boss not chosen yet. */
+.da-plan-boss-empty { border-style: dashed; background: transparent; }
+.da-plan-boss-empty .result-boss-avatar { background: transparent; color: var(--text-muted); font-size: 2rem; font-weight: 300; }
+.da-plan-boss-empty .boss-name { background: transparent; color: var(--text-muted); text-shadow: none; }
+.da-plan-row--empty { opacity: 0.7; }
+
+@media (max-width: 600px) {
+    .da-plan-row .ap-tile { position: relative; }
+    .da-plan-row .ap-tile-name {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        padding: 0.2rem 0.1rem;
+        background: rgba(0, 0, 0, 0.7);
+        font-size: 0.6rem;
+    }
+    .da-plan-row .ap-tile-clear { width: 24px; height: 24px; font-size: 0.7rem; top: 2px; right: 2px; }
+    .da-plan-row .ap-tile-badge { bottom: 1.4rem; }
+    .da-plan-row .ap-tile-add.ap-tile-slot .ap-tile-plus { font-size: 1.4rem; }
+    /* The team panel's solid rule already separates them. */
+    .da-plan-divider { display: none; }
+    .da-plan-boss-empty .result-boss-avatar { aspect-ratio: auto; height: 76px; }
 }
 
 /* ============================================================================
@@ -4483,13 +4611,13 @@ a.rec-unit:hover {
     .ad-focus-section { margin-top: 1rem; }
 
     /* Focus tiles: sized like the Deadly Assault boss cards. */
-    .ad-slots {
+    .ap-slots {
         display: flex;
         flex-wrap: wrap;
         gap: 0.75rem;
         align-items: flex-start;
     }
-    .ad-tile {
+    .ap-tile {
         position: relative;
         width: 150px;
         display: flex;
@@ -4501,16 +4629,16 @@ a.rec-unit:hover {
         cursor: pointer;
         transition: border-color 0.2s, transform 0.2s;
     }
-    .ad-tile:hover { transform: translateY(-2px); border-color: var(--accent-primary); }
-    .ad-tile.picking { border-color: var(--accent-primary); }
-    .ad-tile.element-fire { border-color: var(--element-fire); }
-    .ad-tile.element-ice { border-color: var(--element-ice); }
-    .ad-tile.element-electric { border-color: var(--element-electric); }
-    .ad-tile.element-physical { border-color: var(--element-physical); }
-    .ad-tile.element-ether { border-color: var(--element-ether); }
-    .ad-tile.element-wind { border-color: var(--element-wind); }
-    .ad-tile.element-lumen { border-color: var(--element-lumen); }
-    .ad-tile-avatar {
+    .ap-tile:hover { transform: translateY(-2px); border-color: var(--accent-primary); }
+    .ap-tile.picking { border-color: var(--accent-primary); }
+    .ap-tile.element-fire { border-color: var(--element-fire); }
+    .ap-tile.element-ice { border-color: var(--element-ice); }
+    .ap-tile.element-electric { border-color: var(--element-electric); }
+    .ap-tile.element-physical { border-color: var(--element-physical); }
+    .ap-tile.element-ether { border-color: var(--element-ether); }
+    .ap-tile.element-wind { border-color: var(--element-wind); }
+    .ap-tile.element-lumen { border-color: var(--element-lumen); }
+    .ap-tile-avatar {
         position: relative;
         width: 100%;
         aspect-ratio: 1;
@@ -4519,9 +4647,9 @@ a.rec-unit:hover {
         justify-content: center;
         background: rgba(0, 0, 0, 0.3);
     }
-    .ad-tile-img { width: 100%; height: 100%; object-fit: cover; }
-    .ad-tile-initials { font-size: 1.5rem; font-weight: 700; }
-    .ad-tile-name {
+    .ap-tile-img { width: 100%; height: 100%; object-fit: cover; }
+    .ap-tile-initials { font-size: 1.5rem; font-weight: 700; }
+    .ap-tile-name {
         padding: 0.4rem 0.3rem;
         background: rgba(0, 0, 0, 0.7);
         color: white;
@@ -4532,7 +4660,7 @@ a.rec-unit:hover {
         overflow: hidden;
         text-overflow: ellipsis;
     }
-    .ad-tile-badge {
+    .ap-tile-badge {
         position: absolute;
         bottom: 6px;
         left: 50%;
@@ -4547,7 +4675,7 @@ a.rec-unit:hover {
         text-transform: uppercase;
         white-space: nowrap;
     }
-    .ad-tile-clear {
+    .ap-tile-clear {
         position: absolute;
         top: 4px;
         right: 4px;
@@ -4560,44 +4688,44 @@ a.rec-unit:hover {
         font-size: 0.9rem;
         cursor: pointer;
     }
-    .ad-tile-clear:hover { background: rgba(0, 0, 0, 0.9); }
+    .ap-tile-clear:hover { background: rgba(0, 0, 0, 0.9); }
 
-    .ad-tile-add {
+    .ap-tile-add {
         border-style: dashed;
         background: transparent;
     }
-    .ad-tile-add .ad-tile-avatar { background: transparent; }
-    .ad-tile-add .ad-tile-name { background: transparent; color: var(--text-secondary); }
-    .ad-tile-plus { font-size: 2.5rem; font-weight: 300; color: var(--text-muted); }
-    .ad-tile-add.primary { border-color: var(--accent-primary); }
-    .ad-tile-add.primary .ad-tile-plus,
-    .ad-tile-add.primary .ad-tile-name { color: var(--accent-primary); }
+    .ap-tile-add .ap-tile-avatar { background: transparent; }
+    .ap-tile-add .ap-tile-name { background: transparent; color: var(--text-secondary); }
+    .ap-tile-plus { font-size: 2.5rem; font-weight: 300; color: var(--text-muted); }
+    .ap-tile-add.primary { border-color: var(--accent-primary); }
+    .ap-tile-add.primary .ap-tile-plus,
+    .ap-tile-add.primary .ap-tile-name { color: var(--accent-primary); }
     /* A teammate is optional: keep its tile small and quiet. */
-    .ad-tile-add:not(.primary) { width: 96px; opacity: 0.7; }
-    .ad-tile-add:not(.primary):hover { opacity: 1; }
-    .ad-tile-add:not(.primary) .ad-tile-plus { font-size: 1.6rem; }
-    .ad-tile-add:not(.primary) .ad-tile-name { font-size: 0.65rem; white-space: normal; line-height: 1.2; }
+    .ap-tile-add:not(.primary) { width: 96px; opacity: 0.7; }
+    .ap-tile-add:not(.primary):hover { opacity: 1; }
+    .ap-tile-add:not(.primary) .ap-tile-plus { font-size: 1.6rem; }
+    .ap-tile-add:not(.primary) .ap-tile-name { font-size: 0.65rem; white-space: normal; line-height: 1.2; }
 
     /* Picker */
-    .ad-picker {
+    .ap-picker {
         margin-top: 0.75rem;
         padding: 0.75rem;
         background: var(--bg-tertiary);
         border: 1px solid var(--border-color);
         border-radius: 8px;
     }
-    .ad-picker-top {
+    .ap-picker-top {
         display: flex;
         gap: 0.5rem;
         align-items: center;
     }
-    .ad-picker-title {
+    .ap-picker-title {
         font-size: 0.85rem;
         font-weight: 600;
         color: var(--text-secondary);
         white-space: nowrap;
     }
-    .ad-picker-search {
+    .ap-picker-search {
         flex: 1;
         min-width: 0;
         height: 34px;
@@ -4609,7 +4737,7 @@ a.rec-unit:hover {
         font-family: inherit;
         font-size: 0.9rem;
     }
-    .ad-picker-close {
+    .ap-picker-close {
         width: 34px;
         height: 34px;
         flex-shrink: 0;
@@ -4620,15 +4748,22 @@ a.rec-unit:hover {
         font-size: 1rem;
         cursor: pointer;
     }
-    .ad-picker-close:hover { background: var(--bg-secondary); color: var(--text-primary); }
-    .ad-picker-filters {
+    .ap-picker-close:hover { background: var(--bg-secondary); color: var(--text-primary); }
+    .ap-picker-filters {
         display: flex;
         flex-wrap: wrap;
         gap: 0.35rem 0.9rem;
         margin-top: 0.5rem;
     }
-    .ad-filter-group { display: flex; flex-wrap: wrap; gap: 0.25rem; }
-    .ad-filter {
+    .ap-filter-group { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+    /* Phones: let every filter flow as one wrapping row, so a line breaks only where the width
+       runs out, not between groups. A little extra space still marks where a group ends. */
+    @media (max-width: 600px) {
+        .ap-picker-filters { gap: 0.35rem 0.25rem; }
+        .ap-filter-group { display: contents; }
+        .ap-filter-group .ap-filter:last-child { margin-right: 0.4rem; }
+    }
+    .ap-filter {
         padding: 0.2rem 0.55rem;
         min-height: 28px;
         background: transparent;
@@ -4640,16 +4775,16 @@ a.rec-unit:hover {
         text-transform: capitalize;
         cursor: pointer;
     }
-    .ad-filter:hover { color: var(--text-primary); border-color: var(--text-muted); }
-    .ad-filter.active { background: var(--accent-primary); border-color: var(--accent-primary); color: var(--bg-primary); font-weight: 600; }
-    .ad-filter.element-fire.active { background: var(--element-fire); border-color: var(--element-fire); color: white; }
-    .ad-filter.element-ice.active { background: var(--element-ice); border-color: var(--element-ice); }
-    .ad-filter.element-electric.active { background: var(--element-electric); border-color: var(--element-electric); color: white; }
-    .ad-filter.element-physical.active { background: var(--element-physical); border-color: var(--element-physical); }
-    .ad-filter.element-ether.active { background: var(--element-ether); border-color: var(--element-ether); color: white; }
-    .ad-filter.element-wind.active { background: var(--element-wind); border-color: var(--element-wind); }
-    .ad-filter.element-lumen.active { background: var(--element-lumen); border-color: var(--element-lumen); }
-    .ad-picker-grid {
+    .ap-filter:hover { color: var(--text-primary); border-color: var(--text-muted); }
+    .ap-filter.active { background: var(--accent-primary); border-color: var(--accent-primary); color: var(--bg-primary); font-weight: 600; }
+    .ap-filter.element-fire.active { background: var(--element-fire); border-color: var(--element-fire); color: white; }
+    .ap-filter.element-ice.active { background: var(--element-ice); border-color: var(--element-ice); }
+    .ap-filter.element-electric.active { background: var(--element-electric); border-color: var(--element-electric); color: white; }
+    .ap-filter.element-physical.active { background: var(--element-physical); border-color: var(--element-physical); }
+    .ap-filter.element-ether.active { background: var(--element-ether); border-color: var(--element-ether); color: white; }
+    .ap-filter.element-wind.active { background: var(--element-wind); border-color: var(--element-wind); }
+    .ap-filter.element-lumen.active { background: var(--element-lumen); border-color: var(--element-lumen); }
+    .ap-picker-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(58px, 1fr));
         gap: 0.35rem;
@@ -4657,7 +4792,7 @@ a.rec-unit:hover {
         max-height: 300px;
         overflow-y: auto;
     }
-    .ad-pick {
+    .ap-pick {
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -4672,48 +4807,51 @@ a.rec-unit:hover {
         cursor: pointer;
         min-width: 0;
     }
-    .ad-pick:hover:not(:disabled) { border-color: var(--text-muted); color: var(--text-primary); }
-    .ad-pick:disabled { opacity: 0.25; cursor: not-allowed; }
-    .ad-pick img, .ad-pick .ad-pick-initials {
+    .ap-pick:hover:not(:disabled) { border-color: var(--text-muted); color: var(--text-primary); }
+    .ap-pick:disabled { opacity: 0.25; cursor: not-allowed; }
+    .ap-pick img, .ap-pick .ap-pick-initials {
         width: 46px;
         height: 46px;
         border-radius: 50%;
         object-fit: cover;
         border: 2px solid var(--border-color);
     }
-    .ad-pick .ad-pick-initials {
+    .ap-pick .ap-pick-initials {
         display: flex;
         align-items: center;
         justify-content: center;
         font-weight: 700;
         background: var(--bg-secondary);
     }
-    .ad-pick.element-fire img { border-color: var(--element-fire); }
-    .ad-pick.element-ice img { border-color: var(--element-ice); }
-    .ad-pick.element-electric img { border-color: var(--element-electric); }
-    .ad-pick.element-physical img { border-color: var(--element-physical); }
-    .ad-pick.element-ether img { border-color: var(--element-ether); }
-    .ad-pick.element-wind img { border-color: var(--element-wind); }
-    .ad-pick.element-lumen img { border-color: var(--element-lumen); }
-    .ad-pick-name {
+    .ap-pick.element-fire img { border-color: var(--element-fire); }
+    .ap-pick.element-ice img { border-color: var(--element-ice); }
+    .ap-pick.element-electric img { border-color: var(--element-electric); }
+    .ap-pick.element-physical img { border-color: var(--element-physical); }
+    .ap-pick.element-ether img { border-color: var(--element-ether); }
+    .ap-pick.element-wind img { border-color: var(--element-wind); }
+    .ap-pick.element-lumen img { border-color: var(--element-lumen); }
+    /* Not in the roster, but still pickable: full-colour art in a grey ring instead of its element
+       ring. Must follow the element rules, which it overrides; no fade, or it reads as disabled. */
+    .ap-pick.unowned img, .ap-pick.unowned .ap-pick-initials { border-color: var(--text-secondary); }
+    .ap-pick-name {
         max-width: 100%;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
     }
-    .ad-picker-empty {
+    .ap-picker-empty {
         grid-column: 1 / -1;
         padding: 0.75rem;
         font-size: 0.8rem;
         color: var(--text-muted);
     }
 
-    .ad-picker-hint {
+    .ap-picker-hint {
         margin-top: 0.6rem;
         font-size: 0.75rem;
         color: var(--text-muted);
     }
-    .ad-picker-hint strong { color: var(--text-secondary); }
+    .ap-picker-hint strong { color: var(--text-secondary); }
     .ad-tip {
         margin-bottom: 1rem;
         padding: 0.6rem 0.9rem;
@@ -4799,10 +4937,10 @@ a.rec-unit:hover {
     }
 
     @media (max-width: 768px) {
-        .ad-slots { gap: 0.5rem; }
+        .ap-slots { gap: 0.5rem; }
         /* Three tiles must fit on one line: a third of the row minus two 0.5rem gaps. */
-        .ad-tile { width: min(120px, calc((100% - 1rem) / 3)); }
-        .ad-tile-add:not(.primary) { width: 80px; }
+        .ap-tile { width: min(120px, calc((100% - 1rem) / 3)); }
+        .ap-tile-add:not(.primary) { width: 80px; }
     }
 
     /* Narrow: team above bosses, divided by a rule; both on the same grid. */
@@ -4855,11 +4993,11 @@ a.rec-unit:hover {
     }
 
     @media (max-width: 480px) {
-        .ad-tile-add:not(.primary) { width: 72px; }
-        .ad-picker { padding: 0.6rem; }
-        .ad-picker-title { display: none; }
-        .ad-picker-grid { grid-template-columns: repeat(auto-fill, minmax(54px, 1fr)); max-height: 260px; }
-        .ad-pick img, .ad-pick .ad-pick-initials { width: 42px; height: 42px; }
+        .ap-tile-add:not(.primary) { width: 72px; }
+        .ap-picker { padding: 0.6rem; }
+        .ap-picker-title { display: none; }
+        .ap-picker-grid { grid-template-columns: repeat(auto-fill, minmax(54px, 1fr)); max-height: 260px; }
+        .ap-pick img, .ap-pick .ap-pick-initials { width: 42px; height: 42px; }
     }
 
 

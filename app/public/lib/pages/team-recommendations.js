@@ -416,14 +416,14 @@ function displayResults(results) {
 
 function createResultRow(entry, index) {
     const teamHtml = entry.team.map(unit => createUnitCard(unit)).join('');
-    const band = getStrengthRating(entry.score, entry.team).label.toLowerCase();
+    const band = getStrengthRating(entry.score, entry.team, { lenient: entry.lenient }).label.toLowerCase();
     
     return `
         <div class="recommendation-row result-card band-${band}">
             <div class="recommendation-meta">
                 <div class="recommendation-rank">#${index + 1}</div>
                 <div class="recommendation-strength">
-                    ${createStrengthLabelHtml(entry.score, entry.team)}
+                    ${createStrengthLabelHtml(entry.score, entry.team, { lenient: entry.lenient })}
                 </div>
                 <div class="recommendation-score">${Math.round(entry.score)}</div>
             </div>

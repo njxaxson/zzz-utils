@@ -78,6 +78,12 @@ The app's authoritative bands live in `strength-rating.js`, descending:
 
 > Excellent → Great → Good → OK → Tough → Risky → Bad
 
+Two labels are not score bands. **Abysmal** sits below Bad and means "could not be scored at all"
+(a pinned Deadly Assault team, see [result cards](../ux/result-cards.md)). And a result scored in
+[lenient mode](element-resistance.md#lenient-mode) is **capped at OK** whatever its number
+([LEN-04](element-resistance.md)): lenient scores start from a higher base, so their numbers
+are not comparable with strict ones.
+
 A team containing an A-rank carry is demoted exactly one tier from the top band regardless of
 score.
 

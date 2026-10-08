@@ -22,7 +22,9 @@ you know where a change belongs.
 The full disqualification list: an illegal `join`
 arrangement, no DPS at all, three *pure* DPS, a DPS whose tag matches the boss's `anti`, a
 **damage dealer** whose element is resisted, or too few reliable defensive assists.
-`synergy.avoid` is checked alongside.
+`synergy.avoid` is checked alongside. These are the *strict* rules; [lenient mode](element-resistance.md#lenient-mode)
+turns a resisted or anti-typed DPS and one missing assist into costs, and the L3 stun-shill
+requirement into a flat penalty, while the other disqualifications stand.
 
 ### L2 in detail
 
@@ -158,7 +160,7 @@ else, zero exceptions.**
 * [Teamwork multiplier](teamwork-multiplier.md) — what L1.5 feeds into.
 * [Role activation ripple effects](role-activation-ripple.md) — how a pseudo-role changes each
   layer's answer.
-* [Lenient mode](element-resistance.md#lenient-mode) — what happens to L1 for a limited roster.
+* [Lenient mode](element-resistance.md#lenient-mode) — which L1/L3 disqualifications become costs, for a limited roster or a pinned team.
 
 
 
