@@ -12,7 +12,8 @@ const PAGE_TITLES = {
     'disc-calculator': 'Disc Calculator',
     'character-summary': 'Character Summary',
     'agent-detail': 'Agent Teams',
-    'tier-list': 'Tier List'
+    'tier-list': 'Tier List',
+    'favorites': 'Favorite Teams'
 };
 
 /**
@@ -72,11 +73,42 @@ function initMobileNav() {
     });
 
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') closeMenu();
+        if (e.key === 'Escape') {
+            closeMenu();
+            closeGroups();
+        }
     });
 
     mobileQuery.addEventListener('change', (e) => {
         if (!e.matches) closeMenu();
+    });
+}
+
+// Desktop dropdown groups: hover opens them by CSS; click and keyboard toggle `is-open`.
+// On phones the groups are always expanded sections, so these handlers do nothing visible.
+function closeGroups(except = null) {
+    document.querySelectorAll('.nav-group.is-open').forEach(group => {
+        if (group === except) return;
+        group.classList.remove('is-open');
+        group.querySelector('.nav-group-toggle').setAttribute('aria-expanded', 'false');
+    });
+}
+
+function initNavGroups() {
+    document.querySelectorAll('.nav-group').forEach(group => {
+        const toggle = group.querySelector('.nav-group-toggle');
+        toggle.addEventListener('click', () => {
+            const open = !group.classList.contains('is-open');
+            closeGroups(group);
+            group.classList.toggle('is-open', open);
+            toggle.setAttribute('aria-expanded', String(open));
+        });
+        group.addEventListener('focusout', e => {
+            if (!group.contains(e.relatedTarget)) closeGroups();
+        });
+    });
+    document.addEventListener('click', e => {
+        if (!e.target.closest('.nav-group')) closeGroups();
     });
 }
 
@@ -86,6 +118,7 @@ function initHeader(pageId) {
     navLinks.forEach(link => {
         if (link.dataset.page === pageId) {
             link.classList.add('active');
+            link.closest('.nav-group')?.classList.add('has-active');
         }
     });
     
@@ -95,6 +128,7 @@ function initHeader(pageId) {
         pageTitle.textContent = PAGE_TITLES[pageId];
     }
 
+    initNavGroups();
     initMobileNav();
 }
 

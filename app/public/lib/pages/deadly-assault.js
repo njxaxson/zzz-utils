@@ -12,6 +12,7 @@ import {
     createEmptyPlan, isPlanEmpty, sanitizePicks, getPlanProblems, planToPins, getEffectiveUnitStates, PLAN_TEAM_SIZE
 } from '../common/custom-plan.js';
 import { createUnitCard, getWeaknessGradientClass } from '../common/team-card.js';
+import { favoriteStarHtml, bindFavoriteStars, getFavoritePresets, teamTilesHtml } from '../common/favorite-star.js';
 import {
     decodeBosses, getBossesFromUrl, generateShareUrlWithBosses,
     encodeBossVariations, decodeBossVariations, getBossVariationsFromUrl,
@@ -265,7 +266,8 @@ function setupPlan() {
         isOwned: id => !!getUnitStates()[id]?.owned,
         allowUnowned: true,
         title: () => 'Choose an agent',
-        isConflict: (id, ctx) => isPlannedElsewhere(id, ctx.key)
+        isConflict: (id, ctx) => isPlannedElsewhere(id, ctx.key),
+        getPresets: () => getFavoritePresets(getAllUnits())
     });
 
     document.getElementById('da-plan-toggle').addEventListener('change', e => {
@@ -324,6 +326,7 @@ function setPicks(bossId, ids) {
     savePageToStorage();
     hideValidationErrors();
     updateClearButton();
+    renderPlanStars();
 }
 
 // Always three rows: a boss that is not chosen yet shows a placeholder and cannot take picks.
@@ -353,13 +356,15 @@ function renderPlan() {
             row.innerHTML = `
                 ${createResultBossTileHtml(boss)}
                 <div class="da-plan-divider"></div>
-                <div class="da-row-team"></div>`;
+                <div class="da-row-team"></div>
+                <div class="da-plan-save" data-boss="${boss.id}"></div>`;
         } else {
             row.classList.add('da-plan-row--empty');
             row.innerHTML = `
                 <div class="result-boss-tile da-plan-boss-empty"><div class="result-boss-avatar"><span>?</span></div><div class="boss-name">Select a boss</div></div>
                 <div class="da-plan-divider"></div>
-                <div class="da-row-team"></div>`;
+                <div class="da-row-team"></div>
+                <div class="da-plan-save"></div>`;
         }
         rows.appendChild(row);
 
@@ -375,7 +380,16 @@ function renderPlan() {
             addLabel: () => 'Select agent'
         });
     }
+    renderPlanStars();
     updateClearButton();
+}
+
+// A full team can be saved right from its plan row, as on Agent Teams.
+function renderPlanStars() {
+    document.querySelectorAll('#da-plan-rows .da-plan-save[data-boss]').forEach(el => {
+        const ids = plan.picks[el.dataset.boss] ?? [];
+        el.innerHTML = ids.length === PLAN_TEAM_SIZE ? favoriteStarHtml(ids) : '';
+    });
 }
 
 // Event Handling
@@ -856,7 +870,7 @@ function goToResult(index) {
 function createResultSlide(combo, index, bosses) {
     const rowsHtml = combo.assignments.map(assignment => {
         const boss = bosses.find(b => b.name === assignment.boss);
-        const teamHtml = assignment.team.map(unit => createUnitCard(unit)).join('');
+        const teamHtml = teamTilesHtml(assignment.team, createUnitCard);
         const band = getStrengthRating(assignment.score, assignment.team, { unscorable: assignment.unscorable, lenient: assignment.lenient }).label.toLowerCase();
         
         return `
@@ -864,6 +878,7 @@ function createResultSlide(combo, index, bosses) {
                 ${createResultBossTileHtml(boss)}
                 <div class="da-row-meta">
                     ${createStrengthLabelHtml(assignment.score, assignment.team, { lenient: assignment.lenient, unscorable: assignment.unscorable })}
+                    ${favoriteStarHtml(assignment.team)}
                 </div>
                 <div class="da-row-team">
                     ${teamHtml}
@@ -890,5 +905,8 @@ window.goToResult = goToResult;
 
 // Initialization
 
-document.addEventListener('DOMContentLoaded', loadData);
+document.addEventListener('DOMContentLoaded', () => {
+    bindFavoriteStars(document.body);
+    loadData();
+});
 

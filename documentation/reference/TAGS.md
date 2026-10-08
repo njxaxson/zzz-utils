@@ -161,3 +161,4 @@ Populated during the comment pass. One row per tag, newest last within a prefix.
 | `[CAL-02]` | `../engine/calibration.md` | Archetype pooling, and why the map is a second staleness axis |
 | `[CAL-03]` | `../engine/calibration.md` | `MIN_SELF_ANCHOR_CARRIES` is 3 |
 | `[CTX-01]` | `../engine/unit-context.md` | Resolving onto the unit was shared mutable state, and nothing pinned the cleanup |
+| `[FAV-01]` | `../ux/favorites.md` | A favorite is three ids sorted; ids only, newest first, capped at 12 |

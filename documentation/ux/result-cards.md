@@ -70,4 +70,4 @@ need the room, and keeps its own small rule for that (it still reads the same va
 ## Hover
 
 Result cards have **no hover effect**. They are not clickable, and a highlight implies they are.
-Do not add one unless the card becomes interactive.
+Do not add one unless the card becomes interactive. The ☆ on a card is its own control (`.fav-star`, see [pages](pages.md#favorites)); it does not make the card clickable.

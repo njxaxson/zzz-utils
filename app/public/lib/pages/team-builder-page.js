@@ -7,6 +7,7 @@ import { sortTeamByRole, getTeamLabel } from '../common/team-builder.js';
 import { isDPS, isStun, isSupport, isDefense, getElement, hasSubDPSRole } from '../common/team-scorer.js';
 import { getRosterUnits, buildRosterTeams, scoreCalibrated, NEUTRAL_BOSS } from '../common/team-pool.js';
 import { createUnitCard } from '../common/team-card.js';
+import { favoriteStarHtml, bindFavoriteStars } from '../common/favorite-star.js';
 import {
     initRoster, getUnitStates, getAllUnits, getCalibration
 } from '../common/roster-ui.js';
@@ -963,6 +964,7 @@ function createTeamCard(team) {
             <div class="team-card-units">
                 ${unitsHtml}
             </div>
+            ${favoriteStarHtml(team)}
         </div>
     `;
 }
@@ -994,5 +996,8 @@ function showError(message) {
 
 // Initialization
 
-document.addEventListener('DOMContentLoaded', loadData);
+document.addEventListener('DOMContentLoaded', () => {
+    bindFavoriteStars(document.body);
+    loadData();
+});
 

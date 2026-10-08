@@ -95,7 +95,7 @@ change only the page-specific strings.
 8. `link rel="icon"` → `assets/favicon.svg`, then `link rel="stylesheet"` → `styles/style.css`
 9. Page-specific scripts (e.g. pako) last
 
-Adding a page also means: a nav entry in `components/header.html`, a `PAGE_TITLES` entry, and
+Adding a page also means: a nav entry in `components/header.html` (the five most-used pages are top-level links; the rest sit in the **More** dropdown, whose links join the flat hamburger list on phones; put a new page in a dropdown unless it is a main destination), a `PAGE_TITLES` entry, and
 a `<url>` in `sitemap.xml`.
 
 ## Controls

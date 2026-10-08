@@ -13,6 +13,7 @@ import {
 } from '../common/roster-ui.js';
 import { getRosterUnits, buildRosterTeams, canFormTeam, scoreCalibrated, requireCalibration } from '../common/team-pool.js';
 import { createUnitCard, getWeaknessGradientClass } from '../common/team-card.js';
+import { favoriteStarHtml, bindFavoriteStars, getFavoritePresets, teamTilesHtml } from '../common/favorite-star.js';
 import { createAgentPicker } from '../common/agent-picker.js';
 import { joinList } from '../common/text.js';
 
@@ -51,6 +52,7 @@ async function loadData() {
 
         focusIds = loadInitialFocus();
         setupPicker();
+        renderFocusStar();
         document.getElementById('run-btn').addEventListener('click', () => runSearch());
         // A deep link should land on results, not on an unpressed button.
         if (focusIds.length > 0) runSearch({ scroll: false });
@@ -58,6 +60,13 @@ async function loadData() {
         console.error('Failed to load data:', error);
         showError('Failed to load data. Refresh the page to try again.');
     }
+}
+
+// A full trio can be saved straight from the focus bar, so a what-if team need not appear as a result.
+function renderFocusStar() {
+    const el = document.getElementById('ad-focus-star');
+    el.hidden = focusIds.length !== MAX_FOCUS;
+    el.innerHTML = el.hidden ? '' : `${favoriteStarHtml(focusIds)}<span>Save this team to your favorites</span>`;
 }
 
 function loadInitialFocus() {
@@ -286,7 +295,8 @@ function setupPicker() {
         isOwned,
         allowUnowned: true,
         title: ctx => ctx.slot === 0 && ctx.ids.length <= 1 ? 'Choose an agent' : 'Add a teammate',
-        describe: describePicker
+        describe: describePicker,
+        getPresets: () => getFavoritePresets(getAllUnits())
     });
     picker.mountSlots(document.getElementById('ad-slots'), {
         key: 'focus',
@@ -395,10 +405,10 @@ function renderResults(activeFocus, { rows, forced, candidates, flexTip }, scrol
 
 function createRow(row) {
     const best = getStrengthRating(row.tiles[0].score, row.team, { lenient: row.tiles[0].lenient });
-    const teamHtml = row.team.map(unit => createUnitCard(unit)).join('');
+    const teamHtml = teamTilesHtml(row.team, createUnitCard);
     return `
         <div class="ad-row result-card band-${best.label.toLowerCase()}">
-            <div class="ad-row-team">${teamHtml}</div>
+            <div class="ad-row-team">${teamHtml}<span class="ad-star-side">${favoriteStarHtml(row.team)}</span></div>
             <div class="ad-row-matchups">
                 <div class="ad-bosses-label">Best against</div>
                 <div class="ad-row-bosses">${row.tiles.map(tile => createBossTile(tile, row.team)).join('')}</div>
@@ -427,6 +437,7 @@ function createBossTile(tile, team) {
 
 // Results describe the old selection, so they go away until Find Teams is pressed again.
 function onFocusChange() {
+    renderFocusStar();
     saveFocus();
     hideError();
     clearResults();
@@ -434,4 +445,7 @@ function onFocusChange() {
 
 // Initialization
 
-document.addEventListener('DOMContentLoaded', loadData);
+document.addEventListener('DOMContentLoaded', () => {
+    bindFavoriteStars(document.body);
+    loadData();
+});

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Your saved Zenless Zone Zero teams, with a link to share them">
+    <meta name="robots" content="index, follow">
+    <meta name="theme-color" content="#0a0a0f">
+    <link rel="canonical" href="https://njxaxson.github.io/zzz-utils/favorites.html">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="ZZZ Utils">
+    <meta property="og:title" content="ZZZ Favorite Teams">
+    <meta property="og:description" content="Your saved Zenless Zone Zero teams, with a link to share them">
+    <meta property="og:url" content="https://njxaxson.github.io/zzz-utils/favorites.html">
+    <meta property="og:image" content="https://njxaxson.github.io/zzz-utils/assets/sitelogo.png?v=2">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="ZZZ Tools - Gacha Calculator, Team Builder, Pull Recommendations, and More">
+    <meta property="og:locale" content="en_US">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="ZZZ Favorite Teams">
+    <meta name="twitter:description" content="Your saved Zenless Zone Zero teams, with a link to share them">
+    <meta name="twitter:image" content="https://njxaxson.github.io/zzz-utils/assets/sitelogo.png?v=2">
+    <meta name="twitter:image:alt" content="ZZZ Tools - Gacha Calculator, Team Builder, Pull Recommendations, and More">
+    <title>ZZZ Favorite Teams</title>
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@graph": [
+            {
+                "@type": "WebPage",
+                "name": "ZZZ Favorite Teams",
+                "url": "https://njxaxson.github.io/zzz-utils/favorites.html",
+                "description": "Your saved Zenless Zone Zero teams, with a link to share them",
+                "inLanguage": "en",
+                "about": {
+                    "@type": "VideoGame",
+                    "name": "Zenless Zone Zero",
+                    "alternateName": "ZZZ",
+                    "publisher": {
+                        "@type": "Organization",
+                        "name": "HoYoverse"
+                    }
+                },
+                "author": {
+                    "@type": "Person",
+                    "name": "njxaxson"
+                }
+            },
+            {
+                "@type": "BreadcrumbList",
+                "itemListElement": [
+                    { "@type": "ListItem", "position": 1, "name": "ZZZ Utils", "item": "https://njxaxson.github.io/zzz-utils/" },
+                    { "@type": "ListItem", "position": 2, "name": "Favorite Teams", "item": "https://njxaxson.github.io/zzz-utils/favorites.html" }
+                ]
+            }
+        ]
+    }
+    </script>
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+    <link rel="stylesheet" href="styles/style.css">
+</head>
+<body>
+    <div class="container extra-wide">
+        <div id="header-container"></div>
+
+        <main>
+            <div id="fav-banner"></div>
+
+            <section class="results-section" id="fav-section">
+                <div class="results-header fav-header">
+                    <h2>Favorites</h2>
+                    <span class="results-count" id="fav-count"></span>
+                    <div class="fav-header-actions" id="fav-actions"></div>
+                </div>
+                <div id="fav-body"><div class="loading-msg">Loading favorites...</div></div>
+                <div id="fav-add" hidden></div>
+                <div id="fav-note"></div>
+            </section>
+
+            <div id="roster-container"></div>
+        </main>
+
+        <div id="footer-container"></div>
+    </div>
+
+    <script type="module">
+        import { loadSharedComponents } from './lib/common/components.js';
+        loadSharedComponents('favorites');
+    </script>
+    <script type="module" src="lib/pages/favorites.js"></script>
+</body>
+</html>

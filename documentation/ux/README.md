@@ -10,6 +10,7 @@ results display. The scoring side is in [`../engine/`](../engine/); none of this
 | Changing widths, breakpoints or spacing | [responsive](responsive.md) |
 | Adding a page, or touching colours, fonts, `<head>` or base styles | [style-guide](style-guide.md) |
 | Working on one specific page | [pages](pages.md) |
+| Working on favorite teams (star, Favorites page, share link) | [favorites](favorites.md) |
 | About to try a layout that feels obvious | [decisions](decisions.md) — several have already been tried and rejected |
 
 ## The five result pages

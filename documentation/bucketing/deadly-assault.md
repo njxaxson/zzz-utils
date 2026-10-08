@@ -77,7 +77,7 @@ reduction is worth the same wherever it lands. The first half stands on its own.
 
 ## Custom plans (pins)
 
-The Deadly Assault page lets a player propose teams per boss ([feature spec](../FEATURE%20-%20Custom%20Deadly%20Assault%20Matchup.md)).
+The Deadly Assault page lets a player propose teams per boss.
 The solver takes this as `pinsByBoss` (`{ bossName: unitId[] }`). It is a filter on a boss's
 candidate teams, not a second allocation path:
 

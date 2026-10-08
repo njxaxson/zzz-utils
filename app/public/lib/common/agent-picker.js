@@ -16,6 +16,7 @@ import { getInitials, getUnitElement } from './roster-ui.js';
 // Enough to scan at a glance; search and the filters reach the rest.
 export const DEFAULT_MAX_ICONS = 18;
 
+const PRESET_TEAM_SIZE = 3;
 const DPS_TAGS = ['attack', 'anomaly', 'rupture', 'armorer'];
 
 // Only offered when the picker can list agents the player lacks.
@@ -37,10 +38,12 @@ const FILTER_GROUPS = [
  * @param {(ctx: Object) => {isPickable?: (unit: Object) => boolean, hint?: (shown: Object[]) => string|null}} [config.describe]
  *        Called once per popup render. `isPickable` fades agents that cannot be chosen; `hint` adds a line beneath the grid.
  * @param {(id: string, ctx: Object) => boolean} [config.isConflict] - Marks a filled tile as a problem
+ * @param {() => {ids: string[], title: string}[]} [config.getPresets] - Whole teams offered above the grid;
+ *        clicking one sets every slot of the open group at once (Favorite Teams)
  */
 export function createAgentPicker({
     getUnits, isOwned, allowUnowned = false, maxIcons = DEFAULT_MAX_ICONS,
-    title = null, describe = null, isConflict = null
+    title = null, describe = null, isConflict = null, getPresets = null
 }) {
     const groups = new Map();            // key -> group
     let active = null;                   // { key, slot } while the popup is open
@@ -56,6 +59,7 @@ export function createAgentPicker({
             <input type="search" class="ap-picker-search" placeholder="Search" autocomplete="off">
             <button type="button" class="ap-picker-close" aria-label="Close">✕</button>
         </div>
+        <div class="ap-presets" hidden></div>
         <div class="ap-picker-filters"></div>
         <div class="ap-picker-grid"></div>
         <div class="ap-picker-hint" hidden></div>
@@ -181,6 +185,23 @@ export function createAgentPicker({
             </button>`;
     }
 
+    function presetHtml(preset, index) {
+        const faces = preset.ids.map(unitById).filter(Boolean).map(unit => unit.image
+            ? `<img src="${unit.image}" alt="">`
+            : `<span class="ap-preset-initials">${getInitials(unit.name)}</span>`).join('');
+        return `<button type="button" class="ap-preset" data-preset="${index}" title="${preset.title}">${faces}</button>`;
+    }
+
+    // Only a group that takes a full team can be filled from a saved one.
+    function renderPresets(group) {
+        const presets = getPresets && group.max >= PRESET_TEAM_SIZE ? getPresets() : [];
+        const el = $('.ap-presets');
+        el.hidden = presets.length === 0;
+        el.innerHTML = presets.length
+            ? `<div class="ap-presets-title">Favorite teams</div><div class="ap-presets-list">${presets.map(presetHtml).join('')}</div>`
+            : '';
+    }
+
     function renderPopup() {
         const current = activeContext();
         popup.hidden = !current;
@@ -193,6 +214,8 @@ export function createAgentPicker({
                 `<button type="button" class="ap-filter${g.key === 'element' ? ` element-${value}` : ''}${filters[g.key] === value ? ' active' : ''}" data-group="${g.key}" data-value="${value}">${label}</button>`
             ).join('')}</div>`
         ).join('');
+
+        renderPresets(group);
 
         const query = searchEl.value.trim().toLowerCase();
         const matches = getUnits()
@@ -255,6 +278,13 @@ export function createAgentPicker({
         const ids = current.ctx.ids.slice();
         ids[current.ctx.slot] = tile.dataset.pick;
         commit(current.group, ids.filter(Boolean));
+    });
+    $('.ap-presets').addEventListener('click', e => {
+        const chip = e.target.closest('[data-preset]');
+        const current = activeContext();
+        if (!chip || !current) return;
+        const preset = getPresets()[Number(chip.dataset.preset)];
+        if (preset) commit(current.group, preset.ids.filter(id => unitById(id)));
     });
     $('.ap-picker-filters').addEventListener('click', e => {
         const btn = e.target.closest('[data-group]');

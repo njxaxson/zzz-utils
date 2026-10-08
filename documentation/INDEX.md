@@ -27,6 +27,7 @@ thing that will make the rest make sense, and [GLOSSARY.md](GLOSSARY.md) defines
 | Working on gap detection or coverage | [coverage and gaps](recommendations/coverage-and-gaps.md) |
 | Working on Deadly Assault allocation | [deadly assault](bucketing/deadly-assault.md) |
 | Working on the Deadly Assault **plan** (pins, fixed teams, share link) | [custom plans](bucketing/deadly-assault.md#custom-plans-pins), then [ux/pages](ux/pages.md#deadly-assault-matchups) |
+| Working on **favorite teams** (star, Favorites page, share link) | [ux/favorites](ux/favorites.md), then [ux/pages](ux/pages.md#favorites) |
 | Changing the **agent picker** (focus tiles and popup) | [ux/pages](ux/pages.md#agent-picker-shared) |
 | Changing **lenient mode** or what a lenient result may be labelled | [lenient mode](engine/element-resistance.md#lenient-mode) ([LEN-01..04](reference/TAGS.md)) |
 | Changing how results **look** (cards, tiles, spacing, mobile) | [ux/README](ux/README.md), then the page in [ux/pages](ux/pages.md) |

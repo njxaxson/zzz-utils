@@ -5368,3 +5368,379 @@ a.rec-unit:hover {
         .character-grid { grid-template-columns: 1fr; }
     }
 
+
+/* ============================================================================
+   FAVORITE TEAMS (star on result cards, Favorites page, picker strip)
+   See documentation/ux/favorites.md
+   ============================================================================ */
+
+.fav-star {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    color: var(--text-muted);
+    font-size: 1.05rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.fav-star:hover,
+.fav-star[aria-pressed="true"] { color: var(--accent-primary); }
+.fav-star svg { display: block; }
+.fav-star:focus-visible { outline: 2px solid var(--accent-secondary); outline-offset: 1px; }
+
+/* Team Recommendations: last item of the meta column (desktop) or header strip (mobile). */
+.recommendation-meta .fav-star { margin-top: 0.1rem; }
+
+/* Team Builder: floats over the card's top-right corner so the row keeps its size. */
+.team-card-compact { position: relative; }
+.team-card-compact .fav-star {
+    position: absolute;
+    top: 0.65rem;
+    right: 0.65rem;
+    z-index: 1;
+    width: 1.6rem;
+    height: 1.6rem;
+    font-size: 0.9rem;
+    background: rgba(0, 0, 0, 0.65);
+    border-radius: 999px;
+}
+
+/* Deadly Assault: under the strength label; on mobile beside it, over the boss banner. */
+.da-row-meta .fav-star { margin-top: 0.2rem; }
+
+/* Deadly Assault plan: a trailing column holds the save star once a boss has a full team. */
+.da-plan-row { grid-template-columns: var(--da-boss) auto repeat(3, var(--da-tile)) 2.25rem; }
+.da-plan-save { display: flex; align-items: center; justify-content: center; margin-left: 0.4rem; }
+
+/* Agent Teams: beside the team, before the hairline, centred on the row. */
+.ad-star-side { display: flex; align-items: center; margin-left: 0.25rem; }
+
+/* Phones: one rule everywhere. The star floats over the third agent tile's top-right corner
+   (wider layouts hide that copy and use the placements above). A tile with its own control
+   in that corner, like the plan input's remove X, gets no star at all. */
+.result-unit-card { position: relative; }
+.fav-tile-star { display: none; position: absolute; top: 3px; right: 3px; z-index: 2; }
+.fav-tile-star .fav-star {
+    width: 1.75rem;
+    height: 1.75rem;
+    font-size: 0.9rem;
+    background: rgba(0, 0, 0, 0.7);
+    border-radius: 999px;
+}
+
+@media (max-width: 900px) {
+    .ad-star-side { display: none; }
+    .ad-row .fav-tile-star { display: block; }
+}
+
+@media (max-width: 600px) {
+    .recommendation-row .fav-tile-star,
+    .da-row .fav-tile-star { display: block; }
+    .recommendation-meta .fav-star,
+    .da-row-meta .fav-star,
+    .da-plan-save { display: none; }
+    .da-plan-row { grid-template-columns: minmax(0, 1fr); }
+    .fav-star { width: 2.25rem; height: 2.25rem; }
+    .fav-tile-star .fav-star { width: 1.75rem; height: 1.75rem; }
+    .team-card-compact .fav-star { width: 1.75rem; height: 1.75rem; }
+}
+
+/* Agent Teams focus bar: appears beside the slots once three agents are chosen. */
+.ad-focus-star[hidden] { display: none; }
+.ad-focus-star { display: flex; align-items: center; gap: 0.25rem; margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.85rem; line-height: 1; }
+
+/* Toast (cap message, undo) */
+.fav-toast {
+    position: fixed;
+    left: 50%;
+    bottom: 1.25rem;
+    transform: translateX(-50%);
+    z-index: 1000;
+    max-width: calc(100vw - 2rem);
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    padding: 0.7rem 1rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--accent-primary);
+    border-radius: 8px;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+    color: var(--text-primary);
+    font-size: 0.95rem;
+}
+.fav-toast button {
+    padding: 0.2rem 0.6rem;
+    background: none;
+    border: 1px solid var(--accent-secondary);
+    border-radius: 4px;
+    color: var(--accent-secondary);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+/* Favorites page: a result card like Agent Teams (team | hairline | side); tiles reuse the Team
+   Recommendations sizing through `.recommendation-team`. The accent is the team's DPS archetype,
+   in hues the strength bands and elements do not use. */
+:root {
+    --arch-attack: #e8628f;
+    --arch-anomaly: #5c6bf0;
+    --arch-rupture: #e8d44d;
+    --arch-armorer: #8e44c8;
+    --arch-pending: #8fa3b8;
+}
+.arch-attack  { --arch: var(--arch-attack);  --arch-rgb: 232, 98, 143; }
+.arch-anomaly { --arch: var(--arch-anomaly); --arch-rgb: 92, 107, 240; }
+.arch-rupture { --arch: var(--arch-rupture); --arch-rgb: 232, 212, 77; }
+.arch-armorer { --arch: var(--arch-armorer); --arch-rgb: 142, 68, 200; }
+
+.fav-header { flex-wrap: nowrap; }
+.fav-header h2 { white-space: nowrap; }
+.fav-header .results-count { white-space: nowrap; }
+.fav-header-actions { margin-left: auto; display: flex; align-items: center; gap: 0.5rem; }
+.fav-header-actions .share-btn { margin-left: 0; }
+.fav-note { margin-top: 1rem; color: var(--text-muted); font-size: 0.85rem; }
+
+.fav-legend { display: flex; flex-wrap: wrap; gap: 0.35rem 1rem; margin-bottom: 0.9rem; color: var(--text-secondary); font-size: 0.85rem; }
+.fav-legend:empty { display: none; }
+.fav-legend-item { display: inline-flex; align-items: center; gap: 0.4rem; }
+.fav-dot { width: 0.6rem; height: 0.6rem; border-radius: 50%; background: var(--arch); }
+
+.fav-list { display: flex; flex-direction: column; gap: 0.75rem; }
+
+/* Add a team: the same row shape as a favorite, with the picker's three slots where the tiles go. */
+.fav-add {
+    --band: var(--arch-pending);
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 1.5rem;
+    align-items: center;
+    margin-top: 1rem;
+    padding: 1rem 1.25rem;
+}
+.fav-add[hidden] { display: none; }
+.fav-add .ap-slots { padding-right: 1.5rem; border-right: 1px solid var(--rule-soft); }
+.fav-add .fav-arch { color: var(--arch-pending); }
+.fav-add .fav-lead { min-height: 1.3em; }
+.fav-add .ap-slots { gap: 0.5rem; flex-wrap: nowrap; }
+.fav-add .ap-tile,
+.fav-add .ap-tile-add:not(.primary) { width: 120px; opacity: 1; }
+.fav-save {
+    flex: 0 0 auto;
+    padding: 0.4rem 1.1rem;
+    background: var(--accent-primary);
+    border: 1px solid var(--accent-primary);
+    border-radius: 4px;
+    color: var(--bg-primary);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+.fav-save:disabled { background: transparent; border-color: var(--border-color); color: var(--text-muted); cursor: not-allowed; }
+
+.fav-row {
+    --band: var(--arch, var(--border-color));
+    --band-rgb: var(--arch-rgb, 0, 0, 0);
+    --band-tint: 0.13;
+    --band-edge: rgba(var(--arch-rgb, 42, 42, 58), 0.45);
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 1.5rem;
+    align-items: center;
+    padding: 1rem 1.25rem;
+}
+.fav-row.arch-none { --band-tint: 0; }
+.fav-row .recommendation-team {
+    padding-right: 1.5rem;
+    border-right: 1px solid var(--rule-soft);
+}
+
+.fav-side { display: flex; align-items: center; gap: 1rem; min-width: 0; }
+.fav-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.3rem; }
+.fav-arch {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--arch, var(--text-secondary));
+}
+.fav-lead { color: var(--text-secondary); font-size: 0.95rem; }
+.fav-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.15rem; }
+.fav-chip {
+    padding: 0.1rem 0.55rem;
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+.fav-chip--ok { color: var(--success); border-color: rgba(0, 212, 170, 0.4); }
+.fav-chip--warn { color: var(--warning); border-color: rgba(255, 170, 0, 0.4); }
+
+.fav-open {
+    flex: 0 0 auto;
+    padding: 0.35rem 0.8rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: all 0.2s;
+}
+.fav-open:hover { border-color: var(--accent-secondary); color: var(--accent-secondary); }
+
+.fav-row .result-unit-card.fav-unowned::after {
+    content: 'Not owned';
+    position: absolute;
+    top: 4px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 0.1rem 0.4rem;
+    background: rgba(0, 0, 0, 0.8);
+    border: 1px solid var(--warning);
+    border-radius: 3px;
+    color: var(--warning);
+    font-size: 0.55rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+.fav-row .result-unit-card.fav-missing { border-style: dashed; border-color: var(--text-muted); }
+.fav-row .result-unit-card.fav-missing .unit-initials { color: var(--text-muted); }
+
+/* Phones: tile panel on top (as on Team Recommendations), the side strip beneath; the star moves
+   onto the third tile like every other results page. */
+@media (max-width: 600px) {
+    /* The shared phone rule stacks `.results-header` in a column; this one stays a single row. */
+    .results-header.fav-header { flex-direction: row; align-items: center; flex-wrap: nowrap; gap: 0.6rem; }
+    .fav-header h2 { margin: 0; padding: 0; font-size: 0.8rem; letter-spacing: 0.1em; }
+    .fav-header .results-count { margin: 0; }
+    .fav-list { gap: 1.75rem; }
+    .fav-row { grid-template-columns: minmax(0, 1fr); gap: 0; padding: 0; }
+    .fav-add { grid-template-columns: minmax(0, 1fr); gap: 0.75rem; padding: 0.75rem; }
+    .fav-add .ap-slots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); padding-right: 0; border-right: none; }
+    .fav-add .ap-tile,
+    .fav-add .ap-tile-add:not(.primary) { width: auto; }
+    .fav-add .fav-side { padding: 0; }
+    .fav-row .recommendation-team { border-right: none; }
+    .fav-side { padding: 0.6rem 0.75rem; }
+    .fav-side > .fav-star { display: none; }
+    .fav-row .fav-tile-star { display: block; }
+    /* Same specificity as the base rule, or its `top` survives and the badge stretches top to bottom. */
+    .fav-row .result-unit-card.fav-unowned::after { top: auto; bottom: 1.6rem; font-size: 0.5rem; padding: 0.1rem 0.3rem; }
+}
+
+/* Agent picker: a strip of saved teams above the grid; one click fills every slot. */
+.ap-presets {
+    margin-top: 0.6rem;
+    padding-bottom: 0.6rem;
+    border-bottom: 1px solid var(--border-color);
+}
+.ap-presets-title {
+    margin-bottom: 0.4rem;
+    line-height: 1.3;
+    color: var(--text-muted);
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+.ap-presets-list { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.ap-preset {
+    display: flex;
+    gap: 0.2rem;
+    padding: 0.3rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    cursor: pointer;
+}
+.ap-preset:hover,
+.ap-preset:focus-visible { border-color: var(--accent-secondary); outline: none; }
+.ap-preset img,
+.ap-preset .ap-preset-initials {
+    width: 2.1rem;
+    height: 2.1rem;
+    border: 2px solid var(--border-color);
+    border-radius: 50%;
+    object-fit: cover;
+    background: var(--bg-tertiary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+}
+
+/* ============================================================================
+   NAV GROUPS (header dropdown: More)
+   Top-level links are the most-used pages; the rest live in these menus.
+   ============================================================================ */
+
+.nav-group { position: relative; }
+
+.nav-group-toggle {
+    padding: 0.15rem 0.3rem;
+    background: none;
+    border: none;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.nav-group-toggle::after { content: ' ▾'; font-size: 0.7em; }
+.nav-group-toggle:hover,
+.nav-group.has-active .nav-group-toggle,
+.nav-group.is-open .nav-group-toggle { color: var(--text-secondary); }
+.nav-group-toggle:focus-visible { outline: 2px solid var(--accent-secondary); outline-offset: 2px; border-radius: 4px; }
+
+@media (min-width: 769px) {
+    /* The padding-top bridges the gap so the pointer can travel from toggle to menu. */
+    .nav-menu {
+        display: none;
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 50;
+        min-width: 100%;
+        padding-top: 0.35rem;
+    }
+    .nav-group.is-open .nav-menu,
+    .nav-group:hover .nav-menu { display: flex; flex-direction: column; }
+
+    .nav-menu .nav-link {
+        padding: 0.5rem 0.9rem;
+        background: var(--bg-secondary);
+        border-left: 1px solid var(--border-color);
+        border-right: 1px solid var(--border-color);
+        font-size: 0.85rem;
+        text-align: left;
+    }
+    .nav-menu .nav-link:first-child { border-top: 1px solid var(--border-color); border-radius: 8px 8px 0 0; }
+    .nav-menu .nav-link:last-child { border-bottom: 1px solid var(--border-color); border-radius: 0 0 8px 8px; }
+    .nav-menu .nav-link:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+}
+
+/* Phones: no "More" label; the hamburger shows one flat list, group links included. */
+@media (max-width: 768px) {
+    .nav-group { display: contents; }
+    .nav-group-toggle { display: none; }
+    .nav-menu { display: contents; }
+}

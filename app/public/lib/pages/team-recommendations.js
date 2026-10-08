@@ -8,6 +8,7 @@ import { isSubdps } from '../common/pull-engine.js';
 import { createStrengthLabelHtml, getStrengthRating } from '../common/strength-rating.js';
 import { getRosterUnits, buildRosterTeams, scoreTeamsForBoss, requireCalibration } from '../common/team-pool.js';
 import { createUnitCard } from '../common/team-card.js';
+import { favoriteStarHtml, bindFavoriteStars, teamTilesHtml } from '../common/favorite-star.js';
 import {
     initRoster, getUnitStates, getAllUnits, getCalibration,
     getUniversalUnitNames
@@ -415,7 +416,7 @@ function displayResults(results) {
 }
 
 function createResultRow(entry, index) {
-    const teamHtml = entry.team.map(unit => createUnitCard(unit)).join('');
+    const teamHtml = teamTilesHtml(entry.team, createUnitCard);
     const band = getStrengthRating(entry.score, entry.team, { lenient: entry.lenient }).label.toLowerCase();
     
     return `
@@ -426,6 +427,7 @@ function createResultRow(entry, index) {
                     ${createStrengthLabelHtml(entry.score, entry.team, { lenient: entry.lenient })}
                 </div>
                 <div class="recommendation-score">${Math.round(entry.score)}</div>
+                ${favoriteStarHtml(entry.team)}
             </div>
             <div class="recommendation-team">
                 ${teamHtml}
@@ -438,4 +440,7 @@ function createResultRow(entry, index) {
 // INITIALIZATION
 // ============================================================================
 
-document.addEventListener('DOMContentLoaded', loadData);
+document.addEventListener('DOMContentLoaded', () => {
+    bindFavoriteStars(document.body);
+    loadData();
+});

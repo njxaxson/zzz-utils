@@ -6,9 +6,9 @@ import { getInitials, getUnitElement, getCharacterImageUrl } from './roster-ui.j
 
 /**
  * One unit portrait with name. `className` picks the page's card style
- * (`result-unit-card`, `team-unit`, ...).
+ * (`result-unit-card`, `team-unit`, ...). `extraHtml` is placed inside the card (e.g. an overlay).
  */
-export function createUnitCard(unit, { className = 'result-unit-card' } = {}) {
+export function createUnitCard(unit, { className = 'result-unit-card', extraHtml = '' } = {}) {
     const element = getUnitElement(unit);
     const initials = getInitials(unit.name);
     const imageUrl = getCharacterImageUrl(unit.id);
@@ -22,6 +22,7 @@ export function createUnitCard(unit, { className = 'result-unit-card' } = {}) {
         <div class="${className} element-${element}" title="${unit.name}">
             ${avatarHtml}
             <span class="unit-name">${unit.name}</span>
+            ${extraHtml}
         </div>
     `;
 }

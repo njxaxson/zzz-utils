@@ -38,6 +38,15 @@ Measured across seven rosters before and after: Velina rises to High everywhere 
 unowned; the only rating tiers that moved are the two narrow anomaly rosters; every other
 mover traces to a removed Depth card or a dropped illegal synergy pair.
 
+**Grouped header menu**, 2026-10-08. Ten flat links no longer fit once Favorites arrived. Gacha Simulator, Deadly Assault Matchups, Pull Recommendations, Agent Teams and Tier List stay in the bar; Team Recommendations, Team Builder, Character Summary, Favorites and Disc Calculator move under one **More** dropdown. Dropdowns open on hover, click or keyboard; the phone hamburger shows one flat list.
+
+**Favorite teams**, 2026-10-08. A ☆ on every team card (Team Builder, Team Recommendations, Deadly
+Assault results, Agent Teams results, and beside the Agent Teams focus slots once three agents are
+chosen) saves the trio to a **Favorites** page, up to 12, in this browser. A favorite opens in Agent
+Teams, fills a Deadly Assault plan slot or the Agent Teams focus bar from a new **Favorite teams** strip
+in the shared agent picker, and shares as a `favorites.html?teams=` link that opens read-only with
+**Add all**. No engine, data or calibration change. See [ux/favorites](ux/favorites.md).
+
 **Agent Teams offers unowned agents**, 2026-10-08. The picker's popup now lists agents the player
 does not own (grey ring, with an **Unowned** filter), so any agent can be a focus or teammate;
 the flag can still switch it off. Faded agents are computed for unowned candidates too, with a
