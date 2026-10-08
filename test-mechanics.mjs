@@ -1821,6 +1821,48 @@ async function main() {
         assert(checked > 300, `expected a real sweep, only checked ${checked}`);
     });
 
+    // TEST 41: a full variant weakness match beats a plain element match, in both L3 and L4.
+    //
+    // Sacrifice Bringer is weak to `ice:frost`. Before this test the L4 element modifier compared
+    // weaknesses by exact string, so Miyabi -- the one frost unit -- was charged off-element (x0.85)
+    // on the boss built for her. Owner ruling: variant match x1.3, plain match x1.15 (including a
+    // plain-ice unit against `ice:frost`), no match x0.85. [WEAK-01]
+    run('TEST 41: variant weakness: frost on ice:frost outscores a plain ice match; plain ice on ice:frost is a regular L4 match', () => {
+        const traceOn = (spec, weaknesses) => {
+            const parsed = scoreForTeamString(spec, allUnits);
+            assert(parsed.length === 1, `fixture ${spec} did not resolve to one team`);
+            const boss = { ...NEUTRAL_BOSS, name: `weak:${weaknesses.join(',')}`,
+                mechanics: { ...NEUTRAL_BOSS.mechanics, weaknesses } };
+            const trace = {};
+            const score = scoreTeamForBoss(parsed[0].team, boss, { trace });
+            assert(score > 0, `${spec} vs [${weaknesses}] scored ${score} — pick a legal, viable team`);
+            return trace;
+        };
+
+        // Part 1: Miyabi is the only DPS consumer, so L4 differences are her multiplier alone:
+        // (1.30 - 1.15) is exactly half of (1.15 - 0.85).
+        const may = 'Miyabi/Astra/Yuzuha';
+        const variant = traceOn(may, ['ice:frost']), plain = traceOn(may, ['ice']), off = traceOn(may, ['fire']);
+        assert(variant.l4 > plain.l4 && plain.l4 > off.l4,
+            `Miyabi L4 must order variant > plain > off: ${variant.l4.toFixed(2)} / ${plain.l4.toFixed(2)} / ${off.l4.toFixed(2)}`);
+        const upper = variant.l4 - plain.l4, lower = plain.l4 - off.l4;
+        assert(Math.abs(upper * 2 - lower) < 1e-6,
+            `L4 steps must be x1.30 / x1.15 / x0.85: variant-plain ${upper.toFixed(3)} should be half of plain-off ${lower.toFixed(3)}`);
+
+        // Part 2: the L3 on-element bonus pays the variant premium on top of a full match.
+        assert(variant.l3 > plain.l3,
+            `Miyabi L3 on ice:frost (${variant.l3}) must exceed L3 on plain ice (${plain.l3})`);
+
+        // Part 3: a plain-ice DPS against a frost weakness is a REGULAR L4 match (x1.15), the same
+        // as against plain ice. L3 still pays it partially, which is settled separately.
+        const ellen = 'Ellen/Lycaon/Soukaku';
+        const pFrost = traceOn(ellen, ['ice:frost']), pIce = traceOn(ellen, ['ice']);
+        assert(Math.abs(pFrost.l4 - pIce.l4) < 1e-6,
+            `Ellen L4 must be identical on ice:frost (${pFrost.l4.toFixed(3)}) and ice (${pIce.l4.toFixed(3)})`);
+        assert(pFrost.l3 < pIce.l3,
+            `Ellen L3 must stay partial on ice:frost (${pFrost.l3}) vs ice (${pIce.l3})`);
+    });
+
     // Summary
     console.log('');
 

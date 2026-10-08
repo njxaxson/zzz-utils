@@ -598,6 +598,8 @@ export function getBossWeaknesses(boss) { return boss.mechanics?.weaknesses ?? [
 // This is what lets a boss favour one of two same-element agents through a MECHANIC rather than
 // through `shillIntensity`, which is what it replaced there. [WEAK-01]
 const VARIANT_WEAKNESS_PARTIAL = 0.5;
+// L3 on-element bonus multiplier for a full variant match. [WEAK-01]
+const VARIANT_WEAKNESS_PREMIUM = 2.25;
 export function bossWeaknessFactor(weaknesses, unit) {
     const base = getElement(unit);
     const variant = getElementVariant(unit);
@@ -608,6 +610,12 @@ export function bossWeaknessFactor(weaknesses, unit) {
         else if (classifierBase(wk) === base) best = Math.max(best, VARIANT_WEAKNESS_PARTIAL);
     }
     return best;
+}
+// A FULL variant match — the boss is weak to a variant and this unit is that variant — is a
+// deeper match than a plain element one: Bringer is built for Miyabi. [WEAK-01]
+export function isVariantWeaknessMatch(weaknesses, unit) {
+    const variant = getElementVariant(unit);
+    return weaknesses.some(wk => classifierBase(wk) !== wk && wk === variant);
 }
 export function getBossResistances(boss) { return boss.mechanics?.resistances ?? []; }
 export function getBossShill(boss) { return boss.mechanics?.shill ?? null; }
@@ -3046,7 +3054,7 @@ function scoreInherentQuality(team, { lenient = false, debug = false, boss = nul
         if (isSecondaryAttacker || isSecondaryAnomaly) secondaryDPSUnits.add(unit);
         let tierMult = (isSecondaryAttacker || isSecondaryAnomaly || forcedSecondary) ? 0.5 : 1.0;
         const unitReaction = reactions.get(unit);
-        const onElementWeakness = getBossWeaknesses(boss).includes(getElement(unit));
+        const onElementWeakness = bossWeaknessFactor(getBossWeaknesses(boss), unit) > 0; // [WEAK-01]
         // Native lumen is exempt: it CANNOT produce a reaction (Attribute Mutation fills no
         // gauge), so the absence is what lumen is rather than a defect of the team. Same
         // reasoning as the L5 carve-out below.
@@ -3432,19 +3440,17 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
         if (wkFactor > 0) {
             onElementDPSCount++;
             const isSubDPS = hasSubDPSRole(unit);
-            const unitReaction = l3Reactions.get(unit);
-            const reactionDisabled = isSubDPS && isAnomaly(unit) &&
-                !(unitReaction?.vortexTier > 0 || unitReaction?.hasDisorder) &&
-                !bossWeaknesses.includes(element);
             let bonus = isSRank(unit)
                 ? (isSubDPS ? 17 : 28)
                 : (isSubDPS ? 9 : 15);
-            if (reactionDisabled) bonus = Math.round(bonus * 0.5);
             if (onElementDPSCount > 1 && bossWeaknesses.length >= 2) bonus = Math.round(bonus * 0.6);
             // A partial match — plain ice against a frost-specific weakness — is worth less.
             bonus = Math.round(bonus * wkFactor);
+            // A full variant match is a deeper match than a plain one. [WEAK-01]
+            const variantMatch = isVariantWeaknessMatch(bossWeaknesses, unit);
+            if (variantMatch) bonus = Math.round(bonus * VARIANT_WEAKNESS_PREMIUM);
             score += bonus;
-            if (debug) console.log(`    ${unit.name} on-element (${getElementVariant(unit)}): +${bonus}${wkFactor < 1 ? ` (partial ×${wkFactor})` : ''}${reactionDisabled ? ' (reaction-disabled)' : ''}${onElementDPSCount > 1 ? ' (diminished)' : ''}`);
+            if (debug) console.log(`    ${unit.name} on-element (${getElementVariant(unit)}): +${bonus}${wkFactor < 1 ? ` (partial ×${wkFactor})` : ''}${variantMatch ? ` (variant ×${VARIANT_WEAKNESS_PREMIUM})` : ''}${onElementDPSCount > 1 ? ' (diminished)' : ''}`);
 
             if (isTitled(unit) && bossShill && DPS_ROLES.includes(bossShill) && !unit.tags.includes(bossShill)) {
                 score += TITLED_OFF_SHILL_BONUS;
@@ -3477,9 +3483,10 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
             score -= 80;
             if (debug) console.log(`    ${unit.name} stun element resisted: -80`);
         }
-        if (bossWeaknesses.includes(element)) {
+        const stunWkFactor = bossWeaknessFactor(bossWeaknesses, unit); // [WEAK-01]
+        if (stunWkFactor > 0) {
             const util = computeBuffUtilization(unit, team);
-            const scaledBonus = Math.round(15 * util);
+            const scaledBonus = Math.round(15 * util * stunWkFactor);
             score += scaledBonus;
             if (debug) console.log(`    ${unit.name} stun on-element: +${scaledBonus} (util ${Math.round(util * 100)}%)`);
         } else if (!bossResistances.includes(element) && bossWeaknesses.length > 0) {
@@ -3510,9 +3517,11 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
     // --- Defense element ---
     for (const unit of defenseUnits) {
         const element = getElement(unit);
-        if (bossWeaknesses.includes(element)) {
-            score += 3;
-            if (debug) console.log(`    ${unit.name} defense on-element: +3`);
+        const defWkFactor = bossWeaknessFactor(bossWeaknesses, unit); // [WEAK-01]
+        if (defWkFactor > 0) {
+            const defBonus = Math.round(3 * defWkFactor);
+            score += defBonus;
+            if (debug) console.log(`    ${unit.name} defense on-element: +${defBonus}`);
         }
     }
 
@@ -4067,6 +4076,7 @@ function scoreStunEmergence(supplier, consumer, debug) {
 // --- Diametric Buff Synergy ---
 
 const DIAMETRIC_RATE = 0.20;
+const VARIANT_ELEMENT_L4 = 1.3;
 const ON_ELEMENT_L4 = 1.15;
 const OFF_ELEMENT_L4 = 0.85;
 
@@ -4438,10 +4448,14 @@ function scoreMechanicalSynergy(team, debug, options = {}) {
         for (const consumer of team) {
             const roles = getEffectiveRoles(consumer);
             if (!isDPSByRoles(roles)) continue;
-            const element = getElement(consumer);
             const base = consumerScores.get(consumer.name) || 0;
             if (base <= 0) continue;
-            if (l4Weaknesses.includes(element)) {
+            // Full variant match > plain element match > off-element. [WEAK-01]
+            if (isVariantWeaknessMatch(l4Weaknesses, consumer)) {
+                const bonus = base * (VARIANT_ELEMENT_L4 - 1);
+                consumerScores.set(consumer.name, base + bonus);
+                if (debug) console.log(`    L4 element: ${consumer.name} variant match (${getElementVariant(consumer)}) → ×${VARIANT_ELEMENT_L4} on ${base.toFixed(1)} = +${bonus.toFixed(1)}`);
+            } else if (bossWeaknessFactor(l4Weaknesses, consumer) > 0) {
                 const bonus = base * (ON_ELEMENT_L4 - 1);
                 consumerScores.set(consumer.name, base + bonus);
                 if (debug) console.log(`    L4 element: ${consumer.name} on-element → ×${ON_ELEMENT_L4} on ${base.toFixed(1)} = +${bonus.toFixed(1)}`);

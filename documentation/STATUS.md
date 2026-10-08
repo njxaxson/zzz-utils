@@ -13,13 +13,13 @@ in [notes/adjudications.md](notes/adjudications.md) behind a tag.
 
 | Suite | State |
 |----|----|
-| mechanics | **40 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
-| rankings | **94 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
+| mechanics | **41 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
+| rankings | **95 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
 | recommendations | **51 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
-| bucketing | **6 pass, 0 fail** |
+| bucketing | **14 pass, 0 fail** |
 | cohesion fixture | **11/11** owner judgements hold |
 | calibration freshness | both files match the current engine/data fingerprint **and** the current `pools` map |
-| calibration certification | **CERTIFIED** — 0 within-archetype rank inversions across 60 (boss × archetype) groups and 71,305 teams |
+| calibration certification | **CERTIFIED** — 0 within-archetype rank inversions across 60 (boss × archetype) groups and 71,318 teams |
 
 ```bash
 node test-mechanics.mjs && node test-rankings.mjs && node test-recommendations.mjs && node test-bucketing.mjs && node cohesion-fixture.mjs
@@ -65,4 +65,5 @@ labels, and [calibration](engine/calibration.md) for the anchors.
 
 **Pull engine: a priority budget** (2 High, 4 Medium, ranked greedily), 2026-10-12. Pull
 engine only; no scorer or data change.
+
 Full history in [CHANGELOG.md](CHANGELOG.md).

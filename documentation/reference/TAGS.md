@@ -120,7 +120,7 @@ Populated during the comment pass. One row per tag, newest last within a prefix.
 | `[CODEP-01]` | `../recommendations/codependency-gating.md` | The scorer reads `scaling.codependent` as a discount, not a gate |
 | `[CLS-01]` | `../data-model/mechanics-overview.md` | `:` is a classifier, and `ultimate` is exempt because its keys are orthogonal axes |
 | `[FIELD-01]` | `../data-model/pseudorole.md` | Conditional `onfield` needs a raw resolver, and `isSharedField` reads it too |
-| `[WEAK-01]` | `../data-model/boss-object.md` | A boss weakness understands element variants; a variant weakness pays a plain-element unit half |
+| `[WEAK-01]` | `../data-model/boss-object.md` | A boss weakness understands element variants: a plain-element unit gets half in L3 and a regular match in L4; a full variant match gets a premium in both (L3 ×2.25, L4 ×1.30) |
 | `[AP-01]` | `../data-model/stats.md` | Effective Proficiency is a property of the UNIT: base `ap` plus what its own `scaling.am` converts from its own `stats.am` |
 | `[AP-02]` | `../data-model/stats.md` | Disorder damage reads proc damage; the disorder NEED deliberately does not |
 | `[AP-03]` | `../data-model/stats.md` | Luminize and Refringe scale on Proficiency, never on raw proc damage |

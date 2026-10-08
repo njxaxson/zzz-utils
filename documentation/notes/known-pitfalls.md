@@ -162,6 +162,28 @@ The tell in the wild was a boss ladder, not a number: Claret took #1 on The Defi
 **attack**. If one unit tops bosses built for other archetypes, check its archetype's carry count
 before touching any scoring dial. Fix is `ARCHETYPE_POOLS` — see [CAL-02](../engine/calibration.md).
 
+## Calibration: the Velina/Remielle anchor hypothesis
+
+The symptom was a strong anomaly team (Miyabi/Astra/Yuzuha on Bringer, raw 416) labelled **OK**.
+The obvious story was that the anomaly anchor is inflated by the Velina/Remielle track, so
+calibration crushes everyone else. Measured on 2026-10-08, and false:
+
+| anchor rule | anomaly anchor | MAY calibrated |
+|----|----|----|
+| current (top-10, favored excluded) | 628.6 | 264.8 |
+| excluding every Velina/Remielle team | 626.9 | 265.5 |
+| excluding every Nangong team | 599.9 | 277.4 |
+| top-10 deduped by team label | 611.3 | 272.3 |
+| per-boss best, median | 561.8 | 296.3 |
+
+The top-10 is Nangong/Miyabi/Yuzuha and Nangong/Aria/Sunna, which the owner rules legitimate.
+Reaching Excellent would need an anomaly anchor ≤ 471, below attack's 521. **No anchor rule fixes a
+team whose raw score is wrong.** The raw score was wrong: `[WEAK-01]` was not wired into L4.
+
+**When a single team's label looks crushed, trace that team on that boss before touching
+calibration.** The defect in its trace was visible in one line: `L4 element: Miyabi off-element`
+on an `ice:frost` boss.
+
 ## Calibration: do not anchor on each archetype's global ceiling
 
 The obvious first move — divide each archetype by its own best score — **suppressed anomaly

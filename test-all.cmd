@@ -16,22 +16,21 @@ for %%S in (test-mechanics test-rankings test-recommendations test-bucketing coh
         exit /b 1
     )
 )
-
 echo.
-echo ==== node generate-calibration.mjs ====
-node generate-calibration.mjs
+echo ==== node generate-calibration.mjs --check ====
+node generate-calibration.mjs --check
 if errorlevel 1 (
     echo.
-    echo FAILED: generate-calibration.mjs exited with code %errorlevel%.
+    echo FAILED: generate-calibration.mjs --check exited with code %errorlevel%.
     exit /b 1
 )
 
 echo.
-echo ==== node generate-calibration.mjs --preview ====
-node generate-calibration.mjs --preview
+echo ==== node generate-calibration.mjs --check --preview ====
+node generate-calibration.mjs --check --preview
 if errorlevel 1 (
     echo.
-    echo FAILED: generate-calibration.mjs --preview exited with code %errorlevel%.
+    echo FAILED: generate-calibration.mjs --check --preview exited with code %errorlevel%.
     exit /b 1
 )
 

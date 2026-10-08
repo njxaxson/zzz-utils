@@ -247,6 +247,32 @@ the fix had to be blunt. And "alongside the hyperinflated Vel/Rem teams" names t
 pressure — a declared pair lifted that whole track by 80 points, so anything competing with it
 on an ice-weak boss needs a large counterweight.
 
+### Miyabi/Astra/Yuzuha on Bringer is at least Good, and a variant match beats a plain one
+
+**Complaint (2026-10-08):** Miyabi/Astra/Yuzuha read **OK** on Sacrifice Bringer (raw 416.1,
+calibrated 264.8). The complaint blamed Velina/Remielle for inflating anomaly's calibration anchor.
+
+**The measurement did not support the calibration theory.** See
+[known pitfalls](known-pitfalls.md#calibration-the-velinaremielle-anchor-hypothesis). The real
+defect was [WEAK-01] being only half-wired. Outside the L3 DPS bonus, `ice:frost` matched nobody,
+so Miyabi was charged off-element in L4 on the boss built for her.
+
+**Rulings:**
+
+* *"This team isn't just 'OK', it's at the very least 'Good'."* Disorder lines are better, "but the
+  gap isn't THAT big". Rankings TEST 96.
+* A full variant match (frost on frost) must pay **more** than a regular element match: "that is
+  deep Miyabi shill that Bringer has". L4 is ×1.3 against the regular ×1.15. A plain-ice unit on
+  Bringer gets the regular ×1.15 in L4.
+* Nangong/Miyabi/Yuzuha at 650 on Butcher, the anomaly anchor's #1, is a **legitimate** ceiling.
+  Leave it alone.
+* Disorder pricing, cohesion and the anomaly ladder rungs are **out of bounds** for this kind of
+  complaint. "Anything screwing around with disorders is RISKY", with a "gargantuan blast radius".
+
+The L3 variant premium (×2.25) applies the same principle one layer up and is the fitted half of
+the fix. It moves only Miyabi teams on Bringer. Those are already outside the calibration anchor
+because Bringer favours Miyabi, and the anomaly anchor stayed at 628.6.
+
 ### One withdrawn complaint
 
 Adding favoured units to Miasmic Fiend also flipped a pair the owner had originally

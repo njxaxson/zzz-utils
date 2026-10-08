@@ -98,7 +98,7 @@ anomaly gauge, so a boss can be built to punish one of two same-element agents:
 | boss weakness | Miyabi (`ice:frost`) | Promeia (plain `ice`) |
 |----|----|----|
 | `ice` | full | full |
-| `ice:frost` | full | **half** |
+| `ice:frost` | full **+ variant premium** | **half** |
 
 Half rather than nothing, because a boss weak to frost in particular is still not indifferent to
 ordinary ice. This is what lets Sacrifice Bringer favour Miyabi through a mechanic — see
@@ -175,3 +175,25 @@ than through `shillIntensity`. Sacrifice Bringer's `shillIntensity: 6` became
 `weaknesses: ["ice:frost"]` in phase 3 of the anomaly overhaul, which is what the field replaced
 there. `shillIntensity` itself stays available and no boss sets it — it is the release-deadline
 lever, kept by owner ruling.
+
+**Every weakness check goes through it.** Until 2026-10-08, only the L3 DPS bonus did. The L4
+element modifier, the L3 stunner and defense on-element bonuses, and the L2 reaction-disabled
+exemption still compared `weaknesses.includes(element)`. `ice:frost` therefore matched nobody, and
+Miyabi was charged **off-element** in L4 on the one boss built for her. The fix is consistent and
+complete, and there is now no exact-match weakness test left in the engine.
+
+**A full variant match is a deeper match than a plain one** (owner ruling, 2026-10-08).
+`isVariantWeaknessMatch` is true only when the weakness *is* a variant and the unit is that
+variant:
+
+| | L4 element multiplier | L3 DPS on-element bonus |
+|----|----|----|
+| full variant match (Miyabi vs `ice:frost`) | `VARIANT_ELEMENT_L4` ×1.30 | full × `VARIANT_WEAKNESS_PREMIUM` (2.25) |
+| plain match, including plain ice vs `ice:frost` | `ON_ELEMENT_L4` ×1.15 | full, or ×0.5 for the plain-vs-variant case |
+| no match | `OFF_ELEMENT_L4` ×0.85 | none |
+
+L4 deliberately pays a plain-ice unit on Bringer the **regular** ×1.15. Owner: "Promeia on Bringer
+should get the regular ice-on-ice match." L3's half credit for that case is unchanged.
+`VARIANT_WEAKNESS_PREMIUM` is fitted: 2.25 is the smallest round value that lifts
+`Miyabi/Astra/Yuzuha` on Bringer to **Good** with a few points of margin (raw 464.7, calibrated
+295.7). Mechanics TEST 41 and rankings TEST 96 pin both changes.

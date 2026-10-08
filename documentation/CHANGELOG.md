@@ -38,6 +38,23 @@ Measured across seven rosters before and after: Velina rises to High everywhere 
 unowned; the only rating tiers that moved are the two narrow anomaly rosters; every other
 mover traces to a removed Depth card or a dropped illegal synergy pair.
 
+**Variant weaknesses wired through every layer; a full variant match pays a premium**, 2026-10-08.
+`[WEAK-01]` had only reached the L3 DPS bonus. The L4 element modifier, the L3 stunner and defense
+bonuses, and the L2 reaction-disabled exemption still compared weaknesses by exact name. Sacrifice
+Bringer's `ice:frost` therefore matched nobody, and Miyabi was charged off-element (×0.85) in L4 on
+the boss built for her.
+
+Owner ruling: a full variant match gets L4 ×1.30, a plain match (including plain ice on Bringer)
+×1.15, no match ×0.85. The L3 DPS bonus gains a ×2.25 variant premium. A dead `reactionDisabled`
+clause in the L3 DPS bonus, reachable only through the bug, is removed.
+
+Measured with `score-delta`, two predictions with zero exceptions:
+* Step 1: 1,894 Bringer rows, all with an ice unit, all up, 13 newly viable.
+* Step 2: 187 rows, all Miyabi on Bringer, all up.
+
+Miyabi/Astra/Yuzuha on Bringer goes from 416.1 (OK) to 464.7 (**Good**, 295.7 calibrated).
+Every calibration anchor is unchanged. New: mechanics TEST 41, rankings TEST 96.
+
 **Grouped header menu**, 2026-10-08. Ten flat links no longer fit once Favorites arrived. Gacha Simulator, Deadly Assault Matchups, Pull Recommendations, Agent Teams and Tier List stay in the bar; Team Recommendations, Team Builder, Character Summary, Favorites and Disc Calculator move under one **More** dropdown. Dropdowns open on hover, click or keyboard; the phone hamburger shows one flat list.
 
 **Favorite teams**, 2026-10-08. A ☆ on every team card (Team Builder, Team Recommendations, Deadly

@@ -2355,6 +2355,21 @@ async function main() {
                 `${b.name}: Roxy/Severian/Sunna must be viable and Norma/Severian/Sunna must not`);
         }
     });
+
+    // TEST 96: Miyabi's Astra/Yuzuha hypercarry is a strong team on Sacrifice Bringer.
+    //
+    // Owner ruling (2026-10-08): at least Good on Bringer, the frost-weak boss built for her, while
+    // the disorder lines stay ahead. It read OK because Bringer's `ice:frost` weakness was charged
+    // as off-element in L4. The floor is raw and sits just under 464.7. [WEAK-01]
+    run('TEST 96: Miyabi/Astra/Yuzuha on Sacrifice Bringer clears its floor and trails the disorder lines', () => {
+        const [b] = withBosses(bosses, 'Bringer');
+        assert(b, 'Sacrifice Bringer not found');
+        const may = 'Miyabi / Astra / Yuzuha', mvy = 'Miyabi / Vivian / Yuzuha';
+        const m = scoreMapForBoss(scoreForTeamString('Miyabi/Astra/Yuzuha,Miyabi/Vivian/Yuzuha', allUnits), b);
+        assert(m.get(may) >= 460, `${may} on ${b.name}: ${m.get(may)?.toFixed(1)} must be >= 460`);
+        assert(m.get(mvy) > m.get(may),
+            `${mvy} (${m.get(mvy)?.toFixed(1)}) must still beat ${may} (${m.get(may)?.toFixed(1)}) on ${b.name}`);
+    });
     // Summary
     console.log('');
 
