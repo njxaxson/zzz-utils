@@ -1,0 +1,2 @@
+# Generated files: keep the current side on conflict, then regenerate. See documentation/engine/calibration.md
+app/public/data/calibration*.json merge=keep-current

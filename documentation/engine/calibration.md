@@ -125,6 +125,19 @@ A stale file shows up only as a wrong-looking cross-archetype ladder. See
 
 Both are generated. Regenerate them; never hand-edit.
 
+### Merge and rebase conflicts
+
+`.gitattributes` routes both files to a `keep-current` merge driver, so a rebase or merge keeps
+one side silently instead of stopping on them. Regenerate once when it finishes. The driver is
+registered per clone, so run this once after cloning:
+
+```bash
+git config merge.keep-current.driver true
+```
+
+Without it, git ignores the attribute and falls back to a normal conflict. Commits replayed in
+the middle of a rebase carry a stale file until you regenerate at the end.
+
 The transform itself lives in two copies, `lib/calibration.js` for Node and
 `app/public/lib/common/calibration.js` for the browser.
 
