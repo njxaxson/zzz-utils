@@ -53,7 +53,7 @@
     {
         "id": "marionettes",
         "name": "Notorious Marionettes",
-        "shortName": "Marionettes",
+        "shortName": "Notorious Marionettes",
         "image": "./assets/bosses/marionette.webp",
         "favored": [],
         "released": 1.0,
@@ -68,7 +68,7 @@
     {
         "id": "pompey",
         "name": "Notorious Pompey",
-        "shortName": "Pompey",
+        "shortName": "Notorious Pompey",
         "image": "./assets/bosses/pompey.webp",
         "favored": [],
         "released": 1.2,
@@ -276,7 +276,7 @@
     {
         "id": "aberrant",
         "name": "Stagnant Aberrant",
-        "shortName": "Aberrant",
+        "shortName": "Stagnant Aberrant",
         "image": "./assets/bosses/aberrant.webp",
         "released": 3.1,
         "favored": ["Remielle"],
@@ -302,6 +302,23 @@
             "resistances": ["ice"],
             "shill": "armorer",
             "anti": ["anomaly"],
+            "assists": 3,
+            "chainParry": true,
+            "control": 1
+        }
+    },
+    {
+        "id": "revenant",
+        "name": "Infernal Revenant",
+        "shortName": "Infernal Revenant",
+        "image": "./assets/bosses/revenant.webp",
+        "released": 3.2,
+        "favored": [],
+        "mechanics": {
+            "weaknesses": ["wind", "ice"],
+            "resistances": ["physical"],
+            "shill": null,
+            "anti": [],
             "assists": 3,
             "chainParry": true,
             "control": 1
