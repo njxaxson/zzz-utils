@@ -297,7 +297,12 @@ function renderBannerTiles(results) {
         `);
     }
 
-    el.innerHTML = `<div class="banner-tiles-inner"><div class="banner-tiles-row">${groups.join('')}</div></div>`;
+    const hasMediumOrHigher = results.recommendations.some(r => r.priority === 'High' || r.priority === 'Medium');
+    const simulatorLinkHtml = hasMediumOrHigher
+        ? `<a class="banner-simulator-link" href="index.html">Estimate your chances in the Gacha Simulator</a>`
+        : '';
+
+    el.innerHTML = `<div class="banner-tiles-inner"><div class="banner-tiles-row">${groups.join('')}</div>${simulatorLinkHtml}</div>`;
     el.style.display = 'block';
 }
 

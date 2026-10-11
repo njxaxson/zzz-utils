@@ -4113,6 +4113,22 @@ a.unit-card {
     padding-bottom: 0.25rem;
 }
 
+.banner-simulator-link {
+    display: inline-block;
+    margin-top: 0.5rem;
+    padding: 0.35rem 0.8rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: all 0.2s;
+}
+.banner-simulator-link:hover { border-color: var(--accent-secondary); color: var(--accent-secondary); }
+
 .banner-unit-tile {
     display: flex;
     flex-direction: column;
