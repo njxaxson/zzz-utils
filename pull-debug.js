@@ -149,7 +149,9 @@ async function main() {
         for (let i = 0; i < recommendations.length; i++) {
             const rec = recommendations[i];
             const priorityTag = rec.priority === 'High' ? '🔴 HIGH' : rec.priority === 'Medium' ? '🟡 MED ' : '🟢 LOW ';
-            console.log(`  #${i + 1} [${priorityTag}] ${rec.title}  (raw: ${rec.rawScore}, cal: ${rec.score})`);
+            const budgetNote = rec.budgetedFrom ? `  [budget: ${rec.budgetedFrom} → ${rec.priority}]` : '';
+            const servesNote = options.debug && rec.serves?.length ? `  serves: ${rec.serves.join('/')}` : '';
+            console.log(`  #${i + 1} [${priorityTag}] ${rec.title}  (raw: ${rec.rawScore}, cal: ${rec.score})${servesNote}${budgetNote}`);
             const allReasons = [rec.reason, ...(rec.additionalReasons?.map(r => r.reason) ?? [])];
             for (const r of allReasons) {
                 console.log(`     • ${r}`);

@@ -935,22 +935,56 @@ export function analyze(allUnits, unitStates, ownedUnits, { maxRecommendations =
             .reduce((best, p) => PRIORITY_VALS[p] > PRIORITY_VALS[best] ? p : best, 'Low');
     }
 
-    // One verdict per candidate, from the same steps the cards use, for every card — not just the
-    // ones that make the list. [PULL-05]
-    const unitVerdicts = new Map();
+    // Each unit judged on its own, from the same steps the cards use, for every card — not just
+    // the ones that make the list. The budget below turns these into relative verdicts. [PULL-05]
+    const absoluteVerdicts = new Map();
     for (const card of sortedCards) {
         const cardPriority = cardPriorityOf(card);
         card.profiles.forEach((profile, i) => {
             const base = i < 5 ? cardPriority : getCompositePriority(profile);
             const { priority } = unitVerdict(profile.unit, base);
-            if (priority) unitVerdicts.set(profile.unit.id, priority);
+            if (priority) absoluteVerdicts.set(profile.unit.id, priority);
         });
+    }
+
+    const teamCoverage = buildTeamCoverage(dpsQuality, ownedStunners, ownedSupports, legality);
+    const narrowArch = findNarrowArchetype(dpsQuality, teamCoverage);
+    const fieldedArchs = DPS_ARCHETYPES.filter(a => dpsQuality[a] > 0);
+    const ownedById = new Map(ownedUnits.map(u => [u.id, u]));
+
+    // The archetypes whose teams a unit improves, from the gaps it answers. A support or stunner
+    // must actually fit an owned carry of that archetype — joining is not activating. [PULL-08]
+    function roleServes(unit) {
+        const arch = getPrimaryDPSArchetype(unit);
+        if (arch) return [arch];
+        return fieldedArchs.filter(a => legality.carriesByArch[a].some(c =>
+            legality.canShareTeam(unit, c) && mechanicsFitScore(unit, c) >= SUPPORT_GOOD_FIT));
+    }
+    function gapServes(gap, unit) {
+        const m = gap.id.match(/^(?:dps|depth|support)-(\w+)$/);
+        if (m && DPS_ARCHETYPES.includes(m[1])) return [m[1]];
+        if (gap.id === 'stunner' || gap.id === 'stunner-depth' || gap.id.startsWith('stunner-element-')) {
+            const own = roleServes(unit);
+            return gap.serves ? own.filter(a => gap.serves.includes(a)) : own;
+        }
+        if (gap.id === 'subdps-anomaly' || gap.id === 'anomaly-partner') return ['anomaly'];
+        if (gap.id.startsWith('ladder-')) return [ladderCountTag(unit)?.tag].filter(a => DPS_ARCHETYPES.includes(a));
+        if (gap.id.startsWith('mech-synergy-')) {
+            const partner = ownedById.get(gap.id.slice('mech-synergy-'.length));
+            const partnerArch = partner && !isSubdps(partner) ? getPrimaryDPSArchetype(partner) : null;
+            if (partnerArch) return [partnerArch];
+        }
+        return roleServes(unit);
+    }
+    const unitServes = new Map();
+    for (const profile of unitProfiles.values()) {
+        const set = new Set();
+        for (const { gap } of profile.contributions) for (const a of gapServes(gap, profile.unit)) set.add(a);
+        unitServes.set(profile.unit.id, set);
     }
 
     const recommendations = [];
     for (const card of sortedCards) {
-        if (recommendations.length >= maxRecommendations) break;
-
         const cardProfiles = card.profiles.slice(0, 5);
         const cardUnits = cardProfiles.map(p => p.unit);
 
@@ -1032,19 +1066,101 @@ export function analyze(allUnits, unitStates, ownedUnits, { maxRecommendations =
                 units: groupUnits
             };
             if (group.notes) rec.teamDependencyNotes = group.notes;
+            Object.defineProperty(rec, '_card', { value: card, enumerable: false });
             recommendations.push(rec);
         }
     }
 
-    // A split card's two entries share a gap score, so break the tie on priority.
-    const filteredRecommendations = recommendations
-        .sort((a, b) => (b.score - a.score)
-            || ((PRIORITY_VALS[b.priority] ?? 0) - (PRIORITY_VALS[a.priority] ?? 0)))
+    // Priority budget: rank every entry the way a player would choose pulls, then let only the
+    // first few keep High or Medium. Demotes, never promotes. [PULL-08]
+    const picked = new Set();
+    const freshOf = (serves) => [...serves].filter(a => !picked.has(a) && a !== narrowArch);
+    const isPullable = (u) => opportunitySet.has(u.id);
+    const servesOf = (u) => [...(unitServes.get(u.id) ?? [])];
+    const compareKeys = (a, b) => {
+        for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return b[i] - a[i];
+        return 0;
+    };
+    // An entry is a set of alternatives you'd pull one of, so it ranks as its best unit.
+    const unitRankKey = (u, rec) => {
+        const serves = servesOf(u);
+        const fresh = freshOf(serves);
+        const narrowOnly = !!narrowArch && serves.length > 0 && serves.every(a => a === narrowArch);
+        const bannerT0 = isBannerT0(u, opportunitySet) && absoluteVerdicts.get(u.id) === 'High';
+        return [bannerT0 ? 1 : 0, narrowOnly ? 0 : 1, fresh.length > 0 ? 1 : 0, isPullable(u) ? 1 : 0,
+            fresh.length, rec.score, -u.tier];
+    };
+    const rankKey = (rec) => rec.units.map(u => unitRankKey(u, rec)).sort(compareKeys)[0];
+
+    // How a unit compares with its entry's lead: same fresh coverage, same availability. [PULL-08]
+    const unitStanding = (u) => {
+        const fresh = freshOf(unitServes.get(u.id) ?? []);
+        return { fresh: fresh.sort().join(','), pullable: isPullable(u), count: fresh.length };
+    };
+    const sameStanding = (a, b) => a.fresh === b.fresh && a.pullable === b.pullable && a.count === b.count;
+
+    const ordered = [];
+    const remaining = [...recommendations];
+    const budgetUsed = { High: 0, Medium: 0 };
+    const unitVerdicts = new Map();
+    const capAt = (priority, ceiling) => PRIORITY_ORDER.indexOf(priority) < PRIORITY_ORDER.indexOf(ceiling) ? ceiling : priority;
+    while (remaining.length > 0) {
+        let bestIdx = 0;
+        for (let i = 1; i < remaining.length; i++) {
+            if (compareKeys(rankKey(remaining[i]), rankKey(remaining[bestIdx])) < 0) bestIdx = i;
+        }
+        const rec = remaining.splice(bestIdx, 1)[0];
+
+        // Alternatives that match the lead keep the entry's priority; the rest sit one level lower.
+        const standings = new Map(rec.units.map(u => [u.id, unitStanding(u)]));
+        const lead = [...rec.units].sort((a, b) => compareKeys(unitRankKey(a, rec), unitRankKey(b, rec)))[0];
+        rec.serves = servesOf(lead);
+        const leadStanding = standings.get(lead.id);
+        const matchesLead = (u) => sameStanding(standings.get(u.id), leadStanding);
+        rec.units = [...rec.units.filter(matchesLead), ...rec.units.filter(u => !matchesLead(u))];
+
+        const before = rec.priority;
+        if (before === 'High' && budgetUsed.High < PRIORITY_BUDGET.High) {
+            budgetUsed.High++;
+        } else if ((before === 'High' || before === 'Medium') && budgetUsed.Medium < PRIORITY_BUDGET.Medium) {
+            rec.priority = 'Medium';
+            budgetUsed.Medium++;
+        } else {
+            rec.priority = 'Low';
+        }
+        if (rec.priority !== before) rec.budgetedFrom = before;
+
+        const verdictFor = (u) => {
+            const own = absoluteVerdicts.get(u.id) ?? rec.priority;
+            const entryLevel = matchesLead(u) ? rec.priority : dropPriority(rec.priority, 1) ?? 'Low';
+            return capAt(own, entryLevel);
+        };
+        for (const u of rec.units) {
+            if (!unitVerdicts.has(u.id)) unitVerdicts.set(u.id, verdictFor(u));
+        }
+        // Profiles past a card's first five are not shown; they follow the card's first entry.
+        if (!rec._card._budgeted) {
+            Object.defineProperty(rec._card, '_budgeted', { value: true });
+            for (const profile of rec._card.profiles.slice(5)) {
+                const u = profile.unit;
+                if (!absoluteVerdicts.has(u.id) || unitVerdicts.has(u.id)) continue;
+                standings.set(u.id, unitStanding(u));
+                unitVerdicts.set(u.id, verdictFor(u));
+            }
+        }
+
+        rec.serves.forEach(a => picked.add(a));
+        ordered.push(rec);
+    }
+
+    const filteredRecommendations = ordered
+        .map((rec, i) => ({ rec, i }))
+        .sort((a, b) => ((PRIORITY_VALS[b.rec.priority] ?? 0) - (PRIORITY_VALS[a.rec.priority] ?? 0)) || (a.i - b.i))
+        .map(x => x.rec)
         .slice(0, maxRecommendations);
 
     const limitedSCount = ownedUnits.filter(u => u.rank === 'S' && u.limited).length;
     const highPriorityGapCount = gaps.filter(g => g.priority === 'High').length;
-    const teamCoverage = buildTeamCoverage(dpsQuality, ownedStunners, ownedSupports, legality);
     const assessment = buildAssessment(
         dpsQuality, supportQuality, stunnerQuality, elementQuality,
         compositeScore, limitedSCount,
@@ -1056,6 +1172,7 @@ export function analyze(allUnits, unitStates, ownedUnits, { maxRecommendations =
         assessment,
         recommendations: filteredRecommendations,
         unitVerdicts,
+        absoluteVerdicts,
         coverage: {
             dpsQuality, supportQuality, stunnerQuality, elementQuality,
             ownedDPS, ownedSubdps, ownedSupports, ownedStunners, ownedByElement,
@@ -1086,7 +1203,7 @@ function detectDPSGaps(gaps, dpsQuality, ownedDPS, unownedLimitedS, sortCandidat
             : quality === 0
             ? `You have no ${arch} DPS at all`
             : quality <= 25
-            ? `Your ${arch} DPS coverage is very weak — a major upgrade is available`
+            ? `Your ${arch} DPS coverage is very weak — a premium ${arch} DPS would be a major upgrade`
             : !hasAnySRank
             ? `Your ${arch} coverage relies entirely on A-rank options — a premium DPS would be a significant upgrade`
             : quality <= 40
@@ -1201,7 +1318,7 @@ function detectStunnerGap(gaps, stunnerQuality, ownedStunners, dpsQuality, unown
             u.tags.includes('stun') && uncovered.some(a => legality.canFieldWith(u, a))
         ));
         if (candidates.length > 0) {
-            gaps.push({ id: 'stunner', title: 'Premium Stunner', reason, score, units: candidates });
+            gaps.push({ id: 'stunner', title: 'Premium Stunner', reason, score, units: candidates, serves: uncovered });
         }
         return;
     }
@@ -1729,6 +1846,9 @@ function detectMechanicalSynergies(gaps, ownedUnits, unownedLimitedS, dpsQuality
     }
 }
 
+// At most this many entries keep each priority once every entry is ranked. [PULL-08]
+const PRIORITY_BUDGET = { High: 2, Medium: 4 };
+
 // The team a laddered codependent completes, so the unit has a card whether or not it is on a
 // banner. Its rung sets the priority. [PULL-01]
 const LADDER_GAP_SCORE = { High: 70, Medium: 50, Low: 30 };
@@ -1798,6 +1918,16 @@ function detectDepthGap(gaps, ownedDPS, dpsQuality, unownedLimitedS, sortCandida
     }
 }
 
+// The one team type you play with premium stun and support, or null when there are none or
+// several. [GAP-04]
+function findNarrowArchetype(dpsQuality, teamCoverage) {
+    const PLAYED_QUALITY = 40;
+    const PREMIUM_QUALITY = 75;
+    const premiumTeams = DPS_ARCHETYPES.filter(a => dpsQuality[a] >= PLAYED_QUALITY &&
+        teamCoverage[a].stunnerQuality >= PREMIUM_QUALITY && teamCoverage[a].supportQuality >= PREMIUM_QUALITY);
+    return premiumTeams.length === 1 ? premiumTeams[0] : null;
+}
+
 // Per team type: the carry, plus the best stunner and support that can legally join it. Tier
 // lookups only — never a scored team. [GAP-04]
 function buildTeamCoverage(dpsQuality, ownedStunners, ownedSupports, legality) {
@@ -1836,10 +1966,7 @@ function buildAssessment(dpsQuality, supportQuality, stunnerQuality, elementQual
     ];
     const ratingBase = ratingTerms.reduce((sum, q) => sum + q, 0) / ratingTerms.length;
     const ratingScore = ratingBase * investmentFactor;
-    const premiumTeams = teamCoverage
-        ? played.filter(a => teamCoverage[a].stunnerQuality >= PREMIUM_QUALITY && teamCoverage[a].supportQuality >= PREMIUM_QUALITY)
-        : [];
-    const narrowArch = premiumTeams.length === 1 ? premiumTeams[0] : null;
+    const narrowArch = teamCoverage ? findNarrowArchetype(dpsQuality, teamCoverage) : null;
 
     let ratingTier, ratingColor;
     if (ratingScore <= 20) {

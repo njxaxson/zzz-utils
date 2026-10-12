@@ -7,7 +7,7 @@ re-run the commands and update the numbers.
 change belongs in [CHANGELOG.md](CHANGELOG.md); anything that explains a settled ruling belongs
 in [notes/adjudications.md](notes/adjudications.md) behind a tag.
 
-**Last verified:** 2026-10-11.
+**Last verified:** 2026-10-12.
 
 ## Test status
 
@@ -15,7 +15,7 @@ in [notes/adjudications.md](notes/adjudications.md) behind a tag.
 |----|----|
 | mechanics | **36 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
 | rankings | **94 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
-| recommendations | **50 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
+| recommendations | **51 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
 | bucketing | **6 pass, 0 fail** |
 | cohesion fixture | **11/11** owner judgements hold |
 | calibration freshness | both files match the current engine/data fingerprint **and** the current `pools` map |
@@ -63,6 +63,6 @@ labels, and [calibration](engine/calibration.md) for the anchors.
 
 ## What shipped last
 
-**Pull engine: banner T0s, join-aware coverage, the narrow-roster rating**, 2026-10-11. Pull
+**Pull engine: a priority budget** (2 High, 4 Medium, ranked greedily), 2026-10-12. Pull
 engine only; no scorer or data change.
 Full history in [CHANGELOG.md](CHANGELOG.md).

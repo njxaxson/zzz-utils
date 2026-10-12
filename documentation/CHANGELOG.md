@@ -3,6 +3,16 @@
 What shipped, newest first. This file is history — nothing here is a statement about the
 current state of the engine. For that, see [STATUS.md](STATUS.md).
 
+**Pull engine: a priority budget**, 2026-10-12. A roster that needs a lot came back as a wall of
+High — six High cards and every banner tile but one on a narrow anomaly roster. Every entry is
+now ranked greedily the way a player picks pulls (banner T0 first, branch out of a narrow
+archetype, cover something not yet covered, pullable now), and at most **2** keep High and **4**
+keep Medium [PULL-08]. On that roster the Highs are Velina and Roxy; Norma, who doesn't activate
+Claret, sits below Roxy; Anomaly Depth drops to Low. Measured on seven rosters: nothing rose,
+the owner's own roster is unchanged, and every over-budget roster now reads 2 High / at most 4
+Medium. `absoluteVerdicts` keeps each unit's own verdict for the owner's per-unit rulings; TEST 8
+now expects exactly 2 High on an empty roster.
+
 **Pull engine: banner T0s, join-aware coverage, the narrow-roster rating**, 2026-10-11. On a
 player's anomaly roster (Aria, Jane Doe, Yanagi, Grace, Remielle, Nangong, Yuzuha, plus a lone
 Claret), Velina's banner tile read **No** and the roster rated **Well-Rounded**. Velina was in no

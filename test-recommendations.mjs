@@ -232,8 +232,11 @@ await runTest(8, 'Empty roster gap detection', () => {
     assert(hasGap(result, 'dps-anomaly'), 'expected anomaly DPS gap');
     assert(hasGap(result, 'dps-rupture'), 'expected rupture DPS gap');
     assert(hasGap(result, 'support'), 'expected support gap');
+    // An empty roster needs many things, but the priority budget keeps High to the top two. [PULL-08]
     const high = result.recommendations.filter(r => r.priority === 'High');
-    assert(high.length >= 3, `expected multiple high-priority recs, got ${high.length}`);
+    assert(high.length === 2, `expected exactly 2 High recs under the priority budget, got ${high.length}`);
+    assert(result.recommendations.some(r => r.budgetedFrom === 'High'),
+        'an empty roster should have more High needs than the budget allows');
 });
 
 // TEST 9
@@ -737,14 +740,15 @@ await runTest(42, 'Remielle without Velina is Medium, not High, even on an anoma
     const { unitStates, ownedUnits } = buildSyntheticRoster(allUnits, roster);
     const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 10 });
 
-    const remRec = result.recommendations.find(r => r.units.some(u => u.id === 'ramiel'));
-    assert(remRec, 'Remielle should still appear in recommendations for an anomaly-loaded roster');
-    assert(remRec.priority !== 'High',
+    // Her own verdict, before the priority budget ranks her against the roster's other needs.
+    const remPriority = result.absoluteVerdicts.get('ramiel');
+    assert(remPriority, 'Remielle should still be recommended for an anomaly-loaded roster');
+    assert(remPriority !== 'High',
         `Without Velina, Remielle should not be High priority — her best line here is around ` +
-        `Alice/Vivian/Remielle, not the Rem/Velina ceiling. Got ${remRec.priority}`);
-    assert(remRec.priority === 'Medium',
+        `Alice/Vivian/Remielle, not the Rem/Velina ceiling. Got ${remPriority}`);
+    assert(remPriority === 'Medium',
         `Without Velina, Remielle should be Medium — she completes a triple-anomaly team, ` +
-        `just not at her ceiling. Got ${remRec.priority}`);
+        `just not at her ceiling. Got ${remPriority}`);
 });
 
 await runTest(43, 'Adding Velina to the same roster raises Remielle above her no-Velina priority', () => {
@@ -759,8 +763,7 @@ await runTest(43, 'Adding Velina to the same roster raises Remielle above her no
     const priorityOn = (roster) => {
         const { unitStates, ownedUnits } = buildSyntheticRoster(allUnits, roster);
         const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 10 });
-        const rec = result.recommendations.find(r => r.units.some(u => u.id === 'ramiel'));
-        return rec ? rec.priority : null;
+        return result.absoluteVerdicts.get('ramiel') ?? null;
     };
 
     const without = priorityOn(base);
@@ -923,11 +926,11 @@ await runTest(50, 'Narrow anomaly roster: banner T0 is High, join locks respecte
 
     // (a) A T0 on a current/upcoming banner is High; off every banner she gets no such floor.
     const onBanner = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 10, opportunityIds: ['velina'] });
-    assert(onBanner.unitVerdicts.get('velina') === 'High',
-        `Velina on a banner should be High, got ${onBanner.unitVerdicts.get('velina') ?? 'No'}`);
+    assert(onBanner.absoluteVerdicts.get('velina') === 'High',
+        `Velina on a banner should be High, got ${onBanner.absoluteVerdicts.get('velina') ?? 'No'}`);
     const offBanner = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 10 });
-    assert(offBanner.unitVerdicts.get('velina') !== 'High',
-        `Velina off every banner should not be floored to High, got ${offBanner.unitVerdicts.get('velina')}`);
+    assert(offBanner.absoluteVerdicts.get('velina') !== 'High',
+        `Velina off every banner should not be floored to High, got ${offBanner.absoluteVerdicts.get('velina')}`);
 
     // (b) Nangong joins anomaly teams only, so she does not cover attack or armorer stun.
     const stunGap = findGap(onBanner, 'stunner');
@@ -964,7 +967,7 @@ await runTest(51, 'Remielle verdict follows whether a triple-anomaly team can be
     const filler = ['Nicole', 'Anby', 'Billy', 'Astra', 'Trigger'];
     const verdictFor = (names) => {
         const { unitStates, ownedUnits } = buildSyntheticRoster(allUnits, [...names, ...filler]);
-        return analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 10 }).unitVerdicts.get('ramiel') ?? 'No';
+        return analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 10 }).absoluteVerdicts.get('ramiel') ?? 'No';
     };
     const cases = [
         [['Aria'], 'No'],                   // fewer than two other anomaly agents
@@ -997,6 +1000,48 @@ await runTest(52, 'Two anomaly carries of different elements are each other\'s r
     const solo = buildSyntheticRoster(allUnits, ['Miyabi', 'Nicole', 'Anby', 'Billy']);
     const soloGap = findGap(analyze(allUnits, solo.unitStates, solo.ownedUnits, { maxRecommendations: 10 }), 'anomaly-partner');
     assert(soloGap && /no anomaly partner/.test(soloGap.reason), `Miyabi alone has no partner: ${soloGap?.reason}`);
+});
+
+// TEST 53: the priority budget ranks pulls the way the owner reads this roster. [PULL-08]
+await runTest(53, 'Priority budget: Velina and Roxy are the two Highs on a narrow anomaly roster', () => {
+    const roster = [
+        'Aria', 'Claret', 'Jane Doe', 'Nangong', 'Remielle', 'Yanagi', 'Yuzuha',
+        'Grace', 'Soldier 11', 'Pyrois',
+        'Anton', 'Billy', 'Corin', 'Piper', 'Komano', 'Ben', 'Lucy', 'Nicole',
+        'Pan Yinhu', 'Seth', 'Soukaku', 'Anby', 'Pulchra'
+    ];
+    const banners = ['roxy', 'promeia', 'phoenix', 'velina', 'severian', 'norma'];
+    const { unitStates, ownedUnits } = buildSyntheticRoster(allUnits, roster);
+    const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 50, opportunityIds: banners });
+    const recs = result.recommendations;
+
+    // (a) Two Highs: Velina (banner T0) and the card Roxy leads (activates Pyrois and Claret).
+    const high = recs.filter(r => r.priority === 'High');
+    assert(high.length === 2, `expected exactly 2 High entries, got ${high.length}: ${high.map(r => r.title).join(', ')}`);
+    assert(high.some(r => r.units[0].id === 'velina'), 'Velina should lead a High entry');
+    assert(high.some(r => r.units[0].id === 'roxy'), 'Roxy should lead a High entry');
+
+    // (b) Norma covers attack but not Claret's armorer team, so she sits below Roxy.
+    const RANK = { High: 2, Medium: 1, Low: 0 };
+    assert(RANK[result.unitVerdicts.get('norma')] < RANK[result.unitVerdicts.get('roxy')],
+        `Norma (${result.unitVerdicts.get('norma')}) should be below Roxy (${result.unitVerdicts.get('roxy')})`);
+
+    // (c) At most four Mediums; deepening the narrow anomaly core is not a priority.
+    assert(recs.filter(r => r.priority === 'Medium').length <= 4, 'at most 4 Medium entries');
+    const depth = recs.find(r => r.title === 'Anomaly Depth');
+    assert(!depth || depth.priority === 'Low', `Anomaly Depth should be Low on a narrow anomaly roster, got ${depth?.priority}`);
+
+    // (d) Tiles agree with entries: no unit's verdict exceeds its entry's priority.
+    for (const r of recs) for (const u of r.units) {
+        assert(RANK[result.unitVerdicts.get(u.id)] <= RANK[r.priority],
+            `${u.name} reads ${result.unitVerdicts.get(u.id)} in a ${r.priority} entry`);
+    }
+
+    // (e) The budget only demotes when a tier is already full.
+    for (const r of recs.filter(x => x.budgetedFrom)) {
+        const full = r.budgetedFrom === 'High' ? high.length === 2 : recs.filter(x => x.priority === 'Medium').length === 4;
+        assert(full, `${r.title} was demoted from ${r.budgetedFrom} without its tier being full`);
+    }
 });
 
 // Tests that are red ON PURPOSE. Same contract as test-mechanics.mjs's and test-rankings.mjs's

@@ -151,6 +151,7 @@ Populated during the comment pass. One row per tag, newest last within a prefix.
 | `[PULL-05]` | `../recommendations/cards-and-priority.md` | `unitVerdicts` is the only verdict source, for every candidate |
 | `[PULL-06]` | `../recommendations/cards-and-priority.md` | Banner T0s floor at High; off-banner T0s get nothing extra |
 | `[PULL-07]` | `../recommendations/pull-engine.md` | Who can play together is decided by legal teams, honouring `archetypes.avoid` |
+| `[PULL-08]` | `../recommendations/cards-and-priority.md` | The priority budget: 2 High, 4 Medium, ranked greedily the way a player picks pulls |
 | `[CAL-01]` | `../engine/calibration.md` | The synthetic neutral boss is not in the fitting corpus |
 | `[CAL-02]` | `../engine/calibration.md` | Archetype pooling, and why the map is a second staleness axis |
 | `[CAL-03]` | `../engine/calibration.md` | `MIN_SELF_ANCHOR_CARRIES` is 3 |

@@ -46,9 +46,36 @@ at Medium instead.
 
 ## One verdict per unit
 
-`analyze()` returns `unitVerdicts`: the priority every candidate would carry, computed the same
-way as the cards, for every card — not just the ones that make the visible list. The banner
-tiles read it.
+`analyze()` returns two maps, for every candidate in every card — not just the ones that make the
+visible list:
+
+* `absoluteVerdicts` — the unit judged on its own: gap priority, promotion, the banner-T0 floor,
+  the partner ladder, codependency. Owner rulings about a single unit live here.
+* `unitVerdicts` — the same verdict after the [priority budget](#priority-budget), relative to
+  everything else this roster needs. Cards and banner tiles read this one.
+
+## Priority budget
+
+A roster that needs a lot used to come back as a wall of High. Now every entry is ranked the way a
+player would choose pulls, and only the first few keep their priority: at most **2 High** and
+**4 Medium**; the rest drop to Low. The budget only demotes, and a roster within it is untouched.
+
+Entries are ranked greedily, one pick at a time, each by its best unit:
+
+1. a T0 on a current or upcoming banner;
+2. on a [narrow](coverage-and-gaps.md#gap-04-the-rating-judges-team-types-not-single-best-units)
+   roster, anything that only deepens the narrow archetype goes last;
+3. an archetype no earlier pick already serves, before one that overlaps;
+4. pullable now;
+5. more fresh archetypes;
+6. then score, then tier.
+
+What a unit **serves** comes from the gaps it answers. A support or stunner serves an archetype
+only when it actually fits an owned carry of it (`mechanicsFitScore` ≥ 15) — joining a team is
+not activating it.
+
+Within a card, alternatives that match the lead on fresh coverage and availability keep the
+card's priority; the rest sit one level lower.
 
 ## Code notes
 
@@ -70,3 +97,19 @@ Scoped to banners on purpose. An unconditional "every T0 is High" rule was propo
 by the owner: a new player would get ten-plus "pull the best units" cards and no mechanical
 analysis of their roster. A T0 you can actually pull is the case where tier alone is a good
 reason; a T0 you can't is just noise.
+
+### [PULL-08] The priority budget, and the roster it was built from
+
+The owner's read of a narrow anomaly roster (Aria, Jane Doe, Yanagi, Grace, Remielle, Nangong,
+Yuzuha, plus Claret and Pyrois): the two High pulls are **Velina** — a must-have T0 on a banner,
+completing Aria/Velina/Remielle — and **Roxy**, who activates both Claret (fit 19) and Pyrois
+(fit 23) and gives the account viable attack and armorer teams. Norma fits Pyrois but not Claret
+(9.7), so she is a step below Roxy. Anomaly Depth (Phoenix, Promeia) is the wrong direction: it
+deepens the one thing the account already has, and Velina already covers it.
+
+Owner decisions: the budget counts needs (cards), not units; High 2, Medium 4; pullable-now ranks
+ahead within the rules above.
+
+Owner rulings about a single unit (the banner-T0 floor, the Remielle table) are absolute and are
+tested against `absoluteVerdicts`. The budget is a statement about order, and is tested on its
+own (TEST 53).
