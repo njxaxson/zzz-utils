@@ -3,6 +3,31 @@
 What shipped, newest first. This file is history — nothing here is a statement about the
 current state of the engine. For that, see [STATUS.md](STATUS.md).
 
+**Pull engine: banner T0s, join-aware coverage, the narrow-roster rating**, 2026-10-11. On a
+player's anomaly roster (Aria, Jane Doe, Yanagi, Grace, Remielle, Nangong, Yuzuha, plus a lone
+Claret), Velina's banner tile read **No** and the roster rated **Well-Rounded**. Velina was in no
+gap at all: Remielle (lumen) held the anomaly sub-DPS slot shut, Grace held the partner check
+shut, and Wind listed only Severian. And the rating counted the anomaly-only Yuzuha and Nangong
+as Elite support and stun for every team type. Pull engine only; no scorer or data change, and
+calibration is untouched.
+
+* A limited T0 on the current or upcoming banners is **High** unless codependency, the partner
+  ladder, or a lack of any team to field it says otherwise [PULL-06]. Off-banner T0s get nothing.
+* One verdict per candidate, `unitVerdicts`, feeds both cards and banner tiles [PULL-05].
+* Who can play together is decided by legal teams, honouring `archetypes.avoid` [PULL-07]. The
+  stunner gaps now respect join locks ("Your limited stunner Nangong can't join your attack or
+  armorer teams"); Sunna counts for anomaly when Nangong brings her in; Nangong no longer pairs
+  with Sigrid, Evelyn or Hugo in mechanical synergy.
+* Remielle no longer holds the anomaly sub-DPS slot [GAP-02] and no longer appears as an
+  "Anomaly Depth" carry [GAP-03]. Her verdict is the owner's triple-anomaly table, on or off a
+  banner [PULL-01].
+* The rating judges support and stun per team type, and a roster with premium stun and support
+  for only one team type reads e.g. **Partial Coverage · Narrow: Anomaly** [GAP-04].
+
+Measured across seven rosters before and after: Velina rises to High everywhere she is
+unowned; the only rating tiers that moved are the two narrow anomaly rosters; every other
+mover traces to a removed Depth card or a dropped illegal synergy pair.
+
 **Agent Teams page**, 2026-09-29. `agent-detail.html` takes a focus agent, plus up to two
 optional teammates (via `?agents=a,b,c`, which is also linked from each Character Summary name and Tier List card).
 Find Teams lists up to **5** roster teams containing them. A team earns a boss tile by placing in

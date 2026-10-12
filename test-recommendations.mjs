@@ -727,9 +727,8 @@ await runTest(41, 'Remielle excluded with single A-rank anomaly partner (Piper)'
 });
 
 await runTest(42, 'Remielle without Velina is Medium, not High, even on an anomaly-loaded roster', () => {
-    // Partner ladder (documentation/recommendations/partner-ladder.md): without Velina the best
-    // line here is Alice/Vivian/Remielle, good but not her ceiling. Also throttled by her 3-body
-    // conditional ATK buff and by sharing a stun window with Miyabi (`scaling.greedy`, phase 5).
+    // Partner ladder (documentation/recommendations/partner-ladder.md): two S-rank anomaly agents
+    // but no Velina is Medium — a triple-anomaly team, just not her ceiling.
     const roster = [
         'Miyabi', 'Alice', 'Promeia', 'Vivian', 'Nangong', 'Yuzuha',
         'Astra', 'Trigger', 'Nicole', 'Anby', 'Billy'
@@ -744,7 +743,7 @@ await runTest(42, 'Remielle without Velina is Medium, not High, even on an anoma
         `Without Velina, Remielle should not be High priority — her best line here is around ` +
         `Alice/Vivian/Remielle, not the Rem/Velina ceiling. Got ${remRec.priority}`);
     assert(remRec.priority === 'Medium',
-        `Without Velina, Remielle should be Medium — still a titled T0 that opens new archetypes, ` +
+        `Without Velina, Remielle should be Medium — she completes a triple-anomaly team, ` +
         `just not at her ceiling. Got ${remRec.priority}`);
 });
 
@@ -907,6 +906,97 @@ await runTest(49, 'A self-targeted buff credits only the teammate who switches i
     const deps = JSON.stringify(checkTeamDependencies(codep(severian), ownedUnits, allUnits));
     const depsBare = JSON.stringify(checkTeamDependencies(codep(stripped), ownedUnits, allUnits));
     assert(deps === depsBare, `a self-targeted buff must not create a team dependency: ${deps} vs ${depsBare}`);
+});
+
+// TEST 50: a narrow anomaly roster (from a player's share URL). Velina read "No" on her banner
+// tile and the roster rated Well-Rounded. Covers PULL-05/06/07 and GAP-02/03/04.
+
+await runTest(50, 'Narrow anomaly roster: banner T0 is High, join locks respected, rating reads narrow', () => {
+    const roster = [
+        'Aria', 'Claret', 'Jane Doe', 'Nangong', 'Remielle', 'Yanagi', 'Yuzuha',
+        'Grace', 'Soldier 11', 'Pyrois',
+        'Anton', 'Billy', 'Corin', 'Piper', 'Komano', 'Ben', 'Lucy', 'Nicole',
+        'Pan Yinhu', 'Seth', 'Soukaku', 'Anby', 'Pulchra'
+    ];
+    const { unitStates, ownedUnits } = buildSyntheticRoster(allUnits, roster);
+    assert(ownedUnits.length === roster.length, `fixture: expected ${roster.length} owned units, got ${ownedUnits.length}`);
+
+    // (a) A T0 on a current/upcoming banner is High; off every banner she gets no such floor.
+    const onBanner = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 10, opportunityIds: ['velina'] });
+    assert(onBanner.unitVerdicts.get('velina') === 'High',
+        `Velina on a banner should be High, got ${onBanner.unitVerdicts.get('velina') ?? 'No'}`);
+    const offBanner = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 10 });
+    assert(offBanner.unitVerdicts.get('velina') !== 'High',
+        `Velina off every banner should not be floored to High, got ${offBanner.unitVerdicts.get('velina')}`);
+
+    // (b) Nangong joins anomaly teams only, so she does not cover attack or armorer stun.
+    const stunGap = findGap(onBanner, 'stunner');
+    assert(stunGap, 'the stunner gap should fire: Nangong cannot join the attack/armorer carries');
+    assert(/Nangong/.test(stunGap.reason), `stunner reason should name Nangong: ${stunGap.reason}`);
+    const tc = onBanner.coverage.teamCoverage;
+    assert(tc.armorer.stunner?.id !== 'nangong' && tc.attack.stunner?.id !== 'nangong',
+        'Nangong must not be the fieldable stunner for attack or armorer teams');
+    assert(tc.anomaly.stunner?.id === 'nangong', 'Nangong should be the anomaly stunner');
+
+    // (c) No mechanical-synergy pair with a unit Nangong can't legally share a team with.
+    const nangongSyn = findGap(onBanner, 'mech-synergy-nangong');
+    for (const u of nangongSyn?.units ?? []) {
+        assert(u.tags.includes('anomaly'), `${u.name} cannot join Nangong, so must not pair with her`);
+    }
+
+    // (d) Remielle is lumen: she does not hold the anomaly sub-DPS slot shut. Without Grace the
+    // only other anomaly sub-DPS is gone, so the gap must open even though Remielle is owned.
+    const noGrace = buildSyntheticRoster(allUnits, roster.filter(n => n !== 'Grace'));
+    const noGraceResult = analyze(allUnits, noGrace.unitStates, noGrace.ownedUnits, { maxRecommendations: 10 });
+    assert(hasGap(noGraceResult, 'subdps-anomaly'),
+        'subdps-anomaly should fire when Remielle is the only anomaly sub-DPS — she triggers no reaction');
+
+    // (e) Narrow roster: only anomaly has premium stun and support.
+    const { assessment } = onBanner;
+    const ORDER = ['Significant Gaps', 'Partial Coverage', 'Solid Foundation', 'Well-Rounded', 'Strong Coverage', 'Fully Loaded'];
+    assert(ORDER.indexOf(assessment.ratingTier) <= ORDER.indexOf('Partial Coverage'),
+        `a narrow anomaly roster should rate at most Partial Coverage, got ${assessment.ratingTier}`);
+    assert(assessment.shapeLabel === 'Narrow: Anomaly', `shape label should be "Narrow: Anomaly", got ${assessment.shapeLabel}`);
+});
+
+// TEST 51: Remielle off-banner — the owner's triple-anomaly table, not a Depth card.
+await runTest(51, 'Remielle verdict follows whether a triple-anomaly team can be assembled', () => {
+    const filler = ['Nicole', 'Anby', 'Billy', 'Astra', 'Trigger'];
+    const verdictFor = (names) => {
+        const { unitStates, ownedUnits } = buildSyntheticRoster(allUnits, [...names, ...filler]);
+        return analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 10 }).unitVerdicts.get('ramiel') ?? 'No';
+    };
+    const cases = [
+        [['Aria'], 'No'],                   // fewer than two other anomaly agents
+        [['Aria', 'Piper'], 'Low'],         // only works through A-rank Piper
+        [['Aria', 'Jane Doe'], 'Medium'],   // two S-rank anomaly, no Velina
+        [['Aria', 'Velina'], 'High'],       // Velina plus another S-rank anomaly
+    ];
+    for (const [names, want] of cases) {
+        const got = verdictFor(names);
+        assert(got === want, `Remielle with ${names.join(' + ')} should be ${want}, got ${got}`);
+    }
+    // A Depth card would claim she adds carry depth; she is a sub-DPS.
+    const { unitStates, ownedUnits } = buildSyntheticRoster(allUnits, ['Aria', 'Jane Doe', ...filler]);
+    const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 10 });
+    assert(!(findGap(result, 'depth-anomaly')?.units ?? []).some(u => u.id === 'ramiel'),
+        'Remielle must not appear as an Anomaly Depth candidate');
+});
+
+// TEST 52: two on-field anomaly carries of different elements react with each other. [GAP-02]
+await runTest(52, 'Two anomaly carries of different elements are each other\'s reaction partner', () => {
+    const pair = buildSyntheticRoster(allUnits, ['Jane Doe', 'Yanagi', 'Nicole', 'Anby', 'Billy']);
+    const pairResult = analyze(allUnits, pair.unitStates, pair.ownedUnits, { maxRecommendations: 10 });
+    assert(!hasGap(pairResult, 'anomaly-partner'),
+        'Jane Doe (physical) and Yanagi (electric) disorder together — no reaction-partner gap');
+    const subdps = findGap(pairResult, 'subdps-anomaly');
+    assert(subdps && /react with each other/.test(subdps.reason),
+        `the sub-DPS gap is still the upgrade, worded as such: ${subdps?.reason}`);
+
+    // A lone carry is not her own partner.
+    const solo = buildSyntheticRoster(allUnits, ['Miyabi', 'Nicole', 'Anby', 'Billy']);
+    const soloGap = findGap(analyze(allUnits, solo.unitStates, solo.ownedUnits, { maxRecommendations: 10 }), 'anomaly-partner');
+    assert(soloGap && /no anomaly partner/.test(soloGap.reason), `Miyabi alone has no partner: ${soloGap?.reason}`);
 });
 
 // Tests that are red ON PURPOSE. Same contract as test-mechanics.mjs's and test-rankings.mjs's

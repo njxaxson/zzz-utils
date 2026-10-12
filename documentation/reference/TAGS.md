@@ -145,6 +145,12 @@ Populated during the comment pass. One row per tag, newest last within a prefix.
 | `[PULL-03]` | `../recommendations/mechanics-fit-score.md` | The recovery debuff reads the scorer's burst model, not a MAX over `damage` values |
 | `[PULL-04]` | `../recommendations/mechanics-fit-score.md` | A carry's self-targeted buff is credited to the teammate who switches it on |
 | `[GAP-01]` | `../recommendations/coverage-and-gaps.md` | An element covered only by a sub-DPS gets its own reason line, not "no DPS options" |
+| `[GAP-02]` | `../recommendations/coverage-and-gaps.md` | A reaction partner is any anomaly agent of another element, any role; lumen never is |
+| `[GAP-03]` | `../recommendations/coverage-and-gaps.md` | Depth is for carries; a titled T0 sub-DPS adds no carry depth |
+| `[GAP-04]` | `../recommendations/coverage-and-gaps.md` | The rating judges team types, not single best units; one premium team type is narrow |
+| `[PULL-05]` | `../recommendations/cards-and-priority.md` | `unitVerdicts` is the only verdict source, for every candidate |
+| `[PULL-06]` | `../recommendations/cards-and-priority.md` | Banner T0s floor at High; off-banner T0s get nothing extra |
+| `[PULL-07]` | `../recommendations/pull-engine.md` | Who can play together is decided by legal teams, honouring `archetypes.avoid` |
 | `[CAL-01]` | `../engine/calibration.md` | The synthetic neutral boss is not in the fitting corpus |
 | `[CAL-02]` | `../engine/calibration.md` | Archetype pooling, and why the map is a second staleness axis |
 | `[CAL-03]` | `../engine/calibration.md` | `MIN_SELF_ANCHOR_CARRIES` is 3 |

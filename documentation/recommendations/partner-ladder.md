@@ -1,80 +1,43 @@
 # The partner ladder
 
-**This is a release stopgap, and it is fitted rather than derived.** Read this page before
-touching any of its numbers.
-
 ## The problem, concretely
 
 You don’t own Remielle. Should the engine tell you to pull her?
 
-It depends almost entirely on one other unit. Remielle only works inside a
-[triple-anomaly](../archetypes/triple-anomaly.md) team, and how good that team is comes down to
-who she is paired with:
+It depends almost entirely on whether you can build the team she needs. Remielle only works
+inside a [triple-anomaly](../archetypes/triple-anomaly.md) team, so the question is whether your
+roster supplies the other two anomaly agents, and how good they are.
+
+## The rule
+
+This is the owner's stated table, implemented directly. It replaced the fitted partner-score
+cutoffs that used to live here.
 
 | Your roster has | Remielle is |
 |----|----|
-| Velina | worth chasing |
-| Vivian | a solid second |
-| Burnice | a fallback |
-| none of the three | not worth recommending at all — there is no sub-DPS base to build on |
+| Fewer than two other anomaly agents | not recommended at all |
+| Two others, but only by counting an A-rank (Piper) | Low |
+| Two other S-rank anomaly agents, but no Velina | Medium |
+| Velina and another S-rank anomaly agent | High |
 
-The engine could not tell those four rosters apart. It reasons about scaling keys, role coverage
-and codependency, and **Velina changes none of them** on a roster that is already anomaly-heavy.
-So Remielle rated identically whether or not you owned the one unit that decides her ceiling.
-Recommendations TEST 43 pins this.
+**It does not matter whether she is on a banner.** The rung *is* her verdict: it lifts her
+priority to the rung and caps it there. A Medium or Low may still fall out of the visible list
+when the roster has more pressing needs; the banner tile shows the verdict either way.
 
-The ladder is a cheap proxy for asking the scorer how good the resulting teams actually are. It
-still [never calls the scorer](pull-engine.md).
+"Velina" is read from data, not named: a **ceiling partner** is a sub-DPS of the needed kind
+whose partner score (`tierToQuality(tier)`, +25 for a declared mutual `synergy.units` pair, +10
+for an unconditional `subdps` pseudoRole) reaches 100. Today that is Velina alone (T0,
+unconditional sub-DPS: 105).
 
-## Scoring a partner
-
-Three declared-data terms, nothing measured:
-
-> `tierToQuality(tier)` + 25 if the two units name each other in `synergy.units` + 10 if the
-> partner's `subdps` pseudoRole is unconditional
-
-Over the five anomaly sub-DPS that exist today:
-
-| Partner | Tier | Base | Mutual pair | Unconditional sub-DPS | Score |
-|----|----|----|----|----|----|
-| Velina | T0 | 95 | +25 | +10 | **130** |
-| Vivian | T1 | 55 | — | +10 | **65** |
-| Burnice | T1 | 55 | — | — | **55** |
-| Yanagi | T1.5 | 40 | — | — | **40** |
-| Grace | T1.5 | 40 | — | — | **40** |
-
-## Rungs
-
-| Score | Rung |
-|----|----|
-| 100 and up | High |
-| 60–99 | Medium |
-| 50–59 | Low |
-| below 50 | no recommendation at all |
-
-The cutoffs are not knife-edge against today's five units, but they were fitted to that
-ordering. A sixth anomaly sub-DPS could land anywhere and should be re-checked by hand rather
-than trusted.
-
-## Who counts as a partner
-
-Only **sub-DPS bases** — a unit tagged with the wanted role *and* declaring a `subdps`
-pseudoRole. Carries are deliberately not enablers.
-
-That is why Aria does not qualify even though she and Remielle are a declared mutual synergy
-pair, and why Miyabi does not either. Pairing Remielle with another carry still leaves the team
-without a base to build around, which is exactly the case the ladder is meant to catch.
+Any agent tagged with the needed kind counts as a body — carries included. Aria and Jane Doe
+together are two S-rank anomaly agents, so they put Remielle at Medium.
 
 ## The third-slot check
 
-A pair is only two thirds of a team, and Remielle is lumen — she starts no reaction herself. So
-whatever the pair lives on needs a third body of a *different* element to fire:
-
-* Vivian beside only Aria is ether on ether, and disorders nothing.
-* Velina beside another wind agent triggers no vortex.
-
-When no other owned agent brings a different disorder element, the pair is worth one rung less
-than it looks and the rung is demoted.
+Remielle is lumen and starts no reaction herself, so the two bodies beside her must bring two
+different elements (a wind body always differs, through vortex). Each rung looks for its best
+pair of different elements; a roster whose anomaly agents all share one element can field the
+team but nothing reacts, and is demoted to Low with a note saying so.
 
 This counts **native** tag holders only. A pseudo-anomaly unit such as Nangong supplies procs but
 does not fill one of the three anomaly slots — the same convention the conditional-buff check
@@ -82,11 +45,12 @@ already uses.
 
 ## What the player sees
 
-| Situation | The note |
+| Situation | What appears |
 |----|----|
-| No eligible partner owned | *Your roster has no sub-DPS to build a team around — pull Velina or Vivian first* |
-| Partner owned but third slot blocked | *Your Velina is the right partner, but every other agent who could fill the third slot shares her element — nothing for her to react with* |
-| Partner owned, a better one exists | *Works with your Vivian, but reaches full potential with Velina* |
+| A rung | A card titled *Remielle: Triple-Anomaly Team* — "Remielle completes a triple-anomaly team with your X and Y" |
+| No rung | No card; she is removed from every list |
+| Both bodies share an element | *Your X and Y share an element — nothing for them to react with* |
+| Below High, a ceiling partner exists | *Works with your X, but reaches full potential with Velina* |
 
 ## It replaces codependency gating, it does not stack
 
@@ -95,45 +59,40 @@ A unit with a ladder does **not** also take the generic
 actually run this unit — and the ladder is the better-informed answer, so charging twice would
 double-count.
 
-The two also behave differently: codependency *drops* a priority by one or two levels, while the
-ladder *caps* it at the rung. A rung of `null` removes the unit from gap results entirely.
-
 ## Who grows a ladder
 
 Only a codependent unit that declares a team-scoped conditional buff keyed on `countTag` — the
-data's own way of saying "I need N teammates of a kind".
+data's own way of saying "I need N teammates of a kind". The count it needs comes from the
+highest `minCount` in that buff.
 
 **Remielle is the only unit that matches today.** SAnby declares no conditional buff, and Ye
 Shunguong declares no buffs at all, so neither grows one.
 
 ## What stays broken
 
-* **The numbers are fitted to a stated preference, not derived from anything.** They reproduce
-  one ordering over five units. They are not a model of partner quality.
-* **The honest fix is still outstanding**, and tracked as
-  [a deferred issue](../issues/deferred/medium-the-partner-ladder-is-a-fitted-stopgap.md). It is
-  for the pull engine to ask the scorer how good a candidate's best achievable team is with and
-  without the candidate. That is a feature, and it would be the first thing to make the two
-  engines share a model rather than a vocabulary.
-* **A** `synergy.units` annotation was tried instead and rejected. It did not move the
-  recommendation at all, and in the scorer it lifted `Promeia/Remielle/Velina` by 80 points as a
-  side effect. Do not reach for it again without measuring both halves.
+* **The pull engine still never asks the scorer** how good the resulting team is. The table is
+  the owner's judgement of team quality, not a measurement of it. See
+  [PULL-009](../issues/deferred/medium-the-partner-ladder-is-a-fitted-stopgap.md).
+* **A `synergy.units` annotation** was tried for this once and rejected: it did not move the
+  recommendation, and in the scorer it lifted `Promeia/Remielle/Velina` by 80 points as a side
+  effect. Do not reach for it again without measuring both halves.
 
 ## Related
 
 * [Pull engine](pull-engine.md) — the flow this sits in
 * [Codependency gating](codependency-gating.md) — the mechanism it replaces for laddered units
-* [Cards and priority](cards-and-priority.md) — what the rung caps
+* [Cards and priority](cards-and-priority.md) — where the rung becomes the verdict
 * [Triple anomaly](../archetypes/triple-anomaly.md) — the team shape this is all about
 
 ## Code notes
 
 ### [PULL-01] The partner ladder block in `pull-engine.js`
 
-The `getPartnerLadder` implementation and its constants (`LADDER_RUNGS`, `LADDER_CUTOFFS`,
-`LADDER_MUTUAL_SYNERGY`, `LADDER_UNCONDITIONAL_SUBDPS`) are this whole page in code — the
-problem, the scoring formula, the cutoff table, the eligibility rule and the third-slot check
-above. Nothing in the implementation is not already covered here; read this page rather than
-reconstructing intent from the code.
+`getPartnerLadder`, `ladderCountTag`, `detectLadderTeam` and the `LADDER_*` constants are this
+page in code: the owner's table, the ceiling-partner score, the third-slot check, and the card
+that gives a laddered unit a verdict whether or not it is on a banner.
 
-
+The table replaced a fitted score ladder (cutoffs 100/60/50 over five sub-DPS) whose only path
+to a verdict was the titled-T0 "Anomaly Depth" card — a card that claimed Remielle added carry
+depth. With that card gone ([GAP-03](coverage-and-gaps.md)), the old ladder could only cap a
+priority she no longer had, and she read Low on every roster.

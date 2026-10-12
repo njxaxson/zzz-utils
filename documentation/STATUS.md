@@ -7,7 +7,7 @@ re-run the commands and update the numbers.
 change belongs in [CHANGELOG.md](CHANGELOG.md); anything that explains a settled ruling belongs
 in [notes/adjudications.md](notes/adjudications.md) behind a tag.
 
-**Last verified:** 2026-09-27.
+**Last verified:** 2026-10-11.
 
 ## Test status
 
@@ -15,7 +15,7 @@ in [notes/adjudications.md](notes/adjudications.md) behind a tag.
 |----|----|
 | mechanics | **36 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
 | rankings | **94 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
-| recommendations | **47 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
+| recommendations | **50 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
 | bucketing | **6 pass, 0 fail** |
 | cohesion fixture | **11/11** owner judgements hold |
 | calibration freshness | both files match the current engine/data fingerprint **and** the current `pools` map |
@@ -37,12 +37,16 @@ why an empty map still matters, and why a green suite is not evidence on its own
 
 ## Deferred
 
-Six. Known, understood, and deliberately not being chased.
+Ten. Known, understood, and deliberately not being chased.
 
 | Issue | Priority | Why it is parked |
 |----|----|----|
 | [Sub-DPS tier halved beside a same-type carry](issues/deferred/high-sub-dps-tier-is-halved-beside-a-same-type-carry.md) | high | Wide blast radius; post-release |
-| [The partner ladder is a fitted stopgap](issues/deferred/medium-the-partner-ladder-is-a-fitted-stopgap.md) | medium | The honest fix is a feature, not a repair |
+| [The partner ladder is a fitted stopgap](issues/deferred/medium-the-partner-ladder-is-a-fitted-stopgap.md) | medium | The honest fix is a feature, not a repair — and must scale |
+| [Vortex teams are not a pull-engine team shape](issues/deferred/medium-vortex-teams-are-not-a-shape-the-pull-engine-knows.md) | medium | A model addition; the banner-T0 rule covers today's case |
+| [Grace at T1.5 holds the anomaly sub-DPS slot shut](issues/deferred/low-grace-t15-holds-the-anomaly-subdps-slot-shut.md) | low | A threshold question, not a defect |
+| [Velina listed only as a Wind fallback](issues/deferred/low-velina-listed-only-as-a-wind-fallback.md) | low | No verdict depends on it now |
+| [Roxy and Norma not counted as sub-DPS](issues/deferred/low-roxy-and-norma-are-not-counted-as-sub-dps.md) | low | No reported wrong verdict yet |
 | [Greed value-scaling cannot be tested](issues/deferred/low-greed-value-scaling-cannot-be-tested-on-todays-roster.md) | low | No fixture can distinguish it until a `greedy: 2` unit exists |
 | [Ye Shunguong under-paid on veils](issues/deferred/low-ye-shunguong-underpaid-four-points-on-veils.md) | low | One pair type, about four points, in the safe direction |
 | [`utility.kaleidoscope` is read only by the UI](issues/deferred/low-kaleidoscope-is-read-only-by-the-ui.md) | low | Only a support declares it, so no fixture could tell a fix from a no-op |
@@ -59,6 +63,6 @@ labels, and [calibration](engine/calibration.md) for the anchors.
 
 ## What shipped last
 
-**Scoring resolves onto a `UnitContext`; `units.json` data is now read-only**, 2026-09-22.
-Behaviour-neutral: byte-identical corpus, identical calibration anchors.
+**Pull engine: banner T0s, join-aware coverage, the narrow-roster rating**, 2026-10-11. Pull
+engine only; no scorer or data change.
 Full history in [CHANGELOG.md](CHANGELOG.md).

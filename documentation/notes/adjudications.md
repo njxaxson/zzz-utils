@@ -671,3 +671,21 @@ The bottom five were already true before they were asserted; they are pinned so 
 true by accident. Two structural traps that extension exposed are recorded in
 [known pitfalls](known-pitfalls.md) — a non-viable chain member voiding a whole boss, and an
 "every" quantifier that expires when the set it quantified over grows.
+
+### Remielle's pull verdict is the triple-anomaly table, and carries count as bodies
+
+Owner ruling, 2026-10-11, replacing the fitted partner ladder's "carries are not enablers" rule.
+Whether to pull Remielle depends on whether you can build her triple-anomaly team, on a banner or
+off: fewer than two other anomaly agents is no; two that only works through A-rank Piper is Low;
+two S-rank anomaly agents without Velina is Medium; Velina and another S-rank is High. Aria and
+Jane Doe count as bodies — they are anomaly agents, and the team is three of them. The earlier
+"Medium without Velina" ruling above still holds; it is now one row of this table.
+See [partner ladder](../recommendations/partner-ladder.md).
+
+### A T0 on a banner is a strong pull; a T0 off every banner is noise
+
+Owner ruling, 2026-10-11. An unowned limited T0 on the current or upcoming banners is High unless
+the engine has a concrete reason against it (codependency, the partner ladder, or a support or
+stunner no owned carry can field). Making every T0 High was rejected: it would bury the roster's
+mechanical needs under "pull the best units" for any new player. See
+[PULL-06](../recommendations/cards-and-priority.md#pull-06-the-banner-t0-floor).

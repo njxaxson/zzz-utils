@@ -8,7 +8,8 @@ import {
     getInitials, getCharacterImageUrl
 } from '../common/roster-ui.js';
 
-import { analyze, getUnitElement, checkTeamDependencies } from '../common/pull-engine.js';
+import { analyze, getUnitElement } from '../common/pull-engine.js';
+import { normalizeBannerSchedule } from '../common/banners.js';
 
 const PAGE_STORAGE_KEY = 'zzz-pull-recommendations';
 
@@ -37,31 +38,6 @@ async function loadBanners() {
     } catch {
         return null;
     }
-}
-
-/**
- * Globally dedupe IDs: active order first, then upcoming; later duplicates removed.
- * @returns {{ activeIds: string[], upcomingIds: string[], fullOrder: string[] }}
- */
-function normalizeBannerSchedule(raw) {
-    const seen = new Set();
-    const activeIds = [];
-    for (const id of raw.active) {
-        if (typeof id !== 'string') continue;
-        const k = id.trim();
-        if (!k || seen.has(k)) continue;
-        seen.add(k);
-        activeIds.push(k);
-    }
-    const upcomingIds = [];
-    for (const id of raw.upcoming) {
-        if (typeof id !== 'string') continue;
-        const k = id.trim();
-        if (!k || seen.has(k)) continue;
-        seen.add(k);
-        upcomingIds.push(k);
-    }
-    return { activeIds, upcomingIds, fullOrder: [...activeIds, ...upcomingIds] };
 }
 
 /**
@@ -125,43 +101,10 @@ function applyBannerRecommendationOrdering(recommendations, bumpWindowIds, banne
     return decorated.map(d => d.rec);
 }
 
-/**
- * Verdict for a unit, sourced from its actual recommendation card when one exists —
- * rec.priority already reflects the engine's composite-priority escalation (3+ Medium
- * gap contributions → High) and codependent-dependency drop, so this keeps tile
- * verdicts in lockstep with the recommendation labels instead of re-deriving a
- * possibly-lower verdict from a single raw gap.
- */
-function bannerTileVerdictClass(unitId, allGaps, ownedUnits, allUnits, recommendations) {
-    const recMatch = recommendations?.find(rec => rec.units.some(u => u.id === unitId));
-    if (recMatch) return recMatch.priority.toLowerCase();
-
-    const RANK = { 'High': 2, 'Medium': 1, 'Low': 0 };
-    const ORDERED = ['high', 'medium', 'low', 'no'];
-    let best = -1;
-    let bestPriority = null;
-    for (const gap of allGaps) {
-        if (!gap.units?.some(u => u.id === unitId)) continue;
-        const rank = RANK[gap.priority] ?? -1;
-        if (rank > best) {
-            best = rank;
-            bestPriority = gap.priority;
-        }
-    }
-    if (bestPriority === null) return 'no';
-
-    const verdict = bestPriority.toLowerCase();
-    const unit = allUnits.find(u => u.id === unitId);
-    if (unit && ownedUnits && allUnits) {
-        const dep = checkTeamDependencies(unit, ownedUnits, allUnits);
-        if (dep.hasUnmetDependency || dep.cannotFormTeam) {
-            const idx = ORDERED.indexOf(verdict);
-            const severe = dep.cannotFormTeam || dep.cannotActivateBuffs;
-            const levels = severe ? 2 : 1;
-            return ORDERED[Math.min(idx + levels, ORDERED.length - 1)];
-        }
-    }
-    return verdict;
+// The engine's per-unit verdict, the same one its cards carry. [PULL-05]
+function bannerTileVerdictClass(unitId, unitVerdicts) {
+    const priority = unitVerdicts?.get(unitId);
+    return priority ? priority.toLowerCase() : 'no';
 }
 
 function verdictLabel(verdictClass) {
@@ -248,12 +191,16 @@ function runAnalysis() {
 
     setTimeout(() => {
         try {
-            const analyzed = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 10 });
+            const schedule = bannersData ? normalizeBannerSchedule(bannersData) : null;
+            const analyzed = analyze(allUnits, unitStates, ownedUnits, {
+                maxRecommendations: 10,
+                opportunityIds: schedule?.fullOrder ?? []
+            });
             let recommendations = analyzed.recommendations;
             let bannerMeta = null;
 
-            if (bannersData) {
-                const { activeIds, upcomingIds, fullOrder } = normalizeBannerSchedule(bannersData);
+            if (schedule) {
+                const { activeIds, upcomingIds, fullOrder } = schedule;
                 const bumpWindow = computeBannerBumpWindow(activeIds, upcomingIds);
                 const bannerIndexMap = buildBannerIndexMap(fullOrder);
                 recommendations = applyBannerRecommendationOrdering(
@@ -311,16 +258,13 @@ function renderBannerTiles(results) {
 
     const { activeIds, upcomingIds, unitById } = results.bannerMeta;
     const unitStates = getUnitStates();
-    const { allGaps } = results;
-    const allUnits = getAllUnits();
-    const ownedUnits = allUnits.filter(u => unitStates[u.id]?.owned);
 
     function tilesForIds(ids) {
         return ids
             .filter(id => unitById.has(id) && !unitStates[id]?.owned)
             .map(id => {
                 const unit = unitById.get(id);
-                const verdict = bannerTileVerdictClass(id, allGaps, ownedUnits, allUnits, results.recommendations);
+                const verdict = bannerTileVerdictClass(id, results.unitVerdicts);
                 return createBannerUnitTile(unit, verdict);
             })
             .join('');
@@ -390,7 +334,7 @@ function renderAssessment(assessment) {
         <div class="roster-assessment-card" style="border-left-color: ${assessment.ratingColor}">
             <div class="assessment-header">
                 <span class="assessment-label">Roster Health</span>
-                <span class="assessment-rating" style="color: ${assessment.ratingColor}">${assessment.ratingTier}</span>
+                <span class="assessment-rating" style="color: ${assessment.ratingColor}">${assessment.ratingTier}${assessment.shapeLabel ? ` · ${assessment.shapeLabel}` : ''}</span>
             </div>
             <p class="assessment-summary">${assessment.summary}</p>
         </div>

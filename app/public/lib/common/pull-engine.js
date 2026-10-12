@@ -123,25 +123,52 @@ function getDisorderElement(unit) {
     return getElementVariant(unit) || 'unknown';
 }
 
-// True if either unit's join is satisfied by the other's tags, or they share a join tag.
-function canJoinWith(a, b) {
-    if (isValidTeam(a, b)) return true;
-    const aJoin = a.join ?? [];
-    const bJoin = b.join ?? [];
-    const aTags = new Set(a.tags);
-    const bTags = new Set(b.tags);
-    if (a.faction) { aTags.add(a.faction); }
-    if (b.faction) { bTags.add(b.faction); }
-    const aJoinExpanded = aJoin.map(j => j === 'faction' && a.faction ? a.faction : j);
-    const bJoinExpanded = bJoin.map(j => j === 'faction' && b.faction ? b.faction : j);
-    if (aJoinExpanded.some(tag => bTags.has(tag))) return true;
-    if (bJoinExpanded.some(tag => aTags.has(tag))) return true;
-    const aJoinSet = new Set(aJoinExpanded);
-    return bJoinExpanded.some(tag => aJoinSet.has(tag));
+// Team legality against the owned roster: can two units share a real 3-unit team, with an owned
+// unit in the third slot? The third may not belong to another archetype, and no member may
+// declare the carry's archetype in `archetypes.avoid`. [PULL-07]
+function makeTeamLegality(ownedUnits) {
+    const cache = new Map();
+    const carryArchetype = (u) => (isSubdps(u) ? null : getPrimaryDPSArchetype(u));
+    const avoids = (u, arch) => !!arch && (u.mechanics?.archetypes?.avoid ?? []).includes(arch);
+
+    function canShareTeam(a, b) {
+        if (a.id === b.id) return false;
+        const key = a.id < b.id ? `${a.id}|${b.id}` : `${b.id}|${a.id}`;
+        if (cache.has(key)) return cache.get(key);
+        const arch = carryArchetype(a) ?? carryArchetype(b);
+        let ok = false;
+        for (const t of (avoids(a, arch) || avoids(b, arch)) ? [] : ownedUnits) {
+            if (t.id === a.id || t.id === b.id) continue;
+            const tArch = getPrimaryDPSArchetype(t);
+            if (arch && tArch && tArch !== arch) continue;
+            if (avoids(t, arch)) continue;
+            if (isValidTeam(a, b, t)) { ok = true; break; }
+        }
+        cache.set(key, ok);
+        return ok;
+    }
+
+    const carriesByArch = {};
+    for (const arch of DPS_ARCHETYPES) {
+        carriesByArch[arch] = ownedUnits.filter(u => carryArchetype(u) === arch);
+    }
+
+    // Can this unit join a legal team with at least one owned carry of `arch`?
+    function canFieldWith(unit, arch) {
+        return carriesByArch[arch].some(c => canShareTeam(unit, c));
+    }
+
+    return { canShareTeam, canFieldWith, carriesByArch };
 }
 
 function isLumenElement(unit) {
     return getUnitElement(unit) === 'lumen';
+}
+
+// An anomaly agent that reacts with a teammate of another element: disorder, or vortex when wind.
+// Any role — two on-field carries react too. Lumen has no anomaly gauge. [GAP-02]
+function isReactionPartner(unit) {
+    return unit.tags.includes('anomaly') && !isLumenElement(unit);
 }
 
 function w(value) {
@@ -496,18 +523,12 @@ export function checkTeamDependencies(candidate, ownedUnits, allUnits) {
     return { hasUnmetDependency, cannotFormTeam, cannotActivateBuffs, notes };
 }
 
-// A fitted release stopgap: rates the best partner the roster offers a codependent unit, so
-// Remielle is not rated the same with and without Velina. Fitted, not derived. [PULL-01]
+// Rates whether the roster can assemble the full team a count-tag codependent needs, from the
+// owner's stated table rather than fitted cutoffs. [PULL-01]
 
 const LADDER_RUNGS = ['High', 'Medium', 'Low'];
-
-// Cutoffs are fitted to today's five anomaly sub-DPS (Velina 130 down to Grace 40) — a
-// sixth could land anywhere and should be re-checked by hand. [PULL-01]
-const LADDER_CUTOFFS = [
-    { min: 100, rung: 'High' },
-    { min:  60, rung: 'Medium' },
-    { min:  50, rung: 'Low' }
-];
+// A ceiling partner: a T0 unconditional sub-DPS of the needed kind (today, Velina).
+const LADDER_TOP_PARTNER = 100;
 const LADDER_MUTUAL_SYNERGY = 25;         // both units name each other in synergy.units
 const LADDER_UNCONDITIONAL_SUBDPS = 10;   // partner's subdps pseudoRole is unconditional
 
@@ -530,75 +551,75 @@ function declaresSubdps(unit) {
     return pr.some(e => (typeof e === 'string' ? e : e?.role) === 'subdps');
 }
 
-function demoteRung(rung) {
-    const i = LADDER_RUNGS.indexOf(rung);
-    return i < 0 || i + 1 >= LADDER_RUNGS.length ? null : LADDER_RUNGS[i + 1];
-}
-
-// The tag this candidate needs N of, or null if it declares no such conditional buff.
+// The tag this candidate needs N of, and N (self included), or null if it declares no such
+// conditional buff.
 function ladderCountTag(candidate) {
     if (!candidate.mechanics?.scaling?.codependent) return null;
     for (const spec of Object.values(getTeammateBuffs(candidate))) {
         if (!isTeamScopedConditional(spec)) continue;
         if (maxConditionalValue(spec) <= 0) continue;
-        const tag = spec.cases.map(c => c.when?.countTag).find(Boolean);
-        if (tag) return tag;
+        const counted = spec.cases.filter(c => c.when?.countTag);
+        if (counted.length === 0) continue;
+        const minCount = Math.max(...counted.map(c => c.when.minCount ?? 1));
+        return { tag: counted[0].when.countTag, minCount };
     }
     return null;
 }
 
 /**
- * Rate the best partner the owned roster offers this candidate, or null if it has no ladder.
- * @returns {{ rung: 'High'|'Medium'|'Low'|null, partner, better, blocked }} — rung: null
- *          means don't recommend this unit at all.
+ * Can the owned roster fill this candidate's team? (Remielle: two other anomaly agents.)
+ *   fewer than the needed bodies          → null (don't recommend)
+ *   ceiling partner + another S-rank      → High
+ *   enough S-rank bodies                  → Medium
+ *   only reachable through an A-rank      → Low
+ * The team's other bodies must bring two different elements, or nothing reacts; a roster
+ * whose bodies all share one element is demoted to Low.
+ * @returns {{ rung, partner, second, better, blocked }} or null if the unit has no ladder.
  */
 export function getPartnerLadder(candidate, ownedUnits, allUnits = []) {
-    const tag = ladderCountTag(candidate);
-    if (!tag) return null;
+    const need = ladderCountTag(candidate);
+    if (!need) return null;
+    const { tag, minCount } = need;
+    const othersNeeded = Math.max(1, minCount - 1);
 
     const partnerScore = (partner) =>
         tierToQuality(partner.tier)
         + (isMutualSynergyPair(candidate, partner) ? LADDER_MUTUAL_SYNERGY : 0)
         + (hasUnconditionalSubdps(partner) ? LADDER_UNCONDITIONAL_SUBDPS : 0);
+    const isTopPartner = (u) => declaresSubdps(u) && partnerScore(u) >= LADDER_TOP_PARTNER;
+    const byTier = (a, b) => a.tier - b.tier;
+    const differ = (a, b) => getDisorderElement(a) !== getDisorderElement(b);
 
-    // Eligible partners are sub-DPS bases only — carries are deliberately not enablers, even
-    // a mutual-synergy one like Aria. See partner-ladder.md#who-counts-as-a-partner.
-    const partners = ownedUnits.filter(u =>
-        u.id !== candidate.id && u.tags.includes(tag) && declaresSubdps(u)
-    );
+    const others = ownedUnits.filter(u => u.id !== candidate.id && u.tags.includes(tag)).sort(byTier);
+    const sRank = others.filter(u => u.rank === 'S');
+    const tops = sRank.filter(isTopPartner);
 
-    let best = null;
-    for (const partner of partners) {
-        const score = partnerScore(partner);
-        let rung = LADDER_CUTOFFS.find(c => score >= c.min)?.rung ?? null;
+    // Ceiling partners the roster lacks, for the "reaches full potential with" note.
+    const better = allUnits
+        .filter(u => u.id !== candidate.id && u.tags.includes(tag) && isTopPartner(u) &&
+            !ownedUnits.some(o => o.id === u.id))
+        .map(u => ({ id: u.id, name: u.name }));
 
-        // Needs a third, different-element body to fire (partner-ladder.md#the-third-slot-
-        // check); demoted a rung if not. Native tag holders only, matching
-        // checkTeamDependencies step 1b.
-        const partnerElement = getDisorderElement(partner);
-        const blocked = rung !== null && !ownedUnits.some(u =>
-            u.id !== candidate.id && u.id !== partner.id && u.tags.includes(tag) &&
-            getDisorderElement(u) !== partnerElement && getDisorderElement(u) !== 'unknown'
-        );
-        if (blocked) rung = demoteRung(rung);
-
-        const rank = rung === null ? -1 : LADDER_RUNGS.length - LADDER_RUNGS.indexOf(rung);
-        if (!best || rank > best.rank || (rank === best.rank && score > best.score)) {
-            best = { rung, partner, score, rank, blocked };
-        }
+    if (others.length < othersNeeded) {
+        return { rung: null, partner: null, second: null, better, blocked: false, have: others.length, need: othersNeeded };
     }
 
-    const floor = best ? best.score : 0;
-    // Partners that would rate above what the roster currently offers.
-    const better = allUnits
-        .filter(u => u.id !== candidate.id && u.tags.includes(tag) && declaresSubdps(u))
-        .map(u => ({ unit: u, score: partnerScore(u) }))
-        .filter(e => e.score > floor)
-        .sort((a, b) => b.score - a.score)
-        .map(e => ({ id: e.unit.id, name: e.unit.name }));
+    // The best pair at each rung, requiring two different elements.
+    const pairFrom = (firsts, seconds) => {
+        for (const a of firsts) {
+            const b = seconds.find(x => x.id !== a.id && differ(a, x));
+            if (b) return [a, b];
+        }
+        return null;
+    };
+    const high = pairFrom(tops, sRank);
+    const medium = pairFrom(sRank, sRank);
+    const low = pairFrom(others, others);
 
-    if (!best) return { rung: null, partner: null, better, blocked: false };
-    return { rung: best.rung, partner: best.partner, better, blocked: best.blocked };
+    if (high) return { rung: 'High', partner: high[0], second: high[1], better: [], blocked: false };
+    if (medium) return { rung: 'Medium', partner: medium[0], second: medium[1], better, blocked: false };
+    if (low) return { rung: 'Low', partner: low[0], second: low[1], better, blocked: false };
+    return { rung: 'Low', partner: others[0], second: others[1], better, blocked: true };
 }
 
 function sortCandidates(units, ownedDPSUnits = []) {
@@ -626,7 +647,7 @@ const SUPPORT_GOOD_FIT = 15;
  * Run the full pull recommendation analysis.
  * @returns {{ assessment, recommendations, coverage, allGaps, compositeScore, calibration }}
  */
-export function analyze(allUnits, unitStates, ownedUnits, { maxRecommendations = 5 } = {}) {
+export function analyze(allUnits, unitStates, ownedUnits, { maxRecommendations = 5, opportunityIds = [] } = {}) {
     const ownedDPS = { attack: [], anomaly: [], rupture: [], armorer: [] };
     // TODO(armorer subdps): no armorer sub-DPS units exist yet; when one ships, add an
     // 'armorer' bucket here and a corresponding gap detector (cf. detectSubdpsGap).
@@ -698,18 +719,21 @@ export function analyze(allUnits, unitStates, ownedUnits, { maxRecommendations =
     for (const u of ownedUnits) ownedByName[u.name] = u;
 
     const sortWithDPS = (units) => sortCandidates(units, allOwnedDPS);
+    const legality = makeTeamLegality(ownedUnits);
+    const opportunitySet = new Set(opportunityIds);
 
     detectDPSGaps(gaps, dpsQuality, ownedDPS, unownedLimitedS, sortWithDPS);
-    detectSupportGaps(gaps, ownedSupports, ownedDPS, dpsQuality, unownedLimitedS);
-    detectStunnerGap(gaps, stunnerQuality, ownedStunners, dpsQuality, unownedLimitedS, sortWithDPS);
-    detectStunnerElementGap(gaps, ownedStunners, elementQuality, unownedLimitedS, sortWithDPS);
+    detectSupportGaps(gaps, ownedSupports, ownedDPS, dpsQuality, unownedLimitedS, legality);
+    detectStunnerGap(gaps, stunnerQuality, ownedStunners, dpsQuality, unownedLimitedS, sortWithDPS, legality);
+    detectStunnerElementGap(gaps, ownedStunners, ownedByElement, elementQuality, unownedLimitedS, sortWithDPS, legality);
     detectSubdpsGap(gaps, dpsQuality, ownedSubdps, unownedLimitedS, sortWithDPS, ownedUnits);
     detectAnomalyPartnerGap(gaps, ownedUnits, ownedDPS, ownedSubdps, unownedLimitedS, dpsQuality);
     detectElementGaps(gaps, elementQuality, ownedByElement, unownedLimitedS, sortWithDPS);
     detectSynergies(gaps, ownedUnits, unownedLimitedS, unitByName, ownedByName, dpsQuality, elementQuality);
     const unitGapScoreOverrides = new Map(); // individual unit scores for mech-synergy gaps
-    detectMechanicalSynergies(gaps, ownedUnits, unownedLimitedS, dpsQuality, elementQuality, unitGapScoreOverrides);
+    detectMechanicalSynergies(gaps, ownedUnits, unownedLimitedS, dpsQuality, elementQuality, unitGapScoreOverrides, legality);
     detectDepthGap(gaps, ownedDPS, dpsQuality, unownedLimitedS, sortWithDPS);
+    detectBannerT0s(gaps, unownedLimitedS, opportunitySet);
 
     // Remove (not just deprioritize) codependent units that can't form a team or activate
     // their buffs, and laddered units with no rung — see codependency-gating.md and
@@ -724,6 +748,7 @@ export function analyze(allUnits, unitStates, ownedUnits, { maxRecommendations =
         if (ladder) {
             ladders.set(candidate.id, ladder);
             if (ladder.rung === null) excludedIds.add(candidate.id);
+            else detectLadderTeam(gaps, candidate, ladder);
         }
     }
     if (excludedIds.size > 0) {
@@ -842,8 +867,8 @@ export function analyze(allUnits, unitStates, ownedUnits, { maxRecommendations =
         const notes = [];
         if (ladder.rung === null) {
             notes.push({
-                text: `Your roster has no sub-DPS to build a team around — pull ${ladder.better.slice(0, 3).map(p => p.name).join(' or ')} first`,
-                providers: ladder.better
+                text: `Needs ${ladder.need} other agents of her kind on your roster — you have ${ladder.have}`,
+                providers: []
             });
         } else {
             if (ladder.blocked) {
@@ -851,7 +876,7 @@ export function analyze(allUnits, unitStates, ownedUnits, { maxRecommendations =
                 // valuable pull with X" sentence whenever providers are present, which
                 // cannot express an element clash.
                 notes.push({
-                    text: `Your ${ladder.partner.name} is the right partner, but every other agent who could fill the third slot shares her element — nothing for her to react with`,
+                    text: `Your ${ladder.partner.name} and ${ladder.second.name} share an element — nothing for them to react with`,
                     providers: []
                 });
             }
@@ -887,6 +912,41 @@ export function analyze(allUnits, unitStates, ownedUnits, { maxRecommendations =
         return result;
     }
 
+    // Banner T0s floor at High; a support or stunner no owned carry can field floors a level
+    // lower. Applied before the codependency/ladder penalty so that still discounts. [PULL-06]
+    function bannerFloor(unit) {
+        if (!isBannerT0(unit, opportunitySet)) return null;
+        if (hasDPSRole(unit)) return 'High';
+        return DPS_ARCHETYPES.some(a => legality.canFieldWith(unit, a)) ? 'High' : 'Medium';
+    }
+    function raiseTo(current, floor) {
+        return floor && PRIORITY_VALS[floor] > PRIORITY_VALS[current] ? floor : current;
+    }
+    // A laddered unit's rung is its verdict: raised to it here, capped at it by the penalty. [PULL-01]
+    function unitVerdict(unit, basePriority) {
+        const floored = raiseTo(raiseTo(basePriority, bannerFloor(unit)), ladders.get(unit.id)?.rung ?? null);
+        return unitPenalty(unit, floored);
+    }
+
+    // Card priority = highest composite priority among its first five units
+    function cardPriorityOf(card) {
+        return card.profiles.slice(0, 5)
+            .map(p => getCompositePriority(p))
+            .reduce((best, p) => PRIORITY_VALS[p] > PRIORITY_VALS[best] ? p : best, 'Low');
+    }
+
+    // One verdict per candidate, from the same steps the cards use, for every card — not just the
+    // ones that make the list. [PULL-05]
+    const unitVerdicts = new Map();
+    for (const card of sortedCards) {
+        const cardPriority = cardPriorityOf(card);
+        card.profiles.forEach((profile, i) => {
+            const base = i < 5 ? cardPriority : getCompositePriority(profile);
+            const { priority } = unitVerdict(profile.unit, base);
+            if (priority) unitVerdicts.set(profile.unit.id, priority);
+        });
+    }
+
     const recommendations = [];
     for (const card of sortedCards) {
         if (recommendations.length >= maxRecommendations) break;
@@ -894,10 +954,7 @@ export function analyze(allUnits, unitStates, ownedUnits, { maxRecommendations =
         const cardProfiles = card.profiles.slice(0, 5);
         const cardUnits = cardProfiles.map(p => p.unit);
 
-        // Card priority = highest composite priority among its units
-        const cardPriority = cardProfiles
-            .map(p => getCompositePriority(p))
-            .reduce((best, p) => PRIORITY_VALS[p] > PRIORITY_VALS[best] ? p : best, 'Low');
+        const cardPriority = cardPriorityOf(card);
         const cardPriorityRank = GAP_PRIORITY_RANK[cardPriority] ?? 0;
 
         const isMechSynergyCard = card.gap.id.startsWith('mech-synergy-') && card.gap.bestPairName;
@@ -953,7 +1010,7 @@ export function analyze(allUnits, unitStates, ownedUnits, { maxRecommendations =
         // Each penalized group splits off as its own unit-titled recommendation.
         const groups = new Map(); // priority (or 'null') → { priority, profiles, notes }
         for (const profile of cardProfiles) {
-            const { priority, notes } = unitPenalty(profile.unit, cardPriority);
+            const { priority, notes } = unitVerdict(profile.unit, cardPriority);
             const key = String(priority);
             if (!groups.has(key)) groups.set(key, { priority, profiles: [], notes: null });
             const g = groups.get(key);
@@ -987,19 +1044,22 @@ export function analyze(allUnits, unitStates, ownedUnits, { maxRecommendations =
 
     const limitedSCount = ownedUnits.filter(u => u.rank === 'S' && u.limited).length;
     const highPriorityGapCount = gaps.filter(g => g.priority === 'High').length;
+    const teamCoverage = buildTeamCoverage(dpsQuality, ownedStunners, ownedSupports, legality);
     const assessment = buildAssessment(
         dpsQuality, supportQuality, stunnerQuality, elementQuality,
         compositeScore, limitedSCount,
         { ownedDPS, ownedSupports, ownedStunners },
-        highPriorityGapCount, gaps
+        highPriorityGapCount, gaps, teamCoverage
     );
 
     return {
         assessment,
         recommendations: filteredRecommendations,
+        unitVerdicts,
         coverage: {
             dpsQuality, supportQuality, stunnerQuality, elementQuality,
-            ownedDPS, ownedSubdps, ownedSupports, ownedStunners, ownedByElement
+            ownedDPS, ownedSubdps, ownedSupports, ownedStunners, ownedByElement,
+            teamCoverage
         },
         allGaps: gaps,
         compositeScore,
@@ -1045,7 +1105,7 @@ function detectDPSGaps(gaps, dpsQuality, ownedDPS, unownedLimitedS, sortCandidat
     }
 }
 
-function detectSupportGaps(gaps, ownedSupports, ownedDPS, dpsQuality, unownedLimitedS) {
+function detectSupportGaps(gaps, ownedSupports, ownedDPS, dpsQuality, unownedLimitedS, legality) {
     const ownedLimitedSupports = ownedSupports.filter(u => u.rank === 'S' && u.limited);
     const supportCandidates = unownedLimitedS.filter(u =>
         !hasDPSRole(u) && (u.tags.includes('support') || u.tags.includes('defense'))
@@ -1066,15 +1126,6 @@ function detectSupportGaps(gaps, ownedSupports, ownedDPS, dpsQuality, unownedLim
     // Per-archetype: only premium (limited S) supports count toward coverage — A-ranks are
     // stopgaps and shouldn't mask the need for a real one.
     const hasFewPremiumSupports = ownedLimitedSupports.length <= 1;
-    const DPS_ARCH_SET = new Set(DPS_ARCHETYPES);
-
-    function canJoinArchetype(unit, arch) {
-        const join = unit.join ?? [];
-        if (join.includes(arch)) return true;
-        // If join doesn't reference any DPS archetype, the unit is not
-        // archetype-restricted (e.g. Nicole joins on assist:evasive).
-        return !join.some(tag => DPS_ARCH_SET.has(tag));
-    }
 
     for (const arch of DPS_ARCHETYPES) {
         if (dpsQuality[arch] <= 0) continue;
@@ -1082,8 +1133,10 @@ function detectSupportGaps(gaps, ownedSupports, ownedDPS, dpsQuality, unownedLim
         const primaryUnits = ownedDPS[arch].filter(u => !isSubdps(u));
         if (primaryUnits.length === 0) continue;
         const bestDPS = primaryUnits.reduce((best, u) => u.tier < best.tier ? u : best);
+        // Legal teams with this carry, not join tags alone — Sunna reaches anomaly through Nangong. [PULL-07]
+        const canJoinArchetype = (unit) => legality.canShareTeam(unit, bestDPS);
 
-        const archCompatibleOwned = ownedLimitedSupports.filter(s => canJoinArchetype(s, arch));
+        const archCompatibleOwned = ownedLimitedSupports.filter(s => canJoinArchetype(s));
         const bestOwnedFit = archCompatibleOwned.reduce(
             (max, s) => Math.max(max, mechanicsFitScore(s, bestDPS)), 0
         );
@@ -1091,7 +1144,7 @@ function detectSupportGaps(gaps, ownedSupports, ownedDPS, dpsQuality, unownedLim
 
         const MIN_CANDIDATE_FIT = SUPPORT_GOOD_FIT / 3;
         const ranked = supportCandidates
-            .filter(c => canJoinArchetype(c, arch))
+            .filter(c => canJoinArchetype(c))
             .map(c => ({ unit: c, fit: mechanicsFitScore(c, bestDPS) }))
             .filter(c => c.fit > bestOwnedFit && c.fit >= MIN_CANDIDATE_FIT)
             .sort((a, b) => {
@@ -1102,7 +1155,7 @@ function detectSupportGaps(gaps, ownedSupports, ownedDPS, dpsQuality, unownedLim
         if (ranked.length === 0) continue;
 
         // Fit below a minimum threshold counts as zero — a tiny incidental
-        // contribution (e.g. Lucia's cd:1 for attackers) is not real coverage.
+        // contribution is not real coverage.
         const effectiveFit = bestOwnedFit < 5 ? 0 : bestOwnedFit;
         const coverage = effectiveFit / SUPPORT_GOOD_FIT;
         // High base when DPS is strong OR when the player has very few premium
@@ -1124,8 +1177,34 @@ function detectSupportGaps(gaps, ownedSupports, ownedDPS, dpsQuality, unownedLim
     }
 }
 
-function detectStunnerGap(gaps, stunnerQuality, ownedStunners, dpsQuality, unownedLimitedS, sortCandidatesFn) {
-    const limitedStunnerCount = ownedStunners.filter(u => u.rank === 'S' && u.limited).length;
+function detectStunnerGap(gaps, stunnerQuality, ownedStunners, dpsQuality, unownedLimitedS, sortCandidatesFn, legality) {
+    const ownedLimitedStunners = ownedStunners.filter(u => u.rank === 'S' && u.limited);
+    const limitedStunnerCount = ownedLimitedStunners.length;
+
+    // A limited stunner only covers the team types it can legally join. [PULL-07]
+    const PLAYED_QUALITY = 40;
+    const played = DPS_ARCHETYPES.filter(a => dpsQuality[a] >= PLAYED_QUALITY);
+    const uncovered = played.filter(a => !ownedLimitedStunners.some(s => legality.canFieldWith(s, a)));
+
+    if (limitedStunnerCount > 0 && uncovered.length > 0) {
+        const fallback = ownedStunners.filter(s => uncovered.some(a => legality.canFieldWith(s, a)));
+        const fallbackBest = getBestTier(fallback);
+        const fallbackQuality = fallbackBest !== null ? tierToQuality(fallbackBest) : 0;
+        const score = fallbackQuality <= 10 ? 70 :
+                      fallbackQuality <= 25 ? 55 :
+                      fallbackQuality <= 40 ? 45 : 35;
+        const names = ownedLimitedStunners.map(u => u.name);
+        const nameList = names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
+        const archList = uncovered.length === 1 ? uncovered[0] : `${uncovered.slice(0, -1).join(', ')} or ${uncovered.at(-1)}`;
+        const reason = `Your limited stunner${names.length === 1 ? '' : 's'} ${nameList} can't join your ${archList} teams — a premium stunner for those would greatly strengthen them`;
+        const candidates = sortCandidatesFn(unownedLimitedS.filter(u =>
+            u.tags.includes('stun') && uncovered.some(a => legality.canFieldWith(u, a))
+        ));
+        if (candidates.length > 0) {
+            gaps.push({ id: 'stunner', title: 'Premium Stunner', reason, score, units: candidates });
+        }
+        return;
+    }
 
     if (limitedStunnerCount === 0) {
         const score = stunnerQuality <= 10 ? 70 :
@@ -1158,15 +1237,20 @@ function detectStunnerGap(gaps, stunnerQuality, ownedStunners, dpsQuality, unown
 }
 
 function detectSubdpsGap(gaps, dpsQuality, ownedSubdps, unownedLimitedS, sortCandidatesFn, ownedUnits) {
-    const anomBest = getBestTier(ownedSubdps.anomaly);
+    const anomBest = getBestTier(ownedSubdps.anomaly.filter(u => isReactionPartner(u)));
     const anomSubdpsQuality = anomBest !== null ? tierToQuality(anomBest) : 0;
     if (dpsQuality.anomaly >= 50 && anomSubdpsQuality < 40) {
         const score = anomSubdpsQuality === 0 ? 45 : 35;
-        const reason = anomSubdpsQuality === 0
+        // Two on-field carries of different elements already react; the sub-DPS is the upgrade. [GAP-02]
+        const carries = ownedUnits.filter(u => isReactionPartner(u) && !isSubdps(u, ownedUnits));
+        const carriesReact = carries.some(a => carries.some(b => getDisorderElement(a) !== getDisorderElement(b)));
+        const reason = carriesReact && anomSubdpsQuality === 0
+            ? 'Your anomaly carries can react with each other, but an off-field sub-DPS partner is the stronger setup'
+            : anomSubdpsQuality === 0
             ? 'Anomaly teams perform best with two anomaly agents — you need a sub-DPS partner'
             : 'Anomaly teams perform best with two anomaly agents — your current sub-DPS is too weak to reliably fill this role';
         const candidates = sortCandidatesFn(
-            unownedLimitedS.filter(u => u.tags.includes('anomaly') && isSubdps(u, ownedUnits))
+            unownedLimitedS.filter(u => isSubdps(u, ownedUnits) && isReactionPartner(u))
         );
         if (candidates.length > 0) {
             gaps.push({
@@ -1201,18 +1285,20 @@ function detectAnomalyPartnerGap(gaps, ownedUnits, ownedDPS, ownedSubdps, unowne
     const primaryAnomalyOwned = ownedDPS.anomaly.filter(u => !isSubdps(u));
     if (primaryAnomalyOwned.length === 0) return;
 
-    // Lumen units don't generate disorders (no anomaly gauge) — they don't count as disorder
-    // partners, and they shouldn't be evaluated for disorder coverage gaps.
+    // Lumen units have no anomaly gauge — they neither need nor supply reactions. [GAP-02]
     const nonLumenPrimary = primaryAnomalyOwned.filter(u => !isLumenElement(u));
 
-    const ownedAnomalySubdps = ownedSubdps.anomaly;
     const ownedPseudoAnomaly = ownedUnits.filter(u => {
         if (isSubdps(u)) return false;
         const pr = u.mechanics?.pseudoRole;
         return Array.isArray(pr) && pr.some(entry => (typeof entry === 'string' ? entry : entry?.role) === 'anomaly');
     });
-    // Lumen units also cannot be disorder partners — filter them out
-    const disorderPartners = [...ownedAnomalySubdps, ...ownedPseudoAnomaly].filter(u => !isLumenElement(u));
+    // Any anomaly agent of another element is a partner, carries included; wind reacts through
+    // vortex. A carry never partners itself — same element. [GAP-02]
+    const disorderPartners = [
+        ...ownedUnits.filter(u => isReactionPartner(u)),
+        ...ownedPseudoAnomaly.filter(u => !isLumenElement(u))
+    ].filter(p => nonLumenPrimary.some(dps => dps.id !== p.id));
 
     const PARTNER_QUALITY_THRESHOLD = 40;
 
@@ -1237,7 +1323,7 @@ function detectAnomalyPartnerGap(gaps, ownedUnits, ownedDPS, ownedSubdps, unowne
             const candidates = unownedLimitedS
                 .filter(u => {
                     if (isLumenElement(u)) return false;
-                    const isAnoSubdps = isSubdps(u) && u.tags.includes('anomaly');
+                    const isAnoSubdps = isSubdps(u) && isReactionPartner(u);
                     const pr = u.mechanics?.pseudoRole;
                     const isPseudoAnomaly = Array.isArray(pr) && pr.some(entry => (typeof entry === 'string' ? entry : entry?.role) === 'anomaly') && !isSubdps(u);
                     return isAnoSubdps || isPseudoAnomaly;
@@ -1262,14 +1348,14 @@ function detectAnomalyPartnerGap(gaps, ownedUnits, ownedDPS, ownedSubdps, unowne
                     disorderPartners.every(p => (p.tier != null ? tierToQuality(p.tier) : 0) < PARTNER_QUALITY_THRESHOLD);
 
                 const reason = disorderPartners.length === 0
-                    ? `Your anomaly DPS have no anomaly partner — a different-element anomaly unit is needed to generate disorders`
+                    ? `Your anomaly DPS have no anomaly partner — a different-element anomaly unit is needed to trigger disorders, or a wind unit to trigger vortexes`
                     : hasWeakPartner
-                    ? `Your anomaly partner is too low-tier to reliably generate disorders — a stronger different-element anomaly partner is recommended`
-                    : `Your anomaly partners share an element with your primary DPS — a different-element anomaly partner would unlock disorder generation`;
+                    ? `Your anomaly partner is too low-tier to reliably trigger reactions — a stronger different-element or wind anomaly partner is recommended`
+                    : `Your anomaly partners share an element with your primary DPS — a different-element anomaly partner would unlock disorders, or a wind partner vortexes`;
 
                 gaps.push({
                     id: 'anomaly-partner',
-                    title: 'Anomaly Disorder Partner',
+                    title: 'Anomaly Reaction Partner',
                     reason,
                     score,
                     units: candidates
@@ -1331,20 +1417,20 @@ function detectElementGaps(gaps, elementQuality, ownedByElement, unownedLimitedS
     }
 }
 
-function detectStunnerElementGap(gaps, ownedStunners, elementQuality, unownedLimitedS, sortCandidatesFn) {
-    const ownedLimitedStunnerElements = new Set(
-        ownedStunners
-            .filter(u => u.rank === 'S' && u.limited)
-            .map(u => getUnitElement(u))
-    );
+function detectStunnerElementGap(gaps, ownedStunners, ownedByElement, elementQuality, unownedLimitedS, sortCandidatesFn, legality) {
+    const ownedLimitedStunners = ownedStunners.filter(u => u.rank === 'S' && u.limited);
 
     for (const el of ELEMENTS) {
         if (el === 'lumen') continue;
         if (elementQuality[el] < 55) continue;
-        if (ownedLimitedStunnerElements.has(el)) continue;
+
+        // Only a stunner who can join one of your carries of this element counts. [PULL-07]
+        const elCarries = ownedByElement[el].filter(u => !isSubdps(u));
+        const joinsElCarry = (s) => elCarries.some(c => legality.canShareTeam(s, c));
+        if (ownedLimitedStunners.some(s => getUnitElement(s) === el && joinsElCarry(s))) continue;
 
         const candidates = sortCandidatesFn(
-            unownedLimitedS.filter(u => u.tags.includes('stun') && getUnitElement(u) === el)
+            unownedLimitedS.filter(u => u.tags.includes('stun') && getUnitElement(u) === el && joinsElCarry(u))
         );
         if (candidates.length === 0) continue;
 
@@ -1472,7 +1558,7 @@ function buildMechSynergyReason(units, pairName) {
     return `${names.join(', ')} and ${last} ${qualifier} have strong mechanical synergy with your ${pairName}`;
 }
 
-function detectMechanicalSynergies(gaps, ownedUnits, unownedLimitedS, dpsQuality, elementQuality, scoreOverrides) {
+function detectMechanicalSynergies(gaps, ownedUnits, unownedLimitedS, dpsQuality, elementQuality, scoreOverrides, legality) {
     // Only pair against S-rank units with meaningful quality — A-ranks and garbage tiers
     // produce misleading recommendations ("synergizes with Anton" / "pairs with Harumasa").
     const MIN_PAIR_QUALITY = 40; // tier ≤ 1.5; excludes T2+ S-ranks like Harumasa
@@ -1536,7 +1622,7 @@ function detectMechanicalSynergies(gaps, ownedUnits, unownedLimitedS, dpsQuality
         const qualifyingPairs = [];
         for (const owned of targets) {
             // Join-compatibility gate: skip pairs where the two units can't coexist on a team
-            if (!canJoinWith(candidate, owned)) continue;
+            if (!legality.canShareTeam(candidate, owned)) continue;
 
             const fit = isDPSCandidate
                 ? mechanicsFitScore(owned, candidate)
@@ -1564,7 +1650,7 @@ function detectMechanicalSynergies(gaps, ownedUnits, unownedLimitedS, dpsQuality
                 u.rank === 'S' && hasDPSRole(u)
             );
             for (const owned of hybridTargets) {
-                if (!canJoinWith(candidate, owned)) continue;
+                if (!legality.canShareTeam(candidate, owned)) continue;
                 const fit = mechanicsFitScore(candidate, owned);
                 if (fit < 15) continue;
                 const pairScore = Math.min(45, Math.round(fit * 2.5));
@@ -1643,13 +1729,49 @@ function detectMechanicalSynergies(gaps, ownedUnits, unownedLimitedS, dpsQuality
     }
 }
 
+// The team a laddered codependent completes, so the unit has a card whether or not it is on a
+// banner. Its rung sets the priority. [PULL-01]
+const LADDER_GAP_SCORE = { High: 70, Medium: 50, Low: 30 };
+
+function detectLadderTeam(gaps, candidate, ladder) {
+    const { tag, minCount } = ladderCountTag(candidate);
+    const size = { 2: 'double', 3: 'triple' }[minCount] ?? `${minCount}-unit`;
+    gaps.push({
+        id: `ladder-${candidate.id}`,
+        title: `${candidate.name}: ${capitalize(size)}-${capitalize(tag)} Team`,
+        reason: `${candidate.name} completes a ${size}-${tag} team with your ${ladder.partner.name} and ${ladder.second.name}`,
+        score: LADDER_GAP_SCORE[ladder.rung],
+        units: [candidate]
+    });
+}
+
+// Unowned limited T0s on the current or upcoming banners. Their High floor is applied per unit
+// at card time, before codependency penalties. [PULL-06]
+const BANNER_T0_GAP_ID = 'banner-t0';
+
+function isBannerT0(unit, opportunitySet) {
+    return unit.tier === 0 && opportunitySet.has(unit.id);
+}
+
+function detectBannerT0s(gaps, unownedLimitedS, opportunitySet) {
+    const candidates = unownedLimitedS.filter(u => isBannerT0(u, opportunitySet));
+    if (candidates.length === 0) return;
+    gaps.push({
+        id: BANNER_T0_GAP_ID,
+        title: 'Top-Tier Banner Agent',
+        reason: 'A T0 agent on a current or upcoming banner — a strong pull for almost any roster that can field them',
+        score: 70,
+        units: candidates
+    });
+}
+
 function detectDepthGap(gaps, ownedDPS, dpsQuality, unownedLimitedS, sortCandidatesFn) {
     for (const arch of DPS_ARCHETYPES) {
         const primaryOwned = ownedDPS[arch].filter(u => u.rank === 'S' && u.limited && !isSubdps(u));
 
+        // Carries only — a titled sub-DPS (Remielle) does not add carry depth. [GAP-03]
         const candidates = sortCandidatesFn(
-            unownedLimitedS.filter(u => getPrimaryDPSArchetype(u) === arch &&
-                (!isSubdps(u) || (isTitled(u) && u.tier === 0)))
+            unownedLimitedS.filter(u => getPrimaryDPSArchetype(u) === arch && !isSubdps(u))
         );
         if (candidates.length === 0) continue;
 
@@ -1676,14 +1798,48 @@ function detectDepthGap(gaps, ownedDPS, dpsQuality, unownedLimitedS, sortCandida
     }
 }
 
-function buildAssessment(dpsQuality, supportQuality, stunnerQuality, elementQuality, compositeScore, limitedSCount, coverage, highPriorityGapCount = 0, gaps = []) {
+// Per team type: the carry, plus the best stunner and support that can legally join it. Tier
+// lookups only — never a scored team. [GAP-04]
+function buildTeamCoverage(dpsQuality, ownedStunners, ownedSupports, legality) {
+    const bestOf = (units) => units.reduce((best, u) => (!best || u.tier < best.tier ? u : best), null);
+    const quality = (u) => (u ? tierToQuality(u.tier) : 0);
+    const teamCoverage = {};
+    for (const arch of DPS_ARCHETYPES) {
+        const carryQuality = dpsQuality[arch];
+        const stunner = bestOf(ownedStunners.filter(s => legality.canFieldWith(s, arch)));
+        const support = bestOf(ownedSupports.filter(s => legality.canFieldWith(s, arch)));
+        teamCoverage[arch] = { carryQuality, stunner, stunnerQuality: quality(stunner), support, supportQuality: quality(support) };
+    }
+    return teamCoverage;
+}
+
+function buildAssessment(dpsQuality, supportQuality, stunnerQuality, elementQuality, compositeScore, limitedSCount, coverage, highPriorityGapCount = 0, gaps = [], teamCoverage = null) {
     const totalSCount = coverage.ownedDPS.attack.concat(
         coverage.ownedDPS.anomaly, coverage.ownedDPS.rupture, coverage.ownedDPS.armorer,
         coverage.ownedSupports, coverage.ownedStunners
     ).filter(u => u.rank === 'S').length;
     const investmentFactor = totalSCount === 0 ? 0.3
         : Math.min(1.0, 0.5 + limitedSCount * 0.05);
-    const ratingScore = compositeScore * investmentFactor;
+    // Support and stunner are averaged over the team types you have a carry for, counting only units that
+    // can join each — an anomaly-only support doesn't staff an armorer team. [GAP-04]
+    const PLAYED_QUALITY = 40;
+    const PREMIUM_QUALITY = 75;
+    const played = DPS_ARCHETYPES.filter(a => dpsQuality[a] >= PLAYED_QUALITY);
+    const fielded = DPS_ARCHETYPES.filter(a => dpsQuality[a] > 0);
+    const perTeam = (key, fallback) => teamCoverage && fielded.length > 0
+        ? fielded.reduce((sum, a) => sum + teamCoverage[a][key], 0) / fielded.length
+        : fallback;
+    const ratingTerms = [
+        ...DPS_ARCHETYPES.map(a => dpsQuality[a]),
+        perTeam('supportQuality', supportQuality),
+        perTeam('stunnerQuality', stunnerQuality)
+    ];
+    const ratingBase = ratingTerms.reduce((sum, q) => sum + q, 0) / ratingTerms.length;
+    const ratingScore = ratingBase * investmentFactor;
+    const premiumTeams = teamCoverage
+        ? played.filter(a => teamCoverage[a].stunnerQuality >= PREMIUM_QUALITY && teamCoverage[a].supportQuality >= PREMIUM_QUALITY)
+        : [];
+    const narrowArch = premiumTeams.length === 1 ? premiumTeams[0] : null;
 
     let ratingTier, ratingColor;
     if (ratingScore <= 20) {
@@ -1722,6 +1878,17 @@ function buildAssessment(dpsQuality, supportQuality, stunnerQuality, elementQual
         }
     }
 
+    // Only one team type with premium stun and support is a narrow roster, whatever its average. [GAP-04]
+    const RATING_ORDER = ['Significant Gaps', 'Partial Coverage', 'Solid Foundation', 'Well-Rounded', 'Strong Coverage', 'Fully Loaded'];
+    const RATING_COLORS = ['#e74c3c', '#e67e22', '#f1c40f', '#2ecc71', '#27ae60', '#3498db'];
+    const capRating = (ceiling) => {
+        const idx = Math.min(RATING_ORDER.indexOf(ratingTier), RATING_ORDER.indexOf(ceiling));
+        ratingTier = RATING_ORDER[idx];
+        ratingColor = RATING_COLORS[idx];
+    };
+    if (highPriorityGapCount >= 3) capRating('Solid Foundation');
+    if (narrowArch) capRating('Partial Coverage');
+
     const strengths = [];
     const weaknesses = [];
 
@@ -1732,15 +1899,26 @@ function buildAssessment(dpsQuality, supportQuality, stunnerQuality, elementQual
     }
     const hasSRankSupport = coverage.ownedSupports.some(u => u.rank === 'S');
     const hasArchetypeSupportGap = gaps.some(g => g.id.startsWith('support-'));
-    if (supportQuality >= 75 && hasSRankSupport && !hasArchetypeSupportGap) {
+    const staffed = (key) => teamCoverage && played.length > 0
+        ? played.filter(a => teamCoverage[a][key] >= PREMIUM_QUALITY).length
+        : null;
+    const supportStaffed = staffed('supportQuality');
+    const supportEverywhere = supportStaffed === null ? true : supportStaffed === played.length;
+    if (supportQuality >= 75 && hasSRankSupport && !hasArchetypeSupportGap && supportEverywhere) {
         strengths.push('premium supports');
-    } else if (supportQuality >= 75 && hasSRankSupport && hasArchetypeSupportGap) {
-        strengths.push('a premium support, though coverage is narrow');
+    } else if (supportQuality >= 75 && hasSRankSupport) {
+        // A narrow roster says this once, in its own sentence below.
+        if (!narrowArch) strengths.push('a premium support, though coverage is narrow');
     } else if (supportQuality <= 25) {
         weaknesses.push('support options');
     }
     const hasSRankStunner = coverage.ownedStunners.some(u => u.rank === 'S');
-    if (stunnerQuality >= 75 && hasSRankStunner) strengths.push('solid stunners');
+    const stunnerStaffed = staffed('stunnerQuality');
+    const stunnerEverywhere = stunnerStaffed === null ? true : stunnerStaffed === played.length;
+    if (stunnerQuality >= 75 && hasSRankStunner && stunnerEverywhere) strengths.push('solid stunners');
+    else if (stunnerQuality >= 75 && hasSRankStunner) {
+        if (!narrowArch) strengths.push('a premium stunner, though coverage is narrow');
+    }
     else if (stunnerQuality <= 10) weaknesses.push('stunner coverage');
 
     const weakElements = ELEMENTS.filter(el => el !== 'lumen' && elementQuality[el] < 55);
@@ -1762,5 +1940,18 @@ function buildAssessment(dpsQuality, supportQuality, stunnerQuality, elementQual
         summary = 'Your roster has moderate coverage across most roles.';
     }
 
-    return { ratingTier, ratingColor, compositeScore, summary };
+    let shapeLabel = null;
+    if (narrowArch) {
+        shapeLabel = `Narrow: ${capitalize(narrowArch)}`;
+        const others = DPS_ARCHETYPES.filter(a => a !== narrowArch && teamCoverage[a].carryQuality > 0);
+        const bestAcross = (key) => others.map(a => teamCoverage[a][key]).filter(Boolean)
+            .reduce((best, u) => (!best || u.tier < best.tier ? u : best), null);
+        const stun = bestAcross('stunner');
+        const sup = bestAcross('support');
+        const parts = [stun && `stunner is ${stun.name}`, sup && `support is ${sup.name}`].filter(Boolean);
+        summary += ` Only your ${narrowArch} teams have premium stun and support` +
+            (parts.length ? ` — elsewhere your best ${parts.join(' and best ')}.` : '.');
+    }
+
+    return { ratingTier, ratingColor, compositeScore, ratingScore, shapeLabel, summary };
 }

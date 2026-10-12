@@ -5,7 +5,7 @@
  */
 
 import { parseArgs } from './lib/cli.js';
-import { loadUnits, loadRoster } from './lib/data.js';
+import { loadUnits, loadRoster, loadBanners } from './lib/data.js';
 import { applyShareUrl } from './lib/share-url.js';
 import { resolveOptions } from './lib/unit-resolver.js';
 import { buildUnitStates } from './lib/roster-builder.js';
@@ -14,6 +14,7 @@ import {
     isSubdps, capitalize, DPS_ARCHETYPES, ELEMENTS
 } from './app/public/lib/common/pull-engine.js';
 import { filterByUpdate } from './lib/version-filter.js';
+import { normalizeBannerSchedule } from './app/public/lib/common/banners.js';
 
 const options = parseArgs({
     name: 'pull-debug.js',
@@ -36,6 +37,7 @@ async function main() {
     const allUnitsRaw = await loadUnits();
     const allUnits = filterByUpdate(allUnitsRaw, options.version);
     const roster = await loadRoster();
+    const banners = normalizeBannerSchedule(await loadBanners());
 
     applyShareUrl(options, allUnits);
     resolveOptions(options, allUnits);
@@ -47,12 +49,13 @@ async function main() {
     // ========================================================================
 
     const results = analyze(allUnits, unitStates, ownedUnits, {
-        maxRecommendations: options.depth
+        maxRecommendations: options.depth,
+        opportunityIds: banners.fullOrder
     });
 
-    const { assessment, recommendations, coverage, allGaps, compositeScore, calibration } = results;
+    const { assessment, recommendations, unitVerdicts, coverage, allGaps, compositeScore, calibration } = results;
     const { dpsQuality, supportQuality, stunnerQuality, elementQuality,
-            ownedDPS, ownedSubdps, ownedSupports, ownedStunners, ownedByElement } = coverage;
+            ownedDPS, ownedSubdps, ownedSupports, ownedStunners, ownedByElement, teamCoverage } = coverage;
 
     // ========================================================================
     // PRINT ROSTER SUMMARY
@@ -101,6 +104,13 @@ async function main() {
     console.log(`    Anomaly subdps: [${ownedSubdps.anomaly.map(u => `${u.name} T${u.tier}`).join(', ') || '—'}]`);
     console.log(`    Attack subdps:  [${ownedSubdps.attack.map(u => `${u.name} T${u.tier}`).join(', ') || '—'}]`);
     console.log();
+    console.log('  Team types (best stunner / support that can legally join):');
+    for (const arch of DPS_ARCHETYPES) {
+        const t = teamCoverage[arch];
+        const name = (u) => (u ? `${u.name} T${u.tier}` : '—');
+        console.log(`    ${capitalize(arch).padEnd(10)} carry ${String(t.carryQuality).padStart(3)}  stun ${name(t.stunner).padEnd(16)} support ${name(t.support).padEnd(16)}`);
+    }
+    console.log();
     console.log(`  Composite: ${compositeScore.toFixed(1)}  |  Calibration: ${calibration}`);
     console.log();
 
@@ -109,7 +119,7 @@ async function main() {
     // ========================================================================
 
     console.log('=== Roster Assessment ===\n');
-    console.log(`  Rating:    ${assessment.ratingTier}  (composite: ${compositeScore.toFixed(1)})`);
+    console.log(`  Rating:    ${assessment.ratingTier}${assessment.shapeLabel ? ` · ${assessment.shapeLabel}` : ''}  (rating score: ${assessment.ratingScore.toFixed(1)})`);
     console.log(`  Summary:   ${assessment.summary}`);
     console.log();
 
@@ -123,6 +133,14 @@ async function main() {
         }
         console.log();
     }
+
+    const unitById = new Map(allUnits.map(u => [u.id, u]));
+    const tile = (id) => `${unitById.get(id)?.name ?? id}: ${unitVerdicts.get(id) ?? 'No'}`;
+    const unownedOn = (ids) => ids.filter(id => unitById.has(id) && !unitStates[id]?.owned);
+    console.log('=== Banner Verdicts ===\n');
+    console.log(`  Current:  ${unownedOn(banners.activeIds).map(tile).join(', ') || '—'}`);
+    console.log(`  Upcoming: ${unownedOn(banners.upcomingIds).map(tile).join(', ') || '—'}`);
+    console.log();
 
     console.log(`=== Recommendations (Top ${options.depth}) ===\n`);
     if (recommendations.length === 0) {

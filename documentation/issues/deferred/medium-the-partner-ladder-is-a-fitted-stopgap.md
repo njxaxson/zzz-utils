@@ -47,3 +47,13 @@ share a **model** rather than share a vocabulary.
 **Do not** reach for a `synergy.units` annotation instead. It was measured: it does not move the
 recommendation at all, and it lifts `Promeia/Remielle/Velina` by 80 points in the scorer as a
 side effect.
+
+**2026-10-11.** The fitted cutoffs are gone: the ladder is now the owner's triple-anomaly table
+([PULL-01](../../recommendations/partner-ladder.md)), so the "sixth sub-DPS could land anywhere"
+limit no longer applies. The pull engine still never asks the scorer.
+
+A scorer-driven redesign was proposed during the Velina fix and rejected by the owner on
+**scaling**: scoring every legal team against every boss, per candidate, is about 5–8 s today
+(~134 µs per score, 19 bosses) and grows with bosses × agents — 40 bosses and 150 agents is not
+sensible. Deadly Assault can afford it because it is narrowed to three bosses. Any develop-branch
+redesign must stay at mechanics level or narrow the boss set; brute-force scoring is not the fix.
