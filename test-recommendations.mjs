@@ -5,6 +5,7 @@ import { loadUnits, deepFreeze } from './lib/data.js';
 import {
     analyze,
     isSubdps,
+    subdpsArchetypes,
     getUnitElement,
     tierToQuality,
     qualityLabel,
@@ -130,8 +131,10 @@ await runTest(2, 'Yanagi counts as anomaly subdps when Miyabi is owned', () => {
         allUnits, ['Miyabi', 'Yanagi', 'Nicole', 'Anby', 'Billy']
     );
     const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 20 });
-    assert(!hasGap(result, 'subdps-anomaly'),
-        'subdps-anomaly gap should NOT fire — Yanagi fills the subdps role when Miyabi is present');
+    // Yanagi fills the slot, so the gap is no longer "you need one" — only the T1.5 upgrade. [GAP-06]
+    const gap = findGap(result, 'subdps-anomaly');
+    assert(!gap || (gap.score === 25 && /far behind/.test(gap.reason)),
+        `Yanagi fills the subdps role when Miyabi is present; only the upgrade gap may fire: ${gap?.reason}`);
 });
 
 await runTest(3, 'Yanagi does NOT count as subdps without Miyabi', () => {
@@ -1041,6 +1044,39 @@ await runTest(51, 'Priority budget: Velina and Roxy are the two Highs on a narro
         const full = r.budgetedFrom === 'High' ? high.length === 2 : recs.filter(x => x.priority === 'Medium').length === 4;
         assert(full, `${r.title} was demoted from ${r.budgetedFrom} without its tier being full`);
     }
+});
+
+// TEST 52: sub-DPS buckets follow the archetypes a unit joins; a filled slot is still a gap
+// when the best candidate is far ahead. [GAP-05] [GAP-06]
+await runTest(52, 'Roxy/Norma back the archetypes they join; Grace does not hold the anomaly sub-DPS slot shut', () => {
+    const [roxy, norma, grace] = ['Roxy', 'Norma', 'Grace'].map(n => unitByName(allUnits, n));
+    assert(subdpsArchetypes(roxy).join() === 'attack,armorer,rupture', `Roxy: ${subdpsArchetypes(roxy)}`);
+    assert(subdpsArchetypes(norma).join() === 'attack,rupture', `Norma: ${subdpsArchetypes(norma)}`);
+    assert(subdpsArchetypes(grace).join() === 'anomaly', `a tagged sub-DPS keeps its tag: ${subdpsArchetypes(grace)}`);
+
+    // (a) An owned Roxy or Norma is an attack sub-DPS: the gap closes, and unowned they are candidates.
+    for (const stunner of ['Roxy', 'Norma']) {
+        const r = buildSyntheticRoster(allUnits, ['Ye Shunguong', stunner, 'Nicole', 'Anby', 'Billy']);
+        const res = analyze(allUnits, r.unitStates, r.ownedUnits, { maxRecommendations: 20 });
+        assert(!hasGap(res, 'subdps-attack'), `${stunner} owned should close subdps-attack`);
+    }
+    const bare = buildSyntheticRoster(allUnits, ['Sigrid', 'Nicole', 'Anby', 'Billy']);
+    const bareGap = findGap(analyze(allUnits, bare.unitStates, bare.ownedUnits, { maxRecommendations: 20 }), 'subdps-attack');
+    assert(bareGap && ['roxy', 'norma'].every(id => bareGap.units.some(u => u.id === id)),
+        'Roxy and Norma should be subdps-attack candidates on a strong attack roster without one');
+
+    // (b) Grace (T1.5) beside Aria/Jane/Yanagi: the sub-DPS gap opens on Velina; the partner gap stays shut.
+    const roster = ['Aria', 'Jane Doe', 'Yanagi', 'Grace', 'Nangong', 'Yuzuha', 'Nicole', 'Anby', 'Billy'];
+    const g = buildSyntheticRoster(allUnits, roster);
+    const gRes = analyze(allUnits, g.unitStates, g.ownedUnits, { maxRecommendations: 20 });
+    const gGap = findGap(gRes, 'subdps-anomaly');
+    assert(gGap && gGap.units.some(u => u.id === 'velina'), 'Grace T1.5 should leave the sub-DPS gap open on Velina');
+    assert(!hasGap(gRes, 'anomaly-partner'), 'Aria covers the partner gap');
+
+    // (c) The margin is a full 1.5 tiers: a T1 sub-DPS (Burnice) still closes the gap.
+    const b = buildSyntheticRoster(allUnits, ['Yanagi', 'Burnice', 'Nicole', 'Anby', 'Billy']);
+    assert(!hasGap(analyze(allUnits, b.unitStates, b.ownedUnits, { maxRecommendations: 20 }), 'subdps-anomaly'),
+        'Burnice (T1) must still close subdps-anomaly');
 });
 
 // Tests that are red ON PURPOSE. Same contract as test-mechanics.mjs's and test-rankings.mjs's

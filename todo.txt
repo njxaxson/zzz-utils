@@ -1,3 +1,5 @@
 Consider availability accepting true/false/date
 
 Tier: probably should have an in-tier sort value
+
+Roster share mode - quick link to DA and pull recs that transfers the shared roster state

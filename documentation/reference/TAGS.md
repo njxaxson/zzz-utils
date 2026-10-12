@@ -153,6 +153,8 @@ Populated during the comment pass. One row per tag, newest last within a prefix.
 | `[GAP-02]` | `../recommendations/coverage-and-gaps.md` | A reaction partner is any anomaly agent of another element, any role; lumen never is |
 | `[GAP-03]` | `../recommendations/coverage-and-gaps.md` | Depth is for carries; a titled T0 sub-DPS adds no carry depth |
 | `[GAP-04]` | `../recommendations/coverage-and-gaps.md` | The rating judges team types, not single best units; one premium team type is narrow |
+| `[GAP-05]` | `../recommendations/coverage-and-gaps.md` | A sub-DPS backs the archetypes it joins; an untagged stunner (Roxy, Norma) is bucketed by `join` |
+| `[GAP-06]` | `../recommendations/coverage-and-gaps.md` | A filled slot is still a gap when the best candidate is 1.5 tiers ahead (Grace T1.5 vs Velina) |
 | `[PULL-05]` | `../recommendations/cards-and-priority.md` | `unitVerdicts` is the only verdict source, for every candidate |
 | `[PULL-06]` | `../recommendations/cards-and-priority.md` | Banner T0s floor at High; off-banner T0s get nothing extra |
 | `[PULL-07]` | `../recommendations/pull-engine.md` | Who can play together is decided by legal teams, honouring `archetypes.avoid` |

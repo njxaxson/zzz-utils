@@ -3,6 +3,12 @@
 What shipped, newest first. This file is history — nothing here is a statement about the
 current state of the engine. For that, see [STATUS.md](STATUS.md).
 
+**Roxy and Norma count as sub-DPS; Grace no longer holds the anomaly sub-DPS slot shut**,
+2026-10-12. An attack roster owning Roxy or Norma used to read "no attack sub-DPS"; they now back
+the archetypes they join ([GAP-05]). Grace T1.5 beside Aria, Jane Doe and Yanagi now leaves the
+sub-DPS gap open on Velina, at score 25 ([GAP-06]); Yanagi beside Miyabi gets the same low-priority
+upgrade gap, and TEST 2 now expects it. Pull engine only; no score moved.
+
 **Rankings TEST 94 asserts the median AoD gap**, 2026-10-12. The frost-weakness fix
 ([WEAK-01]) lifted Nangong/Miyabi/Yuzuha by 110.7 on Sacrifice Bringer — intended, Bringer is
 built for Miyabi — and that one reference dragged AoD's mean gap from −22.2 to −30.1, past the

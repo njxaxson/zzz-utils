@@ -106,6 +106,14 @@ export function isSubdps(unit, team = null) {
     });
 }
 
+// The carry archetypes a sub-DPS backs: its archetype tags, or for an untagged stunner (Roxy,
+// Norma) the archetypes it joins. [GAP-05]
+export function subdpsArchetypes(unit) {
+    const tagged = DPS_ARCHETYPES.filter(a => unit.tags.includes(a));
+    if (tagged.length > 0) return tagged;
+    return (unit.join || []).filter(j => DPS_ARCHETYPES.includes(j));
+}
+
 export function isTitled(unit) {
     return unit.tags.includes('title');
 }
@@ -649,9 +657,7 @@ const SUPPORT_GOOD_FIT = 15;
  */
 export function analyze(allUnits, unitStates, ownedUnits, { maxRecommendations = 5, opportunityIds = [] } = {}) {
     const ownedDPS = { attack: [], anomaly: [], rupture: [], armorer: [] };
-    // TODO(armorer subdps): no armorer sub-DPS units exist yet; when one ships, add an
-    // 'armorer' bucket here and a corresponding gap detector (cf. detectSubdpsGap).
-    const ownedSubdps = { anomaly: [], attack: [] };
+    const ownedSubdps = { anomaly: [], attack: [], rupture: [], armorer: [] };
     const ownedSupports = [];
     const ownedStunners = [];
     const ownedByElement = {};
@@ -667,8 +673,7 @@ export function analyze(allUnits, unitStates, ownedUnits, { maxRecommendations =
             }
         }
         if (isSubdps(unit, ownedUnits)) {
-            if (unit.tags.includes('anomaly')) ownedSubdps.anomaly.push(unit);
-            if (unit.tags.includes('attack')) ownedSubdps.attack.push(unit);
+            for (const arch of subdpsArchetypes(unit)) ownedSubdps[arch].push(unit);
         }
         if ((unit.tags.includes('support') || unit.tags.includes('defense')) && !primaryArch) {
             ownedSupports.push(unit);
@@ -1353,28 +1358,38 @@ function detectStunnerGap(gaps, stunnerQuality, ownedStunners, dpsQuality, unown
     }
 }
 
+// A filled slot is still a gap when the best unowned candidate is this many tiers ahead. [GAP-06]
+const UPGRADE_TIERS = 1.5;
+const OUTCLASSED_SCORE = 25;
+function isOutclassed(ownedTier, candidateTier) {
+    return ownedTier !== null && candidateTier !== null && ownedTier - candidateTier >= UPGRADE_TIERS;
+}
+
 function detectSubdpsGap(gaps, dpsQuality, ownedSubdps, unownedLimitedS, sortCandidatesFn, ownedUnits) {
     const anomBest = getBestTier(ownedSubdps.anomaly.filter(u => isReactionPartner(u)));
     const anomSubdpsQuality = anomBest !== null ? tierToQuality(anomBest) : 0;
-    if (dpsQuality.anomaly >= 50 && anomSubdpsQuality < 40) {
-        const score = anomSubdpsQuality === 0 ? 45 : 35;
-        // Two on-field carries of different elements already react; the sub-DPS is the upgrade. [GAP-02]
-        const carries = ownedUnits.filter(u => isReactionPartner(u) && !isSubdps(u, ownedUnits));
-        const carriesReact = carries.some(a => carries.some(b => getDisorderElement(a) !== getDisorderElement(b)));
-        const reason = carriesReact && anomSubdpsQuality === 0
-            ? 'Your anomaly carries can react with each other, but an off-field sub-DPS partner is the stronger setup'
-            : anomSubdpsQuality === 0
-            ? 'Anomaly teams perform best with two anomaly agents — you need a sub-DPS partner'
-            : 'Anomaly teams perform best with two anomaly agents — your current sub-DPS is too weak to reliably fill this role';
+    if (dpsQuality.anomaly >= 50) {
         const candidates = sortCandidatesFn(
             unownedLimitedS.filter(u => isSubdps(u, ownedUnits) && isReactionPartner(u))
         );
-        if (candidates.length > 0) {
+        const weak = anomSubdpsQuality < 40;
+        const outclassed = isOutclassed(anomBest, getBestTier(candidates));
+        if ((weak || outclassed) && candidates.length > 0) {
+            // Two on-field carries of different elements already react; the sub-DPS is the upgrade. [GAP-02]
+            const carries = ownedUnits.filter(u => isReactionPartner(u) && !isSubdps(u, ownedUnits));
+            const carriesReact = carries.some(a => carries.some(b => getDisorderElement(a) !== getDisorderElement(b)));
+            const reason = !weak
+                ? `Your best anomaly sub-DPS is far behind what is available — ${candidates[0].name} is a clear step up`
+                : carriesReact && anomSubdpsQuality === 0
+                ? 'Your anomaly carries can react with each other, but an off-field sub-DPS partner is the stronger setup'
+                : anomSubdpsQuality === 0
+                ? 'Anomaly teams perform best with two anomaly agents — you need a sub-DPS partner'
+                : 'Anomaly teams perform best with two anomaly agents — your current sub-DPS is too weak to reliably fill this role';
             gaps.push({
                 id: 'subdps-anomaly',
                 title: 'Anomaly Sub-DPS',
                 reason,
-                score,
+                score: !weak ? OUTCLASSED_SCORE : anomSubdpsQuality === 0 ? 45 : 35,
                 units: candidates
             });
         }
@@ -1384,7 +1399,7 @@ function detectSubdpsGap(gaps, dpsQuality, ownedSubdps, unownedLimitedS, sortCan
     const atkSubdpsQuality = atkBest !== null ? tierToQuality(atkBest) : 0;
     if (dpsQuality.attack >= 75 && atkSubdpsQuality < 50) {
         const candidates = sortCandidatesFn(
-            unownedLimitedS.filter(u => u.tags.includes('attack') && isSubdps(u, ownedUnits))
+            unownedLimitedS.filter(u => subdpsArchetypes(u).includes('attack') && isSubdps(u, ownedUnits))
         );
         if (candidates.length > 0) {
             gaps.push({
@@ -1421,14 +1436,31 @@ function detectAnomalyPartnerGap(gaps, ownedUnits, ownedDPS, ownedSubdps, unowne
 
     // Only check disorder coverage for non-lumen primary anomaly DPS
     if (nonLumenPrimary.length > 0) {
-        const hasSufficientCoverage = disorderPartners.some(partner => {
-            const partnerEl = getDisorderElement(partner);
-            const partnerQuality = partner.tier != null ? tierToQuality(partner.tier) : 0;
-            const coversAtLeastOneDPS = nonLumenPrimary.some(dps => getDisorderElement(dps) !== partnerEl);
-            return coversAtLeastOneDPS && partnerQuality >= PARTNER_QUALITY_THRESHOLD;
-        });
+        const candidates = unownedLimitedS
+            .filter(u => {
+                if (isLumenElement(u)) return false;
+                const isAnoSubdps = isSubdps(u) && isReactionPartner(u);
+                const pr = u.mechanics?.pseudoRole;
+                const isPseudoAnomaly = Array.isArray(pr) && pr.some(entry => (typeof entry === 'string' ? entry : entry?.role) === 'anomaly') && !isSubdps(u);
+                return isAnoSubdps || isPseudoAnomaly;
+            })
+            .sort((a, b) => {
+                const aEl = getDisorderElement(a);
+                const bEl = getDisorderElement(b);
+                const aDiffers = nonLumenPrimary.some(dps => getDisorderElement(dps) !== aEl) ? 1 : 0;
+                const bDiffers = nonLumenPrimary.some(dps => getDisorderElement(dps) !== bEl) ? 1 : 0;
+                if (aDiffers !== bDiffers) return bDiffers - aDiffers;
+                return a.tier - b.tier;
+            });
 
-        if (!hasSufficientCoverage) {
+        const covering = disorderPartners.filter(partner =>
+            (partner.tier != null ? tierToQuality(partner.tier) : 0) >= PARTNER_QUALITY_THRESHOLD &&
+            nonLumenPrimary.some(dps => getDisorderElement(dps) !== getDisorderElement(partner)));
+        const hasSufficientCoverage = covering.length > 0;
+
+        const outclassed = hasSufficientCoverage &&
+            isOutclassed(getBestTier(covering), getBestTier(candidates));
+        if (!hasSufficientCoverage || outclassed) {
             const uncoveredDPS = nonLumenPrimary.filter(dps => {
                 const dpsEl = getDisorderElement(dps);
                 return !disorderPartners.some(p =>
@@ -1437,34 +1469,20 @@ function detectAnomalyPartnerGap(gaps, ownedUnits, ownedDPS, ownedSubdps, unowne
                 );
             });
 
-            const candidates = unownedLimitedS
-                .filter(u => {
-                    if (isLumenElement(u)) return false;
-                    const isAnoSubdps = isSubdps(u) && isReactionPartner(u);
-                    const pr = u.mechanics?.pseudoRole;
-                    const isPseudoAnomaly = Array.isArray(pr) && pr.some(entry => (typeof entry === 'string' ? entry : entry?.role) === 'anomaly') && !isSubdps(u);
-                    return isAnoSubdps || isPseudoAnomaly;
-                })
-                .sort((a, b) => {
-                    const aEl = getDisorderElement(a);
-                    const bEl = getDisorderElement(b);
-                    const aDiffers = nonLumenPrimary.some(dps => getDisorderElement(dps) !== aEl) ? 1 : 0;
-                    const bDiffers = nonLumenPrimary.some(dps => getDisorderElement(dps) !== bEl) ? 1 : 0;
-                    if (aDiffers !== bDiffers) return bDiffers - aDiffers;
-                    return a.tier - b.tier;
-                });
-
             if (candidates.length > 0) {
                 const scoringDPS = uncoveredDPS.length > 0 ? uncoveredDPS : nonLumenPrimary;
                 const bestTier = getBestTier(scoringDPS);
                 const bestQuality = bestTier != null ? tierToQuality(bestTier) : 0;
-                const score = bestQuality >= 75 ? 55 :
+                const score = outclassed ? OUTCLASSED_SCORE :
+                              bestQuality >= 75 ? 55 :
                               bestQuality >= 55 ? 45 : 35;
 
                 const hasWeakPartner = disorderPartners.length > 0 &&
                     disorderPartners.every(p => (p.tier != null ? tierToQuality(p.tier) : 0) < PARTNER_QUALITY_THRESHOLD);
 
-                const reason = disorderPartners.length === 0
+                const reason = outclassed
+                    ? `Your best anomaly partner is far behind what is available — ${candidates[0].name} is a clear step up`
+                    : disorderPartners.length === 0
                     ? `Your anomaly DPS have no anomaly partner — a different-element anomaly unit is needed to trigger disorders, or a wind unit to trigger vortexes`
                     : hasWeakPartner
                     ? `Your anomaly partner is too low-tier to reliably trigger reactions — a stronger different-element or wind anomaly partner is recommended`

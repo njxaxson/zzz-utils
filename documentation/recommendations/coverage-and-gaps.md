@@ -56,11 +56,11 @@ scorer's. It must stay
 [variant-aware](../concepts/anomaly-reactions.md) for the same reason the scorer is, or it will
 gate a unit out for lacking a partner the scorer is happily scoring.
 
-## A known gap in the detectors
+## Sub-DPS buckets
 
-**No armorer sub-DPS exists yet.** `pull-engine.js` carries a TODO for the bucket and the
-detector that will be needed when one ships. Until then an armorer sub-DPS would simply not be
-bucketed.
+`analyze()` buckets sub-DPS per carry archetype — anomaly, attack, rupture, armorer
+([GAP-05](#gap-05-a-sub-dps-backs-the-archetypes-it-joins)). Only the anomaly and attack buckets
+have a gap detector; a rupture or armorer sub-DPS gap is not built.
 
 ## Code notes
 
@@ -98,6 +98,27 @@ partner".
 
 The partner gap's wording names vortex alongside disorder, because Velina never makes a
 disorder. Vortex teams are not yet a team shape this engine can recommend toward.
+
+### [GAP-05] A sub-DPS backs the archetypes it joins
+
+Sub-DPS were bucketed by tag, so Roxy and Norma — stunners with an unconditional `subdps`
+pseudoRole and no `anomaly` or `attack` tag — landed in no bucket, and an attack roster owning
+either still read "no attack sub-DPS". `subdpsArchetypes` uses a unit's archetype tags when it has
+any, and otherwise the archetypes in its `join`: Roxy backs attack, armorer and rupture; Norma
+attack and rupture. Neither joins anomaly, so neither enters the reaction-partner check. Unowned,
+both are now candidates for the attack sub-DPS gap.
+
+### [GAP-06] A filled slot is still a gap when the candidate is far ahead
+
+Both anomaly detectors asked whether the slot was filled to quality 40, so Grace (T1.5, quality
+40) held the sub-DPS slot shut although she is only good at P6 beside Velina. Each now also fires,
+at a lower score (25), when the best unowned candidate is `UPGRADE_TIERS` = 1.5 tiers ahead of the
+best owned sub-DPS (or best covering partner). Grace T1.5 against Velina T0 meets it; Burnice or
+Jane Doe at T1 do not. **1.5 is fitted, not derived.**
+
+Two consequences are intended. Yanagi beside Miyabi, also T1.5, now gets the upgrade gap too
+(TEST 2 expects it at score 25). And on Aria, Jane Doe, Yanagi and Grace the partner gap stays
+shut, because Aria T0.5 covers it; only the sub-DPS gap opens.
 
 ### [GAP-03] Depth is for carries
 

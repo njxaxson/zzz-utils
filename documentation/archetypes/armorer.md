@@ -46,8 +46,9 @@ buff at all**, which matters exactly because so little else can reach them.
 
 ## What does not exist yet
 
-* **No armorer sub-DPS.** Every armorer team is a hypercarry team by default. `pull-engine.js`
-  carries a TODO for the bucket and detector that a second one would need.
+* **No armorer sub-DPS gap detector.** Roxy now fills the armorer sub-DPS bucket
+  ([GAP-05](../recommendations/coverage-and-gaps.md#gap-05-a-sub-dps-backs-the-archetypes-it-joins)),
+  but nothing yet asks whether a roster lacks one; every armorer team is a hypercarry team by default.
 * **The element diametric pair is unreachable.** Claret is electric, and the roster's only
   electric-element supplier is a *debuff*, so there is no electric buff to pair it against. The
   code path is correct and simply cannot fire. See

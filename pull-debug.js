@@ -103,6 +103,8 @@ async function main() {
     console.log('  Sub-DPS:');
     console.log(`    Anomaly subdps: [${ownedSubdps.anomaly.map(u => `${u.name} T${u.tier}`).join(', ') || '—'}]`);
     console.log(`    Attack subdps:  [${ownedSubdps.attack.map(u => `${u.name} T${u.tier}`).join(', ') || '—'}]`);
+    console.log(`    Rupture subdps: [${ownedSubdps.rupture.map(u => `${u.name} T${u.tier}`).join(', ') || '—'}]`);
+    console.log(`    Armorer subdps: [${ownedSubdps.armorer.map(u => `${u.name} T${u.tier}`).join(', ') || '—'}]`);
     console.log();
     console.log('  Team types (best stunner / support that can legally join):');
     for (const arch of DPS_ARCHETYPES) {
