@@ -112,4 +112,4 @@ ahead within the rules above.
 
 Owner rulings about a single unit (the banner-T0 floor, the Remielle table) are absolute and are
 tested against `absoluteVerdicts`. The budget is a statement about order, and is tested on its
-own (TEST 53).
+own (TEST 51).

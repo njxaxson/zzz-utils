@@ -75,6 +75,6 @@ self-targeted ones out. Two reads would otherwise have gone wrong:
 * the dependency check would have told a codependent unit with such a buff to pull a wind
   teammate before it can work.
 
-Recommendations TEST 49 pins both, and was checked by breaking each read in turn. See
+Recommendations TEST 47 pins both, and was checked by breaking each read in turn. See
 [`[BUFF-09]`](../data-model/buffs-and-debuffs.md).
 

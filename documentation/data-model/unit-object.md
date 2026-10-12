@@ -109,9 +109,11 @@ over the 14 bosses where AoD and at least one reference are both viable. The own
 15–20 points back; 45 is the only half-step value inside it.
 
 **Sized against a ladder, not derived from a mechanic** — say so whenever it moves. Rankings
-TEST 94 guards it from both sides: AoD must stay at least 10 points behind on average, because a
-declaration-carried team outscoring the modelled ones means the declaration has been oversized,
-and no further back than 25. Mechanics TEST 32 pins the *gating* and deliberately knows nothing
+TEST 94 guards it from both sides: AoD's **median** gap must stay at least 10 points behind,
+because a declaration-carried team outscoring the modelled ones means the declaration has been
+oversized, and no further back than 25. It was the mean until the frost fix ([WEAK-01]) lifted
+Nangong/Miyabi/Yuzuha by 110.7 on Bringer alone and dragged the mean from −22.2 to −30.1, with
+AoD itself unchanged on every boss. The median is −19.0 before and after. Mechanics TEST 32 pins the *gating* and deliberately knows nothing
 about the amount; it used to assert `>= 55` and broke on this re-derivation, which was a hidden
 pin rather than a real failure.
 

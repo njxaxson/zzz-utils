@@ -19,7 +19,7 @@ changes none of those three things on an anomaly-heavy roster.
 ## Reproduction
 
 ```bash
-node test-recommendations.mjs -43
+node test-recommendations.mjs -41
 ```
 
 The test passes. It passes because a proxy was built, not because the blindness was cured.

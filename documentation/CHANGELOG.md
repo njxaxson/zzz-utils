@@ -3,6 +3,18 @@
 What shipped, newest first. This file is history — nothing here is a statement about the
 current state of the engine. For that, see [STATUS.md](STATUS.md).
 
+**Rankings TEST 94 asserts the median AoD gap**, 2026-10-12. The frost-weakness fix
+([WEAK-01]) lifted Nangong/Miyabi/Yuzuha by 110.7 on Sacrifice Bringer — intended, Bringer is
+built for Miyabi — and that one reference dragged AoD's mean gap from −22.2 to −30.1, past the
+−25 floor. AoD itself did not move on any boss. The test went red in that commit while its
+STATUS still read green. It now asserts the median (−19.0 before and after), which a single
+home-turf boss cannot move; the band and `CONJUNCTIVE_SYNERGY_BONUS` are unchanged. Test-only.
+
+**Recommendations tests renumbered 1–51**, 2026-10-12. The suite ran 51 tests numbered 0–53, with
+19, 37 and 39 retired, so its count never matched its last number. Tests are now sequential:
+0–18 became 1–19, 20–36 kept their numbers, and 38–53 became 37–51. References in the docs were
+updated; older CHANGELOG entries below still cite the numbers of their day.
+
 **Pull engine: a priority budget**, 2026-10-12. A roster that needs a lot came back as a wall of
 High — six High cards and every banner tile but one on a narrow anomaly roster. Every entry is
 now ranked greedily the way a player picks pulls (banner T0 first, branch out of a narrow
@@ -10,7 +22,7 @@ archetype, cover something not yet covered, pullable now), and at most **2** kee
 keep Medium [PULL-08]. On that roster the Highs are Velina and Roxy; Norma, who doesn't activate
 Claret, sits below Roxy; Anomaly Depth drops to Low. Measured on seven rosters: nothing rose,
 the owner's own roster is unchanged, and every over-budget roster now reads 2 High / at most 4
-Medium. `absoluteVerdicts` keeps each unit's own verdict for the owner's per-unit rulings; TEST 8
+Medium. `absoluteVerdicts` keeps each unit's own verdict for the owner's per-unit rulings; TEST 9
 now expects exactly 2 High on an empty roster.
 
 **Pull engine: banner T0s, join-aware coverage, the narrow-roster rating**, 2026-10-11. On a
@@ -150,7 +162,7 @@ and `engineFingerprint`. `calibration.preview.json` was already stale at HEAD fr
 and was regenerated. Its anchor changes match a regeneration at HEAD exactly, so none of them are
 this change. Both files certify at 0 within-archetype rank inversions.
 
-Pinned by mechanics TEST 36, rankings TEST 95 and recommendations TEST 49. TEST 36 and 49 were
+Pinned by mechanics TEST 36, rankings TEST 95 and recommendations TEST 47. Mechanics 36 and recommendations 47 were
 mutation-checked: removing `target`, or bypassing the accessor at either of the two pull-engine
 reads that mattered, turns them red.
 

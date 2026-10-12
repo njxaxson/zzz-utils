@@ -83,8 +83,8 @@ async function runTest(num, name, fn) {
 
 console.log('Pull Engine Tests\n');
 
-// PRE-TEST 0: isSubdps unit-level sanity check
-await runTest(0, 'isSubdps correctness (pre-test)', () => {
+// TEST 1 (pre-test): isSubdps unit-level sanity check
+await runTest(1, 'isSubdps correctness (pre-test)', () => {
     const subdpsNames = ['Burnice', 'Vivian', 'Grace', 'Orphie', 'Velina'];
     const primaryNames = ['Miyabi', 'Evelyn', 'SAnby'];
     for (const name of subdpsNames) {
@@ -122,10 +122,10 @@ await runTest(0, 'isSubdps correctness (pre-test)', () => {
     }
 });
 
-// TESTS 1-7: Conditional subdps in pull recommendations (integration) — the recommendation
+// TESTS 2-8: Conditional subdps in pull recommendations (integration) — the recommendation
 // engine must account for conditional subdps roles in roster coverage and candidates.
 
-await runTest(1, 'Yanagi counts as anomaly subdps when Miyabi is owned', () => {
+await runTest(2, 'Yanagi counts as anomaly subdps when Miyabi is owned', () => {
     const { unitStates, ownedUnits } = buildSyntheticRoster(
         allUnits, ['Miyabi', 'Yanagi', 'Nicole', 'Anby', 'Billy']
     );
@@ -134,7 +134,7 @@ await runTest(1, 'Yanagi counts as anomaly subdps when Miyabi is owned', () => {
         'subdps-anomaly gap should NOT fire — Yanagi fills the subdps role when Miyabi is present');
 });
 
-await runTest(2, 'Yanagi does NOT count as subdps without Miyabi', () => {
+await runTest(3, 'Yanagi does NOT count as subdps without Miyabi', () => {
     const { unitStates, ownedUnits } = buildSyntheticRoster(
         allUnits, ['Yanagi', 'Aria', 'Nicole', 'Anby', 'Billy']
     );
@@ -147,7 +147,7 @@ await runTest(2, 'Yanagi does NOT count as subdps without Miyabi', () => {
     }
 });
 
-await runTest(3, 'Yanagi recommended as subdps when Miyabi is owned', () => {
+await runTest(4, 'Yanagi recommended as subdps when Miyabi is owned', () => {
     const { unitStates, ownedUnits } = buildSyntheticRoster(
         allUnits, ['Miyabi', 'Nicole', 'Anby', 'Billy']
     );
@@ -158,7 +158,7 @@ await runTest(3, 'Yanagi recommended as subdps when Miyabi is owned', () => {
     assert(yanagi, 'Yanagi should appear as a subdps-anomaly candidate (her condition is met by owned Miyabi)');
 });
 
-await runTest(4, 'Yanagi NOT a subdps candidate without Miyabi in roster', () => {
+await runTest(5, 'Yanagi NOT a subdps candidate without Miyabi in roster', () => {
     const { unitStates, ownedUnits } = buildSyntheticRoster(
         allUnits, ['Aria', 'Nicole', 'Anby', 'Billy']
     );
@@ -170,7 +170,7 @@ await runTest(4, 'Yanagi NOT a subdps candidate without Miyabi in roster', () =>
     }
 });
 
-await runTest(5, 'Cissia counts as attack subdps when a second electric attacker is owned', () => {
+await runTest(6, 'Cissia counts as attack subdps when a second electric attacker is owned', () => {
     // Owned coverage: Cissia fills subdps role, gap should not fire
     const { unitStates, ownedUnits } = buildSyntheticRoster(
         allUnits, ['Evelyn', 'Cissia', 'Seed', 'Nicole', 'Anby', 'Billy']
@@ -191,7 +191,7 @@ await runTest(5, 'Cissia counts as attack subdps when a second electric attacker
     }
 });
 
-await runTest(6, 'Cissia NOT a subdps candidate without a second electric attacker', () => {
+await runTest(7, 'Cissia NOT a subdps candidate without a second electric attacker', () => {
     // Evelyn is an attacker but FIRE. Under the old `countTag attack >= 2` this roster activated
     // Cissia's sub-DPS role; under `hasRole attack:electric` it does not. The direct assertion is
     // the point — the gap check below is guarded and would pass vacuously on its own. [PRED-03]
@@ -215,7 +215,7 @@ await runTest(6, 'Cissia NOT a subdps candidate without a second electric attack
     }
 });
 
-await runTest(7, 'Enabler still recommended via primary gap', () => {
+await runTest(8, 'Enabler still recommended via primary gap', () => {
     const { unitStates, ownedUnits } = buildSyntheticRoster(
         allUnits, ['Yanagi', 'Nicole', 'Anby', 'Billy']
     );
@@ -224,8 +224,8 @@ await runTest(7, 'Enabler still recommended via primary gap', () => {
     assert(miyabiRec, 'Miyabi should be recommended (T0 anomaly DPS fills the dps-anomaly gap)');
 });
 
-// TEST 8
-await runTest(8, 'Empty roster gap detection', () => {
+// TEST 9
+await runTest(9, 'Empty roster gap detection', () => {
     const { unitStates, ownedUnits } = buildSyntheticRoster(allUnits, ['Nicole', 'Anby', 'Billy']);
     const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 20 });
     assert(hasGap(result, 'dps-attack'), 'expected attack DPS gap');
@@ -239,8 +239,8 @@ await runTest(8, 'Empty roster gap detection', () => {
         'an empty roster should have more High needs than the budget allows');
 });
 
-// TEST 9
-await runTest(9, 'Attack-only roster', () => {
+// TEST 10
+await runTest(10, 'Attack-only roster', () => {
     const { unitStates, ownedUnits } = buildSyntheticRoster(
         allUnits, ['Evelyn', 'Dialyn', 'Astra', 'Nicole', 'Anby', 'Billy']
     );
@@ -259,8 +259,8 @@ await runTest(9, 'Attack-only roster', () => {
     assert(!structuralReasons.includes('Lucia'), 'structural reasons should not reference Lucia by name');
 });
 
-// TEST 10
-await runTest(10, 'Anomaly-loaded roster', () => {
+// TEST 11
+await runTest(11, 'Anomaly-loaded roster', () => {
     const { unitStates, ownedUnits } = buildSyntheticRoster(
         allUnits, ['Miyabi', 'Nangong', 'Yuzuha', 'Vivian', 'Nicole', 'Anby', 'Billy']
     );
@@ -275,8 +275,8 @@ await runTest(10, 'Anomaly-loaded roster', () => {
     assert(hasAttackOrRuptureRec, 'should recommend attack or rupture DPS');
 });
 
-// TEST 11
-await runTest(11, 'Support gap mechanics', () => {
+// TEST 12
+await runTest(12, 'Support gap mechanics', () => {
     const { unitStates, ownedUnits } = buildSyntheticRoster(
         allUnits, ['Miyabi', 'Yixuan', 'Evelyn', 'Koleda', 'Nicole', 'Anby', 'Billy']
     );
@@ -288,8 +288,8 @@ await runTest(11, 'Support gap mechanics', () => {
     assert(supportGap.units.length > 0, 'support gap should list candidates');
 });
 
-// TEST 12
-await runTest(12, 'Wind element coverage', () => {
+// TEST 13
+await runTest(13, 'Wind element coverage', () => {
     const { unitStates, ownedUnits } = buildSyntheticRoster(
         allUnits, ['Miyabi', 'Evelyn', 'Dialyn', 'Nicole', 'Anby', 'Billy']
     );
@@ -302,8 +302,8 @@ await runTest(12, 'Wind element coverage', () => {
     }
 });
 
-// TEST 13
-await runTest(13, 'Loaded roster still produces recommendations', () => {
+// TEST 14
+await runTest(14, 'Loaded roster still produces recommendations', () => {
     const { unitStates, ownedUnits } = buildSyntheticRoster(
         allUnits, ['Miyabi', 'Nangong', 'Yuzuha', 'Astra', 'Yixuan', 'Dialyn', 'Evelyn', 'Trigger', 'SAnby', 'Lucia', 'Nicole', 'Anby', 'Billy']
     );
@@ -318,8 +318,8 @@ await runTest(13, 'Loaded roster still produces recommendations', () => {
     assert(scored.length >= 3, 'at least 3 recommendations with score > 0');
 });
 
-// TEST 14
-await runTest(14, 'Mechanics synergy detection', () => {
+// TEST 15
+await runTest(15, 'Mechanics synergy detection', () => {
     const { unitStates, ownedUnits } = buildSyntheticRoster(
         allUnits, ['SAnby', 'Trigger', 'Astra', 'Nicole', 'Anby', 'Billy']
     );
@@ -332,8 +332,8 @@ await runTest(14, 'Mechanics synergy detection', () => {
     assert(orphieGap.score >= 15, `Orphie synergy score too low: ${orphieGap.score}`);
 });
 
-// TEST 15
-await runTest(15, 'SubDPS not counted as primary', () => {
+// TEST 16
+await runTest(16, 'SubDPS not counted as primary', () => {
     const { unitStates, ownedUnits } = buildSyntheticRoster(
         allUnits, ['Vivian', 'Nicole', 'Anby', 'Billy']
     );
@@ -343,8 +343,8 @@ await runTest(15, 'SubDPS not counted as primary', () => {
     assert(hasGap(result, 'dps-anomaly'), 'should recommend primary anomaly DPS');
 });
 
-// TEST 16
-await runTest(16, 'Calibration does not flatten loaded rosters', () => {
+// TEST 17
+await runTest(17, 'Calibration does not flatten loaded rosters', () => {
     const loadedNames = [
         'Miyabi', 'Nangong', 'Yuzuha', 'Astra', 'Yixuan', 'Dialyn',
         'Evelyn', 'Trigger', 'SAnby', 'Lucia', 'Yanagi', 'Burnice',
@@ -359,8 +359,8 @@ await runTest(16, 'Calibration does not flatten loaded rosters', () => {
     assert(spread > 15, `gap score spread should be > 15, got ${spread}`);
 });
 
-// TEST 17
-await runTest(17, 'No disorder partner', () => {
+// TEST 18
+await runTest(18, 'No disorder partner', () => {
     const { unitStates, ownedUnits } = buildSyntheticRoster(allUnits, ['Miyabi', 'Nicole', 'Anby', 'Billy']);
     const result = analyze(allUnits, unitStates, ownedUnits, { maxRecommendations: 20 });
     const gap = findGap(result, 'anomaly-partner');
@@ -370,8 +370,8 @@ await runTest(17, 'No disorder partner', () => {
     assert(ids.includes('burnice') || ids.includes('vivian'), 'expected Burnice or Vivian as candidate');
 });
 
-// TEST 18
-await runTest(18, 'Same-element sub-DPS', () => {
+// TEST 19
+await runTest(19, 'Same-element sub-DPS', () => {
     const { unitStates, ownedUnits } = buildSyntheticRoster(
         allUnits, ['Yanagi', 'Grace', 'Nicole', 'Anby', 'Billy']
     );
@@ -382,7 +382,6 @@ await runTest(18, 'Same-element sub-DPS', () => {
         `expected element or tier reason, got: ${gap.reason}`);
 });
 
-// TEST 19 removed — Grace is no longer weak enough for this fixture (recent buffs, Remielle, Velina).
 
 // TEST 20
 await runTest(20, 'Pseudo-anomaly mitigates gap', () => {
@@ -648,7 +647,7 @@ await runTest(35, 'Support coverage — Lucia recommended for rupture, Sunna exc
         'Sunna should appear in the support-attack gap instead');
 });
 
-// TESTS 36-39: Lumen / Remielle pull recommendations
+// TESTS 36-37: Lumen / Remielle pull recommendations
 
 await runTest(36, 'Remielle not recommended to synergize with join-incompatible units', () => {
     // Trigger joins on ["attack", "electric"] — no join overlap with Rem at all.
@@ -666,7 +665,7 @@ await runTest(36, 'Remielle not recommended to synergize with join-incompatible 
         'Remielle should NOT be paired with Trigger — no join compatibility');
 });
 
-await runTest(38, 'Remielle does NOT count as disorder partner for other anomaly DPS', () => {
+await runTest(37, 'Remielle does NOT count as disorder partner for other anomaly DPS', () => {
     // Roster: Miyabi + Remielle — Rem is lumen and can't generate disorders.
     // Miyabi should still need a non-lumen disorder partner.
     const roster = ['Miyabi', 'Remielle', 'Nicole', 'Anby', 'Billy'];
@@ -677,7 +676,7 @@ await runTest(38, 'Remielle does NOT count as disorder partner for other anomaly
         'anomaly-partner gap should fire — Remielle (lumen) cannot generate disorders for Miyabi');
 });
 
-await runTest(40, 'Remielle codependent — no anomaly roster drops to Low or removed', () => {
+await runTest(38, 'Remielle codependent — no anomaly roster drops to Low or removed', () => {
     // Roster has zero anomaly agents — Rem can't form any valid team.
     // cannotFormTeam should fire, dropping TWO priority levels.
     const roster = [
@@ -696,7 +695,7 @@ await runTest(40, 'Remielle codependent — no anomaly roster drops to Low or re
     assert(!remRec, 'Rem should not appear in recommendations at all when she cannot form any team');
 });
 
-await runTest(41, 'Remielle excluded with single A-rank anomaly partner (Piper)', () => {
+await runTest(39, 'Remielle excluded with single A-rank anomaly partner (Piper)', () => {
     // Piper alone can't enable triple-anomaly. Rem's best achievable buff is 2
     // (half of max 4) — cannotActivateBuffs should fire, excluding her from gaps.
     const baseRoster = [
@@ -729,7 +728,7 @@ await runTest(41, 'Remielle excluded with single A-rank anomaly partner (Piper)'
     assert(anomalyGap1, 'dps-anomaly gap should still fire with only Piper');
 });
 
-await runTest(42, 'Remielle without Velina is Medium, not High, even on an anomaly-loaded roster', () => {
+await runTest(40, 'Remielle without Velina is Medium, not High, even on an anomaly-loaded roster', () => {
     // Partner ladder (documentation/recommendations/partner-ladder.md): two S-rank anomaly agents
     // but no Velina is Medium — a triple-anomaly team, just not her ceiling.
     const roster = [
@@ -751,8 +750,8 @@ await runTest(42, 'Remielle without Velina is Medium, not High, even on an anoma
         `just not at her ceiling. Got ${remPriority}`);
 });
 
-await runTest(43, 'Adding Velina to the same roster raises Remielle above her no-Velina priority', () => {
-    // Paired with TEST 42: same roster, plus Velina, must rate Remielle higher — the partner
+await runTest(41, 'Adding Velina to the same roster raises Remielle above her no-Velina priority', () => {
+    // Paired with TEST 40: same roster, plus Velina, must rate Remielle higher — the partner
     // ladder's top rung (see partner-ladder.md).
     const base = [
         'Miyabi', 'Alice', 'Promeia', 'Vivian', 'Nangong', 'Yuzuha',
@@ -775,10 +774,10 @@ await runTest(43, 'Adding Velina to the same roster raises Remielle above her no
         `Remielle's priority: got ${without} without Velina and ${with_} with her`);
 });
 
-// TESTS 44-46: Claret (armorer/electric, light kit) must classify as primary armorer DPS,
+// TESTS 42-44: Claret (armorer/electric, light kit) must classify as primary armorer DPS,
 // not a support unit, and credit electric-DPS coverage.
 
-await runTest(44, 'Claret classifies as armorer DPS', () => {
+await runTest(42, 'Claret classifies as armorer DPS', () => {
     const claret = unitByName(allUnits, 'Claret');
     if (!claret) return; // unreleased data not present
     assert(hasDPSRole(claret), 'hasDPSRole(Claret) should be true');
@@ -786,7 +785,7 @@ await runTest(44, 'Claret classifies as armorer DPS', () => {
         `getPrimaryDPSArchetype(Claret) should be 'armorer', got ${getPrimaryDPSArchetype(claret)}`);
 });
 
-await runTest(45, 'Claret surfaces as armorer/electric DPS candidate', () => {
+await runTest(43, 'Claret surfaces as armorer/electric DPS candidate', () => {
     const claret = unitByName(allUnits, 'Claret');
     if (!claret) return;
     // Roster with no armorer and no primary electric DPS.
@@ -819,7 +818,7 @@ await runTest(45, 'Claret surfaces as armorer/electric DPS candidate', () => {
     }
 });
 
-await runTest(46, 'Electric DPS coverage improves when Claret is added to roster', () => {
+await runTest(44, 'Electric DPS coverage improves when Claret is added to roster', () => {
     const claret = unitByName(allUnits, 'Claret');
     if (!claret) return;
     // Base roster has electric support (Rina) and electric stun (Anby) but no primary
@@ -841,7 +840,7 @@ await runTest(46, 'Electric DPS coverage improves when Claret is added to roster
         `Electric coverage should improve when Claret is added — before: ${electric0}, after: ${electric1}`);
 });
 
-await runTest(47, 'An element covered only by a sub-DPS is not reported as having no options', () => {
+await runTest(45, 'An element covered only by a sub-DPS is not reported as having no options', () => {
     // Velina is a T0 wind anomaly SUB-DPS. Element quality counts primary carries only, so
     // wind reads 0 either way — but the reason line must not claim there is nothing. [GAP-01]
     const withVelina = ['Miyabi', 'Velina', 'Nangong', 'Astra', 'Nicole', 'Anby'];
@@ -863,7 +862,7 @@ await runTest(47, 'An element covered only by a sub-DPS is not reported as havin
         `a wind-less roster should still read "no DPS options"; got: "${windGap0?.reason}"`);
 });
 
-await runTest(48, 'A carry whose only burst is a chain attack earns no recovery-debuff synergy', () => {
+await runTest(46, 'A carry whose only burst is a chain attack earns no recovery-debuff synergy', () => {
     // Severian's damage is `ultimate:strong: 2` + `chain: 3`. A MAX over those values read 3 —
     // the same as a 6000% ultimate — which paid Nangong's recovery debuff enough to clear the
     // synergy threshold and print "Severian has mechanical synergy with your Nangong". [PULL-03]
@@ -885,7 +884,7 @@ await runTest(48, 'A carry whose only burst is a chain attack earns no recovery-
         'Severian should still be a wind DPS candidate');
 });
 
-await runTest(49, 'A self-targeted buff credits only the teammate who switches it on', () => {
+await runTest(47, 'A self-targeted buff credits only the teammate who switches it on', () => {
     // Severian's `buffs.cd` targets himself and fires beside another wind unit. Roxy earns that
     // fit; Dialyn and Norma do not, and his wind case must not read as a teammate conditional
     // (a 0.2 fit discount on every non-wind stunner, or an unmet codependency). [PULL-04]
@@ -911,10 +910,10 @@ await runTest(49, 'A self-targeted buff credits only the teammate who switches i
     assert(deps === depsBare, `a self-targeted buff must not create a team dependency: ${deps} vs ${depsBare}`);
 });
 
-// TEST 50: a narrow anomaly roster (from a player's share URL). Velina read "No" on her banner
+// TEST 48: a narrow anomaly roster (from a player's share URL). Velina read "No" on her banner
 // tile and the roster rated Well-Rounded. Covers PULL-05/06/07 and GAP-02/03/04.
 
-await runTest(50, 'Narrow anomaly roster: banner T0 is High, join locks respected, rating reads narrow', () => {
+await runTest(48, 'Narrow anomaly roster: banner T0 is High, join locks respected, rating reads narrow', () => {
     const roster = [
         'Aria', 'Claret', 'Jane Doe', 'Nangong', 'Remielle', 'Yanagi', 'Yuzuha',
         'Grace', 'Soldier 11', 'Pyrois',
@@ -962,8 +961,8 @@ await runTest(50, 'Narrow anomaly roster: banner T0 is High, join locks respecte
     assert(assessment.shapeLabel === 'Narrow: Anomaly', `shape label should be "Narrow: Anomaly", got ${assessment.shapeLabel}`);
 });
 
-// TEST 51: Remielle off-banner — the owner's triple-anomaly table, not a Depth card.
-await runTest(51, 'Remielle verdict follows whether a triple-anomaly team can be assembled', () => {
+// TEST 49: Remielle off-banner — the owner's triple-anomaly table, not a Depth card.
+await runTest(49, 'Remielle verdict follows whether a triple-anomaly team can be assembled', () => {
     const filler = ['Nicole', 'Anby', 'Billy', 'Astra', 'Trigger'];
     const verdictFor = (names) => {
         const { unitStates, ownedUnits } = buildSyntheticRoster(allUnits, [...names, ...filler]);
@@ -986,8 +985,8 @@ await runTest(51, 'Remielle verdict follows whether a triple-anomaly team can be
         'Remielle must not appear as an Anomaly Depth candidate');
 });
 
-// TEST 52: two on-field anomaly carries of different elements react with each other. [GAP-02]
-await runTest(52, 'Two anomaly carries of different elements are each other\'s reaction partner', () => {
+// TEST 50: two on-field anomaly carries of different elements react with each other. [GAP-02]
+await runTest(50, 'Two anomaly carries of different elements are each other\'s reaction partner', () => {
     const pair = buildSyntheticRoster(allUnits, ['Jane Doe', 'Yanagi', 'Nicole', 'Anby', 'Billy']);
     const pairResult = analyze(allUnits, pair.unitStates, pair.ownedUnits, { maxRecommendations: 10 });
     assert(!hasGap(pairResult, 'anomaly-partner'),
@@ -1002,8 +1001,8 @@ await runTest(52, 'Two anomaly carries of different elements are each other\'s r
     assert(soloGap && /no anomaly partner/.test(soloGap.reason), `Miyabi alone has no partner: ${soloGap?.reason}`);
 });
 
-// TEST 53: the priority budget ranks pulls the way the owner reads this roster. [PULL-08]
-await runTest(53, 'Priority budget: Velina and Roxy are the two Highs on a narrow anomaly roster', () => {
+// TEST 51: the priority budget ranks pulls the way the owner reads this roster. [PULL-08]
+await runTest(51, 'Priority budget: Velina and Roxy are the two Highs on a narrow anomaly roster', () => {
     const roster = [
         'Aria', 'Claret', 'Jane Doe', 'Nangong', 'Remielle', 'Yanagi', 'Yuzuha',
         'Grace', 'Soldier 11', 'Pyrois',

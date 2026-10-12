@@ -2292,13 +2292,16 @@ async function main() {
     // WHAT IS BEING PINNED IS THE SIZING, which is fitted rather than derived and therefore needs
     // a guard. `CONJUNCTIVE_SYNERGY_BONUS` was re-derived 55 -> 45 against this team, its only
     // user, so 3 x 45 = 135 raw. The target was the owner's: AoD lands within 15-20 points of the
-    // better of the two premier anomaly teams, averaged over every boss where all three are
-    // viable. Measured at 45: **-17.5**, and AoD is the top non-Miyabi, non-Remielle anomaly team
+    // better of the two premier anomaly teams, across every boss where all three are viable.
+    // Measured at 45: **-17.5** mean (now -19.0 median), and AoD is the top non-Miyabi, non-Remielle anomaly team
     // on 12 of 14 bosses, never worse than third.
     //
-    // The band is asserted on the AVERAGE, not per boss, because matchup legitimately swings it
+    // The band is asserted on the MEDIAN, not per boss, because matchup legitimately swings it
     // from -80 to +50 — Girtablullu and Bringer are far worse for AoD than Vesper or Sweeper. A
-    // per-boss assertion would be pinning the boss table, not the synergy.
+    // per-boss assertion would be pinning the boss table, not the synergy. It was the mean until
+    // the frost fix ([WEAK-01]) lifted Nangong/Miyabi/Yuzuha by 110.7 on Bringer alone: AoD did
+    // not move on any boss, yet one home-turf reference dragged the mean -22.2 -> -30.1. The
+    // median (-19.0 before and after) measures the synergy and ignores one boss's outlier.
     run('TEST 94: Angels of Delusion within 15-20 points of the premier anomaly teams', () => {
         const AOD = 'Nangong/Aria/Sunna';
         const REFERENCES = ['Nangong/Miyabi/Yuzuha', 'Aria/Remielle/Velina'];
@@ -2314,16 +2317,18 @@ async function main() {
         assert(gaps.length >= 12,
             `only ${gaps.length} boss(es) had AoD and a reference both viable — this test has gone vacuous.`);
 
-        const mean = gaps.reduce((a, b) => a + b, 0) / gaps.length;
+        const sorted = [...gaps].sort((a, b) => a - b);
+        const mid = Math.floor(sorted.length / 2);
+        const median = sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
         // Two-sided. The lower bound is the owner's "within 15-20"; the upper bound is what stops
         // a future resizing from quietly making a declaration-carried team the best in the game.
-        assert(mean <= -10,
-            `AoD averages ${mean.toFixed(1)} against the better reference — it must stay BELOW ` +
-            `them. A team carried by declared synergy outscoring the modelled ones means the ` +
+        assert(median <= -10,
+            `AoD's median gap is ${median.toFixed(1)} against the better reference — it must stay ` +
+            `BELOW them. A team carried by declared synergy outscoring the modelled ones means the ` +
             `declaration has been oversized.`);
-        assert(mean >= -25,
-            `AoD averages ${mean.toFixed(1)} against the better reference, further back than the ` +
-            `owner's 15-20 point target. Raise CONJUNCTIVE_SYNERGY_BONUS or add a declaration.`);
+        assert(median >= -25,
+            `AoD's median gap is ${median.toFixed(1)} against the better reference, further back ` +
+            `than the owner's 15-20 point target. Raise CONJUNCTIVE_SYNERGY_BONUS or add a declaration.`);
     });
 
     // TEST 95: Severian's stunner on wind-weak bosses — Roxy over Norma.

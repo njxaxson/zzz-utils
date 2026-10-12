@@ -63,7 +63,9 @@ labels, and [calibration](engine/calibration.md) for the anchors.
 
 ## What shipped last
 
-**Pull engine: a priority budget** (2 High, 4 Medium, ranked greedily), 2026-10-12. Pull
-engine only; no scorer or data change.
+**Rankings TEST 94 asserts AoD's median gap, not its mean**, 2026-10-12. The frost fix
+([WEAK-01]) lifted Nangong/Miyabi/Yuzuha by 110.7 on Bringer alone, dragging the mean past the
+floor with AoD unchanged; the test had been red on develop since that commit. Before that: the
+pull engine's priority budget (2 High, 4 Medium, ranked greedily).
 
 Full history in [CHANGELOG.md](CHANGELOG.md).

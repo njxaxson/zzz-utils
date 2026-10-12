@@ -359,5 +359,5 @@ not tracked as an issue, by owner decision.
 
 Mechanics TEST 36 pins the behaviour. Its central assertion is equivalence: raising Roxy's own
 crit-damage buff by 2 pays Severian exactly what his self term pays him. That fails if the buff
-leaks to teammates, and fails if it is priced any other way. Recommendations TEST 49 pins the
+leaks to teammates, and fails if it is priced any other way. Recommendations TEST 47 pins the
 pull-engine half.
