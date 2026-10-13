@@ -1613,6 +1613,40 @@ a.unit-card {
     margin-top: 1rem;
 }
 
+.boss-selection-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+/* The underline lives on the wrapper so it spans the full width. */
+.boss-selection-header h2 {
+    margin: 0;
+    padding: 0;
+    border-bottom: none;
+}
+
+.boss-randomize-btn {
+    padding: 0.4rem 0.9rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-secondary);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.boss-randomize-btn:hover {
+    border-color: var(--accent-primary);
+    color: var(--text-primary);
+}
+
 /* Mobile-only mode toggle bar above the boss grid */
 .boss-mode-toggle-container {
     display: none; /* shown only in mobile media query */

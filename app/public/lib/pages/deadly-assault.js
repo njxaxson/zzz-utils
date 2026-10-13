@@ -401,8 +401,10 @@ function setupEventListeners() {
 
     addLongPressToGrid(bossGrid);
 
+    document.getElementById('boss-randomize-btn').addEventListener('click', randomizeBosses);
+
     document.getElementById('run-btn').addEventListener('click', runOptimization);
-    
+
     document.getElementById('da-variations-checkbox').addEventListener('change', (e) => {
         showCreativeOptions = e.target.checked;
         savePageToStorage();
@@ -437,6 +439,20 @@ function addLongPressToGrid(bossGrid) {
     bossGrid.addEventListener('touchmove', () => {
         clearTimeout(longPressTimer);
     }, { passive: true });
+}
+
+function randomizeBosses() {
+    const pool = allBosses.filter(boss => boss.available !== false).map(boss => boss.id);
+    // Fisher-Yates shuffle, then take the first BOSSES_REQUIRED.
+    for (let i = pool.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    selectedBosses = pool.slice(0, BOSSES_REQUIRED);
+
+    renderBossSection();
+    savePageToStorage();
+    renderPlan();
 }
 
 function handleBossModeToggle(e) {
