@@ -2375,6 +2375,29 @@ async function main() {
         assert(m.get(mvy) > m.get(may),
             `${mvy} (${m.get(mvy)?.toFixed(1)}) must still beat ${may} (${m.get(may)?.toFixed(1)}) on ${b.name}`);
     });
+
+    // TEST 97: Nangong/Vivian has no primary carry and trails real-carry anomaly teams on Vesper.
+    //
+    // Owner ruling (2026-10-13): Vivian is off-field, Nangong is a stunner, so the team has no
+    // primary DPS. It is legal, but it outranked Alice/Remielle/Velina and Nangong/Alice/Sunna on
+    // Vesper — teams with a proper carry. All four are anomaly, so raw scores compare. [PIPE-04]
+    run('TEST 97: Nangong/Vivian teams trail real-carry anomaly teams on Vesper', () => {
+        const [b] = withBosses(bosses, 'Vesper');
+        assert(b, 'Vesper not found');
+        const LOWER = ['Nangong / Vivian / Sunna', 'Nangong / Vivian / Yuzuha'];
+        const HIGHER = ['Alice / Remielle / Velina', 'Nangong / Alice / Sunna'];
+        const m = scoreMapForBoss(scoreForTeamString(
+            'Nangong/Vivian/Sunna,Nangong/Vivian/Yuzuha,Alice/Remielle/Velina,Nangong/Alice/Sunna', allUnits), b);
+        for (const label of [...LOWER, ...HIGHER]) {
+            assert(m.get(label) > 0, `${label} must be viable on ${b.name}, got ${m.get(label)}`);
+        }
+        for (const lo of LOWER) {
+            for (const hi of HIGHER) {
+                assert(m.get(hi) > m.get(lo),
+                    `${hi} (${m.get(hi).toFixed(1)}) must beat ${lo} (${m.get(lo).toFixed(1)}) on ${b.name}`);
+            }
+        }
+    });
     // Summary
     console.log('');
 

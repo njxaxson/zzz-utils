@@ -3,6 +3,15 @@
 What shipped, newest first. This file is history — nothing here is a statement about the
 current state of the engine. For that, see [STATUS.md](STATUS.md).
 
+**A team with no on-field carry is not CONVENTIONAL**, 2026-10-13. `Nangong/Vivian/Sunna` ranked
+#3 on Vesper (324.3), ahead of teams with a real carry. Vivian is off-field and Nangong is a
+stunner, but the classifier read Vivian as an anomaly hypercarry. A CONVENTIONAL team none of
+whose carries is on-field now drops to ×0.85. A totalize ≥ 2 carry (Hugo) counts as a primary
+off-field ([PIPE-04]). 575 rows moved, all downward, structure+teamwork only, zero prediction
+exceptions; calibration anchors unchanged. Vesper: NVS 324.3 → 275.7, NVY 304.2 → 258.6. Added
+mechanics TEST 42 and rankings TEST 97. Also opened SCORE-143 for `Nangong/Pyrois/Sunna`, which
+is underscored on the same boss.
+
 **Roxy and Norma count as sub-DPS; Grace no longer holds the anomaly sub-DPS slot shut**,
 2026-10-12. An attack roster owning Roxy or Norma used to read "no attack sub-DPS"; they now back
 the archetypes they join ([GAP-05]). Grace T1.5 beside Aria, Jane Doe and Yanagi now leaves the

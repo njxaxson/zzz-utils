@@ -150,6 +150,22 @@ Settled in the same ruling: **rupture never accepts a second carry.** Both branc
 testing "at least one rupture unit", so two rupture carries plus a stunner plus a support was
 scoring as a fully conventional team.
 
+### No off-field agent is a primary DPS
+
+**Complaint:** `Nangong/Vivian/Sunna` ranked #3 on Vesper, ahead of `Alice/Remielle/Velina`,
+`Nangong/Alice/Sunna` and `Dialyn/Pyrois/Sunna` — every one of which has a real carry. Vivian
+is an off-field sub-DPS and Nangong is a stunner, so the team has no primary at all.
+
+**Ruling, in the owner's words:** *"By definition, ceding the field means ceding the primary DPS
+role."* It is as true of Orphie as it is of Vivian. The deciding factor is **`onfield`**, not
+whether a sub-DPS role is conditional — Burnice is a primary exactly when she is configured
+on-field (beside Velina), and a sub-DPS when she is not. Such a team stays legal and viable, but
+it is not conventional.
+
+Settled in the same ruling: a **totalize carry of weight 2 or more** is a primary off-field — Hugo
+converts stun time, not field time. Pyrois (weight 1) does not qualify. Engine detail in
+[PIPE-04](../engine/layers.md#pipe-04-ceding-the-field-cedes-the-primary-role).
+
 ### A stunner's daze is not charged on a stunless carry
 
 Ye Shunguong inherits the stun damage multiplier without ever opening a window, so Qingyi's

@@ -19,6 +19,10 @@ Hugo is `onfield: false`. He enters for chains and totalize bursts, then hands f
 back to the rest of the team. That matters for how the engine budgets who is actually on
 screen; see [L4 components](../engine/l4-components.md).
 
+He is still the team's **primary**: a totalize carry of weight 2 or more is exempt from the
+no-on-field-carry structure demotion, because it converts stun time rather than field time. A
+weight-1 totalize carry (Pyrois) is not. See [PIPE-04](../engine/layers.md#pipe-04-ceding-the-field-cedes-the-primary-role).
+
 ## Naming
 
 The file is named for the mechanic, not the unit. A future carry with the same stun-time

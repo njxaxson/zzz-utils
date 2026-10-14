@@ -7,19 +7,19 @@ re-run the commands and update the numbers.
 change belongs in [CHANGELOG.md](CHANGELOG.md); anything that explains a settled ruling belongs
 in [notes/adjudications.md](notes/adjudications.md) behind a tag.
 
-**Last verified:** 2026-10-12.
+**Last verified:** 2026-10-13.
 
 ## Test status
 
 | Suite | State |
 |----|----|
-| mechanics | **41 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
-| rankings | **95 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
+| mechanics | **42 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
+| rankings | **96 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
 | recommendations | **51 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
 | bucketing | **14 pass, 0 fail** |
 | cohesion fixture | **11/11** owner judgements hold |
 | calibration freshness | both files match the current engine/data fingerprint **and** the current `pools` map |
-| calibration certification | **CERTIFIED** — 0 within-archetype rank inversions across 60 (boss × archetype) groups and 71,318 teams |
+| calibration certification | **CERTIFIED** — 0 within-archetype rank inversions across 64 (boss × archetype) groups and 74,674 teams |
 
 ```bash
 node test-mechanics.mjs && node test-rankings.mjs && node test-recommendations.mjs && node test-bucketing.mjs && node cohesion-fixture.mjs
@@ -33,7 +33,11 @@ why an empty map still matters, and why a green suite is not evidence on its own
 
 ## Open
 
-**None as issue files.** Nothing is release-blocking and nothing is outstanding.
+One. Nothing is release-blocking.
+
+| Issue | Priority | Note |
+|----|----|----|
+| [Nangong/Pyrois/Sunna underscored on Vesper](issues/open/medium-nangong-pyrois-sunna-underscored-on-vesper.md) | medium | Cohesion 0.65 on a CONVENTIONAL team; not yet diagnosed |
 
 ## Deferred
 
@@ -61,9 +65,8 @@ labels, and [calibration](engine/calibration.md) for the anchors.
 
 ## What shipped last
 
-**Rankings TEST 94 asserts AoD's median gap, not its mean**, 2026-10-12. The frost fix
-([WEAK-01]) lifted Nangong/Miyabi/Yuzuha by 110.7 on Bringer alone, dragging the mean past the
-floor with AoD unchanged; the test had been red on develop since that commit. Before that: the
-pull engine's priority budget (2 High, 4 Medium, ranked greedily).
+**A team with no on-field carry is not CONVENTIONAL**, 2026-10-13. Ceding the field cedes the
+primary role ([PIPE-04]); totalize ≥ 2 is exempt. `Nangong/Vivian/Sunna` on Vesper 324.3 → 275.7.
+Before that: rankings TEST 94 moved to asserting AoD's median gap.
 
 Full history in [CHANGELOG.md](CHANGELOG.md).

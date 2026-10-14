@@ -1863,6 +1863,72 @@ async function main() {
             `Ellen L3 must stay partial on ice:frost (${pFrost.l3}) vs ice (${pIce.l3})`);
     });
 
+    // TEST 42: ceding the field cedes the primary role
+    // A CONVENTIONAL team none of whose carries is on-field has no primary and drops to
+    // unconventional-viable. Stunners (Nangong's pseudo-anomaly) and support-like units (Remielle,
+    // Orphie) are never the carry; a totalize >= 2 carry is a primary off-field. [PIPE-04]
+    run('TEST 42: a team with no on-field carry is not CONVENTIONAL; totalize >= 2 is exempt', () => {
+        const CONVENTIONAL = 35, VIABLE = 0;   // STRUCTURE.CONVENTIONAL_BONUS / UNCONVENTIONAL_VIABLE
+        const clone = (srcId, id, name, patch) => {
+            const c = JSON.parse(JSON.stringify(allUnits.find(u => u.id === srcId)));
+            c.id = id;
+            c.name = name;
+            return Object.assign(c, patch);
+        };
+        const traceOf = (spec, roster = allUnits) => {
+            const parsed = scoreForTeamString(spec, roster);
+            assert(parsed.length === 1, `fixture ${spec} did not resolve to one team`);
+            const trace = {};
+            const score = scoreTeamForBoss(parsed[0].team, NEUTRAL_BOSS, { trace });
+            assert(score > 0, `${spec} scored ${score} — pick a legal, viable team`);
+            return trace;
+        };
+
+        // (a) No on-field carry: lone Vivian/Velina beside a pseudo-anomaly stunner, Burnice
+        //     without Velina (off-field), and two off-field carries together.
+        for (const spec of ['Nangong/Vivian/Sunna', 'Nangong/Velina/Sunna', 'Lighter/Burnice/Lucy',
+                            'Velina/Vivian/Astra', 'Velina/Vivian/Nicole']) {
+            const t = traceOf(spec);
+            assert(!t.onFieldPrimary, `${spec}: expected no on-field primary`);
+            assert(t.structure === VIABLE, `${spec}: structure ${t.structure}, expected ${VIABLE} (demoted)`);
+        }
+
+        // (b) Velina/Vivian/Remielle on its own: Remielle is off-field AND support-like, so she
+        //     must not stand in as the primary.
+        const vvr = traceOf('Velina/Vivian/Remielle');
+        assert(!vvr.onFieldPrimary, 'Velina/Vivian/Remielle: Remielle must not count as an on-field primary');
+        assert(vvr.structure !== CONVENTIONAL, `Velina/Vivian/Remielle: structure ${vvr.structure} must not be CONVENTIONAL`);
+
+        // (c) Unaffected: Burnice resolves on-field beside Velina; Hugo is totalize 3.
+        for (const spec of ['Burnice/Velina/Lucy', 'Dialyn/Hugo/Astra', 'Lycaon/Qingyi/Hugo']) {
+            const t = traceOf(spec);
+            assert(t.onFieldPrimary, `${spec}: expected an on-field primary`);
+            assert(t.structure === CONVENTIONAL, `${spec}: structure ${t.structure}, expected ${CONVENTIONAL}`);
+        }
+
+        // (d) The threshold, not Hugo's identity: the same kit at totalize 1 is demoted.
+        const weak = clone('hugo', 'totalize-one', 'TotalizeOne', {
+            mechanics: { ...allUnits.find(u => u.id === 'hugo').mechanics, damage: { totalize: 1 } } });
+        const t1 = traceOf('Dialyn/TotalizeOne/Astra', [...allUnits, weak]);
+        assert(!t1.onFieldPrimary && t1.structure === VIABLE,
+            `totalize-1 clone: onFieldPrimary ${t1.onFieldPrimary}, structure ${t1.structure} — expected demoted`);
+
+        // (e) Attack is not excluded. Orphie is support-like, so Koleda/Orphie/Lucy has no primary
+        //     (it already classifies wildly unconventional). An off-field Ellen proves the gate
+        //     itself fires on the attacker branch; plain Ellen is the control.
+        const kol = traceOf('Koleda/Orphie/Lucy');
+        assert(!kol.onFieldPrimary, 'Koleda/Orphie/Lucy: Orphie must not count as an on-field primary');
+        assert(kol.structure !== CONVENTIONAL, `Koleda/Orphie/Lucy: structure ${kol.structure} must not be CONVENTIONAL`);
+        const offEllen = clone('ellen', 'offfield-ellen', 'OffFieldEllen', {
+            mechanics: { ...allUnits.find(u => u.id === 'ellen').mechanics, onfield: false, pseudoRole: ['subdps'] } });
+        const ctrl = traceOf('Lycaon/Ellen/Lucy');
+        const off = traceOf('Lycaon/OffFieldEllen/Lucy', [...allUnits, offEllen]);
+        assert(ctrl.onFieldPrimary && ctrl.structure === CONVENTIONAL,
+            `Lycaon/Ellen/Lucy control: onFieldPrimary ${ctrl.onFieldPrimary}, structure ${ctrl.structure}`);
+        assert(!off.onFieldPrimary && off.structure === VIABLE,
+            `off-field Ellen: onFieldPrimary ${off.onFieldPrimary}, structure ${off.structure} — expected demoted`);
+    });
+
     // Summary
     console.log('');
 

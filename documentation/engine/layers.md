@@ -47,6 +47,9 @@ carry exempts a stunnerless team from a stun shill.
 | 2 | Neutral |
 | 3+ | Penalty — field competition |
 
+A zero-on-field team usually also loses CONVENTIONAL under [PIPE-04](#pipe-04-ceding-the-field-cedes-the-primary-role).
+That is not double counting: this row prices field economy, PIPE-04 prices the missing primary.
+
 ## No support or defense is its own tier
 
 A team with no effective support and no effective defense — pseudo-roles included, so Orphie,
@@ -246,3 +249,37 @@ lands looked promising and does not survive: among genuinely supportless teams t
 **backwards** on the owner's own Miyabi ladder, because Nangong is a buff-rich stunner whose
 buffs all land. And re-introducing a compression curve scoped to supportless teams was rejected
 outright by the owner — the cap is the wrong mechanism, not merely the wrongly-scoped one.
+
+### [PIPE-04] Ceding the field cedes the primary role
+
+A CONVENTIONAL team with **no on-field carry** is demoted to `UNCONVENTIONAL_VIABLE` (×0.85).
+Owner ruling: no off-field agent can be a primary DPS. See
+[adjudications](../notes/adjudications.md#no-off-field-agent-is-a-primary-dps).
+
+**The case.** `Nangong/Vivian/Sunna` on Vesper scored 510.0 raw, ahead of `Alice/Remielle/Velina`
+(494.9) and `Nangong/Alice/Sunna` (483.2). The carry lists exclude stunners, so Vivian was the
+lone anomaly carry and the team matched the anomaly hypercarry branch. Vivian then banked full
+primary L2 credit. The team also collected the solo-carry bonus, because its only on-field agent
+is Nangong. The reaction-disabled sub-DPS halving never fired, because Nangong's pseudo-anomaly
+supplies the reactions. That route is legitimate and the team stays legal.
+
+**What counts as a carry.** It uses the classifier's filter: DPS, not a stunner, not an
+effective support or defense. So Nangong's pseudo-anomaly never makes her the primary, and
+Remielle and Orphie are support-like and never rescue a team either. `isOnField` reads the
+per-team resolution, so Burnice is off-field without Velina and on-field beside her. This is
+why `onfield` decides rather than whether a sub-DPS role is conditional.
+
+**Totalize exemption.** A carry with `damage.totalize` weight **≥ 2** is a primary off-field.
+Hugo (3) qualifies, because his damage is stun time. Pyrois (1) does not, and is on-field by
+default anyway.
+
+**Order.** The gate runs right after classification and before the no-support gate, so a
+supportless team still takes the harsher 0.75 (e.g. `Nangong/Velina/Vivian`). It only ever
+demotes, and only from CONVENTIONAL.
+
+Measured: **575 team-boss rows, every one downward, signature `structure+teamwork` and nothing
+else, zero exceptions** against the prediction "every mover contains Vivian, Velina or Burnice".
+No Hugo team moved, and no team with Burnice beside Velina moved. Calibration anchors were
+unchanged. Vesper: `Nangong/Vivian/Sunna` 324.3 → 275.7 and `Nangong/Vivian/Yuzuha` 304.2 → 258.6
+(calibrated), now below `Alice/Remielle/Velina`, `Nangong/Alice/Sunna` and `Dialyn/Pyrois/Sunna`.
+Mechanics TEST 42 pins the rule and rankings TEST 97 pins the Vesper ordering.

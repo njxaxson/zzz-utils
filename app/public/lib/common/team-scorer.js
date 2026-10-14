@@ -2757,7 +2757,12 @@ const FIELD_TIME = {
 // Remielle, and Cissia-alongside-Seed all count as the team's support. See
 // documentation/engine/layers.md ("No support or defense is its own tier").
 function scoreTeamStructure(team, debug) {
-    const classified = classifyTeamStructure(team, debug);
+    let classified = classifyTeamStructure(team, debug);
+    // No carry holds the field, so there is no primary. [PIPE-04]
+    if (classified === STRUCTURE.CONVENTIONAL_BONUS && !hasOnFieldPrimary(team)) {
+        if (debug) console.log('    Structure: ^ DEMOTED to UNCONVENTIONAL viable — no on-field primary carry');
+        classified = STRUCTURE.UNCONVENTIONAL_VIABLE;
+    }
     if (team.some(u => isEffectiveSupport(u) || isEffectiveDefense(u))) return classified;
     // Exemption: in a totalize + double-stun comp the SECOND STUNNER *is* the support. Totalize
     // damage is stun uptime, so a second stunner is feeding the carry's damage the way a support
@@ -2800,6 +2805,13 @@ function mandatesDualCarry(unit) {
     const join = unit.join;
     if (!Array.isArray(join) || join.length === 0) return false;
     return join.every(j => DUAL_CARRY_JOIN_ROLES.includes(j));
+}
+
+// A carry who cedes the field is not a primary; totalize >= 2 converts stun time instead. [PIPE-04]
+const OFFFIELD_PRIMARY_TOTALIZE = 2;
+function hasOnFieldPrimary(team) {
+    const carries = team.filter(u => isDPS(u) && !isEffectiveSupport(u) && !isEffectiveDefense(u) && !isStun(u));
+    return carries.some(u => isOnField(u) || w(u.mechanics?.damage?.totalize) >= OFFFIELD_PRIMARY_TOTALIZE);
 }
 
 function secondStunnerActsAsSupport(team) {
@@ -5051,6 +5063,7 @@ function scoreTeamContexts(team, boss, options = {}) {
         trace.base = baseScore;
         trace.avoid = avoidResult;
         trace.structure = structureScore;
+        trace.onFieldPrimary = hasOnFieldPrimary(team);   // [PIPE-04]
         trace.fieldTime = fieldTimeAdj;
         trace.contention = contentionAdj;
         trace.l2 = l2;
