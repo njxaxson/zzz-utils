@@ -97,6 +97,7 @@ Populated during the comment pass. One row per tag, newest last within a prefix.
 | `[ARCH-03]` | `../archetypes/README.md` | The monoshock calibration override |
 | `[ARCH-04]` | `../archetypes/README.md` | Archetype fit calibration (`intended` = 0, `avoid` = -40); notes a stale comment contradiction |
 | `[ARCH-05]` | `../archetypes/README.md` | The titled off-shill bonus is half the shill bonus, and used to be double it |
+| `[ARCH-06]` | `../data-model/declared-archetypes.md` | Archetype declarations can be narrowed by the carry's element or variant (`rupture:!ice`) |
 | `[BUFF-01]` | `../data-model/buffs-and-debuffs.md` | Supplier buffs a damage type the consumer deals — not a need/provision channel |
 | `[BUFF-02]` | `../data-model/buffs-and-debuffs.md` | Anomaly crit-damage efficiency is 30%, not 0% |
 | `[BUFF-03]` | `../data-model/buffs-and-debuffs.md` | Chain damage buff priced on its own dial, not the provision rate |
@@ -109,8 +110,9 @@ Populated during the comment pass. One row per tag, newest last within a prefix.
 | `[COH-01]` | `../engine/cohesion.md` | A unit PLAYING support is judged as one, even with a DPS tag (Remielle/Orphie/Cissia) |
 | `[COH-02]` | `../engine/cohesion.md` | The element-buff menu, and why only Lighter can be moved by it |
 | `[COH-03]` | `../engine/cohesion.md` | Delivery is priced at the square root of the L4 coefficient |
-| `[TWM-01]` | `../engine/teamwork-multiplier.md` | Pseudo-role stat alignment, and why SAnby is not double-charged |
+| `[TWM-01]` | `../engine/teamwork-multiplier.md` | Why SAnby is not double-charged (the pseudo-role alignment discount it once covered is gone) |
 | `[TWM-02]` | `../engine/teamwork-multiplier.md` | Two views of cohesion, so an unmet weight-2 need does not cost the boss matchup |
+| `[TWM-03]` | `../engine/teamwork-multiplier.md` | An idle DPS pseudo-role caps cohesion on a neutral carry only; intended and avoided are exempt |
 | `[ULT-01]` | `../engine/ultimates-two-channel.md` | Frequency is its own axis, and `chain:extra` is self-provision |
 | `[ULT-02]` | `../engine/ultimates-two-channel.md` | `getUltimateMagnitude`'s zeroing is load-bearing for Sigrid and Pyrois |
 | `[SCAL-01]` | `../data-model/scaling.md` | The plural need keys (`ablooms`, `vortex`) are not typos |

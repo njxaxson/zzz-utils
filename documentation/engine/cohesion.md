@@ -91,6 +91,20 @@ element does not inflate a supplier's utilisation.
 
 Sub-DPS units are **always** damage contributors, even with a support pseudo-role.
 
+### An idle pseudo-role is a ceiling, not a discount
+
+Nangong behind Pyrois does a stunner's whole job, but her anomaly half sits idle. Her cohesion is
+measured on her base role, then capped, because she is short of her potential. Whether the cap
+applies depends on her declared archetypes. See
+[TWM-03](teamwork-multiplier.md#twm-03-an-idle-pseudo-role-caps-cohesion--on-a-neutral-carry-only).
+
+## Reading cohesion in the trace
+
+`--debug` prints every term that feeds cohesion, per unit, with its reason and weight — buff
+utilisation, unmet needs, armorer levers, the cap, a unit that supplies nothing. A unit that
+contributes no term says so. The same terms are on `trace.cohesionTerms` for tests. Before this
+existed, Nangong/Pyrois/Sunna's 0.65 had to be found by patching the engine with log lines.
+
 ## Related
 
 * [Buffs and debuffs](../data-model/buffs-and-debuffs.md) — the flagship test, the MAX-not-average

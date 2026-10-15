@@ -21,7 +21,7 @@
  */
 
 import { loadAllData, deepFreeze } from './lib/data.js';
-import { chargeableElementArms, getBasicDamage, getBasicDamageBaseline, getMaxBurstWeight, quickAssistCohesionWeight, scoreTeamForBoss, resolveBossVariation, resolveConditionalValue, getEffectiveScaling, effectiveDisorderSupply, effectiveDisorderWeakSupply, getChainMagnitude, UnitContext, getTeammateBuffs, getSelfBuffSpecs, isDPS, isStun, isSupport, isOnField, getElement, getEffectiveRoles, hasSubDPSRole } from './app/public/lib/common/team-scorer.js';
+import { archetypeSpecMatches, parseArchetypeSpec, chargeableElementArms, getBasicDamage, getBasicDamageBaseline, getMaxBurstWeight, quickAssistCohesionWeight, scoreTeamForBoss, resolveBossVariation, resolveConditionalValue, getEffectiveScaling, effectiveDisorderSupply, effectiveDisorderWeakSupply, getChainMagnitude, UnitContext, getTeammateBuffs, getSelfBuffSpecs, isDPS, isStun, isSupport, isOnField, getElement, getEffectiveRoles, hasSubDPSRole } from './app/public/lib/common/team-scorer.js';
 import { filterBosses } from './lib/boss-filter.js';
 import { getStrengthRating } from './app/public/lib/common/strength-rating.js';
 import { buildRosterTeams, canFormTeam } from './app/public/lib/common/team-pool.js';
@@ -1927,6 +1927,88 @@ async function main() {
             `Lycaon/Ellen/Lucy control: onFieldPrimary ${ctrl.onFieldPrimary}, structure ${ctrl.structure}`);
         assert(!off.onFieldPrimary && off.structure === VIABLE,
             `off-field Ellen: onFieldPrimary ${off.onFieldPrimary}, structure ${off.structure} — expected demoted`);
+    });
+
+    // TEST 43: qualified archetype declarations, and the idle pseudo-role cap they feed.
+    // `rupture:!ice` avoids every rupture carry except an ice one; a variant counts as its base
+    // element and can be negated on its own. An idle DPS pseudo-role caps cohesion only on a
+    // NEUTRAL carry — intended needs no cap, avoided is charged flat by archetype fit. [ARCH-06]
+    // [TWM-03]
+    run('TEST 43: archetype qualifiers parse and match; an idle pseudo-role is capped only on a neutral carry', () => {
+        const unit = name => {
+            const u = allUnits.find(x => x.name === name);
+            assert(u, `fixture assumption broken: ${name} not found`);
+            return u;
+        };
+
+        // (a) Grammar: the accepted forms parse, malformed ones throw.
+        for (const spec of ['rupture', 'rupture:ice', 'rupture:!ice', 'anomaly:ice:frost', 'anomaly:ice:!frost']) {
+            parseArchetypeSpec(spec);
+        }
+        for (const spec of ['', 'dps', 'rupture:', 'rupture:icee', 'rupture:!ice:frost', 'anomaly:ice:fr-ost',
+                            'anomaly:ice:frost:extra', 'rupture:!']) {
+            let threw = false;
+            try { parseArchetypeSpec(spec); } catch { threw = true; }
+            assert(threw, `"${spec}" must be rejected`);
+        }
+
+        // (b) Matching against real carries.
+        const cases = [
+            ['rupture:!ice', 'rupture', 'Yidhari', false],
+            ['rupture:!ice', 'rupture', 'Starlight Billy', true],
+            ['rupture:ice', 'rupture', 'Yidhari', true],
+            ['rupture', 'rupture', 'Yidhari', true],
+            ['anomaly:ice:frost', 'anomaly', 'Miyabi', true],
+            ['anomaly:ice:frost', 'anomaly', 'Promeia', false],
+            ['anomaly:ice:!frost', 'anomaly', 'Miyabi', false],
+            ['anomaly:ice:!frost', 'anomaly', 'Promeia', true],
+            ['anomaly:!ice', 'anomaly', 'Miyabi', false],   // frost is ice
+            ['rupture:!ice', 'anomaly', 'Miyabi', false],   // wrong archetype never matches
+        ];
+        for (const [spec, arch, name, want] of cases) {
+            const got = archetypeSpecMatches(spec, [arch], unit(name));
+            assert(got === want, `"${spec}" on ${name} [${arch}]: got ${got}, expected ${want}`);
+        }
+
+        // (c) Every declaration in the data parses, and every named variant exists on some unit —
+        //     a typo like `anomaly:ice:forst` would otherwise just never match.
+        const variants = new Set(allUnits.map(u => u.mechanics?.elementalVariant).filter(Boolean));
+        for (const u of allUnits) {
+            for (const spec of [...(u.mechanics?.archetypes?.intended ?? []), ...(u.mechanics?.archetypes?.avoid ?? [])]) {
+                const p = parseArchetypeSpec(spec);
+                assert(p.variant === null || variants.has(p.variant),
+                    `${u.name}: "${spec}" names variant "${p.variant}", which no unit declares`);
+            }
+        }
+
+        // (d) The cap, with base utilization 1.00 in every case so only the verdict decides.
+        const CAP = 0.85;
+        const buffTerm = (spec, name, roster = allUnits) => {
+            const parsed = scoreForTeamString(spec, roster);
+            assert(parsed.length === 1, `fixture ${spec} did not resolve to one team`);
+            const trace = {};
+            const score = scoreTeamForBoss(parsed[0].team, NEUTRAL_BOSS, { trace });
+            assert(score > 0, `${spec} scored ${score} — pick a legal, viable team`);
+            const term = trace.cohesionTerms.find(t => t.unit === name && t.kind === 'buffs');
+            assert(term, `${spec}: no buffs term for ${name}`);
+            return term.value;
+        };
+        const close = (a, b) => Math.abs(a - b) < 1e-9;
+        // Neutral: Nangong behind an attacker, Soukaku behind ice Yidhari via `rupture:!ice`.
+        for (const [spec, name] of [['Nangong/Pyrois/Sunna', 'Nangong'], ['Yidhari/Lucia/Soukaku', 'Soukaku']]) {
+            const v = buffTerm(spec, name);
+            assert(close(v, CAP * CAP), `${spec}: ${name} enters at ${v.toFixed(4)}, expected the cap squared`);
+        }
+        // Intended: Soukaku behind Ellen is doing her job; the Miyabi-only pseudo-role is irrelevant.
+        const ellen = buffTerm('Ellen/Lycaon/Soukaku', 'Soukaku');
+        assert(close(ellen, 1), `Ellen/Lycaon/Soukaku: Soukaku enters at ${ellen.toFixed(4)}, expected 1 (intended, no cap)`);
+        // Avoided: the same Soukaku declaring plain `rupture` takes the flat -40, not the cap too.
+        const sou = unit('Soukaku');
+        const avoider = JSON.parse(JSON.stringify(sou));
+        Object.assign(avoider, { id: 'soukaku-avoids-rupture', name: 'SoukakuAvoider' });
+        avoider.mechanics.archetypes = { intended: ['attack', 'anomaly'], avoid: ['armorer', 'rupture'] };
+        const avoided = buffTerm('Yidhari/Lucia/SoukakuAvoider', 'SoukakuAvoider', [...allUnits, avoider]);
+        assert(close(avoided, 1), `avoided clone enters at ${avoided.toFixed(4)}, expected 1 (no cap — charged flat)`);
     });
 
     // Summary

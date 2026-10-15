@@ -629,3 +629,38 @@ why those two fields should be changed deliberately rather than reached for to m
 structural change reports fewer movers than a property check over the corpus. One measurement
 saw 7,164 against 7,575; the 411-row difference was entirely non-viable teams. Expect that gap
 on every structural change — it is not a discrepancy.
+## Nangong/Pyrois/Sunna: three cohesion designs for an idle pseudo-role
+
+Nangong behind Pyrois read cohesion 0.65 and sat about 65 below Dialyn/Pyrois/Sunna on Vesper,
+where the owner places them side by side. Three designs were tried before the one that shipped
+([TWM-03]).
+
+**1. The pseudo-role stat-alignment discount (the original rule, removed).** It asked what share
+of a pseudo-role unit's stat buffs landed, and if under half, multiplied its utilisation by 0.65.
+Nangong's buildup buff (3) misses Pyrois and her stun multiplier (2) lands, so 2 of 5 — 0.40 —
+and the discount fired. Four problems:
+
+* It ignored the stunner's real value. The stun window, recovery debuff and damage debuff all
+  landed; Lighter, who lands only a recovery debuff on Pyrois, scored 100%.
+* It charged the buildup miss that the fit measure had deliberately forgiven (the Fiona and
+  Marissa rule above).
+* It was a cliff. Buildup annotated 2 instead of 3 would have aligned at exactly 0.50 and lost
+  nothing.
+* Its own doc said it discounted pseudo-DPS credit for an *active* pseudo-role. The code fired
+  only on an *inactive* one, and discounted cohesion.
+
+Lifting it alone overshot: Nangong/Pyrois/Sunna went to 449.0, third on the Vesper attack ladder.
+
+**2. A cap on every idle pseudo-role (rejected).** Right for Nangong, and 1,511 rows down for
+Soukaku — Burnice/Miyabi/Soukaku −122 on Bringer, Ellen/Lycaon/Soukaku −19. Soukaku's
+pseudo-anomaly only activates beside Miyabi; behind Ellen she is doing exactly her job. "Pseudo-role
+not active" is not the same as "potential wasted". The declared archetype is what separates them.
+
+**3. The cap on avoided carries too (rejected).** Proposed first as a steeper 50% cap, then as the
+same 0.85. Either way it charges the −40 judgement a second time. Measured on Butcher: Lucia/
+Yidhari/Soukaku 315.9 → 273.2, about 43 below the otherwise identical Zhao version. The argument
+for it — that avoided must not beat neutral — protects no unit that exists.
+
+Measuring the second design also exposed that Soukaku's `avoid: rupture` was imprecise. She is a
+valid backfill for ice rupture Yidhari and a poor one for every other rupture carry, which is why
+declarations can now be narrowed (`rupture:!ice`, [ARCH-06]).

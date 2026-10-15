@@ -1812,16 +1812,87 @@ export function getTeamArchetype(team) {
     return carryArchs[0];
 }
 
-// intended / neutral / avoided. `avoid` wins ties (they should never overlap in the data, but a
-// mismatch is the more important claim). A unit with no annotation is always neutral.
-function getArchetypeFit(unit, carryArchs) {
+// An archetype declaration: `rupture`, `rupture:!ice`, `anomaly:ice:frost`, `anomaly:ice:!frost`.
+// A variant carry counts as its base element. Anything else throws. [ARCH-06]
+const archetypeSpecCache = new Map();
+export function parseArchetypeSpec(spec) {
+    if (archetypeSpecCache.has(spec)) return archetypeSpecCache.get(spec);
+    const parts = typeof spec === 'string' ? spec.split(':') : [];
+    const [archetype, elementPart, variantPart] = parts;
+    const negated = s => typeof s === 'string' && s.startsWith('!');
+    const bare = s => (negated(s) ? s.slice(1) : s);
+    const valid = parts.length >= 1 && parts.length <= 3
+        && DPS_ROLES.includes(archetype)
+        && (elementPart === undefined || ELEMENTS.includes(bare(elementPart)))
+        && (variantPart === undefined || (!negated(elementPart) && /^[A-Za-z]+$/.test(bare(variantPart))));
+    if (!valid) {
+        throw new Error(`Invalid archetype declaration "${spec}": expected archetype, ` +
+            `archetype:[!]element, or archetype:element:[!]variant (archetypes: ${DPS_ROLES.join(', ')}).`);
+    }
+    const parsed = {
+        archetype,
+        element: elementPart === undefined ? null : bare(elementPart),
+        elementNegated: negated(elementPart),
+        variant: variantPart === undefined ? null : bare(variantPart),
+        variantNegated: negated(variantPart),
+    };
+    archetypeSpecCache.set(spec, parsed);
+    return parsed;
+}
+
+// Does this declaration cover a carry playing one of `archs`? Shared with the pull engine so the
+// two readers cannot disagree. [ARCH-06]
+export function archetypeSpecMatches(spec, archs, carry) {
+    const s = parseArchetypeSpec(spec);
+    if (!archs.includes(s.archetype)) return false;
+    if (s.element !== null && (getElement(carry) === s.element) === s.elementNegated) return false;
+    if (s.variant !== null
+        && ((carry.mechanics?.elementalVariant ?? null) === s.variant) === s.variantNegated) return false;
+    return true;
+}
+
+// intended / neutral / avoided, plus the declaration that decided it. `avoid` wins ties (they
+// should never overlap in the data, but a mismatch is the more important claim). A unit with no
+// annotation is always neutral. Every declaration is parsed, so a malformed one throws even when
+// an earlier one already matched.
+function archetypeFitDetail(unit, carry) {
     const arch = unit.mechanics?.archetypes;
-    if (!arch || carryArchs.length === 0) return 'neutral';
-    const avoid = arch.avoid || [];
-    const intended = arch.intended || [];
-    if (carryArchs.some(a => avoid.includes(a))) return 'avoided';
-    if (carryArchs.some(a => intended.includes(a))) return 'intended';
-    return 'neutral';
+    const carryArchs = carry ? carryArchetypes(carry) : [];
+    if (!arch) return { fit: 'neutral', spec: null };
+    const avoid = (arch.avoid || []).filter(spec => parseArchetypeSpec(spec));
+    const intended = (arch.intended || []).filter(spec => parseArchetypeSpec(spec));
+    if (carryArchs.length === 0) return { fit: 'neutral', spec: null };
+    const avoidHit = avoid.find(spec => archetypeSpecMatches(spec, carryArchs, carry));
+    if (avoidHit) return { fit: 'avoided', spec: avoidHit };
+    const intendedHit = intended.find(spec => archetypeSpecMatches(spec, carryArchs, carry));
+    if (intendedHit) return { fit: 'intended', spec: intendedHit };
+    // Name a qualified declaration for this archetype that did NOT match, so a neutral verdict
+    // from `rupture:!ice` on an ice carry is visible in the trace rather than a mystery.
+    const missed = [...avoid, ...intended].find(spec => carryArchs.includes(parseArchetypeSpec(spec).archetype));
+    return { fit: 'neutral', spec: null, missed: missed ?? null };
+}
+
+function getArchetypeFit(unit, carry) {
+    return archetypeFitDetail(unit, carry).fit;
+}
+
+// Debug wording for a verdict: the qualified declaration that decided it, or failed to.
+function describeArchetypeFit(detail) {
+    if (detail.spec && detail.spec.includes(':')) return `${detail.fit} via "${detail.spec}"`;
+    if (detail.missed) return `${detail.fit} ("${detail.missed}" does not match)`;
+    return detail.fit;
+}
+
+// The cohesion ceiling for a unit whose DPS pseudo-role is idle and whose primary carry's
+// archetype it does not declare as intended — its base job only, short of its potential. [TWM-03]
+const IDLE_PSEUDO_ROLE_CAP = 0.85;
+
+// A non-DPS unit's DPS pseudo-roles that did not activate on this team.
+function idleDpsPseudoRoles(unit) {
+    if (isDPS(unit)) return [];
+    const activated = unit._activatedRoles || [];
+    return (unit.mechanics?.pseudoRole || []).map(pseudoRoleName)
+        .filter(name => DPS_ROLES.includes(name) && !activated.includes(name));
 }
 
 // A unit that plays support infrastructure — the population whose archetype fit we judge, and log
@@ -1851,16 +1922,16 @@ function scoreArchetypeFit(team, debug) {
     for (const unit of team) {
         if (unit === carry) continue;
         if (!isSupportLike(unit) && !unit.mechanics?.archetypes) continue;
-        const fit = getArchetypeFit(unit, carryArchs);
+        const detail = archetypeFitDetail(unit, carry);
         let delta = 0;
-        if (fit === 'intended') delta = ARCHETYPE_INTENDED_BONUS;
-        else if (fit === 'avoided') delta = ARCHETYPE_AVOID_PENALTY;
+        if (detail.fit === 'intended') delta = ARCHETYPE_INTENDED_BONUS;
+        else if (detail.fit === 'avoided') delta = ARCHETYPE_AVOID_PENALTY;
         total += delta;
         if (debug) {
             const tag = unit.mechanics?.archetypes ? '' : ' (unannotated)';
             const sign = delta > 0 ? `+${delta}` : `${delta}`;
             console.log(`    ${unit.name} → ${carry.name} [${carryArchs.join('/') || 'none'}]: ` +
-                `${fit}${delta ? ` ${sign}` : ''}${tag}`);
+                `${describeArchetypeFit(detail)}${delta ? ` ${sign}` : ''}${tag}`);
         }
     }
     return total;
@@ -4586,7 +4657,7 @@ const STRUCTURE_FACTOR = new Map([
 
 const COHESION_FLOOR = 0.2;
 
-function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs = 0, diametricFloor = 0, boss = null) {
+function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs = 0, diametricFloor = 0, boss = null, trace = null) {
     const structureFactor = STRUCTURE_FACTOR.get(structureScore) ?? 0.35;
     const twReactions = computeAnomalyReactions(team, boss);
 
@@ -4597,11 +4668,14 @@ function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs =
     let totalWeight = 0;
     let logSumM = 0;
     let totalWeightM = 0;
+    // Every term, labelled, for the debug print and the trace.
+    const terms = [];
     // Add a term to both views (the default), or to just one of them.
-    const addTerm = (value, weight, view = 'both') => {
+    const addTerm = (unit, kind, note, value, weight, view = 'both') => {
         const term = weight * Math.log(Math.max(value, 0.01));
         if (view !== 'matchup') { logSum += term; totalWeight += weight; }
         if (view !== 'full') { logSumM += term; totalWeightM += weight; }
+        terms.push({ unit: unit.name, kind, note, value, weight, view });
     };
 
     for (const unit of team) {
@@ -4612,8 +4686,8 @@ function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs =
             const supply = getArmorerLeverSupply(unit, team);
             const leverUtil = ARMORER_LEVER_MISS_UTIL + (1 - ARMORER_LEVER_MISS_UTIL)
                 * Math.min(1, supply / ARMORER_LEVER_FULL);
-            addTerm(leverUtil * leverUtil, ARMORER_LEVER_WEIGHT);
-            if (debug) console.log(`    Armorer levers: ${unit.name} supply=${supply.toFixed(2)} util=${leverUtil.toFixed(2)}`);
+            addTerm(unit, 'armorer levers', `supply ${supply.toFixed(2)}, util ${leverUtil.toFixed(2)}`,
+                leverUtil * leverUtil, ARMORER_LEVER_WEIGHT);
         }
         const buffs = unit.mechanics?.buffs || {};
         const debuffs = unit.mechanics?.debuffs || {};
@@ -4724,7 +4798,8 @@ function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs =
             const chargeNeeds = (met, total, view) => {
                 if (!(total > 0 && met < total - 1e-9)) return false;
                 const receptionUtil = 0.7 + 0.3 * (met / total);
-                addTerm(receptionUtil * receptionUtil, Math.min(0.5, total * 0.25), view);
+                addTerm(unit, 'needs', `met ${met.toFixed(2)} of ${total.toFixed(2)}`,
+                    receptionUtil * receptionUtil, Math.min(0.5, total * 0.25), view);
                 return true;
             };
             // Each view gets exactly one needs term: the full view from every unmet need, the
@@ -4740,7 +4815,7 @@ function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs =
         // rather than role so the data stays the single source of truth.
         if (!hasBuffContributions) {
             if (getScalingBuffs(unit) > 0) {
-                addTerm(0.01, 1.0);
+                addTerm(unit, 'buffs', 'expected to supply buffs, supplies none', 0.01, 1.0);
             }
             continue;
         }
@@ -4749,38 +4824,31 @@ function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs =
         // which must not wash out this same unit's needs penalty above.
         if (getScalingBuffs(unit) === 0) {
             if (!chargedForNeeds) {
-                addTerm(1.0, isDPS(unit) ? 0.5 : 1.0);
+                addTerm(unit, 'buffs', 'not part of its job', 1.0, isDPS(unit) ? 0.5 : 1.0);
             }
             continue;
         }
 
         let util = computeBuffUtilization(unit, team);
-        const pseudo = unit.mechanics?.pseudoRole;
-        // A pseudo-support whose stat buffs don't actually align with a teammate is not really
-        // playing support; discount her pseudo-DPS credit instead. [TWM-01]
-        if (Array.isArray(pseudo) && pseudo.length > 0 && !isDPS(unit)) {
-            const unitBuffs = unit.mechanics?.buffs || {};
-            let statBuffWeight = 0, statBuffEffective = 0;
-            const teammates = team.filter(t => t !== unit);
-            for (const [key, value] of Object.entries(unitBuffs)) {
-                if (!STAT_BUFF_KEYS.has(key)) continue;
-                const bw = w(value);
-                if (bw <= 0) continue;
-                statBuffWeight += bw;
-                let maxRel = 0;
-                for (const c of teammates) maxRel = Math.max(maxRel, getBuffRelevance(key, c));
-                statBuffEffective += bw * maxRel;
-            }
-            const buffAlignment = statBuffWeight > 0 ? statBuffEffective / statBuffWeight : 1;
-            if (buffAlignment < 0.5) {
-                const activated = unit._activatedRoles || [];
-                for (const entry of pseudo) {
-                    const name = pseudoRoleName(entry);
-                    if (DPS_ROLES.includes(name) && !activated.includes(name)) {
-                        util *= 0.65;
-                        break;
-                    }
-                }
+        let note = `util ${util.toFixed(2)}`;
+        // An idle DPS pseudo-role caps cohesion only on a NEUTRAL carry: intended needs no cap, and
+        // avoided is already charged flat by scoreArchetypeFit — capping it too charges twice. [TWM-03]
+        const idle = idleDpsPseudoRoles(unit);
+        if (idle.length > 0) {
+            const carry = getPrimaryCarry(team);
+            const carryArchs = carry ? carryArchetypes(carry) : [];
+            const detail = archetypeFitDetail(unit, carry);
+            const why = `pseudo-role ${idle.join('/')} idle, ${carry?.name ?? 'no carry'} ` +
+                `[${carryArchs.join('/') || 'none'}] ${describeArchetypeFit(detail)}`;
+            if (detail.fit === 'intended') {
+                note += ` (${why}: no cap)`;
+            } else if (detail.fit === 'avoided') {
+                note += ` (${why}: no cap, charged by archetype fit)`;
+            } else if (util > IDLE_PSEUDO_ROLE_CAP) {
+                util = IDLE_PSEUDO_ROLE_CAP;
+                note += `, capped ${IDLE_PSEUDO_ROLE_CAP} (${why})`;
+            } else {
+                note += ` (${why}: already under the ${IDLE_PSEUDO_ROLE_CAP} cap)`;
             }
         }
         // A DPS that opts into scaling.buffs > 0 (SAnby) still takes the lighter DPS weight
@@ -4788,8 +4856,9 @@ function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs =
         // here would double-count it. [TWM-01]
         const weight = isDPS(unit) ? 0.5 : 1.0;
         const utilValue = isDPS(unit) ? util : util * util;
+        if (!isDPS(unit)) note += ', squared';
 
-        addTerm(utilValue, weight);
+        addTerm(unit, 'buffs', note, utilValue, weight);
     }
 
     const toCohesion = (ls, tw) => {
@@ -4802,7 +4871,24 @@ function computeTeamworkMultiplier(team, structureScore, debug, diametricPairs =
     const teamwork = toTeamwork(cohesion);
     const teamworkMatchup = toTeamwork(cohesionMatchup);
 
+    if (trace) {
+        trace.cohesion = cohesion;
+        trace.cohesionTerms = terms;
+    }
     if (debug) {
+        console.log('    Cohesion terms (geometric mean of value, by weight):');
+        for (const unit of team) {
+            const own = terms.filter(t => t.unit === unit.name);
+            if (own.length === 0) console.log(`      ${unit.name}: no term`);
+            for (const t of own) {
+                const view = t.view === 'both' ? '' : ` [${t.view} view only]`;
+                console.log(`      ${unit.name} ${t.kind}: ${t.note} → ${t.value.toFixed(3)} ×${+t.weight.toFixed(3)}${view}`);
+            }
+        }
+        const rawCohesion = totalWeight > 0 ? Math.exp(logSum / totalWeight) : 0.5;
+        if (cohesion > rawCohesion + 1e-9) {
+            console.log(`      diametric floor lifts cohesion ${rawCohesion.toFixed(2)} → ${cohesion.toFixed(2)}`);
+        }
         console.log(`    Teamwork multiplier: ${teamwork.toFixed(3)} (structure=${structureFactor}, cohesion=${cohesion.toFixed(2)}${diametricPairs > 0 ? `, diametric=${diametricPairs}` : ''})`);
         if (Math.abs(teamworkMatchup - teamwork) > 1e-9) {
             console.log(`      ...but L3 is scaled by ${teamworkMatchup.toFixed(3)} (matchup view, cohesion=${cohesionMatchup.toFixed(2)}): an unmet weight-2 need does not cost the boss matchup`);
@@ -5042,7 +5128,7 @@ function scoreTeamContexts(team, boss, options = {}) {
         maxDiametricPairs = Math.max(maxDiametricPairs, count);
         maxDiametricFloor = Math.max(maxDiametricFloor, floor);
     }
-    const { teamwork, teamworkMatchup } = computeTeamworkMultiplier(team, structureScore, debug, maxDiametricPairs, maxDiametricFloor, boss);
+    const { teamwork, teamworkMatchup } = computeTeamworkMultiplier(team, structureScore, debug, maxDiametricPairs, maxDiametricFloor, boss, trace);
 
     // Archetype fit: does the support infrastructure suit the primary carry's archetype? Applied
     // FLAT, AFTER the teamwork multiplier, deliberately not scaled by it — see

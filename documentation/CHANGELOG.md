@@ -3,6 +3,21 @@
 What shipped, newest first. This file is history — nothing here is a statement about the
 current state of the engine. For that, see [STATUS.md](STATUS.md).
 
+**An idle pseudo-role is a cohesion ceiling, not a discount; archetype declarations take
+element qualifiers**, 2026-10-15. `Nangong/Pyrois/Sunna` read cohesion 0.65 on Vesper (323.3),
+about 65 below `Dialyn/Pyrois/Sunna`. Nangong's utilisation was 1.00 as a stunner; a pseudo-role
+alignment discount then cut it by 35% because her buildup buff missed. That rule is gone. A
+non-DPS unit whose DPS pseudo-role is idle is now capped at 0.85, only when the primary carry is
+**neutral** for it — intended needs no cap, and avoided is already charged −40 ([TWM-03]). Nangong
+declares `intended: ["anomaly"]`. Declarations can be narrowed by the carry's element or variant
+(`rupture:!ice`, `anomaly:ice:!frost`), read through one matcher by the scorer and the pull
+engine ([ARCH-06]); Soukaku now avoids `rupture:!ice`, so she is a capped backfill for Yidhari
+and still the wrong tool elsewhere. `--debug` prints every cohesion term with its reason
+(`trace.cohesionTerms`). 605 rows moved, all containing Nangong or Soukaku, 0 exceptions; 20
+went down, all Soukaku + Yidhari, worst −6.1. Calibration anchors unchanged. Vesper: NPS
+323.3 → 395.1. Added mechanics TEST 43 and rankings TEST 98. Resolved SCORE-143; opened SCORE-144
+(neutral and avoided charged in different currencies) and SCORE-145 (Zhao's rupture avoid).
+
 **A team with no on-field carry is not CONVENTIONAL**, 2026-10-13. `Nangong/Vivian/Sunna` ranked
 #3 on Vesper (324.3), ahead of teams with a real carry. Vivian is off-field and Nangong is a
 stunner, but the classifier read Vivian as an anomaly hypercarry. A CONVENTIONAL team none of

@@ -621,6 +621,7 @@
         "mechanics": {
             "stats": { "am": 2, "ap": 2 },
             "pseudoRole": [{"role":"anomaly","when":{"countTag":"anomaly","minCount":1}}],
+            "archetypes" : { "intended" : ["anomaly"] },
             "damage": { "polarity": true, "abloom": true },
             "buffs": { "buildup": 3, "dmg": 2, "stun-multiplier": 2 },
             "debuffs": { "recovery": 3 },
@@ -1098,7 +1099,7 @@
             "stats": { "am": 1.5, "ap": 1, "atk": 1 },
             "damage": { "basic": { "cases": [ { "when": { "allOf": [{ "hasUnit": "miyabi" }, { "othersDisorder": false }] }, "value": 1 }, { "value": 0 } ] } },
             "pseudoRole": [{"role":"anomaly","when":{ "allOf": [{ "hasUnit": "miyabi" }, { "othersDisorder": false }] }}],
-            "archetypes" : { "intended" : ["attack", "anomaly"], "avoid": ["armorer", "rupture"] },
+            "archetypes" : { "intended" : ["attack", "anomaly"], "avoid": ["armorer", "rupture:!ice"] },
             "buffs": { "atk": 3, "ice": 3 },
             "utility": { "quick-assists": true }
         },

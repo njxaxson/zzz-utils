@@ -7,19 +7,19 @@ re-run the commands and update the numbers.
 change belongs in [CHANGELOG.md](CHANGELOG.md); anything that explains a settled ruling belongs
 in [notes/adjudications.md](notes/adjudications.md) behind a tag.
 
-**Last verified:** 2026-10-13.
+**Last verified:** 2026-10-15.
 
 ## Test status
 
 | Suite | State |
 |----|----|
-| mechanics | **42 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
-| rankings | **96 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
-| recommendations | **51 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
+| mechanics | **43 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
+| rankings | **97 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
+| recommendations | **52 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
 | bucketing | **14 pass, 0 fail** |
 | cohesion fixture | **11/11** owner judgements hold |
 | calibration freshness | both files match the current engine/data fingerprint **and** the current `pools` map |
-| calibration certification | **CERTIFIED** — 0 within-archetype rank inversions across 64 (boss × archetype) groups and 74,674 teams |
+| calibration certification | **CERTIFIED** — 0 within-archetype rank inversions across 64 (boss × archetype) groups and 74,688 teams |
 
 ```bash
 node test-mechanics.mjs && node test-rankings.mjs && node test-recommendations.mjs && node test-bucketing.mjs && node cohesion-fixture.mjs
@@ -33,11 +33,12 @@ why an empty map still matters, and why a green suite is not evidence on its own
 
 ## Open
 
-One. Nothing is release-blocking.
+Two. Nothing is release-blocking.
 
 | Issue | Priority | Note |
 |----|----|----|
-| [Nangong/Pyrois/Sunna underscored on Vesper](issues/open/medium-nangong-pyrois-sunna-underscored-on-vesper.md) | medium | Cohesion 0.65 on a CONVENTIONAL team; not yet diagnosed |
+| [Neutral and avoided verdicts use different mechanisms](issues/open/medium-intended-neutral-avoided-use-different-mechanisms.md) | medium | A cohesion ceiling for one, a flat −40 for the other; explained in [TWM-03] but not yet justified |
+| [Zhao avoids every rupture carry](issues/open/low-zhao-avoids-every-rupture-carry.md) | low | Probably should not; follows the Soukaku `rupture:!ice` change |
 
 ## Deferred
 

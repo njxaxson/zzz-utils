@@ -32,16 +32,12 @@ cohesive the rest of the team is. The two must never charge the same judgement t
 
 ## Code notes
 
-### [TWM-01] Pseudo-role stat alignment, and why SAnby is not double-charged
+### [TWM-01] Why SAnby is not double-charged
 
-A non-DPS unit with an active pseudo-role (Nangong, Soukaku, ...) that carries big stat buffs
-(`atk`, `cr`, `cd`, ...) is checked in `computeTeamworkMultiplier` for whether those buffs
-actually align with a teammate who can use them. If the best-aligned relevance across all such
-buffs is below half, the unit's pseudo-DPS credit is discounted (×0.65) for any pseudo-role it
-has not otherwise activated — a unit whose "support" half of its kit does not land is not really
-playing support, so it should not get full credit for its DPS half either.
+(This tag used to cover a pseudo-role stat-alignment discount as well. That rule was replaced by
+[TWM-03]; its history is in [known pitfalls](../notes/known-pitfalls.md).)
 
-Separately: how much a buff whiff costs is a property of the unit's kit (`scaling.buffs`), not
+How much a buff whiff costs is a property of the unit's kit (`scaling.buffs`), not
 its role tag — support/defense default to 3, stun to 2, DPS to 0, with explicit overrides
 (SAnby's 3) winning. A DPS that opts in via an explicit override still takes the lighter DPS
 weight (0.5) in the geometric mean; the severity of its whiff is already applied inside
@@ -94,3 +90,59 @@ Yixuan — and leaves the Miyabi ladder untouched, because `disorders: 3` is sev
 Structural charges (no reaction, wasted vortex) count as **severe**: they are failures, not
 appetites. And note that 1,408 of the movers go **down** — forgiving the discount makes a *bad*
 matchup bite harder too, which is the same rule running in the other direction.
+
+### [TWM-03] An idle pseudo-role caps cohesion — on a neutral carry only
+
+**The game situation.** Nangong is a stunner whose kit is built for anomaly teams. Beside an
+anomaly agent she also plays a pseudo-anomaly role. Put her behind Pyrois and she still does a
+stunner's whole job — stun window, stun multiplier, recovery debuff — but her buildup buff and
+her anomaly half go unused. She is useful, and she is not reaching her potential.
+
+**The rule.** When a non-DPS unit has a DPS pseudo-role that did not activate, its cohesion is
+judged on its base role as usual, and then the primary carry's archetype is checked against the
+unit's [declared archetypes](../data-model/declared-archetypes.md):
+
+| Verdict on the primary carry | Cohesion | Archetype fit (applied flat, after the multiplier) |
+|----|----|----|
+| intended | no cap | 0 |
+| neutral | capped at `IDLE_PSEUDO_ROLE_CAP` | 0 |
+| avoided | no cap | −40 |
+
+The cap is a **ceiling, not a multiplier**. A unit that already scores below it on its base role
+is not charged again. The numbers are already telling the truth there.
+
+| Team (Vesper) | Nangong's utilisation | Enters cohesion as | Final (raw) |
+|----|----|----|----|
+| Nangong / Pyrois / Sunna, before | 1.00, then ×0.65 | 0.42 | 323.3 |
+| Nangong / Pyrois / Sunna, after | 1.00, capped 0.85 | 0.72 | 395.1 |
+| Dialyn / Pyrois / Sunna (for reference) | — | — | 388.9 |
+
+**Why intended is exempt.** Soukaku also has a pseudo-anomaly role, but it only activates beside
+Miyabi. Behind Ellen she is an attack support doing exactly her job. "Pseudo-role not active" is
+not the same as "potential wasted", and the declared archetype is what tells the two apart.
+
+**Why avoided is exempt.** An avoided verdict already costs −40, applied flat. Capping cohesion
+as well charges the judgement "not built for this carry" twice. Measured: it cost
+Lucia/Yidhari/Soukaku about 43 points more than Lucia/Yidhari/Zhao, two supports with identical
+declarations, purely because of a pseudo-role that has nothing to do with Yidhari.
+
+#### Why the three verdicts use different mechanisms — an open question
+
+This is the part that looks wrong at first sight. The same declaration produces a cohesion
+ceiling in one case and a flat score penalty in another. The current reasons:
+
+* **They answer different questions.** Neutral-plus-idle says "this unit could be doing more".
+  That is about how much of the unit's kit lands, which is what cohesion measures. Avoided says
+  "this is the wrong tool". That is a verdict on the composition, and the flat penalty was made
+  flat on purpose, so it bites the same however cohesive the rest of the team is.
+* **The flat penalty only applies to supports in practice.** It was calibrated for
+  support-to-carry fit ([ARCH-04]). The cap was built for a stunner with an idle anomaly half, and
+  the stunner and the support may genuinely need different treatment.
+
+Neither reason has been tested. It is entirely possible that one mechanism should serve both. See
+[the open issue](../issues/open/medium-intended-neutral-avoided-use-different-mechanisms.md).
+
+**What stays unprotected.** Within a single unit, avoided must never come out better than
+neutral. Today no unit can be both. Nangong is intended or neutral; Soukaku is intended or
+avoided. But a future unit with an idle pseudo-role and both a neutral and an avoided archetype
+could invert, because the cap costs a share of the score and the penalty is a fixed 40.

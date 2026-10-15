@@ -17,7 +17,8 @@ import {
     maxConditionalValue,
     getMaxBurstWeight,
     getTeammateBuffs,
-    getSelfBuffSpecs
+    getSelfBuffSpecs,
+    archetypeSpecMatches
 } from './team-scorer.js';
 import { getTeams, isValidTeam } from './team-builder.js';
 
@@ -137,19 +138,22 @@ function getDisorderElement(unit) {
 function makeTeamLegality(ownedUnits) {
     const cache = new Map();
     const carryArchetype = (u) => (isSubdps(u) ? null : getPrimaryDPSArchetype(u));
-    const avoids = (u, arch) => !!arch && (u.mechanics?.archetypes?.avoid ?? []).includes(arch);
+    // Qualified declarations (`rupture:!ice`) are read against the carry itself. [ARCH-06]
+    const avoids = (u, arch, carry) => !!arch
+        && (u.mechanics?.archetypes?.avoid ?? []).some(spec => archetypeSpecMatches(spec, [arch], carry));
 
     function canShareTeam(a, b) {
         if (a.id === b.id) return false;
         const key = a.id < b.id ? `${a.id}|${b.id}` : `${b.id}|${a.id}`;
         if (cache.has(key)) return cache.get(key);
         const arch = carryArchetype(a) ?? carryArchetype(b);
+        const carry = carryArchetype(a) ? a : b;
         let ok = false;
-        for (const t of (avoids(a, arch) || avoids(b, arch)) ? [] : ownedUnits) {
+        for (const t of (avoids(a, arch, carry) || avoids(b, arch, carry)) ? [] : ownedUnits) {
             if (t.id === a.id || t.id === b.id) continue;
             const tArch = getPrimaryDPSArchetype(t);
             if (arch && tArch && tArch !== arch) continue;
-            if (avoids(t, arch)) continue;
+            if (avoids(t, arch, carry)) continue;
             if (isValidTeam(a, b, t)) { ok = true; break; }
         }
         cache.set(key, ok);

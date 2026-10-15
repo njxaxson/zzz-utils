@@ -2398,6 +2398,36 @@ async function main() {
             }
         }
     });
+
+    // TEST 98: backfill supports and stunners off their intended archetype are viable, not crushed.
+    //
+    // Owner rulings (2026-10-15):
+    // (a) Nangong/Pyrois/Sunna belongs alongside Dialyn/Pyrois/Sunna on Vesper. Nangong is a
+    //     stunner doing her base job with her anomaly half idle — capped, not discounted. Both are
+    //     attack, so raw scores compare. [TWM-03]
+    // (b) Soukaku is an adequate backfill for ice rupture Yidhari — "objectively better than Lucy"
+    //     — on the ice-weak bosses. Her avoid is `rupture:!ice`. Zhao's ordering is deliberately not
+    //     pinned: her `avoid: rupture` is under review. [ARCH-06]
+    run('TEST 98: Nangong/Pyrois/Sunna sits beside Dialyn/Pyrois/Sunna; Soukaku backfills Yidhari over Lucy', () => {
+        const [v] = withBosses(bosses, 'Vesper');
+        assert(v, 'Vesper not found');
+        const mv = scoreMapForBoss(scoreForTeamString('Nangong/Pyrois/Sunna,Dialyn/Pyrois/Sunna', allUnits), v);
+        const nps = mv.get('Nangong / Pyrois / Sunna');
+        const dps = mv.get('Dialyn / Pyrois / Sunna');
+        assert(nps > 0 && dps > 0, `${v.name}: both teams must be viable (NPS ${nps}, DPS ${dps})`);
+        assert(Math.abs(nps - dps) <= 25,
+            `${v.name}: Nangong/Pyrois/Sunna (${nps.toFixed(1)}) must sit within 25 of Dialyn/Pyrois/Sunna (${dps.toFixed(1)})`);
+
+        const ice = withBosses(bosses, 'Butcher,Marionettes,Hunter,Revenant,Bringer');
+        assert(ice.length >= 5, `expected the five ice-weak bosses, got ${ice.length}`);
+        for (const b of ice) {
+            const m = scoreMapForBoss(scoreForTeamString('Yidhari/Lucia/Soukaku,Yidhari/Lucia/Lucy', allUnits), b);
+            const sou = m.get('Yidhari / Lucia / Soukaku');
+            const lucy = m.get('Yidhari / Lucia / Lucy');
+            assert(sou > 0, `${b.name}: Yidhari/Lucia/Soukaku must be viable, got ${sou}`);
+            assert(sou > lucy, `${b.name}: Yidhari/Lucia/Soukaku (${sou.toFixed(1)}) must beat Yidhari/Lucia/Lucy (${lucy?.toFixed(1)})`);
+        }
+    });
     // Summary
     console.log('');
 
