@@ -4931,7 +4931,7 @@ a.rec-unit:hover {
     .ad-row-team {
         display: flex;
         gap: 0.5rem;
-        padding-right: 1.5rem;
+        padding-right: 0.75rem;
         border-right: 1px solid var(--rule-soft);
         align-self: stretch;
         align-items: center;
@@ -4943,6 +4943,14 @@ a.rec-unit:hover {
     }
     .ad-row-matchups { min-width: 0; }
     .ad-bosses-label { display: none; }
+
+    /* Desktop shows one line of five; the sixth tile is for the 3×2 narrow grid. */
+    @media (min-width: 901px) {
+        .ad-row-bosses > :nth-child(n+6) { display: none; }
+        /* Eight tiles share the row; ~176px is padding, gaps, star and hairline. */
+        .ad-rows { container-type: inline-size; }
+        .ad-row { --ad-tile: min(120px, (100cqi - 176px) / 8); }
+    }
 
     .ad-row .result-unit-card,
     .ad-row .result-boss-tile {
