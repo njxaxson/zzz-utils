@@ -751,7 +751,6 @@
         "limited": true,
         "released": "3.3",
         "tier": 0.5,
-        "available": false,
         "tags": ["anomaly", "fire", "assist:defensive"],
         "join": ["anomaly", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
