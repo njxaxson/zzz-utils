@@ -219,9 +219,10 @@ function createBossCard(boss) {
 
     const initials = getInitials(resolvedBoss.shortName || boss.shortName);
     const weaknessClass = getWeaknessGradientClass(getBossWeaknesses(resolvedBoss));
-    const imageUrl = getBossImageUrl(boss.id);
+    const imageUrl = resolvedBoss.image || null;
 
-    const isMirrored = !!activeVariationId;
+    // Variations without their own artwork are mirrored instead.
+    const isMirrored = !!activeVariationId && !boss.variations?.[activeVariationId]?.image;
     const imgClass = `boss-avatar-img${isMirrored ? ' boss-avatar-img--mirrored' : ''}`;
 
     const avatarHtml = imageUrl
@@ -248,14 +249,6 @@ function createBossCard(boss) {
             <div class="boss-name">${displayName}</div>
         </button>
     `;
-}
-
-function getBossImageUrl(bossId) {
-    const boss = allBosses.find(b => b.id === bossId);
-    if (!boss || !boss.image) {
-        return null;
-    }
-    return boss.image;
 }
 
 // Custom plan
@@ -290,7 +283,7 @@ function isPlannedElsewhere(unitId, bossId) {
 
 function createResultBossTileHtml(boss) {
     const weaknessClass = getWeaknessGradientClass(getBossWeaknesses(boss));
-    const imageUrl = getBossImageUrl(boss.id);
+    const imageUrl = boss.image || null;
     const initials = getInitials(boss.shortName);
     const avatarHtml = imageUrl
         ? `<img class="boss-avatar-img" src="${imageUrl}" alt="${boss.shortName}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="boss-initials" style="display:none">${initials}</span>`
@@ -513,6 +506,23 @@ function handleBossRightClick(e) {
     cycleBossVariation(card.dataset.bossId);
 }
 
+// Card-flip: rotate edge-on, swap the picture, rotate back out.
+function flipBossImage(img, newSrc) {
+    if (img.src.endsWith(newSrc.replace(/^\./, ''))) return;
+    img.getAnimations().forEach(a => a.cancel());
+    const half = 'perspective(600px) rotateY(90deg)';
+    const flat = 'perspective(600px) rotateY(0deg)';
+    const opts = { duration: 200, fill: 'forwards' };
+    const out = img.animate([{ transform: flat }, { transform: half }], { ...opts, easing: 'ease-in' });
+    out.onfinish = () => {
+        img.src = newSrc;
+        const back = img.animate([{ transform: 'perspective(600px) rotateY(-90deg)' }, { transform: flat }],
+            { duration: 200, easing: 'ease-out' });
+        out.cancel();
+        back.onfinish = () => back.cancel();
+    };
+}
+
 function cycleBossVariation(bossId) {
     const boss = allBosses.find(b => b.id === bossId);
     if (!boss || !boss.variations) return;
@@ -540,7 +550,9 @@ function cycleBossVariation(bossId) {
         // 1. Toggle the mirror class on the existing <img> (CSS transition fires here)
         const img = card.querySelector('.boss-avatar-img');
         if (img) {
-            img.classList.toggle('boss-avatar-img--mirrored', !!activeVariationId);
+            const ownImage = !!activeVariationId && !!boss.variations?.[activeVariationId]?.image;
+            img.classList.toggle('boss-avatar-img--mirrored', !!activeVariationId && !ownImage);
+            if (resolvedBoss.image) flipBossImage(img, resolvedBoss.image);
         }
 
         // 2. Update the variation badge inside the avatar

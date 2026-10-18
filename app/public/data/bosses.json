@@ -2,7 +2,7 @@
     {
         "id": "butcher",
         "name": "Notorious Dead End Butcher",
-        "shortName": "Dead End Butcher",
+        "shortName": "Notorious Butcher",
         "image": "./assets/bosses/butcher.webp",
         "released": 1.0,
         "favored": [],
@@ -19,6 +19,8 @@
             "raging": {
                 "enabled": true,
                 "name": "Dead End Butcher",
+                "shortName": "Dead End Butcher",
+                "image": "./assets/bosses/butcher_alt.webp",
                 "mechanics": {
                     "shill": "stun",
                     "debuffs": null,
