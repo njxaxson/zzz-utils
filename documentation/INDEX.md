@@ -40,6 +40,7 @@ thing that will make the rest make sense, and [GLOSSARY.md](GLOSSARY.md) defines
 | About to try something clever | [known pitfalls](notes/known-pitfalls.md) — it may already have been measured and rejected |
 | Wondering what is broken right now | [STATUS.md](STATUS.md) and [issues/open](issues/open/) |
 | Wondering when and why something changed | [CHANGELOG.md](CHANGELOG.md) |
+| Proposing or picking up a future feature | The specs in [features/](features/). An idea without one has been considered and rejected |
 
 ## The map
 
@@ -140,6 +141,14 @@ defined by slot count rather than by carry:
 
 [How the issue system works](issues/README.md) ·
 [open](issues/open/) · [deferred](issues/deferred/) · [resolved](issues/resolved/)
+
+### `features/` — accepted future features
+
+One spec per feature. An idea with no spec here has been considered and rejected.
+[Accessibility pass](features/accessibility.md) ·
+[boss mechanics on Deadly Assault](features/da-show-weakness-resistance-shill.md) ·
+[first-visit roster setup](features/first-visit-roster-setup.md) ·
+[native share on mobile](features/mobile-native-share.md)
 
 ### `reference/`
 

@@ -3,6 +3,18 @@
 What shipped, newest first. This file is history — nothing here is a statement about the
 current state of the engine. For that, see [STATUS.md](STATUS.md).
 
+**Phoenix's codependency reaches the pull engine**, 2026-10-18. Her `scaling.codependent: true`
+was inert there: her only scaling key is a foundational stat and she has no conditional buff, so
+no dependency check fired and owning Velina or Remielle changed nothing. `scaling.codependent` may
+now be a `{ cases }` spec, resolved against the best legal team the roster can field ([CODEP-03]).
+Phoenix declares `hasUnit` `anomaly:wind` or `anomaly:lumen`. Owner's ruling: either partner is no
+penalty; neither is one rank down with a "Reaches full potential with Remielle or Velina" note,
+never removal. Pull engine only: the scorer reads both forms as `true` and already prices the
+dependence mechanically. 0 corpus rows moved; calibration anchors unchanged. Added
+recommendations TEST 53. Opened SCORE-146 (Phoenix's and Jane's anomaly crit is priced as proc
+damage, post-release). PULL-009 reopened at high, with the four gaps between the declared form and
+Remielle's ladder recorded.
+
 **An idle pseudo-role is a cohesion ceiling, not a discount; archetype declarations take
 element qualifiers**, 2026-10-15. `Nangong/Pyrois/Sunna` read cohesion 0.65 on Vesper (323.3),
 about 65 below `Dialyn/Pyrois/Sunna`. Nangong's utilisation was 1.00 as a stunner; a pseudo-role

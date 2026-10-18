@@ -140,7 +140,7 @@ ceiling in one case and a flat score penalty in another. The current reasons:
   the stunner and the support may genuinely need different treatment.
 
 Neither reason has been tested. It is entirely possible that one mechanism should serve both. See
-[the open issue](../issues/open/medium-intended-neutral-avoided-use-different-mechanisms.md).
+[the deferred issue](../issues/deferred/medium-intended-neutral-avoided-use-different-mechanisms.md).
 
 **What stays unprotected.** Within a single unit, avoided must never come out better than
 neutral. Today no unit can be both. Nangong is intended or neutral; Soukaku is intended or

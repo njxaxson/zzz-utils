@@ -1079,6 +1079,65 @@ await runTest(52, 'Roxy/Norma back the archetypes they join; Grace does not hold
         'Burnice (T1) must still close subdps-anomaly');
 });
 
+// TEST 53: Phoenix's declared partner requirement. Owner: owning EITHER Velina or Remielle is no
+// penalty; owning neither drops her one rank, with a note — never removal. Her `scaling.codependent`
+// is a `{ cases }` spec over `anomaly:wind` / `anomaly:lumen`, read off her best legal team. [CODEP-03]
+//
+// Every priority is compared against the same roster run with a clone of Phoenix whose declaration
+// is stripped, so the assertion is "this check moved her by exactly N ranks" and not a hard-coded
+// rank that the priority budget [PULL-08] could shift on its own. That budget is why the fixture is
+// a starter roster: on an attack-heavy roster it already demotes her anomaly card to Medium, and a
+// drop from a High she never keeps is invisible.
+await runTest(53, 'Phoenix codependent — needs Velina or Remielle, else drops one rank', () => {
+    const BASE = ['Anby', 'Billy', 'Nicole', 'Corin', 'Piper', 'Lucy', 'Soukaku', 'Seth', 'Ben', 'Koleda', 'Yuzuha'];
+    const RANK = ['High', 'Medium', 'Low'];
+    const phoenix = unitByName(allUnits, 'Phoenix');
+    assert(typeof phoenix.mechanics.scaling.codependent === 'object',
+        'fixture: Phoenix must declare her partner requirement as a { cases } spec');
+    const undeclared = allUnits.map(u => u.id !== 'phoenix' ? u
+        : { ...u, mechanics: { ...u.mechanics, scaling: { ...u.mechanics.scaling, codependent: undefined } } });
+
+    const phoenixRec = (units, names) => {
+        const { unitStates, ownedUnits } = buildSyntheticRoster(units, names);
+        const result = analyze(units, unitStates, ownedUnits, { maxRecommendations: 20 });
+        return result.recommendations.find(r => r.units.some(u => u.id === 'phoenix'));
+    };
+    const dependency = names => {
+        const { ownedUnits } = buildSyntheticRoster(allUnits, names);
+        return checkTeamDependencies(phoenix, ownedUnits, allUnits);
+    };
+
+    // (A) Neither partner: an unmet, PARTIAL dependency naming both providers.
+    const dep = dependency(BASE);
+    assert(dep.hasUnmetDependency, '(A) neither Velina nor Remielle owned — dependency must be unmet');
+    assert(!dep.cannotActivateBuffs && !dep.cannotFormTeam,
+        '(A) the declared requirement is partial — it must never remove Phoenix');
+    const providerIds = dep.notes.flatMap(n => n.providers.map(p => p.id));
+    assert(providerIds.includes('velina') && providerIds.includes('ramiel'),
+        `(A) note must name Velina and Remielle as providers, got [${providerIds.join(', ')}]`);
+
+    const without = phoenixRec(undeclared, BASE);
+    assert(without, '(A) fixture: Phoenix must be recommended on this roster at all, or the drop is untestable');
+    const withDecl = phoenixRec(allUnits, BASE);
+    assert(withDecl, '(A) Phoenix must still be recommended — a one-rank drop is not removal');
+    assert(withDecl.teamDependencyNotes?.length > 0, '(A) her card must carry the dependency note');
+    assert(RANK.indexOf(withDecl.priority) === RANK.indexOf(without.priority) + 1,
+        `(A) expected exactly one rank below ${without.priority}, got ${withDecl.priority}`);
+
+    // (B-D) Velina, Remielle, or both: fully met — no note, no drop.
+    for (const extra of [['Velina'], ['Remielle'], ['Velina', 'Remielle']]) {
+        const names = [...BASE, ...extra];
+        const label = extra.join(' + ');
+        assert(!dependency(names).hasUnmetDependency, `(${label}) dependency must be met`);
+        const rec = phoenixRec(allUnits, names);
+        const ref = phoenixRec(undeclared, names);
+        assert(rec && ref, `(${label}) fixture: Phoenix must be recommended in both runs`);
+        assert(!rec.teamDependencyNotes?.length, `(${label}) her card must carry no dependency note`);
+        assert(rec.priority === ref.priority,
+            `(${label}) expected no penalty (${ref.priority}), got ${rec.priority}`);
+    }
+});
+
 // Tests that are red ON PURPOSE. Same contract as test-mechanics.mjs's and test-rankings.mjs's
 // KNOWN_RED: exits 0 only
 // when the failing set is EXACTLY this map's keys — exits 1 the instant an entry starts

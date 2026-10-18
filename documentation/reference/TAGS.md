@@ -134,6 +134,7 @@ Populated during the comment pass. One row per tag, newest last within a prefix.
 | `[VTX-05]` | `../concepts/anomaly-reactions.md` | A vortex event has one damage number; the wind enabler is paid for events, not damage |
 | `[ANOM-01]` | `../concepts/anomaly-reactions.md` | Abloom is damage AND a reaction; `ABLOOM_BONUS` is capped by the Miyabi ladder, not by principle |
 | `[CODEP-02]` | `../recommendations/codependency-gating.md` | `anomalyProcSupply` mirrors team-scorer's anomaly-quantity rule, not `buffs.buildup` |
+| `[CODEP-03]` | `../recommendations/codependency-gating.md` | A declared partner requirement is read by the pull engine only |
 | `[PULL-01]` | `../recommendations/partner-ladder.md` | The partner ladder block in `pull-engine.js` is this whole page in code |
 | `[PRED-01]` | `../data-model/predicates.md` | `optional` — a conditional buff allowed not to fire, and why waiving the penalty alone is not enough |
 | `[PRED-02]` | `../data-model/predicates.md` | `allOf`, `othersDisorder`, and two-pass role activation — the Soukaku backfill |

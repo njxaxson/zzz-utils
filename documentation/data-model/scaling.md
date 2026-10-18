@@ -130,9 +130,19 @@ Support and defense default to 3, stun to 2, the carry roles to 0. At 0 the pena
 entirely. Only weight-2-and-above buffs are evaluated — weight-1 entries are assumed always to
 land.
 
-### `scaling.codependent` (boolean)
+### `scaling.codependent` (`true` or a `{ cases }` spec)
 
-Originally onsumed only by the [pull engine](../recommendations/codependency-gating.md), but now the scorer uses it as well. It it used to make the baseline value of tier dependent on whether or not their key teammates are present. For example, the core value of YSG and Remielle drops dramatically if their teammates do not provide their scaling needs.
+Originally consumed only by the [pull engine](../recommendations/codependency-gating.md), but now the scorer uses it as well. It is used to make the baseline value of tier dependent on whether or not their key teammates are present. For example, the core value of YSG and Remielle drops dramatically if their teammates do not provide their scaling needs.
+
+Two forms:
+
+| Value | Means |
+|----|----|
+| `true` | Codependent; the need is read off the unit's scaling keys and team-scoped conditional buffs |
+| `{ "cases": [...] }` | Also a **declared partner requirement**: the pull engine resolves it against the best legal team the roster can field, and anything below the maximum drops the unit one rank. Phoenix: `hasUnit` `anomaly:wind` or `anomaly:lumen` |
+
+The scorer reads both forms as plain `true`. See
+[CODEP-03](../recommendations/codependency-gating.md#codep-03-a-declared-partner-requirement-is-read-by-the-pull-engine-only).
 
 ## `replaces` — supplier side
 

@@ -72,7 +72,7 @@ Shunguong declares no buffs at all, so neither grows one.
 
 * **The pull engine still never asks the scorer** how good the resulting team is. The table is
   the owner's judgement of team quality, not a measurement of it. See
-  [PULL-009](../issues/deferred/medium-the-partner-ladder-is-a-fitted-stopgap.md).
+  [PULL-009](../issues/open/high-the-partner-ladder-is-a-fitted-stopgap.md).
 * **A `synergy.units` annotation** was tried for this once and rejected: it did not move the
   recommendation, and in the scorer it lifted `Promeia/Remielle/Velina` by 80 points as a side
   effect. Do not reach for it again without measuring both halves.

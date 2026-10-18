@@ -760,7 +760,14 @@
             "damage": { "abloom": 3 },
             "buffs": { "anomaly": 4 },
             "utility": { "heal:self": true },
-            "scaling": { "am": 3, "codependent": true }
+            "scaling": {
+                "am": 3,
+                "codependent": { "cases": [
+                    { "when": { "hasUnit": "anomaly:wind" }, "value": 1 },
+                    { "when": { "hasUnit": "anomaly:lumen" }, "value": 1 },
+                    { "value": 0 }
+                ] }
+            }
         },
         "faction": "Krampus",
         "displayText": "Murphy's law magnet, or just run-of-the-mill klutz? Best-in-slot alongside Velina and Remielle, but not great with disorder teams.",

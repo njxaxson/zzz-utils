@@ -1,11 +1,10 @@
 ---
 id: PULL-009
 title: The partner ladder is a fitted stopgap; the pull engine still never asks the scorer
-priority: medium
+priority: high
 area: pull
-status: deferred
+status: open
 opened: 2026-09-03
-deferred-reason: Too complex, too close to a release; and the current solution is theoretically capable of being generic enough for future growth.
 ---
 
 ## Symptom
@@ -57,3 +56,29 @@ A scorer-driven redesign was proposed during the Velina fix and rejected by the 
 (~134 µs per score, 19 bosses) and grows with bosses × agents — 40 bosses and 150 agents is not
 sensible. Deadly Assault can afford it because it is narrowed to three bosses. Any develop-branch
 redesign must stay at mechanics level or narrow the boss set; brute-force scoring is not the fix.
+
+**2026-10-18. A mechanics-level route now exists in part; raised to high.** Phoenix hit this
+issue's second limit: a codependent unit whose ceiling hangs on specific partners (Velina or
+Remielle) but who declares no `countTag` conditional, so she got no ladder and her flag was inert.
+She now declares `scaling.codependent` as a `{ cases }` spec, which the pull engine resolves
+against the best legal team the roster can field ([CODEP-03](../../recommendations/codependency-gating.md#codep-03-a-declared-partner-requirement-is-read-by-the-pull-engine-only)).
+That is mechanics-level and scales, so it fits the constraint above.
+
+Could the same form replace Remielle's ladder? In principle yes, but four things are missing:
+
+1. **Rank.** Low vs Medium hinges on "only via an A-rank (Piper)". No predicate reads `rank`
+   (e.g. a `minRank` qualifier on `countTag`/`hasRole`).
+2. **A reacting pair.** The third-slot check is "the other two bodies bring different elements,
+   wind always differs". `othersDisorder` is close but excludes wind, so it answers a different
+   question.
+3. **Value → verdict.** The ladder *caps* priority at a rung, removes at no rung, and gives a card
+   off-banner (`detectLadderTeam`). The declared form only drops one rank. Unifying them means
+   deciding what each case value means (explicit rung values via `resolveConditionalRaw`, say) and
+   moving card generation off `ladderCountTag`.
+4. **Card text.** Recommendations TESTs 41 and 49, and the partner-ladder tests, pin the
+   "completes a triple-anomaly team with your X and Y" / "share an element" / "reaches full
+   potential with Velina" sentences, which would then have to be derived from the spec.
+
+One structural improvement the migration would bring: the declared form evaluates **legal teams**,
+whereas the ladder scans the roster. Phoenix's spec was deliberately left as a simple drop-one form,
+so it doesn't pre-commit the rung semantics that this migration should decide.

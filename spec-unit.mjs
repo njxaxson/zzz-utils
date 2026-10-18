@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * TOY harness — not part of the verification loop, not covered by any test suite.
+ * Preview harness — not part of the verification loop, not covered by any test suite.
  *
  * Drop a speculative unit's JSON on disk, name some bosses, and see the full team ranking —
  * with rows containing the speculative unit marked — using the real engine + the CURRENT

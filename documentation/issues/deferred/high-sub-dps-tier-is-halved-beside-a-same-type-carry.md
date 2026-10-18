@@ -37,5 +37,5 @@ Open. Deliberately **post-release** — the blast radius is wide, since the halv
 team containing a sub-DPS beside a carry, and the current ordering is held in place by declared
 relationships that would all need re-checking.
 
-Related: [the partner ladder](medium-the-partner-ladder-is-a-fitted-stopgap.md) exists partly
+Related: [the partner ladder](../open/high-the-partner-ladder-is-a-fitted-stopgap.md) exists partly
 because the pull engine inherits the same blindness from a different direction.

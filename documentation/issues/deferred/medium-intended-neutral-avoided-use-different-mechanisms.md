@@ -5,6 +5,7 @@ priority: medium
 area: scoring
 status: open
 opened: 2026-10-15
+deferred-reason: For now, the engine is producing numerically correct results; effort to change this may not have enough material benefit to justify the risk (at least for now)
 tags: [TWM-03, ARCH-04, ARCH-06]
 related: [medium-nangong-pyrois-sunna-underscored-on-vesper.md]
 ---

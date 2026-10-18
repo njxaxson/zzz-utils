@@ -532,6 +532,27 @@ export function checkTeamDependencies(candidate, ownedUnits, allUnits) {
         }
     }
 
+    // Step 4: a declared partner requirement, `scaling.codependent: { cases }`, read off the
+    // best legal team. Partial only — it drops a rank, never removes. [CODEP-03]
+    const declared = candidate.mechanics.scaling.codependent;
+    if (validTeams.length > 0 && isConditionalSpec(declared)) {
+        const maxLevel = maxConditionalValue(declared);
+        const levelWith = team => resolveConditionalValue(declared, { team, self: candidate, consumer: null });
+        const best = Math.max(...validTeams.map(levelWith));
+        if (best < maxLevel) {
+            hasUnmetDependency = true;
+            const providers = allUnits
+                .filter(u => u.id !== candidate.id && u.limited && u.rank === 'S'
+                    && levelWith([candidate, u]) >= maxLevel)
+                .sort((a, b) => a.tier - b.tier)
+                .map(u => ({ id: u.id, name: u.name }));
+            notes.push({
+                text: `Reaches full potential with ${providers.slice(0, 3).map(p => p.name).join(' or ')}`,
+                providers
+            });
+        }
+    }
+
     return { hasUnmetDependency, cannotFormTeam, cannotActivateBuffs, notes };
 }
 
