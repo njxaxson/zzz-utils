@@ -50,5 +50,5 @@ away.
 * 3.0
   * Norma is released and is uniquely compatible with Lucia and Pan, making her an alternative to the highly demanded Dialyn on rupture teams.
 * 3.2
-  * Roxy is released, providing another rupture-compatible stunner; although she is more closely aligned with armorers.
+  * Roxy is released, providing another rupture-compatible stunner; although she is more closely aligned with armorers and has better benefits for attackers. 
   

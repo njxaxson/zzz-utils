@@ -66,8 +66,9 @@ with many attackers preferring a strong stunner like Dialyn or Norma (etc.) and 
   * Zhu Yuan is added to the 50/50 loss pool, cementing her as no longer likely to receive any buffs.
 * 3.2
   * Koleda receives a potential vision unlock that helps her be more relevant to attack teams, although her unlock is mostly intended to slot her on armorer compositions rather than attack. 
+  * Roxy releases as an attack-compatible wind stunner. Although she is primarily aimed at armorers, she works with attack and rupture as well and does sufficient damage as a sub-DPS. Additionally, she has strong anomaly buildup and can supply wind anomalies that feed special wind-anomaly-triggered buffs for Pyrois and Sigrid, and will activate a Severian wind-related buff as well when he releases in the next patch. 
 * 3.3
-  * Severian is revealed as a wind attack agent with strong burst damage and a lot of unique dodge and parry abilities. 
+  * Severian is released as a wind attack agent with strong burst damage and a lot of unique dodge and parry abilities. He is nearly as strong as Sigrid, but unlike her, he has no strings attached other than being a traditional field-hungry attack agent.  He indicates a trend that attack agents will be the strongest class of "easy to run" hypercarry DPS agents, where players with thin rosters can easily slot any sufficiently capable stunner and support agent around them and they will still be quite powerful. Like most attack agents, he pairs well with Sunna as a support agent and any of the top-class attack-compatible stunners: Dialyn, Norma, or Roxy. 
 
 
 

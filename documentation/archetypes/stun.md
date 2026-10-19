@@ -62,7 +62,7 @@ This matters for element resistance. A stunner whose element is resisted is *pen
     heavily contested Dialyn on rupture teams. Her focus on chain attacks makes her the new best stunner 
     for Evelyn and Starlight Billy, and for the attacker Sigrid who will be released in the next patch. 
 * 3.2
-  * Roxy releases as an armorer-centric stunner who also works well for attack agents that benefit from wind anomaly procs.
+  * Roxy releases as an armorer-centric stunner who also works well for attack agents that benefit from wind anomaly procs.  She also joins with rupture agents, making her the only other stunner besides Koleda who can be slotted into three DPS archetypes. Like Norma, she also deals enough damage to constitute as a sub-DPS. 
   * Koleda is retrofitted to join with armorers and receives a potential vision unlock with buffs that increase her wider relevance, but mostly classify her as an standard alternative to Roxy for armorer teams. 
 
 

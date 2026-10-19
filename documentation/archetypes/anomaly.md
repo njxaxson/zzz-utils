@@ -96,6 +96,6 @@ compositions.
   * Yanagi is added to the 50/50 loss pool, cementing her as no longer likely to receive any buffs. She is a particularly strong agent for the loss pool and many players rejoice that she is now more easily accessible.
   * This leaves anomaly with three distinctly strong team compositions: Velina/Remielle variants, AoD, and NMY.
 * 3.3
-  * Phoenix is revealed as an on-field fire anomaly agent with abloom damage, intended to be the best-in-slot teammate for Velina/Remielle teams, and to be less appealing to disorder-based teams. Early beta testing confirms this split but much could change before her release. 
+  * Phoenix is released as an on-field fire anomaly agent with an extraordinarily high damage ceiling. Phoenix/Velina/Remielle becomes the strongest damage output team in the game by a fairly large margin; considerably stronger than other anomaly teams and even more than the strongest rupture and attack teams, exceeding outputs of Starlight Billy, Sigrid, and even Yixuan, YSG, and Miyabi. However, Phoenix is highly dependent on Velina and Remielle (particularly Velina), and without them, her damage output falls considerably lower than comparable upper tier DPS agents. 
 
 
