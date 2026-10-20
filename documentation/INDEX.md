@@ -148,6 +148,7 @@ One spec per feature. An idea with no spec here has been considered and rejected
 [Accessibility pass](features/accessibility.md) ·
 [boss mechanics on Deadly Assault](features/da-show-weakness-resistance-shill.md) ·
 [first-visit roster setup](features/first-visit-roster-setup.md) ·
+[Infernal Revenant mechanics](features/infernal-revenant-mechanics.md) ·
 [native share on mobile](features/mobile-native-share.md)
 
 ### `reference/`

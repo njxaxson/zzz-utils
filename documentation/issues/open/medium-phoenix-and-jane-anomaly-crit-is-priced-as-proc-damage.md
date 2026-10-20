@@ -12,13 +12,24 @@ tags: [LUM-02, BUFF-05, BUFF-08]
 
 Phoenix and Jane Doe don't buff anomaly **proc damage** the way Rina or Grace do. They let anomaly
 **damage** crit at a fixed rate with a fixed crit-damage percentage: Phoenix at 45% on every
-element, Jane at 30% on physical only.
+element, Jane at 30% on physical only.  Also, they don't buff the proc itself, they buff the anomaly 
+damage that is applied from the proc - i.e. the actual shock damage or the burn damage. That means that 
+these effects do not play well with disorders, because disorders erase the proc - so that shock or burn 
+state is removed and does not have future damage to crit. (Vortexes retain both the wind and alternate procs.)  
+This is why Jane/Alice/Yuzuha is viable - the damage that would be from disorders is replaced by the team's 
+assaults scoring critical hits post-proc.  
 
-The difference matters for Remielle. Her luminize hits are anomaly damage, so in game they can
-crit beside Phoenix, and beside Jane when Remielle's lumen morphs to physical. A proc-damage buff
-can never reach her, because she procs nothing.
+The difference also matters for Remielle. Her luminize hits are counted as anomaly damage (even though 
+there is no such thing as a lumen proc), so in game they can crit beside Phoenix, and beside Jane when 
+Remielle's lumen morphs to physical. This is the core reason behind Jane's synergy with Remielle. However, the currently modeled proc-damage buff can never reach Remielle, because she procs nothing.
 
-The engine models both as proc-damage buffs — `buffs.anomaly: 4` and `buffs["anomaly:physical"]: 3`
+This is one of the major reasons that Phoenix's overall damage output falls hard without Velina; she cannot 
+capitalize on disorders the same way.  Technically speaking, the safest teams to capitalize her damage that don't 
+include Velina would be Phoenix/Burnice/Remielle (lumen morph to fire) or Phoenix/Burnice/Yuzuha (whose kaleidoscope means that Yuzu 
+won't proc physical to cause disorders). But in these cases, Phoenix loses most anomaly reactions: Burnice's limited
+ablooms provide the only anomaly reactions, and anomaly reactions are where most anomaly damage is dealt. 
+
+Currently, the engine models both as proc-damage buffs — `buffs.anomaly: 4` and `buffs["anomaly:physical"]: 3`
 — and `[LUM-02]` then rules out Remielle entirely. Phoenix/Remielle teams are therefore
 under-credited. Jane/Remielle teams would be too, but see the constraint below.
 
@@ -62,13 +73,18 @@ damage can crit at a fixed rate" that:
 **Acceptance, owner-stated:**
 
 * Phoenix rises.
-* TEST 90 order holds: Jane stays below Burnice on the Remielle/Velina ladder.
+* TEST 90 order holds: Jane stays below Burnice on the Remielle/Velina ladder. (Owner has reconfirmed this.)
 * TEST 93 is re-ruled so Jane sits **slightly ahead of Yanagi** on the Remielle/Vivian ladder.
-  They are 0.2 apart today, and the test already calls that rung a tie.
+  They are 0.2 apart today, and the test already calls that rung a tie.  (Owner addendum: since 
+  last posted, additional playtesting evidence shows that Jane should indeed be definitively better
+  than Yanagi int the Velina/Remielle ladder; although by how much is subject to debate.)
 
 The magnitude is the hard part. Jane's TEST 90 headroom is under 2 points, so whatever prices the
 mechanic must keep her increment there, unless something else of hers is re-priced at the same
-time. The in-game ratio of the two crit rates is 45:30 (3:2).
+time. The in-game ratio of the two crit rates is 45:30 (3:2).  
+
+It may also be reasonable to drop Jane from T1 to T1.5, as that may actually be the proper way to express that Jane is not quite as good as Burnice, since this is objectively true across the board
+and not just in Velina/Remielle teams. (It also matches the idea that Jane and Yanagi - also T1.5 - are similar in power level.) This would free up some of the missing headroom. 
 
 ## Resolution
 
