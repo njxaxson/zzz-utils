@@ -714,6 +714,42 @@ true by accident. Two structural traps that extension exposed are recorded in
 [known pitfalls](known-pitfalls.md) — a non-viable chain member voiding a whole boss, and an
 "every" quantifier that expires when the set it quantified over grows.
 
+### Phoenix's and Jane's anomaly crit is not proc damage; Jane is T1.5 and falls below Aria beside Vivian
+
+Owner rulings, 2026-10-21, closing SCORE-146. The mechanism is `[BUFF-10]`; this entry records
+the calls.
+
+**Jane Doe: `tier` 1 → 1.5.** Jane is not quite as good as Burnice, and that is true across the
+board, not only on Remielle/Velina teams. The demotion also puts her level with Yanagi, which
+matches the owner's read of the two.
+
+**The crit is kit-accurate, and TEST 93 gave way.** Jane's crit reaches only physical anomaly
+damage. Vivian's disorders erase the procs it would land on. Measured with Jane at T1.5, the
+Remielle/Velina rung (stay under Burnice, 4.8 points of room on Girtablullu) and the old
+Remielle/Vivian rung (beat Yanagi, 9.6 short once Vivian stopped receiving the buff) could not
+both hold. Any luminize price that closed the second broke the first. The owner chose the
+Vivian ladder: **Yanagi > Aria > Jane Doe**. Yanagi/Vivian has the better disorder synergy.
+Recent indirect playtest evidence agrees. Many players now say Jane is not much better than
+Piper, and the engine's emergent ladder supports that: Jane sits about 70 above Piper beside
+Vivian, and closer to Aria and Yanagi than to anyone above.
+
+**`scaling.buffs`: Phoenix 3, Jane 1.** Phoenix's crit has to land, the way SAnby's aftershock
+does, or she falls off. Jane at 2 dropped her below Yanagi on the Girtablullu Velina ladder. At 1
+she clears him by **0.4**, a fragile rung. It holds only because her crit lands on Velina's
+vortexes (they keep the physical proc standing). On Girtablullu, Remielle stays wind, so the crit
+does not reach her there.
+
+**Weights stay Phoenix 4 / Jane 3**, matching the 40% vs 30% in-game crit rates. The issue had
+said 45%; that was wrong.
+
+**Grace.** Her place on the Velina ladder (below Burnice, above Yanagi) matters more than staying
+within one rank band of Jane. The band assertion still holds (5.3 against 5.8 on Aberrant). If
+it breaks, retire it rather than fit around it.
+
+Numbers after the change (Girtablullu / Aberrant): `Phoenix/Remielle/Velina` 570.0 → **574.6** /
+615.6 → **619.6**. `Jane Doe/Remielle/Velina` 495.4 → **481.6** / 536.0 → **536.0**.
+`Jane Doe/Remielle/Vivian` 352.6 → **338.2** / 474.1 → **457.2**.
+
 ### Remielle's pull verdict is the triple-anomaly table, and carries count as bodies
 
 Owner ruling, 2026-10-11, replacing the fitted partner ladder's "carries are not enablers" rule.

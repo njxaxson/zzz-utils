@@ -2011,6 +2011,60 @@ async function main() {
         assert(close(avoided, 1), `avoided clone enters at ${avoided.toFixed(4)}, expected 1 (no cap — charged flat)`);
     });
 
+    // TEST 44: anomaly crit lands on covered anomaly damage — luminize included — and nowhere else.
+    // `buffs["anomaly-crit:<element>"]` is a crit property of anomaly DAMAGE, not a proc-damage
+    // buff: it reaches Remielle's luminize when her morph is covered, never a teammate whose
+    // anomalies are another element. The proc-damage key keeps [LUM-02]. [BUFF-10]
+    run('TEST 44: anomaly crit reaches covered luminize, not other elements; proc damage never reaches lumen', () => {
+        const boss = withBosses(bosses, 'Neutral').find(Boolean);
+        assert(boss, 'synthetic neutral boss not found');
+        const find = (n) => {
+            const u = allUnits.find(x => x.name === n);
+            assert(u, `fixture unit ${n} not found`);
+            return u;
+        };
+        const trace = (team) => {
+            const real = console.log;
+            const lines = [];
+            console.log = (...a) => lines.push(a.join(' '));
+            try { scoreTeamForBoss(team, boss, { debug: true }); }
+            finally { console.log = real; }
+            return lines;
+        };
+        const pairLines = (lines, from, to) => {
+            const start = lines.findIndex(l => l.includes(`${from} → ${to}:`));
+            if (start < 0) return [];
+            const rest = lines.slice(start + 1);
+            const end = rest.findIndex(l => /pair total|→ \w/.test(l) && !/→luminize/.test(l));
+            return rest.slice(0, end < 0 ? 0 : end);
+        };
+        const morphOf = (lines) => /Remielle→(\w+)/.exec(lines.find(l => l.includes('Lumen morph')) ?? '')?.[1];
+
+        const jane = find('Jane Doe');
+        assert(jane.mechanics.buffs['anomaly-crit:physical'] > 0, 'fixture assumption: Jane carries anomaly-crit:physical');
+
+        // (a) Beside Vivian, Jane's crit reaches Remielle on a physical morph and never Vivian (ether).
+        const viv = trace([jane, find('Remielle'), find('Vivian')]);
+        assert(!pairLines(viv, 'Jane Doe', 'Vivian').some(l => /anomaly-crit/.test(l)),
+            "Jane's physical anomaly crit must not reach Vivian, whose anomalies are ether");
+        const toRem = pairLines(viv, 'Jane Doe', 'Remielle').some(l => /anomaly-crit:physical→luminize/.test(l));
+        assert(toRem === (morphOf(viv) === 'physical'),
+            `Jane's crit must reach Remielle's luminize exactly when she morphs physical (morph ${morphOf(viv)}, reached ${toRem})`);
+
+        // (b) The bare key covers every element, so Phoenix's reaches Remielle on any morph.
+        const phx = trace([find('Phoenix'), find('Remielle'), find('Velina')]);
+        assert(pairLines(phx, 'Phoenix', 'Remielle').some(l => /anomaly-crit→luminize/.test(l)),
+            `Phoenix's anomaly crit must reach Remielle's luminize (morph ${morphOf(phx)})`);
+
+        // (c) The same weight as a PROC-DAMAGE buff still never reaches lumen. [LUM-02]
+        const procJane = structuredClone(jane);
+        procJane.mechanics.buffs = { 'anomaly:physical': 3 };
+        delete procJane.mechanics.scaling;
+        const proc = trace([procJane, find('Remielle'), find('Vivian')]);
+        assert(!pairLines(proc, 'Jane Doe', 'Remielle').some(l => /anomaly/.test(l)),
+            'a proc-damage buff must never reach Remielle, whatever her morph');
+    });
+
     // Summary
     console.log('');
 

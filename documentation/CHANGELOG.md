@@ -3,6 +3,20 @@
 What shipped, newest first. This file is history — nothing here is a statement about the
 current state of the engine. For that, see [STATUS.md](STATUS.md).
 
+**Phoenix's and Jane's anomaly crit stops posing as proc damage**, 2026-10-21. Both buffs are now
+`buffs["anomaly-crit"]` (Phoenix) and `buffs["anomaly-crit:physical"]` (Jane) ([BUFF-10]). A crit
+lands only on covered anomaly damage, including Remielle's luminize on a covered morph (the one
+exception to [LUM-02], new dial `MULT.ANOMALY_CRIT_LUMINIZE: 1.0`). Disorders cut it by proc
+persistence; a vortex keeps the proc, so the vortex payout is unchanged. Phoenix declares
+`scaling.buffs: 3` and Jane `scaling.buffs: 1`, so a crit that lands on nobody is charged. Jane
+drops to T1.5. Owner re-ruled rankings TEST 93 to Yanagi > Aria > Jane Doe beside Vivian.
+Recommendations TEST 50's fixture swapped Jane for Alice: two T1.5 carries now read as
+outclassed, a different gap. Character summary shows "Anomaly Crit" / "Physical Anomaly Crit",
+where neither buff rendered before. 3,514 rows moved (preview corpus), every one containing Jane
+Doe or Phoenix, 0 exceptions; 3,387 down, 123 up. `Phoenix/Remielle/Velina` 570.0 → 574.6 on
+Girtablullu. The largest falls are Phoenix with an uncovered support, e.g. `Phoenix/Velina/Yuzuha`
+−33.8 on Pompey. Calibration anchors unchanged. Added mechanics TEST 44. Resolved SCORE-146.
+
 **Phoenix's codependency reaches the pull engine**, 2026-10-18. Her `scaling.codependent: true`
 was inert there: her only scaling key is a foundational stat and she has no conditional buff, so
 no dependency check fired and owning Velina or Remielle changed nothing. `scaling.codependent` may

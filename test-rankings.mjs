@@ -2166,7 +2166,7 @@ async function main() {
     // The sister of TEST 90. Same shape — third slot behind Remielle, asserted on the same two
     // element-neutral bosses — but Vivian in the Velina seat, which reorders it substantially:
     //
-    //   Miyabi > Alice > Promeia > Yanagi > Jane Doe > Aria > Piper
+    //   Miyabi > Alice > Promeia > Yanagi > Aria > Jane Doe > Piper
     //
     // TWO REORDERINGS ARE THE POINT OF THE TEST, and both are mechanical:
     //
@@ -2183,12 +2183,12 @@ async function main() {
     //   lines, against six for Alice or Yanagi in the same seat. Her Proficiency, the best on
     //   the roster, is left with nothing to react with.
     //
-    // FRAGILE RUNGS, stated plainly: Yanagi/Jane Doe/Aria are separated by 0.2 and 3.2 points on
-    // Girtablullu (0.7 and 4.1 on Aberrant) against a rank band of ~4.5. All three sit inside one
-    // band of each other on both bosses, so the engine is NOT claiming they are meaningfully
-    // apart — only that this is the order it produces. The owner confirmed the order is right;
-    // a future repricing that flips the 0.2 is a tie breaking the other way, not a regression,
-    // and should be re-ruled rather than chased. Read the failure message before fixing anything.
+    // JANE SITS BELOW YANAGI AND ARIA, re-ruled by the owner with SCORE-146. Her buff is an
+    // anomaly CRIT [BUFF-10]: it lands only on physical anomaly damage, Vivian's disorders erase
+    // the procs it would land on, and Vivian is ether, so it reaches nobody but Remielle's
+    // physical morph. Yanagi/Vivian has the better disorder synergy. Playtest sentiment agrees:
+    // Jane is no longer far ahead of Piper. Aria/Jane are ~3 apart, inside one rank band — the
+    // order is asserted, the magnitude is not. Read the failure message before fixing anything.
     //
     // ABSENT ON PURPOSE: Grace and Burnice both demote to sub-DPS here (their `subdps` pseudo-role
     // fires on `notPresent: velina`), so neither is the carry the ladder is ordering. Their teams
@@ -2203,8 +2203,8 @@ async function main() {
             'Alice/Remielle/Vivian',
             'Promeia/Remielle/Vivian',
             'Yanagi/Remielle/Vivian',
-            'Jane Doe/Remielle/Vivian',
             'Aria/Remielle/Vivian',
+            'Jane Doe/Remielle/Vivian',
             'Piper/Remielle/Vivian',
         ];
         const NEUTRAL_TO_THESE = ['Girtablullu', 'Aberrant'];

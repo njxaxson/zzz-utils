@@ -2,20 +2,21 @@
 
 What a unit does for its teammates, and what it does to the enemy.
 
-**Buff keys:** `atk`, `buildup`, `anomaly:<element>`, `aftershock`, `abloom`, `chain`, `chains`, `sheer`,
+**Buff keys:** `atk`, `buildup`, `anomaly:<element>`, `anomaly-crit:<element>`, `aftershock`, `abloom`, `chain`, `chains`, `sheer`,
 `laceration`, `pen`, `def`, `stun-multiplier`, `cr`, `cd`, `dmg`, `disorders`, `vortex`, plus
 element names.
 
 **Debuff keys:** `defense`, `recovery`, `dmg`, plus element names.
 
-## Five senses of "anomaly"
+## Six senses of "anomaly"
 
-The stem is overloaded and has been misread before. All five are distinct:
+The stem is overloaded and has been misread before. All six are distinct:
 
 | Key | Means |
 |----|----|
 | `buffs.buildup` | Anomaly **buildup** — the rate at which procs accrue |
-| `buffs["anomaly:<element>"]` | **Proc damage** of that element — Grace, Rina, Jane |
+| `buffs["anomaly:<element>"]` | **Proc damage** of that element — Grace, Rina, Sunna (bare key) |
+| `buffs["anomaly-crit:<element>"]` | Anomaly **damage** of that element can crit — Jane (physical), Phoenix (bare key). See `[BUFF-10]` |
 | `mechanics.stats.am` / `.ap` | The **stat levels** this unit has. See [stats](stats.md) |
 | `utility["anomaly:<element>"]` | Extra procs **produced** |
 | `scaling.anomaly` | Procs **needed** |
@@ -175,7 +176,8 @@ Do not rename it back.
 
 ### [BUFF-02] Anomaly crit-damage efficiency is 30%, not 0%
 
-Anomaly damage does not crit, so a CD buff on an anomaly agent only reaches whatever direct
+Anomaly damage does not crit (except where Phoenix or Jane enable it — that is a separate
+channel, `[BUFF-10]`), so a CD buff on an anomaly agent only reaches whatever direct
 damage they do on the side — mostly, but not entirely, wasted. Owner described it as "like ATK
 buffs on rupture," floated ~15%, then ruled the existing 30% (`ANOMALY_CRIT_DMG_EFFICIENCY`)
 should stand: the important property is that it is not zero, and the exact figure is not worth
@@ -361,3 +363,40 @@ Mechanics TEST 36 pins the behaviour. Its central assertion is equivalence: rais
 crit-damage buff by 2 pays Severian exactly what his self term pays him. That fails if the buff
 leaks to teammates, and fails if it is priced any other way. Recommendations TEST 47 pins the
 pull-engine half.
+
+### [BUFF-10] Anomaly crit is a property of anomaly damage, not a proc-damage buff
+
+`buffs["anomaly-crit"]` (Phoenix, every element) and `buffs["anomaly-crit:physical"]` (Jane) let
+anomaly **damage** of the covered element crit at a fixed rate: 40% for Phoenix (25% base, 15%
+from her additional ability) and 30% for Jane. Rina, Grace and Sunna buff proc damage instead, and
+stay on `anomaly:<element>`. Both families are read through `parseAnomalyBuffKey`, which owns the
+bare-key trap of `[BUFF-05]`.
+
+What the crit reaches, and what it does not:
+
+* **Only covered anomaly damage.** A teammate is paid only if it procs a covered element itself.
+  Jane's crit reaches Alice and Piper. It does not reach Vivian (ether) or a support, even though
+  they hit a target carrying a physical proc. The proc-damage key still pays anyone hitting an
+  afflicted target.
+* **Disorders cut it.** A disorder consumes the proc the crit lands on, so the pair payment is
+  multiplied by `computeProcPersistence`. A vortex keeps the proc standing, so the vortex payout
+  is scaled by the crit through `teamProcDamageBuff`, exactly as for a proc-damage buff.
+* **Luminize, the one exception to `[LUM-02]`.** Remielle's luminize hits count as anomaly damage
+  of her morph target. A crit covering that element pays `MULT.ANOMALY_CRIT_LUMINIZE` per point
+  of `damage.luminize`/3, with no disorder cut.
+* **Self, outside a vortex.** The owner's own covered procs are paid at `SELF_PROC_BUFF_SHARE`
+  (`[BUFF-08]`), with the disorder cut.
+* **Cohesion.** Both units declare `scaling.buffs` (Phoenix 3, Jane 1), so a crit that lands on
+  nobody is charged, the way SAnby's aftershock buff is. Relevance follows the same reach. A wind
+  teammate counts when the team keeps a covered proc standing, because the crit lands on its
+  vortexes. That is the Jane/Velina synergy.
+
+**The measured cost of being honest.** Jane loses the 7.5 raw she used to hand Vivian. Beside
+Vivian, disorders erase most of what is left, so she falls below Yanagi and Aria on the
+Remielle/Vivian ladder (rankings TEST 93, re-ruled). Phoenix teams whose third slot is not
+covered pay the `scaling.buffs` charge: `Phoenix/Velina/Yuzuha` on Pompey is −33.8. On
+Girtablullu, Remielle stays wind (the boss is wind-weak), so Jane's crit reaches only Velina, and
+her `scaling.buffs: 1` leaves her 0.4 above Yanagi in TEST 90. That rung is fragile.
+
+A `buffs.luminize` key was considered and rejected. It would render as a Luminize buff, which
+the kit does not have, and would pose as a damage-type buff.

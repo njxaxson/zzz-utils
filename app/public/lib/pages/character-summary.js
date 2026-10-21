@@ -357,6 +357,11 @@ function buildSynergyLine(unit) {
         if (teamBuffs.dmg) buffs.push(formatMechanic('General Damage', teamBuffs.dmg));
         if (teamBuffs.disorders) buffs.push(formatMechanic('Disorders', teamBuffs.disorders));
         if (teamBuffs.vortex) buffs.push(formatMechanic('Vortex', teamBuffs.vortex));
+        if (teamBuffs['anomaly-crit']) buffs.push(formatMechanic('Anomaly Crit', teamBuffs['anomaly-crit']));
+        for (const el of ELEMENTS) {
+            const crit = teamBuffs[`anomaly-crit:${el}`];
+            if (crit) buffs.push(formatElementalMechanic(`${cap(el)} Anomaly Crit`, crit, el));
+        }
 
         // Elemental buffs
         if (teamBuffs.ice) buffs.push(formatElementalMechanic('Ice Damage', teamBuffs.ice, 'ice'));

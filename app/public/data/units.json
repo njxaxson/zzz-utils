@@ -417,13 +417,14 @@
         "rank": "S",
         "limited": true,
         "released": "1.1",
-        "tier": 1,
+        "tier": 1.5,
         "tags": ["anomaly", "physical", "assist:defensive"],
         "join": ["anomaly", "faction"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "stats": { "am": 2, "ap": 2 },
-            "buffs": { "anomaly:physical": 3 }
+            "buffs": { "anomaly-crit:physical": 3 },
+            "scaling": { "buffs": 1 }
         },
         "faction": "PubSec",
         "displayText": "Sensuous rat lady is an older physical anomaly unit that remains a fan favorite. She likes being paired with Alice or Velina.",
@@ -757,10 +758,11 @@
         "mechanics": {
             "stats": { "am": 2.5, "ap": 2.5 },
             "damage": { "abloom": 3 },
-            "buffs": { "anomaly": 4 },
+            "buffs": { "anomaly-crit": 4 },
             "utility": { "heal:self": true },
             "scaling": {
                 "am": 3,
+                "buffs": 3,
                 "codependent": { "cases": [
                     { "when": { "hasUnit": "anomaly:wind" }, "value": 1 },
                     { "when": { "hasUnit": "anomaly:lumen" }, "value": 1 },
@@ -769,7 +771,7 @@
             }
         },
         "faction": "Krampus",
-        "displayText": "Murphy's law magnet, or just run-of-the-mill klutz? Best-in-slot alongside Velina and Remielle, but not great with disorder teams.",
+        "displayText": "Murphy's law magnet, or just an immortal klutz? Best-in-slot alongside Velina and Remielle, but not great in disorder teams.",
         "gender": "female",
         "species": "human"
     },

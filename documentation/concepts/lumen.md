@@ -107,3 +107,8 @@ This is why Phoenix was **not** priced by inflating that buff when rankings TEST
 doubling it to 8 would have paid all 8 weight to a single teammate. She was priced on her stats
 instead, which reach vortex, abloom, refringe, her own proc rate and her weight in Remielle's
 anomaly supply. A key that lands on one teammate is not a way to price a unit.
+
+**One exception, narrowly.** An anomaly **crit** (`buffs["anomaly-crit…"]`) is not a proc-damage
+buff. Luminize hits count as anomaly damage of the morph target, so a crit covering that element
+does reach Remielle, priced by `MULT.ANOMALY_CRIT_LUMINIZE`. Proc-damage keys still never do. See
+`[BUFF-10]`.

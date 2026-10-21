@@ -990,10 +990,11 @@ await runTest(49, 'Remielle verdict follows whether a triple-anomaly team can be
 
 // TEST 50: two on-field anomaly carries of different elements react with each other. [GAP-02]
 await runTest(50, 'Two anomaly carries of different elements are each other\'s reaction partner', () => {
-    const pair = buildSyntheticRoster(allUnits, ['Jane Doe', 'Yanagi', 'Nicole', 'Anby', 'Billy']);
+    // Alice, not Jane: two T1.5 carries are "outclassed" by an available T0, which is a different gap.
+    const pair = buildSyntheticRoster(allUnits, ['Alice', 'Yanagi', 'Nicole', 'Anby', 'Billy']);
     const pairResult = analyze(allUnits, pair.unitStates, pair.ownedUnits, { maxRecommendations: 10 });
     assert(!hasGap(pairResult, 'anomaly-partner'),
-        'Jane Doe (physical) and Yanagi (electric) disorder together — no reaction-partner gap');
+        'Alice (physical) and Yanagi (electric) disorder together — no reaction-partner gap');
     const subdps = findGap(pairResult, 'subdps-anomaly');
     assert(subdps && /react with each other/.test(subdps.reason),
         `the sub-DPS gap is still the upgrade, worded as such: ${subdps?.reason}`);

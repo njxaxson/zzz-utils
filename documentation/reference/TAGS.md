@@ -88,7 +88,7 @@ Populated during the comment pass. One row per tag, newest last within a prefix.
 |----|----|----|
 | `[FUND-01]` | `../concepts/elements-and-roles.md` | `isDamageDealer` is narrower than `isDPS` — a subdps is a damage dealer even when tagged `stun` |
 | `[LUM-01]` | `../concepts/lumen.md` | Lumen is exempt from the subdps "no reaction" cohesion charge |
-| `[LUM-02]` | `../concepts/lumen.md` | No proc-damage buff reaches lumen, by any route |
+| `[LUM-02]` | `../concepts/lumen.md` | No proc-damage buff reaches lumen, by any route (anomaly crit is the one exception, `[BUFF-10]`) |
 | `[DISO-01]` | `../concepts/disorder-supply.md` | Do not net polarity provision against element-cycling supply |
 | `[ARM-01]` | `../concepts/armorer-laceration-gash-maim.md` | Defense shred is a full-value armorer lever, not a `pen`-tier one |
 | `[ARM-02]` | `../concepts/armorer-laceration-gash-maim.md` | `CONTROL_QUICKTIME` is 17, just above the rest of its family |
@@ -107,6 +107,7 @@ Populated during the comment pass. One row per tag, newest last within a prefix.
 | `[BUFF-07]` | `../data-model/buffs-and-debuffs.md` | Three anomaly buffs, three gates, all flat — "anomaly affinity" was an engine invention |
 | `[BUFF-08]` | `../data-model/buffs-and-debuffs.md` | A proc-damage buff landing on its own owner counts at 15% |
 | `[BUFF-09]` | `../data-model/buffs-and-debuffs.md` | A self-targeted buff (`target: "self"`) is split off on the context and priced like a teammate's — the Severian case |
+| `[BUFF-10]` | `../data-model/buffs-and-debuffs.md` | Anomaly crit (Phoenix, Jane) lands on covered anomaly damage and luminize, is cut by disorders, and is not a proc-damage buff |
 | `[COH-01]` | `../engine/cohesion.md` | A unit PLAYING support is judged as one, even with a DPS tag (Remielle/Orphie/Cissia) |
 | `[COH-02]` | `../engine/cohesion.md` | The element-buff menu, and why only Lighter can be moved by it |
 | `[COH-03]` | `../engine/cohesion.md` | Delivery is priced at the square root of the L4 coefficient |

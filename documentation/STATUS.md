@@ -7,19 +7,19 @@ re-run the commands and update the numbers.
 change belongs in [CHANGELOG.md](CHANGELOG.md); anything that explains a settled ruling belongs
 in [notes/adjudications.md](notes/adjudications.md) behind a tag.
 
-**Last verified:** 2026-10-18.
+**Last verified:** 2026-10-21.
 
 ## Test status
 
 | Suite | State |
 |----|----|
-| mechanics | **43 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
+| mechanics | **44 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
 | rankings | **97 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
 | recommendations | **53 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
 | bucketing | **14 pass, 0 fail** |
 | cohesion fixture | **11/11** owner judgements hold |
 | calibration freshness | both files match the current engine/data fingerprint **and** the current `pools` map |
-| calibration certification | **CERTIFIED** — 0 within-archetype rank inversions across 64 (boss × archetype) groups and 74,688 teams |
+| calibration certification | **CERTIFIED** — 0 within-archetype rank inversions across 64 (boss × archetype) groups and 75,999 teams |
 
 ```bash
 node test-mechanics.mjs && node test-rankings.mjs && node test-recommendations.mjs && node test-bucketing.mjs && node cohesion-fixture.mjs
@@ -33,13 +33,12 @@ why an empty map still matters, and why a green suite is not evidence on its own
 
 ## Open
 
-Four. Nothing is release-blocking.
+Three. Nothing is release-blocking.
 
 | Issue | Priority | Note |
 |----|----|----|
 | [Severian ranks below Evelyn for wanting nothing](issues/open/high-severian-ranks-below-evelyn-for-wanting-nothing.md) | high | A thin-kit attacker is paid only through tier; Nekomata and Soldier 11 look swept up too. Rupture is not |
 | [The partner ladder is a fitted stopgap](issues/open/high-the-partner-ladder-is-a-fitted-stopgap.md) | high | The pull engine never asks the scorer. [CODEP-03] is a partial mechanics-level route; four gaps remain before it can replace Remielle's ladder |
-| [Phoenix's and Jane's anomaly crit is priced as proc damage](issues/open/medium-phoenix-and-jane-anomaly-crit-is-priced-as-proc-damage.md) | medium | Post-release. Must reach luminize; Jane has under 2 points of TEST 90 headroom |
 | [Zhao avoids every rupture carry](issues/open/low-zhao-avoids-every-rupture-carry.md) | low | Probably should not; follows the Soukaku `rupture:!ice` change |
 
 ## Deferred

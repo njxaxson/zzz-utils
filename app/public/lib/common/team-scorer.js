@@ -89,6 +89,8 @@ const MULT = {
     // anomaly, and on the procs themselves. Narrower than a plain element buff (the team has to
     // actually land that element) and correspondingly worth more when it does.
     ANOMALY_ELEMENT_BUFF: 2.5,
+    // `buffs["anomaly-crit…"]` landing on a lumen unit's luminize, per point of `damage.luminize`/3. [BUFF-10]
+    ANOMALY_CRIT_LUMINIZE: 1.0,
     // How much a proc-damage buff amplifies a VORTEX built on that proc. A vortex's damage IS
     // proc damage, so this is the same buff arriving through a second door, not a new one.
     PROC_BUFF_VORTEX_SCALE: 0.15,    // How much of a proc-damage buff counts when it lands on its own owner. [BUFF-08]
@@ -980,6 +982,31 @@ function getProcElements(unit) {
     return els;
 }
 
+// A `buffs` key of the proc-damage (`anomaly`) or anomaly-crit (`anomaly-crit`) family, or null.
+// `element` is null for the bare key, which covers every element. [BUFF-05] [BUFF-10]
+function parseAnomalyBuffKey(key) {
+    const base = classifierBase(key);
+    if (base !== 'anomaly' && base !== 'anomaly-crit') return null;
+    return { element: key === base ? null : key.slice(base.length + 1), crit: base === 'anomaly-crit' };
+}
+
+// Does an anomaly buff scoped to `element` (null = every element) cover this proc element?
+function anomalyBuffCovers(element, procElement) {
+    return element === null || procElement.split(':')[0] === element;
+}
+
+// A unit's own crit weight covering its own procs — what they pay themselves outside a vortex. [BUFF-10]
+function ownAnomalyCritWeight(unit, team) {
+    let total = 0;
+    for (const [key, val] of Object.entries(unit.mechanics?.buffs || {})) {
+        const parsed = parseAnomalyBuffKey(key);
+        if (!parsed?.crit) continue;
+        if (![...getProcElements(unit)].some(el => anomalyBuffCovers(parsed.element, el))) continue;
+        total += w(resolveConditionalValue(val, { team, self: unit, consumer: null }));
+    }
+    return total;
+}
+
 /**
  * The team's total `buffs["anomaly:<element>"]` weight for one element.
  *
@@ -998,12 +1025,9 @@ function teamProcDamageBuff(team, element, self = null) {
         // is the case that makes the distinction real. [BUFF-08]
         const share = (self !== null && u === self) ? SELF_PROC_BUFF_SHARE : 1;
         for (const [key, val] of Object.entries(u.mechanics?.buffs || {})) {
-            if (classifierBase(key) !== 'anomaly') continue;
-            // Bare `anomaly` is the parent class: proc damage of EVERY element. A subclass
-            // matches only its own. NOTE `'anomaly'.slice(8)` is `''`, not `'anomaly'`, so the
-            // bare case needs its own branch or it silently matches nothing. [BUFF-05]
-            const matches = (key === 'anomaly') || (key.slice('anomaly:'.length) === base);
-            if (!matches) continue;
+            // Both families: a vortex leaves the proc standing, so a crit on it lands. [BUFF-10]
+            const parsed = parseAnomalyBuffKey(key);
+            if (!parsed || !anomalyBuffCovers(parsed.element, base)) continue;
             // Resolved, not raw: Phoenix's buff is a `{ cases: [...] }` spec and `w()` returns 0
             // for an object, so a raw read would silently drop the whole mechanic here.
             total += share * w(resolveConditionalValue(val, { team, self: u, consumer: null }));
@@ -2092,7 +2116,7 @@ const UNDERSUPPLY_FACTOR = 0.6;
 // documentation/engine/l4-components.md ("Supply gates fulfilment").
 const FRACTIONAL_COVERAGE_KEYS = new Set(['ultimates']);
 
-function getBuffRelevance(key, consumer) {
+function getBuffRelevance(key, consumer, team = null) {
     const roles = getEffectiveRoles(consumer);
     const element = getElement(consumer);
     const dps = isDPSByRoles(roles);
@@ -2102,7 +2126,21 @@ function getBuffRelevance(key, consumer) {
     // member would land in BUFF_IMPACT as undefined. It buffs damage against a target carrying
     // that anomaly, so it lands on any damage dealer. Whether the TEAM actually lands the
     // element is not visible from here (no team argument), and is checked where it is paid.
-    if (classifierBase(key) === 'anomaly') {
+    const anomalyBuff = parseAnomalyBuffKey(key);
+    if (anomalyBuff?.crit) {
+        // A crit lands only on anomaly damage of a covered element; for lumen, its morph target. [BUFF-10]
+        if (isNativeLumen(consumer)) {
+            if (damageOfClass(consumer, 'luminize') <= 0) return 0;
+            return anomalyBuffCovers(anomalyBuff.element, getElement(consumer) ?? '') ? 1 : 0;
+        }
+        const procs = [...getProcElements(consumer)];
+        if (procs.some(el => anomalyBuffCovers(anomalyBuff.element, el))) return 1;
+        // A vortex keeps the covered proc standing, so the crit lands on the wind partner's vortexes too. [BUFF-10]
+        const teamKeepsCovered = (team ?? []).some(u => u !== consumer
+            && [...getProcElements(u)].some(el => el.split(':')[0] !== 'wind' && anomalyBuffCovers(anomalyBuff.element, el)));
+        return (procs.some(el => el.split(':')[0] === 'wind') && teamKeepsCovered) ? 1 : 0;
+    }
+    if (anomalyBuff) {
         return dps ? 1 : 0;
     }
 
@@ -2232,7 +2270,7 @@ function buffImpact(key) {
     // in BUFF_IMPACT — that table is fixed and guarded by a load-time throw over STAT_BUFF_KEYS.
     // Without this branch the whole family falls through to IMPACT_UNIT and cohesion prices a
     // flagship proc-damage buff below what L4 pays for it.
-    if (classifierBase(key) === 'anomaly') return scaleImpact(MULT.ANOMALY_ELEMENT_BUFF);
+    if (parseAnomalyBuffKey(key)) return scaleImpact(MULT.ANOMALY_ELEMENT_BUFF);
     return scaleImpact(BUFF_IMPACT[key] ?? IMPACT_UNIT);
 }
 
@@ -2407,7 +2445,7 @@ function computeBuffUtilization(supplier, team, out = null) {
             totalWeight += bw;
             let totalRelevance = 0;
             for (const consumer of consumers) {
-                totalRelevance += getBuffRelevance(key, consumer);
+                totalRelevance += getBuffRelevance(key, consumer, team);
             }
             effectiveWeight += bw * (nConsumers > 0 ? totalRelevance / nConsumers : 0);
         }
@@ -2514,7 +2552,7 @@ function computeBuffUtilization(supplier, team, out = null) {
         let dpsRelevance = 0;
         let otherRelevance = 0;
         for (const consumer of consumers) {
-            const rel = getBuffRelevance(key, consumer);
+            const rel = getBuffRelevance(key, consumer, team);
             if (isDPS(consumer)) dpsRelevance = Math.max(dpsRelevance, rel);
             else otherRelevance = Math.max(otherRelevance, rel);
         }
@@ -3718,19 +3756,30 @@ function scoreBaselineAffinity(supplier, consumer, debug, options = {}) {
     // also how it reaches a vortex — a vortex's damage IS proc damage, so buffing the proc
     // buffs the vortex built on it, which is what Jane really does. [BUFF-05]
     for (const [buffKey, buffVal] of Object.entries(supplierBuffs)) {
-        if (classifierBase(buffKey) !== 'anomaly') continue;
-        // null means the bare key: every element, not one. Never `slice` the bare key — it
-        // yields '' and would match an element nobody has. [BUFF-05]
-        const element = (buffKey === 'anomaly') ? null : buffKey.slice('anomaly:'.length);
+        const parsed = parseAnomalyBuffKey(buffKey);
+        if (!parsed) continue;
+        const { element, crit } = parsed;
         const team = options?.team ?? [];
-        let teamLandsElement = false;
-        for (const u of team) {
-            for (const el of getProcElements(u)) {
-                if (element === null || el.split(':')[0] === element) { teamLandsElement = true; break; }
+        const consumerCovered = [...getProcElements(consumer)].some(el => anomalyBuffCovers(element, el));
+        if (crit) {
+            // Anomaly crit lands on a covered element's anomaly DAMAGE, not on anyone hitting an
+            // afflicted target. Luminize counts as anomaly damage of the morph target. [BUFF-10]
+            if (isNativeLumen(consumer)) {
+                const luminize = damageOfClass(consumer, 'luminize') / 3;
+                if (luminize <= 0 || !anomalyBuffCovers(element, getElement(consumer) ?? '')) continue;
+                const val = w(buffVal) * luminize * MULT.ANOMALY_CRIT_LUMINIZE;
+                score += val;
+                dbg(`${buffKey}→luminize`, val);
+                continue;
             }
-            if (teamLandsElement) break;
+            if (!consumerCovered) continue;
+        } else {
+            let teamLandsElement = false;
+            for (const u of team) {
+                if ([...getProcElements(u)].some(el => anomalyBuffCovers(element, el))) { teamLandsElement = true; break; }
+            }
+            if (!teamLandsElement) continue;
         }
-        if (!teamLandsElement) continue;
         // Skip a consumer whose proc damage is already realised as vortex: the vortex payout
         // amplifies itself by this same buff, so paying here too would count one buff twice on
         // the same damage. A consumer with no vortex (Remielle, or Harumasa in a monoshock team)
@@ -3748,16 +3797,16 @@ function scoreBaselineAffinity(supplier, consumer, debug, options = {}) {
             // ...and only for a buff that actually covers HER procs. The bare key is every
             // element and reaches them; `anomaly:physical` does not buff a wind proc just
             // because a teammate is landing physical elsewhere on the target.
-            const covers = element === null
-                || [...getProcElements(consumer)].some(el => el.split(':')[0] === element);
-            if (!covers) continue;
+            if (!consumerCovered) continue;
         }
         // Lumen never touches an anomaly gauge in either direction, and luminize runs strictly
         // on Proficiency, so no proc-damage buff reaches Remielle by any route. [LUM-02]
         if (isNativeLumen(consumer)) continue;
         const cw = getBasicDamage(consumer) / 3;
         if (cw <= 0) continue;
-        const val = w(buffVal) * cw * MULT.ANOMALY_ELEMENT_BUFF;
+        // A disorder consumes the proc a crit would land on. [BUFF-10]
+        const persistence = crit ? computeProcPersistence(team, options?.boss) : 1;
+        const val = w(buffVal) * cw * MULT.ANOMALY_ELEMENT_BUFF * persistence;
         score += val;
         dbg(buffKey, val);
     }
@@ -4365,6 +4414,15 @@ function scoreMechanicalSynergy(team, debug, options = {}) {
             const vortexBonus = VORTEX_BASE * vortexValue(paidTier) * apFactor(unit) * procRate(unit) * paidProcBuff;
             consumerScores.set(unit.name, (consumerScores.get(unit.name) || 0) + vortexBonus);
             if (debug) console.log(`    Vortex bonus: ${unit.name} +${vortexBonus.toFixed(1)} (tier ${paidTier.toFixed(2)} -> ${vortexValue(paidTier).toFixed(2)}${reaction.isWindEnabler ? ' wind-enabler' : ''}, ap x${apFactor(unit).toFixed(2)}, rate x${procRate(unit).toFixed(2)})`);
+        } else {
+            // Outside a vortex, a unit's own anomaly crit lands on its own standing procs. [BUFF-08] [BUFF-10]
+            const ownCrit = ownAnomalyCritWeight(unit, team);
+            if (ownCrit > 0) {
+                const selfCrit = SELF_PROC_BUFF_SHARE * ownCrit * (getBasicDamage(unit) / 3)
+                    * MULT.ANOMALY_ELEMENT_BUFF * computeProcPersistence(team, boss);
+                consumerScores.set(unit.name, (consumerScores.get(unit.name) || 0) + selfCrit);
+                if (debug) console.log(`    Self anomaly crit: ${unit.name} +${selfCrit.toFixed(1)}`);
+            }
         }
 
         // Flat "a disorder happened, and this agent's own procs are part of it" bonus — this is

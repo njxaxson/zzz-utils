@@ -230,6 +230,12 @@ export function mechanicsFitScore(supplier, consumer) {
         score += defW * 2;
     }
     if (w(sBuf.anomaly) > 0 && isAnoDPS) score += w(sBuf.anomaly) * 3;
+    // Anomaly crit lands on a covered element's anomaly damage; lumen can morph to any. [BUFF-10]
+    for (const [key, val] of Object.entries(sBuf)) {
+        if (key !== 'anomaly-crit' && !key.startsWith('anomaly-crit:')) continue;
+        const element = key === 'anomaly-crit' ? null : key.slice('anomaly-crit:'.length);
+        if (isAnoDPS && (element === null || cElement === element || cElement === 'lumen')) score += w(val) * 3;
+    }
     if (w(sBuf.sheer) > 0 && isRupDPS) score += w(sBuf.sheer) * 5;
     // Laceration is to armorers what sheer is to rupture (Claret, Koleda, Roxy supply it).
     if (w(sBuf.laceration) > 0 && isArmDPS) score += w(sBuf.laceration) * 5;
