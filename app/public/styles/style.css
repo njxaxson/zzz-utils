@@ -4482,7 +4482,8 @@ a.rec-unit:hover {
    TIER LIST PAGE
    ========================================================================== */
 
-.tier-list-intro {
+.tier-list-intro,
+.recent-changes {
     margin-bottom: 1.5rem;
     padding: 1rem 1.25rem;
     background: var(--bg-tertiary);
@@ -4496,6 +4497,16 @@ a.rec-unit:hover {
 
 .tier-list-intro p {
     margin: 0;
+}
+
+.recent-changes h2 {
+    margin: 0 0 0.5rem;
+    font-size: 1rem;
+}
+
+.recent-changes ul {
+    margin: 0;
+    padding-left: 1.25rem;
 }
 
 .tier-list-grid {
