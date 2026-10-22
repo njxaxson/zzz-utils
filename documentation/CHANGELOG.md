@@ -3,6 +3,54 @@
 What shipped, newest first. This file is history — nothing here is a statement about the
 current state of the engine. For that, see [STATUS.md](STATUS.md).
 
+**Hugo stops outranking Sigrid**, 2026-10-22. Hugo's best team beat Sigrid's on 8 bosses,
+Yidhari's on 3 and Miyabi's on Horizon. Owner ruling: among ice DPS he beats only Ellen, and his
+best team still rates Good on Marionettes, Thrall and Revenant. His data was right; three credits
+were not:
+
+* **Recovery counted totalize twice** (`burst + totalize × 2`, and burst already holds totalize):
+  31.9 into Hugo per stunner, now 7.9. Totalize-qty `5 → 4.2`, fitted to the two rulings above.
+  Removing it outright left Marionettes at 271.6. [COMP-02]
+* **Koleda's chain buff paid Norma as a carry** (34.8, from Norma's `chain: 3`), which made
+  `Koleda/Norma/Hugo` Hugo's best team over `Norma/Roxy/Hugo`. A sub-DPS stunner now takes it at
+  the 0.6 sub-DPS share (20.9). [BUFF-11]
+* **Revenant's crit weakness paid both stunners in full.** A second stunner shares the field time
+  the first covers, so it gets 15% (Roxy +9 → +1). [WEAK-02]
+
+The recovery fix moved 3,235 rows, every one containing Hugo or Pyrois, all down, `l4` only. The
+rest moved 7,947 rows against a three-part prediction with 0 exceptions: 7,622 Hugo/Pyrois rows,
+313 Koleda + Norma/Roxy rows (down, `l4` only) and 12 Revenant Norma + Roxy rows (down, `l3`
+only). Hugo's best is now Marionettes 292.0, Thrall 316.7 and Revenant 317.6, all Good. Sigrid's
+smallest lead over him is 14.8 (Fiend, where Norma is resisted) and 17.5 elsewhere; Hugo's
+smallest lead over Ellen is 23.0. Added mechanics TEST 48, falloff parts to TEST 47, and
+rankings TESTs 101 (ice ordering on every boss) and 102 (Good floor, Roxy over Koleda).
+
+**Infernal Revenant gets its mechanics**, 2026-10-22. It played as a generic wind/ice boss, so
+anomaly took the top of the ladder on raw ceiling. Two new boss mechanics, neither naming
+Revenant:
+
+* `weak: ["cd"]` [WEAK-02]: every damage dealer earns `critDamageExposure × CD_WEAK_PER_UNIT`
+  (30). Exposure is 1.0 for attack and rupture, `scaling.cd / 2` for a declarer (Miyabi 1.5), 0.3
+  for anomaly, 0 for armorers, 0.5 for a stunner, plus 0.25 per point of active self crit damage
+  (Severian), all × 0.6 on a sub-DPS.
+* `debuffs.buildup: 6` [WEAK-03]: each native anomaly carry pays `shortfall × 16`, where shortfall
+  is the debuff less its teammates' buildup buffs. Every `utility["anomaly:*"]` surplus is cut by
+  `1 − shortfall / debuff`. The spec's gate would have charged Nangong as an activated anomaly
+  DPS, costing NMY 48 against the owner ruling that it pays nothing, so the native tag is required.
+
+3,528 Revenant rows moved and no other boss (released corpus). 163 crossed zero. Every
+`l4` mover contains Roxy and moved down. Three Roxy rows also moved `l2`/teamwork, all down,
+because Roxy's cut wind procs left Vivian or Pyrois without a reaction. NMY 370.3 → 404.2
+(#2 → #1); `Norma/Yidhari/Lucia` #12 → #2; `Norma/Roxy/Hugo` #14 → #3; `Promeia/Remielle/Velina`
+#1 → #15; `Miyabi/Vivian/Yuzuha` 348.5 → 319.2. With preview units, `Roxy/Severian/Sunna` is #4
+at 363.9. The anomaly calibration anchor moved 629 → 630.5 because NMY entered its top 10, which
+shifts every anomaly score by −0.24% on every boss. The other anchors are unchanged.
+
+The Sigrid rung was not met by this change alone: `Norma/Sigrid/Sunna` (345.9) trailed
+`Norma/Roxy/Hugo` (367.3). That was Hugo's overcredit, fixed in [COMP-02] above. Added mechanics
+TESTs 46–47 and rankings TEST 100. Alice's polarity surplus is
+knowingly cut too (deferred ENG-012).
+
 **A plain attacker doing the conventional job is credited by tier**, 2026-10-21. Severian ranked
 below Evelyn because L4 pays a carry only when a teammate feeds a declared need, and he declares
 none. On Butcher Norma paid Evelyn 71.4 and him 22.2. The new L4 term [COMP-01] pays an attacker

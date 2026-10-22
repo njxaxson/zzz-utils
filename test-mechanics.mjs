@@ -2139,6 +2139,118 @@ async function main() {
         assert(t3 === 0, `T3: expected 0, got ${t3}`);
     });
 
+    // Debug lines from one scoring pass on a synthetic boss, for TESTs 46 and 47.
+    const bossProbe = (names, mechanics) => {
+        const team = names.map(n => {
+            const u = allUnits.find(x => x.name === n);
+            assert(u, `fixture unit ${n} not found`);
+            return u;
+        });
+        const boss = { ...NEUTRAL_BOSS, mechanics: { ...NEUTRAL_BOSS.mechanics, ...mechanics } };
+        const real = console.log;
+        const lines = [];
+        console.log = (...a) => lines.push(a.join(' '));
+        let score;
+        try { score = scoreTeamForBoss(team, boss, { debug: true }); }
+        finally { console.log = real; }
+        assert(score > 0, `${names.join('/')} scored ${score} — the fixture must be viable for the trace to mean anything`);
+        return lines;
+    };
+
+    // TEST 46: a boss buildup debuff charges proccing anomaly carries for what teammates leave
+    // unoffset, and cuts a proc surplus by the same ratio. [WEAK-03]
+    run('TEST 46: buildup debuff — charged to proccing anomaly carries, offset by buffs; proc surplus cut', () => {
+        const debuff = { debuffs: { buildup: 6 } };
+        const charge = (names, carry) => {
+            const line = bossProbe(names, debuff).find(l => l.includes(`Boss buildup debuff: ${carry} `));
+            return line ? Number(line.split('→ -').pop()) : 0;
+        };
+
+        // (a) Charged on the shortfall; the carry's teammates offset it.
+        assert(charge(['Miyabi', 'Yuzuha', 'Nicole'], 'Miyabi') === 48, 'Miyabi beside Yuzuha alone: shortfall 3 must cost 48');
+        assert(charge(['Nangong', 'Miyabi', 'Yuzuha'], 'Miyabi') === 0, 'Nangong 3 + Yuzuha 3 must fully offset the debuff');
+        // (b) Not charged: a pseudo-anomaly stunner, lumen, or an attacker.
+        assert(charge(['Nangong', 'Miyabi', 'Yuzuha'], 'Nangong') === 0, 'Nangong is a pseudo-anomaly stunner, not a carry');
+        assert(charge(['Promeia', 'Remielle', 'Velina'], 'Remielle') === 0, 'Remielle procs nothing and must not be charged');
+        assert(charge(['Promeia', 'Remielle', 'Velina'], 'Promeia') === 48, 'Remielle and Velina must leave Promeia a shortfall of 3: expected 48');
+        assert(charge(['Promeia', 'Remielle', 'Velina'], 'Velina') === 64, "Velina's own buildup buff must not offset her own charge");
+        assert(!bossProbe(['Norma', 'Hugo', 'Sunna'], debuff).some(l => l.includes('Boss buildup debuff')),
+            'an attack team must not be charged');
+
+        // (c) Roxy's wind surplus is cut: gone with no buildup teammate, halved beside Yuzuha.
+        const windSupply = (names, mechanics) => {
+            const line = bossProbe(names, mechanics).find(l => l.includes('Anomaly(wind): Sigrid'));
+            return line ? Number(/\(([\d.]+) anomaly source/.exec(line)[1]) : 0;
+        };
+        const open = windSupply(['Roxy', 'Sigrid', 'Yuzuha'], {});
+        assert(open > 0, `Roxy must supply wind procs to Sigrid on a neutral boss, got ${open}`);
+        assert(windSupply(['Roxy', 'Sigrid', 'Sunna'], debuff) === 0, 'with no buildup teammate Roxy must deliver no wind procs');
+        const halved = windSupply(['Roxy', 'Sigrid', 'Yuzuha'], debuff);
+        assert(Math.abs(halved - open / 2) < 1e-9, `Yuzuha's buildup 3 must restore half of Roxy's procs: expected ${open / 2}, got ${halved}`);
+
+        // (d) Severian's wind condition reads tags, so Roxy still counts as his wind teammate.
+        const sevExposure = mechanics => bossProbe(['Roxy', 'Severian', 'Sunna'], mechanics)
+            .find(l => l.includes('Boss weak(cd): Severian'));
+        assert(sevExposure({ weak: ['cd'], ...debuff }) === sevExposure({ weak: ['cd'] }),
+            "the buildup debuff must not change Severian's wind-teammate crit damage");
+    });
+
+    // TEST 47: a crit-damage weakness pays every damage dealer by crit exposure. [WEAK-02]
+    run('TEST 47: crit-damage weakness — exposure by role, declared cd, sub-DPS share, active self cd', () => {
+        const weak = { weak: ['cd'] };
+        const exposure = (names, unit) => {
+            const line = bossProbe(names, weak).find(l => l.includes(`Boss weak(cd): ${unit} `));
+            return line ? Number(/exposure=([\d.]+)/.exec(line)[1]) : 0;
+        };
+        const attacker = exposure(['Norma', 'Hugo', 'Sunna'], 'Hugo');
+        assert(attacker === 1, `an attacker reads 1.0, got ${attacker}`);
+        assert(exposure(['Miyabi', 'Yuzuha', 'Nicole'], 'Miyabi') === 1.5 * attacker, 'Miyabi (scaling.cd 3) must read 1.5x an attacker');
+        assert(exposure(['Nangong', 'Miyabi', 'Yuzuha'], 'Nangong') === 0.3, 'an anomaly agent without declared cd reads 0.3');
+        assert(exposure(['Roxy', 'Claret', 'Nicole'], 'Claret') === 0, 'an armorer reads 0');
+        assert(exposure(['Norma', 'Hugo', 'Sunna'], 'Norma') === 0.3, 'a sub-DPS stunner reads 0.5 x 0.6');
+        assert(!bossProbe(['Norma', 'Hugo', 'Sunna'], weak).some(l => l.includes('Boss weak(cd): Sunna')),
+            'a support is not a damage dealer');
+        // Severian's self crit damage counts only while his wind-teammate condition holds.
+        assert(exposure(['Roxy', 'Severian', 'Sunna'], 'Severian') === 1.5, 'Severian beside a wind teammate reads 1 + 2 x 0.25');
+        assert(exposure(['Norma', 'Severian', 'Sunna'], 'Severian') === 1, 'Severian without a wind teammate reads 1.0');
+        // A second stunner shares the field time the first covers: Roxy beside Norma is cut to
+        // the falloff, while a lone stunner and a non-stunner keep full exposure.
+        const lone = exposure(['Roxy', 'Severian', 'Sunna'], 'Roxy');
+        const second = exposure(['Norma', 'Roxy', 'Hugo'], 'Roxy');
+        assert(second > 0 && second < lone / 2, `Roxy as a second stunner must be cut well below ${lone}, got ${second}`);
+        assert(exposure(['Norma', 'Roxy', 'Hugo'], 'Norma') === lone, 'the first stunner keeps full exposure');
+        assert(exposure(['Norma', 'Roxy', 'Hugo'], 'Hugo') === attacker, 'the carry is not part of the stunner falloff');
+    });
+
+    // TEST 48: Koleda's chain buff reaches a sub-DPS stunner at the sub-DPS share, not as a
+    // carry. Norma against a copy of herself retagged as a plain attacker. [BUFF-11]
+    run('TEST 48: chain buff into a sub-DPS stunner is paid at the sub-DPS share', () => {
+        const find = n => { const u = allUnits.find(x => x.name === n); assert(u, `fixture unit ${n} not found`); return u; };
+        const [koleda, norma, sunna] = ['Koleda', 'Norma', 'Sunna'].map(find);
+        const asCarry = structuredClone(norma);
+        asCarry.id = 'norma-carry';
+        asCarry.name = 'NormaCarry';
+        asCarry.tags = ['attack', 'fire', 'assist:defensive'];
+        asCarry.join = ['stun', 'support'];
+        asCarry.mechanics = { ...asCarry.mechanics, pseudoRole: undefined };
+        const chainBuff = (team, consumer) => {
+            const real = console.log;
+            const lines = [];
+            console.log = (...a) => lines.push(a.join(' '));
+            try { scoreTeamForBoss(team, NEUTRAL_BOSS, { debug: true }); }
+            finally { console.log = real; }
+            const start = lines.findIndex(l => l.trim() === `Koleda → ${consumer}:`);
+            assert(start >= 0, `no Koleda → ${consumer} pair in the trace`);
+            const end = lines.findIndex((l, i) => i > start && l.includes('pair total'));
+            const line = lines.slice(start, end).find(l => l.includes('chain-buff:'));
+            return line ? Number(line.split(':').pop()) : 0;
+        };
+        const full = chainBuff([koleda, asCarry, sunna], 'NormaCarry');
+        const sub = chainBuff([koleda, norma, find('Hugo')], 'Norma');
+        assert(full > 0, `a carry with Norma's chains must take Koleda's chain buff, got ${full}`);
+        assert(Math.abs(sub - full * 0.6) < 0.06, `Norma as a sub-DPS stunner must take 0.6 of ${full}, got ${sub}`);
+    });
+
     // Summary
     console.log('');
 

@@ -45,9 +45,12 @@ context. See `[BUFF-09]`.
 ## What the `_` prefix means now
 
 `_activatedRoles`, `_resolvedDamage`, `_resolvedOnfield`, `_effectiveAP`, `_procInput`,
-`_procDamage`, `_morphedElement`, `_selfBuffSpecs` and `_resolvedSelfBuffs` are **context
-fields**. The prefix marks them as resolved for one pass rather than declared in the data; a
-raw unit never has them, which is exactly what the fallback branches test for.
+`_procDamage`, `_morphedElement`, `_selfBuffSpecs`, `_resolvedSelfBuffs` and `_procSurplusScale`
+are **context fields**. The prefix marks them as resolved for one pass rather than declared in
+the data; a raw unit never has them, which is exactly what the fallback branches test for.
+
+`_procSurplusScale` is the one that depends on the **boss** as well as the team: the share of a
+`utility["anomaly:<element>"]` surplus that a buildup debuff leaves standing ([WEAK-03]).
 
 ## Code notes
 

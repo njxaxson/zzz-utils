@@ -108,10 +108,12 @@ Populated during the comment pass. One row per tag, newest last within a prefix.
 | `[BUFF-08]` | `../data-model/buffs-and-debuffs.md` | A proc-damage buff landing on its own owner counts at 15% |
 | `[BUFF-09]` | `../data-model/buffs-and-debuffs.md` | A self-targeted buff (`target: "self"`) is split off on the context and priced like a teammate's — the Severian case |
 | `[BUFF-10]` | `../data-model/buffs-and-debuffs.md` | Anomaly crit (Phoenix, Jane) lands on covered anomaly damage and luminize, is cut by disorders, and is not a proc-damage buff |
+| `[BUFF-11]` | `../data-model/buffs-and-debuffs.md` | Koleda's chain buff reaches a sub-DPS stunner (Norma, Roxy) at the 0.6 sub-DPS share, not as a carry |
 | `[COH-01]` | `../engine/cohesion.md` | A unit PLAYING support is judged as one, even with a DPS tag (Remielle/Orphie/Cissia) |
 | `[COH-02]` | `../engine/cohesion.md` | The element-buff menu, and why only Lighter can be moved by it |
 | `[COH-03]` | `../engine/cohesion.md` | Delivery is priced at the square root of the L4 coefficient |
 | `[COMP-01]` | `../engine/l4-components.md` | A plain attacker with a fit stunner and support is credited by tier — the Severian case |
+| `[COMP-02]` | `../engine/l4-components.md` | Totalize: recovery no longer double-counts it, and totalize-qty is fitted to 4.2 (Hugo below Sigrid, Good on his ice bosses) |
 | `[TWM-01]` | `../engine/teamwork-multiplier.md` | Why SAnby is not double-charged (the pseudo-role alignment discount it once covered is gone) |
 | `[TWM-02]` | `../engine/teamwork-multiplier.md` | Two views of cohesion, so an unmet weight-2 need does not cost the boss matchup |
 | `[TWM-03]` | `../engine/teamwork-multiplier.md` | An idle DPS pseudo-role caps cohesion on a neutral carry only; intended and avoided are exempt |
@@ -125,6 +127,8 @@ Populated during the comment pass. One row per tag, newest last within a prefix.
 | `[CLS-01]` | `../data-model/mechanics-overview.md` | `:` is a classifier, and `ultimate` is exempt because its keys are orthogonal axes |
 | `[FIELD-01]` | `../data-model/pseudorole.md` | Conditional `onfield` needs a raw resolver, and `isSharedField` reads it too |
 | `[WEAK-01]` | `../data-model/boss-object.md` | A boss weakness understands element variants: a plain-element unit gets half in L3 and a regular match in L4; a full variant match gets a premium in both (L3 ×2.25, L4 ×1.30) |
+| `[WEAK-02]` | `../data-model/boss-object.md` | The crit-damage weakness pays every damage dealer by an uncapped crit exposure; stunner, sub-DPS and self-CD rulings |
+| `[WEAK-03]` | `../data-model/boss-object.md` | The buildup debuff excludes a unit's own buff, charges native anomaly carries only, and cuts proc surpluses by the same ratio |
 | `[AP-01]` | `../data-model/stats.md` | Effective Proficiency is a property of the UNIT: base `ap` plus what its own `scaling.am` converts from its own `stats.am` |
 | `[AP-02]` | `../data-model/stats.md` | Disorder damage reads proc damage; the disorder NEED deliberately does not |
 | `[AP-03]` | `../data-model/stats.md` | Luminize and Refringe scale on Proficiency, never on raw proc damage |

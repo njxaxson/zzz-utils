@@ -7,19 +7,19 @@ re-run the commands and update the numbers.
 change belongs in [CHANGELOG.md](CHANGELOG.md); anything that explains a settled ruling belongs
 in [notes/adjudications.md](notes/adjudications.md) behind a tag.
 
-**Last verified:** 2026-10-21.
+**Last verified:** 2026-10-22.
 
 ## Test status
 
 | Suite | State |
 |----|----|
-| mechanics | **45 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
-| rankings | **98 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
+| mechanics | **48 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
+| rankings | **101 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
 | recommendations | **53 pass, 0 fail**, exits 0. `KNOWN_RED` empty |
 | bucketing | **14 pass, 0 fail** |
 | cohesion fixture | **11/11** owner judgements hold |
 | calibration freshness | both files match the current engine/data fingerprint **and** the current `pools` map |
-| calibration certification | **CERTIFIED** — 0 within-archetype rank inversions across 64 (boss × archetype) groups and 76,003 teams |
+| calibration certification | **CERTIFIED** — 0 within-archetype rank inversions across 64 (boss × archetype) groups and 75,911 teams |
 
 ```bash
 node test-mechanics.mjs && node test-rankings.mjs && node test-recommendations.mjs && node test-bucketing.mjs && node cohesion-fixture.mjs
@@ -42,13 +42,14 @@ Two. Nothing is release-blocking.
 
 ## Deferred
 
-Eight. Known, understood, and deliberately not being chased.
+Nine. Known, understood, and deliberately not being chased.
 
 | Issue | Priority | Why it is parked |
 |----|----|----|
 | [Sub-DPS tier halved beside a same-type carry](issues/deferred/high-sub-dps-tier-is-halved-beside-a-same-type-carry.md) | high | Wide blast radius; post-release |
 | [Neutral and avoided verdicts use different mechanisms](issues/deferred/medium-intended-neutral-avoided-use-different-mechanisms.md) | medium | A cohesion ceiling for one, a flat −40 for the other; explained in [TWM-03] but not yet justified |
 | [Vortex teams are not a pull-engine team shape](issues/deferred/medium-vortex-teams-are-not-a-shape-the-pull-engine-knows.md) | medium | A model addition; the banner-T0 rule covers today's case |
+| [Alice's polarity surplus is cut by buildup debuffs](issues/deferred/low-alice-polarity-surplus-is-cut-by-buildup-debuffs.md) | low | Revenant resists physical, so strict mode never reaches it |
 | [Velina listed only as a Wind fallback](issues/deferred/low-velina-listed-only-as-a-wind-fallback.md) | low | No verdict depends on it now |
 | [Greed value-scaling cannot be tested](issues/deferred/low-greed-value-scaling-cannot-be-tested-on-todays-roster.md) | low | No fixture can distinguish it until a `greedy: 2` unit exists |
 | [Ye Shunguong under-paid on veils](issues/deferred/low-ye-shunguong-underpaid-four-points-on-veils.md) | low | One pair type, about four points, in the safe direction |
@@ -66,8 +67,9 @@ labels, and [calibration](engine/calibration.md) for the anchors.
 
 ## What shipped last
 
-**A team with no on-field carry is not CONVENTIONAL**, 2026-10-13. Ceding the field cedes the
-primary role ([PIPE-04]); totalize ≥ 2 is exempt. `Nangong/Vivian/Sunna` on Vesper 324.3 → 275.7.
-Before that: rankings TEST 94 moved to asserting AoD's median gap.
+**Infernal Revenant mechanics**, 2026-10-22: `weak: ["cd"]` [WEAK-02] and `debuffs.buildup: 6`
+[WEAK-03]. `Nangong/Miyabi/Yuzuha` 370.3 → 404.2 (#1); `Promeia/Remielle/Velina` 394.6 → 335.4
+(#1 → #15). With it, Hugo stopped outranking Sigrid ([COMP-02], [BUFF-11], [WEAK-02] falloff): every
+ice DPS but Ellen now beats Hugo on every boss (rankings TEST 101). Before that: SCORE-146.
 
 Full history in [CHANGELOG.md](CHANGELOG.md).

@@ -78,7 +78,8 @@ const MULT = {
     // Trigger's damage.aftershock) — not a need/provision channel. Do not rename to
     // DAMAGE_NEED. [BUFF-01]
     DAMAGE_TYPE_BUFF: 3,
-    TOTALIZE_QTY: 5,
+    // Per stunner, per point of totalize and of the stunner's daze. [COMP-02]
+    TOTALIZE_QTY: 4.2,
     STUN_EMERGENCE: 1.0,
     // A plain attacker doing the conventional job, per point of fitTierCredit. [COMP-01]
     CONVENTIONAL_FIT: 1.0,
@@ -192,6 +193,10 @@ const BOSS_WEAK = {
     FREEZE_BONUS: 15,
     CD_DEBUFF_PER_UNIT: 16,
     DAZE_DEBUFF_PER_UNIT: 10,
+    // Crit-damage weakness, per unit of crit exposure on each damage dealer. [WEAK-02]
+    CD_WEAK_PER_UNIT: 30,
+    // Buildup debuff, per point of unmitigated debuff on each proccing anomaly DPS. [WEAK-03]
+    BUILDUP_DEBUFF_PER_UNIT: 16,
     // Armorer quicktime bonus, per control skill the boss uses. A control skill locks the
     // player out of everything but dodge/parry/assist and arrives without the usual telegraph,
     // so timing it is a large part of a good clear. Armorers intercept it and reduce it to a
@@ -200,6 +205,13 @@ const BOSS_WEAK = {
     // it was ~2% of a ~450 raw score, too thin for "a large part of a good clear". [ARM-02]
     CONTROL_QUICKTIME: 17,
 };
+
+// Crit exposure for the crit-damage weakness. [WEAK-02]
+const STUN_CRIT_EXPOSURE = 0.5;       // a stunner's crit rate is lower
+const SELF_CD_EXPOSURE = 0.25;        // per point of active self-targeted crit damage
+const CD_WEAK_SUBDPS_SHARE = 0.6;     // same ratio as the L3 on-element sub-DPS bonus (17/28)
+// A second stunner shares the field time the first already covers. [WEAK-02]
+const CD_WEAK_STUN_FALLOFF = [1, 0.15, 0];
 
 // Second armorer adds much less (one interceptor already covers the fight); third adds nothing.
 const ARMORER_CONTROL_FALLOFF = [1, 0.25, 0];
@@ -656,7 +668,12 @@ function unitMatchesIdentifier(u, ident) {
 // (e.g. Roxy provisions "anomaly:wind" via utility while being a stunner, not an anomaly agent).
 function unitProvidesIdentifier(u, ident) {
     if (unitMatchesIdentifier(u, ident)) return true;
-    return w(u.mechanics?.utility?.[ident]) > 0;
+    return procSurplus(u, ident) > 0;
+}
+
+// A `utility["anomaly:<element>"]` proc surplus, after any boss buildup debuff. [WEAK-03]
+function procSurplus(unit, key) {
+    return w(unit.mechanics?.utility?.[key]) * (unit._procSurplusScale ?? 1);
 }
 
 // Do the members of this team OTHER than `self` already disorder with each other?
@@ -979,7 +996,7 @@ function getProcElements(unit) {
     const own = getOwnGaugeElement(unit);
     if (own) els.add(own);
     for (const [key, val] of Object.entries(unit.mechanics?.utility || {})) {
-        if (key.startsWith('anomaly:') && w(val) > 0) els.add(key.slice('anomaly:'.length));
+        if (key.startsWith('anomaly:') && procSurplus(unit, key) > 0) els.add(key.slice('anomaly:'.length));
     }
     return els;
 }
@@ -1665,14 +1682,19 @@ function teamBuildupSupply(unit, team) {
     return supply;
 }
 
+/** How much of a boss buildup debuff this unit's teammates leave unoffset. [WEAK-03] */
+function buildupShortfall(unit, team, debuff) {
+    return Math.max(0, debuff - teamBuildupSupply(unit, team));
+}
+
 function computeProcInput(unit, team) {
     // Lumen is OFF this curve. Remielle is the only anomaly unit with `am: 0`, and that is not a
     // low value on a scale — it is the statement that she fills no gauge and procs nothing at
     // all. A rate below 1.0 would say she procs slowly, which is a different and wrong claim.
     if (isNativeLumen(unit)) return null;
     let surplus = 0;
-    for (const [key, val] of Object.entries(unit.mechanics?.utility || {})) {
-        if (key.startsWith('anomaly:')) surplus += w(val);
+    for (const key of Object.keys(unit.mechanics?.utility || {})) {
+        if (key.startsWith('anomaly:')) surplus += procSurplus(unit, key);
     }
     return {
         mastery: getStat(unit, 'am'),
@@ -2205,6 +2227,24 @@ function getBuffRelevance(key, consumer, team = null) {
             if (ELEMENTS.includes(key) && element === key && (dps || roles.includes('stun'))) return 1;
             return 0;
     }
+}
+
+/**
+ * How much of a unit's damage scales on crit damage, for a crit-damage weakness. Like
+ * getBuffRelevance('cd') but uncapped, so a declared `scaling.cd: 3` reads above an attacker.
+ * [WEAK-02]
+ */
+function critDamageExposure(unit) {
+    const roles = getEffectiveRoles(unit);
+    let exposure;
+    if (roles.includes('armorer')) exposure = 0;     // armorer crit damage is fixed
+    else if (unit.mechanics?.scaling?.cd) exposure = w(unit.mechanics.scaling.cd) / 2;
+    else if (roles.includes('attack') || roles.includes('rupture')) exposure = 1;
+    else if (roles.includes('anomaly')) exposure = ANOMALY_CRIT_DMG_EFFICIENCY;
+    else if (roles.includes('stun')) exposure = STUN_CRIT_EXPOSURE;
+    else exposure = 0;
+    exposure += w(unit._resolvedSelfBuffs?.cd) * SELF_CD_EXPOSURE;
+    return hasSubDPSRole(unit) ? exposure * CD_WEAK_SUBDPS_SHARE : exposure;
 }
 
 function getDebuffRelevance(key, consumer) {
@@ -3550,6 +3590,36 @@ function scoreBossMatchup(team, boss, { lenient = false, debug = false } = {}) {
         }
     }
 
+    // Crit-damage weakness (e.g. Infernal Revenant): every damage dealer, by crit exposure. [WEAK-02]
+    if (weakMechanics.includes('cd')) {
+        const dealers = team.filter(isDamageDealer)
+            .map(unit => ({ unit, exposure: critDamageExposure(unit) }))
+            .sort((a, b) => b.exposure - a.exposure);
+        let stunners = 0;
+        for (const { unit, exposure: full } of dealers) {
+            const exposure = unit.tags.includes('stun') ? full * (CD_WEAK_STUN_FALLOFF[stunners++] ?? 0) : full;
+            if (exposure <= 0) continue;
+            const bonus = Math.round(exposure * BOSS_WEAK.CD_WEAK_PER_UNIT);
+            score += bonus;
+            if (debug) console.log(`    Boss weak(cd): ${unit.name} exposure=${exposure.toFixed(2)} → +${bonus}`);
+        }
+    }
+
+    // Buildup debuff (e.g. Infernal Revenant): each proccing anomaly carry pays for what its
+    // teammates' buildup buffs leave unoffset. Its own buff does not count; a pseudo-anomaly
+    // stunner (Nangong) is not a carry. [WEAK-03]
+    const buildupDebuffVal = w(boss.mechanics?.debuffs?.buildup);
+    if (buildupDebuffVal > 0) {
+        for (const unit of dpsUnits) {
+            if (!unit.tags.includes('anomaly') || getBuffRelevance('buildup', unit) <= 0) continue;
+            const shortfall = buildupShortfall(unit, team, buildupDebuffVal);
+            if (shortfall <= 0) continue;
+            const penalty = Math.round(shortfall * BOSS_WEAK.BUILDUP_DEBUFF_PER_UNIT);
+            score -= penalty;
+            if (debug) console.log(`    Boss buildup debuff: ${unit.name} shortfall=${shortfall.toFixed(1)} → -${penalty}`);
+        }
+    }
+
     // Control skills (e.g. Discordant Solo): armorers intercept a control skill and turn it
     // into a simple quicktime event, so their value rises with how many the boss uses. Scales
     // per armorer with a steep falloff — a second interceptor helps a little, a third not at
@@ -4013,12 +4083,11 @@ function scoreBaselineAffinity(supplier, consumer, debug, options = {}) {
 
     // Recovery debuffs → all DPS (non-stunless), proportional to burst potential
     // Chains scaling: longer stun windows = more chains
-    // Totalize: entire damage output is stun-time-dependent, so recovery is critical
+    // Totalize reaches this through burst weight only, like any other burst instrument. [COMP-02]
     if (supplierDebuffs.recovery) {
         if (!isStunlessUnit(consumer) && isDPSByRoles(consumerRoles)) {
             const burstWeight = getMaxBurstWeight(consumer);
             const chainsScaling = w(consumer.mechanics?.scaling?.chains);
-            const totalizeWeight = w(consumer.mechanics?.damage?.totalize);
             const recoveryScaling = w(consumer.mechanics?.scaling?.recovery);
             // A GREEDY carry (>= 2) gets more out of a longer window than anyone else — the
             // reason Lighter beats Trigger as Evelyn's stunner. See documentation/data-model/
@@ -4026,8 +4095,7 @@ function scoreBaselineAffinity(supplier, consumer, debug, options = {}) {
             const team = options?.team ?? [supplier, consumer];
             const greedBonus = (getGreed(consumer) >= 2 && canExploitLongWindow(consumer, team))
                 ? getGreed(consumer) : 0;
-            const effectiveBurst = burstWeight + chainsScaling + totalizeWeight * 2
-                + recoveryScaling + greedBonus;
+            const effectiveBurst = burstWeight + chainsScaling + recoveryScaling + greedBonus;
             const val = w(supplierDebuffs.recovery) * effectiveBurst * MULT.RECOVERY_DEBUFF;
             score += val;
             dbg('recovery', val);
@@ -4062,9 +4130,11 @@ function scoreBaselineAffinity(supplier, consumer, debug, options = {}) {
     // Chain damage BUFF (Koleda's `buffs.chains`) -> any DPS, priced by chain MAGNITUDE. Unlike
     // the provision above this lands on every DPS, since it multiplies chains the carry already
     // has. Rated at its own MULT.CHAINS_BUFF dial, not the provision rate. [BUFF-03]
+    // A sub-DPS stunner (Norma) takes it at the sub-DPS damage share, not as a carry. [BUFF-11]
     const chainBuffWeight = w(supplierBuffs.chains);
     if (chainBuffWeight > 0) {
-        const val = chainBuffWeight * getChainMagnitude(consumer) * MULT.CHAINS_BUFF;
+        const share = isDPSByRoles(consumerRoles) ? 1 : CD_WEAK_SUBDPS_SHARE;
+        const val = chainBuffWeight * getChainMagnitude(consumer) * MULT.CHAINS_BUFF * share;
         if (val > 0) {
             score += val;
             dbg('chain-buff', val);
@@ -4240,7 +4310,7 @@ function scoreStunEmergence(supplier, consumer, debug) {
     let score = burstWeight * infraWeight * MULT.STUN_EMERGENCE;
     if (debug) console.log(`        stun-emergence: burst=${burstWeight} × infra=${infraWeight} × ${MULT.STUN_EMERGENCE} = ${score.toFixed(1)}`);
 
-    // Totalize quantity bonus: more stunners = more stun cycles for totalize
+    // Totalize quantity bonus: more stunners = more stun cycles for totalize. [COMP-02]
     const totalizeWeight = w(consumer.mechanics?.damage?.totalize);
     if (totalizeWeight > 0 && getEffectiveRoles(supplier).includes('stun')) {
         const stunWeight = getSupplierDaze(supplier);
@@ -4604,10 +4674,10 @@ function scoreMechanicalSynergy(team, debug, options = {}) {
                 if (!isNativeLumen(u)
                     && getEffectiveRoles(u).includes('anomaly')
                     && (element === null || getElement(u) === element)) supply += anomalySupplyWeight(u) * procRate(u);
-                for (const [ukey, uval] of Object.entries(u.mechanics?.utility || {})) {
+                for (const ukey of Object.keys(u.mechanics?.utility || {})) {
                     if (!ukey.startsWith('anomaly:')) continue;
                     if (element !== null && ukey.slice('anomaly:'.length) !== element) continue;
-                    supply += ANOMALY_PROC_SUPPLY * w(uval) * anomalySupplyWeight(u);
+                    supply += ANOMALY_PROC_SUPPLY * procSurplus(u, ukey) * anomalySupplyWeight(u);
                 }
             }
             if (supply <= 0) continue;
@@ -5108,6 +5178,14 @@ function scoreTeamContexts(team, boss, options = {}) {
     }
     for (const unit of team) {
         unit._activatedRoles = computeActivatedRoles(unit, team, false);
+    }
+    // A boss buildup debuff cuts each proc surplus by the share teammates cannot offset. Before
+    // damage, so `provisions` predicates see the cut. [WEAK-03]
+    const buildupDebuff = w(boss.mechanics?.debuffs?.buildup);
+    if (buildupDebuff > 0) {
+        for (const unit of team) {
+            unit._procSurplusScale = 1 - buildupShortfall(unit, team, buildupDebuff) / buildupDebuff;
+        }
     }
     // Resolve conditional damage values (e.g. Pyrois's ultimate:strong under wind anomaly) once
     // against the team, after roles are known. Damage is always team-scoped (a unit's own output),

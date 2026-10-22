@@ -59,13 +59,14 @@ team is still disqualified.
 |----|----|
 | `weaknesses` / `resistances` | Element match bonus; a resisted carry is disqualified. See [element resistance and role](../engine/element-resistance.md) |
 | `anti` | Carry archetypes disqualified outright |
-| `weak` | Array of mechanic weaknesses — `disorders`, `veils`, `stun`, `abloom`, `luminize`. A boss can have several |
+| `weak` | Array of mechanic weaknesses — `disorders`, `veils`, `stun`, `abloom`, `luminize`, `cd`. A boss can have several |
 | `assists` | Minimum defensive-assist count. See [defensive assists](../concepts/defensive-assists.md) |
 | `anomaly:state` | The boss permanently carries this element's anomaly. See [anomaly reactions](../concepts/anomaly-reactions.md) |
 | `freezable` | Ice anomaly agents get a large bonus; pseudo-anomaly agents get half |
 | `chainParry` | Blocks the limited-rotation reduction to the assist requirement |
 | `debuffs.cd` | Penalises crit-damage-scaling carries when the debuff exceeds the team's CD supply |
 | `debuffs.daze` | Slows daze accumulation |
+| `debuffs.buildup` | Slows anomaly buildup. Charges proccing anomaly carries and cuts proc surpluses, offset by teammates' `buffs.buildup`. See `[WEAK-03]` |
 | `control` | Number of control skills over the fight |
 | `shillIntensity` | Multiplies the `favored` bonus. See below |
 
@@ -76,6 +77,13 @@ are exempt, being less window-dependent.
 
 Unlike an `anti` entry, this is **fully mitigable** — bring a high-daze stunner and it goes
 away.
+
+### `weak: cd`
+
+Weak to crit damage: every damage dealer earns a bonus scaled by its crit exposure — 1.0 for an
+attacker or rupture carry, `scaling.cd / 2` for a declarer (Miyabi 1.5), 0.3 for anomaly, 0 for
+an armorer, less for a stunner and for any sub-DPS. Teammates' `buffs.cd` are not amplified.
+Bonus only. See `[WEAK-02]`.
 
 ### `control`
 
@@ -149,6 +157,7 @@ the scoring code.
 
 | Boss | Why it is interesting |
 |----|----|
+| **Infernal Revenant** | The inverse of Scorched Horizon. Weak to crit damage (a bonus) where Horizon debuffs it, and debuffs anomaly buildup where Horizon shills anomaly. Favors attack and rupture; `Nangong/Miyabi/Yuzuha` is the one anomaly answer, because it offsets the debuff and Miyabi scales on crit damage |
 | **Scorched Horizon** | The wind `anomaly:state` boss. Team-side reactions suppressed, disorders replaced by vortex, polarity damage gutted, plus a CD debuff. Designed to favour Promeia (pure ice vortex) over Miyabi (frost, a much weaker multiplier) |
 | **Thrall & Sobek** | `shill: stun`, a hard requirement. No stunner is a disqualification unless the team fields a stunless carry |
 | **Notorious Dead End Butcher** | The first boss with a variation, one that favors non-anomaly stun-based teams and another that favors anomaly-based disorder teams |
@@ -197,3 +206,63 @@ should get the regular ice-on-ice match." L3's half credit for that case is unch
 `VARIANT_WEAKNESS_PREMIUM` is fitted: 2.25 is the smallest round value that lifts
 `Miyabi/Astra/Yuzuha` on Bringer to **Good** with a few points of margin (raw 464.7, calibrated
 295.7). Mechanics TEST 41 and rankings TEST 96 pin both changes.
+
+### [WEAK-02] The crit-damage weakness pays every damage dealer by crit exposure
+
+`critDamageExposure` is close to `getBuffRelevance('cd')` but uncapped, so Miyabi's declared
+`scaling.cd: 3` reads 1.5 against an attacker's 1.0. In order:
+
+| Unit | Exposure |
+|----|----|
+| armorer | 0 — armorer crit damage is fixed. Claret's declared `cd: 1` is a known separate mismodel, ignored here |
+| declares `scaling.cd` | `cd / 2` |
+| attack / rupture | 1.0 |
+| anomaly | `ANOMALY_CRIT_DMG_EFFICIENCY` (0.3) [BUFF-02] |
+| stunner | `STUN_CRIT_EXPOSURE` (0.5): a stunner's crit rate is lower, so extra crit damage lands less often (owner) |
+| **plus** active self-targeted `cd` | `_resolvedSelfBuffs.cd × SELF_CD_EXPOSURE` (0.25). Owner: Severian's wind-teammate crit damage is something he *has* going into combat, so the boss multiplies it like base crit damage |
+| **times** an active sub-DPS role | `CD_WEAK_SUBDPS_SHARE` (0.6), the L3 on-element sub-DPS ratio (17/28) |
+
+It reads `team.filter(isDamageDealer)` ([FUND-01]), not the L3 `dpsUnits` list, because owner
+ruling credits every sub-DPS, stunners such as Norma and Roxy included. A double-sub-DPS team
+(Norma + Roxy) therefore collects twice; the levers for that are `STUN_CRIT_EXPOSURE` and
+`CD_WEAK_SUBDPS_SHARE`, never `CD_WEAK_PER_UNIT`.
+
+Teammates' `buffs.cd` are deliberately not amplified (owner).
+
+**A second stunner gets a nominal share** (`CD_WEAK_STUN_FALLOFF = [1, 0.15, 0]`, highest exposure
+first). Owner: in a single-stunner team the third slot is a support that does not hog field time.
+Two stunners split the field time one would have had, so part of the second stunner's credit is
+already counted in the first. The second gets something, which is more than a support's zero. At
+today's 0.3 exposure that is +1 raw, the same as at 10%, and 25% was too high. A non-damage-dealer
+stunner (Koleda) is never credited, so `Koleda/Norma/X` counts Norma as its only stunner.
+
+### [WEAK-03] The buildup debuff: self-excluded, carries only, and it cuts proc surpluses
+
+**Shortfall** is `max(0, debuffs.buildup − teamBuildupSupply(unit, team))`. The helper skips the
+unit's own buff, so Velina's `buildup: 1` offsets her teammates and not herself. That is stricter
+than the Horizon CD-debuff block, which counts the whole team's supply including the consumer,
+and the difference is deliberate: a buildup buff in this data model is something a unit hands
+its teammates.
+
+**Charged to proccing anomaly carries only.** The gate is `getBuffRelevance('buildup')` (so
+lumen is exempt: Remielle procs nothing [BUFF-07]) **and** the native `anomaly` tag. The second
+half excludes a pseudo-anomaly stunner: Nangong activates `anomaly` beside Miyabi, and without
+it `Nangong/Miyabi/Yuzuha` paid 48 for Nangong against the owner ruling that NMY pays nothing.
+Penalty per carry is `shortfall × BUILDUP_DEBUFF_PER_UNIT`.
+
+**Proc surpluses are cut by the same ratio.** Every `utility["anomaly:<element>"]` is read through
+`procSurplus`, scaled by `_procSurplusScale = 1 − shortfall / debuff`, resolved onto the unit
+context before conditional damage so `provisions` predicates (Pyrois) see it. Its readers are
+`computeProcInput`, `getProcElements`, `unitProvidesIdentifier` and the anomaly-quantity supply.
+Roxy alone delivers no wind procs on Revenant; beside Yuzuha she delivers half. The cut reaches
+L2 and the teamwork multiplier wherever a proc element decides a reaction (a Vivian beside Roxy
+loses her reaction partner). Not routed through `procRate`: that curve saturates with 0.20 of
+headroom, so buffs could barely offset it.
+
+**Severian is unaffected by construction.** His crit-damage condition is `countTag: "wind"`,
+which reads tags; Roxy is wind whether or not she procs.
+
+**Alice is a known limitation.** Her `utility["anomaly:physical"]` comes from polarity, which
+bypasses buildup, so in game the debuff should not touch it. The data cannot tell polarity from
+buildup surpluses, and Revenant resists physical, so she never reaches L3 in strict mode. See
+[the deferred issue](../issues/deferred/low-alice-polarity-surplus-is-cut-by-buildup-debuffs.md).

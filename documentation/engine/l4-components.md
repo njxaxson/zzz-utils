@@ -188,3 +188,36 @@ one boss against each.
 
 Mechanics TEST 45 pins each gate, including Orphie standing in as the support. Rankings TEST 99
 pins the Severian / Evelyn ordering.
+
+### [COMP-02] Totalize: no recovery double count, and a lower totalize-qty rate
+
+Owner: Hugo's kit is right (`totalize: 3`, T2.5), and its *credit* was too high. Even his best
+team does not beat Sigrid, and among ice DPS he beats only Ellen. His best team still rates Good
+on the ice-weak bosses he is built for (Marionettes, Thrall, Revenant). Before this, it beat
+Sigrid's on 8 bosses (by up to 29.1 calibrated on Thrall), Yidhari's on 3, and Miyabi's on Horizon.
+
+**Recovery counted totalize twice.** The recovery debuff paid `burstWeight + totalize × 2`, and
+burst weight already holds `BURST_TOTALIZE`. Into Hugo that was 31.9 per stunner against Sigrid's
+18.4. The extra term is gone, leaving 7.9, about twice an ordinary attacker's.
+
+**Totalize-qty stays, at a lower rate.** `totalize × daze × MULT.TOTALIZE_QTY`, per stunner, is
+the one term that prices what defines a totalize carry: more stunners mean more stun time to
+convert. Totalize is only about 3 raw of a stunner's stun-emergence into Hugo, so this is not a
+double count. Removing it was tried and rejected, because it put Hugo's best Marionettes team at
+271.6 (OK). The rate went from 5 to 4.2, fitted to the owner's two requirements:
+
+| `TOTALIZE_QTY` | Marionettes | Thrall | Revenant | Sigrid's smallest lead | Hugo over Ellen |
+|----|----|----|----|----|----|
+| 5 (before) | 296.2 | 320.9 | 322.6 | 11.7 | 26.2 |
+| **4.2** | **292.0** | **316.7** | **317.6** | **14.8** | **23.0** |
+| 4 | 290.9 (not Good) | 315.6 | 316.3 | 15.6 | 22.3 |
+| 0 | 269.7 | 294.4 | 292.3 | 31.2 | 6.6 |
+
+Hugo's best team on each boss, calibrated. "Smallest lead" is over all bosses, comparing each
+unit's best team without a second attacker (`Dialyn/Ellen/Seed` is Seed's team). The table already
+includes [BUFF-11] and the [WEAK-02] stunner falloff. Sigrid's smallest lead is on Fiend, which
+resists fire and so disqualifies Norma, her best stunner. The next smallest is 17.5, on Thrall.
+
+The 4.2 rate is tight at both ends: Marionettes clears Good (291.3) by 0.7, and Revenant sits 0.6
+under Great (318.2). Rankings TEST 101 pins the ice ordering on every boss, and TEST 102 pins the
+Good floor.

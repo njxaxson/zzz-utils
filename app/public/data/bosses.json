@@ -322,6 +322,8 @@
             "shill": null,
             "anti": [],
             "assists": 3,
+            "weak": ["cd"],
+            "debuffs": { "buildup": 6 },
             "chainParry": true,
             "control": 1
         }

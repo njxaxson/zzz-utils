@@ -24,6 +24,8 @@ import { loadAllData, deepFreeze } from './lib/data.js';
 import { scoreTeamForBoss, resolveBossVariation, getBossResistances } from './app/public/lib/common/team-scorer.js';
 import { NEUTRAL_BOSS, assert, makeAllViableTeamEntries, filterIncludeOneOf, getTopViableTeams, scoreForTeamString, scoreMapForBoss, withBosses } from './lib/scoring-test-utils.js';
 import { rankBandEpsilon } from './app/public/lib/common/team-builder.js';
+import { getStrengthRating } from './app/public/lib/common/strength-rating.js';
+import { calibrate } from './lib/calibration.js';
 
 // Viability / disqualification: `matchups.js` only *lists* teams with score > 0. A score <= 0
 // means the comp is not viable for that boss (disqualification, anti-synergy, etc.). Assertions
@@ -60,7 +62,7 @@ async function main() {
         if (m) onlyTests.add(Number(m[1]));
     }
 
-    const { units: allUnits, bosses: bossesRaw, roster } = await loadAllData();
+    const { units: allUnits, bosses: bossesRaw, roster, calibration } = await loadAllData();
     // Frozen so any write to a unit throws instead of landing silently. The engine
     // resolves onto a UnitContext and must never touch `units.json` data. [CTX-01]
     deepFreeze(allUnits);
@@ -2440,6 +2442,123 @@ async function main() {
             const sev = m.get('Norma / Severian / Sunna'), eve = m.get('Norma / Evelyn / Sunna');
             assert(sev > 0 && eve > 0, `${b.name}: both teams must be viable (Severian ${sev}, Evelyn ${eve})`);
             assert(sev > eve, `${b.name}: Norma/Severian/Sunna (${sev.toFixed(1)}) must beat Norma/Evelyn/Sunna (${eve.toFixed(1)})`);
+        }
+    });
+
+    // TEST 100: Infernal Revenant. Weak to crit damage, buildup debuff 6: NMY is the one good
+    // anomaly answer, and attack and rupture are favored over the rest of anomaly. Calibrated,
+    // because it compares archetypes. [WEAK-02] [WEAK-03]
+    run('TEST 100: Revenant — NMY is the only good anomaly team; attack and rupture lead the rest', () => {
+        const boss = bosses.find(b => b.id === 'revenant');
+        assert(boss, 'Infernal Revenant not found');
+        assert(calibration, 'calibration.json not found — run node generate-calibration.mjs');
+        const rows = [];
+        for (const { label, team } of allTeamEntries) {
+            const trace = {};
+            const raw = scoreTeamForBoss(team, boss, { trace });
+            if (raw <= 0) continue;
+            rows.push({ label, team, raw, archetype: trace.carryArchetype, cal: calibrate(raw, trace.carryArchetype, calibration) });
+        }
+        const byLabel = new Map(rows.map(r => [r.label, r]));
+        const best = archetype => rows.filter(r => r.archetype === archetype).sort((a, b) => b.cal - a.cal);
+        const nmy = byLabel.get('Nangong / Miyabi / Yuzuha');
+        assert(nmy, 'Nangong/Miyabi/Yuzuha must be viable');
+
+        // (a) NMY is the best anomaly team by a clear margin, and rates Excellent.
+        const [top, next] = best('anomaly');
+        assert(top === nmy, `NMY must be the best anomaly team, got ${top.label} (${top.cal.toFixed(1)})`);
+        assert(nmy.cal - next.cal >= 20, `NMY (${nmy.cal.toFixed(1)}) must clear ${next.label} (${next.cal.toFixed(1)}) by 20+`);
+        const rating = getStrengthRating(nmy.cal, nmy.team).label;
+        assert(rating === getStrengthRating(Infinity, nmy.team).label, `NMY must rate in the top band, got ${rating} at ${nmy.cal.toFixed(1)}`);
+
+        // (b) No other anomaly team sits above the best attack or the best rupture team.
+        const floor = Math.min(best('attack')[0].cal, best('rupture')[0].cal);
+        assert(next.cal < floor, `${next.label} (${next.cal.toFixed(1)}) must sit below the best attack and rupture teams (${floor.toFixed(1)})`);
+
+        // (c) Miyabi lines beat non-Miyabi anomaly lines on the same supports.
+        for (const pair of ['Nangong / Yuzuha', 'Nangong / Sunna', 'Yuzuha / Nicole']) {
+            const [x, y] = pair.split(' / ');
+            const rowsWith = rows.filter(r => r.archetype === 'anomaly'
+                && [x, y].every(n => r.team.some(u => u.name === n)));
+            const miyabi = rowsWith.find(r => r.team.some(u => u.name === 'Miyabi'));
+            assert(miyabi, `Miyabi/${pair} must be viable`);
+            for (const r of rowsWith) {
+                if (r === miyabi) continue;
+                assert(r.cal < miyabi.cal, `${r.label} (${r.cal.toFixed(1)}) must trail ${miyabi.label} (${miyabi.cal.toFixed(1)})`);
+            }
+        }
+
+        // (d) Claret's crit damage is fixed: the crit weakness pays her nothing.
+        const real = console.log;
+        const lines = [];
+        console.log = (...a) => lines.push(a.join(' '));
+        try { scoreTeamForBoss(byLabel.get('Roxy / Claret / Nicole').team, boss, { debug: true }); }
+        finally { console.log = real; }
+        assert(!lines.some(l => l.includes('Boss weak(cd): Claret')), 'Claret must collect no crit-weakness credit');
+    });
+
+    // TEST 101: Hugo is a T2.5 totalize carry. Among ice DPS he beats Ellen and nobody else, on
+    // every boss. A unit's team is its best team without a second attacker, which would make it
+    // someone else's team (Dialyn/Ellen/Seed is Seed's). Calibrated, because Miyabi, Promeia and
+    // Yidhari are other archetypes. [COMP-02]
+    run('TEST 101: on every boss, every ice DPS but Ellen beats Hugo, and Hugo beats Ellen', () => {
+        assert(calibration, 'calibration.json not found — run node generate-calibration.mjs');
+        const DPS = ['attack', 'anomaly', 'rupture', 'armorer'];
+        const ice = allUnits.filter(u => u.tags.includes('ice') && u.tags.some(t => DPS.includes(t))).map(u => u.name);
+        assert(['Hugo', 'Ellen', 'Sigrid'].every(n => ice.includes(n)), `expected Hugo, Ellen and Sigrid among ice DPS, got ${ice.join(', ')}`);
+        const entries = allTeamEntries.filter(({ team }) => team.some(u => ice.includes(u.name)));
+        let compared = 0;
+        for (const boss of bosses) {
+            const best = new Map();
+            for (const { label, team } of entries) {
+                const trace = {};
+                const raw = scoreTeamForBoss(team, boss, { trace });
+                if (raw <= 0) continue;
+                const cal = calibrate(raw, trace.carryArchetype, calibration);
+                const attackers = team.filter(u => u.tags.includes('attack')).length;
+                for (const u of team) {
+                    if (!ice.includes(u.name) || (u.tags.includes('attack') && attackers > 1)) continue;
+                    if (!(best.get(u.name)?.cal >= cal)) best.set(u.name, { cal, label });
+                }
+            }
+            const hugo = best.get('Hugo');
+            if (!hugo) continue;
+            for (const [name, b] of best) {
+                if (name === 'Hugo') continue;
+                compared++;
+                const [hi, lo] = name === 'Ellen' ? [hugo, b] : [b, hugo];
+                assert(hi.cal > lo.cal, `${boss.name}: ${hi.label} (${hi.cal.toFixed(1)}) must beat ${lo.label} (${lo.cal.toFixed(1)})`);
+            }
+        }
+        assert(compared > 0, 'no boss compared Hugo against another ice DPS');
+    });
+
+    // TEST 102: Hugo's good matchups. His best team rates Good or better on the ice-weak bosses
+    // he is built for, and Roxy, a tier above Koleda, is the better second stunner there.
+    // [COMP-02] [BUFF-11]
+    run('TEST 102: Hugo rates Good+ on Marionettes, Thrall and Revenant; Roxy beats Koleda beside him', () => {
+        assert(calibration, 'calibration.json not found — run node generate-calibration.mjs');
+        const goodOrBetter = new Set(['Excellent', 'Great', 'Good']);
+        for (const id of ['marionettes', 'thrall', 'revenant']) {
+            const boss = bosses.find(b => b.id === id);
+            assert(boss, `${id} not found`);
+            let best = null, roxy = null, koleda = null;
+            for (const { label, team } of allTeamEntries) {
+                if (!team.some(u => u.name === 'Hugo')) continue;
+                const trace = {};
+                const raw = scoreTeamForBoss(team, boss, { trace });
+                if (raw <= 0) continue;
+                const row = { label, team, cal: calibrate(raw, trace.carryArchetype, calibration) };
+                if (!best || row.cal > best.cal) best = row;
+                const hasRoxy = team.some(u => u.name === 'Roxy'), hasKoleda = team.some(u => u.name === 'Koleda');
+                if (hasRoxy && !hasKoleda && (!roxy || row.cal > roxy.cal)) roxy = row;
+                if (hasKoleda && !hasRoxy && (!koleda || row.cal > koleda.cal)) koleda = row;
+            }
+            assert(best, `${boss.name}: no viable Hugo team`);
+            const rating = getStrengthRating(best.cal, best.team).label;
+            assert(goodOrBetter.has(rating), `${boss.name}: Hugo's best ${best.label} (${best.cal.toFixed(1)}) must rate Good or better, got ${rating}`);
+            assert(roxy && koleda, `${boss.name}: expected viable Hugo teams with Roxy and with Koleda`);
+            assert(roxy.cal > koleda.cal, `${boss.name}: ${roxy.label} (${roxy.cal.toFixed(1)}) must beat ${koleda.label} (${koleda.cal.toFixed(1)})`);
         }
     });
     // Summary

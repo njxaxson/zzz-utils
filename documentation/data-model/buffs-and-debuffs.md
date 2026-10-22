@@ -202,6 +202,22 @@ deliberately tiny (0.4) because gifting one extra chain is a small thing; multip
 chain the carry throws is not the same statement, and pricing the buff at the provision rate
 would have made Koleda worse than the bug it fixed.
 
+### [BUFF-11] A chain buff reaches a sub-DPS stunner at the sub-DPS share
+
+Koleda's `buffs.chains` is priced by the consumer's chain magnitude, and Norma's `damage.chain: 3`
+gives her the top magnitude whatever her role. So Koleda→Norma paid 34.8, more than Koleda paid
+into any carry. That alone made `Koleda/Norma/Hugo` Hugo's best team on Revenant, above
+`Norma/Roxy/Hugo`, when Roxy is a tier above Koleda. The score was really about Norma, not Hugo.
+
+Owner: Koleda + Norma is a good way to squeeze extra damage out of Norma, but not 35 points of it.
+A consumer without a real DPS role (a sub-DPS stunner: Norma, Roxy) now takes the buff at
+`CD_WEAK_SUBDPS_SHARE` (0.6), the same 17/28 sub-DPS ratio the crit weakness uses. Koleda→Norma is
+20.9. The `MULT.CHAINS_BUFF` rate itself is unchanged; it was settled separately (see
+[known pitfalls](../notes/known-pitfalls.md)).
+
+Zero was also measured. It produces the same Hugo ladders, but it would erase a real
+Koleda–Norma interaction to fix someone else's ranking. Mechanics TEST 48 pins the share.
+
 ### [BUFF-04] BUFF_IMPACT is one table, sourced from MULT
 
 There used to be two answers to "how much damage is one point of this buff worth": the L4
