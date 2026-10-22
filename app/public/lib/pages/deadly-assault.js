@@ -70,6 +70,7 @@ async function loadData() {
             containerSelector: '#roster-container',
             pageUrl: 'deadly-assault.html',
             onStateChange: () => { savePageToStorage(); planPicker?.refresh(); },
+            shareTitle: 'My ZZZ Deadly Assault plan',
             shareUrlGenerator: (unitStates, allUnits) =>
                 generateShareUrlWithBosses(unitStates, allUnits, selectedBosses, selectedBossVariations,
                     plan.enabled ? plan.picks : null)

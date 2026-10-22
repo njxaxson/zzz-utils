@@ -324,6 +324,21 @@ export function getPlanFromUrl() {
     return params.get('plan');
 }
 
+// Share a link: native share sheet on phones, clipboard elsewhere.
+// Returns 'shared' | 'copied' | 'cancelled' | 'failed'.
+export async function shareLink(url, { title }) {
+    const isPhone = window.matchMedia?.('(pointer: coarse)').matches;
+    if (isPhone && navigator.share && (!navigator.canShare || navigator.canShare({ url }))) {
+        try {
+            await navigator.share({ title, url });
+            return 'shared';
+        } catch (e) {
+            if (e.name === 'AbortError') return 'cancelled';
+        }
+    }
+    return (await copyToClipboard(url)) ? 'copied' : 'failed';
+}
+
 // Copy text to clipboard with fallback.
 export async function copyToClipboard(text) {
     try {

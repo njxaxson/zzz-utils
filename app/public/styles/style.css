@@ -3156,6 +3156,11 @@ a.unit-card {
     .share-btn {
         padding: 0.35rem 0.5rem;
     }
+
+    /* Text is hidden here, so keep the icon (green) or the button collapses. */
+    .share-btn.copied .share-icon {
+        display: block;
+    }
     
     .shared-roster-banner {
         flex-wrap: wrap;

@@ -7,7 +7,7 @@ import {
     decodeRoster,
     getRosterFromUrl,
     generateShareUrl,
-    copyToClipboard
+    shareLink
 } from './roster-share.js';
 import { addLongPressListener } from './touch-utils.js';
 import { ELEMENTS } from './constants.js';
@@ -26,6 +26,7 @@ let _options = {
     pageUrl: '',
     onStateChange: null,
     shareUrlGenerator: null,
+    shareTitle: 'My ZZZ roster',
     lockedUnits: [],
     collapseKnownRoster: false
 };
@@ -42,6 +43,7 @@ let _options = {
  * @param {string} opts.pageUrl - Current page filename for shared-roster-banner reset link
  * @param {Function} opts.onStateChange - Callback when roster state changes (for page-specific saves)
  * @param {Function} opts.shareUrlGenerator - Custom (unitStates, allUnits) => string; defaults to generateShareUrl
+ * @param {string} opts.shareTitle - Title passed to the native share sheet (default 'My ZZZ roster')
  * @param {string[]} opts.lockedUnits - Unit IDs that are force-owned and non-toggleable
  * @param {boolean} opts.collapseKnownRoster - Start collapsed when a saved or shared roster exists;
  *        the drawer's open state on this page is then not persisted to other pages
@@ -449,9 +451,9 @@ async function handleShareClick(e) {
         ? _options.shareUrlGenerator(unitStates, allUnits)
         : generateShareUrl(unitStates, allUnits);
 
-    const success = await copyToClipboard(shareUrl);
+    const result = await shareLink(shareUrl, { title: _options.shareTitle });
 
-    if (success) {
+    if (result === 'copied') {
         btn.classList.add('copied');
         const textEl = btn.querySelector('.share-text');
         const originalText = textEl.textContent;
@@ -461,7 +463,7 @@ async function handleShareClick(e) {
             btn.classList.remove('copied');
             textEl.textContent = originalText;
         }, 2000);
-    } else {
+    } else if (result === 'failed') {
         showToast('Failed to copy link. Try again.', true);
     }
 }

@@ -6,7 +6,7 @@
 import { initRoster, getUnitStates, getAllUnits } from '../common/roster-ui.js';
 import { createUnitCard } from '../common/team-card.js';
 import { getTeamDpsBuckets, getPrimaryDpsNames } from '../common/dps-buckets.js';
-import { copyToClipboard } from '../common/roster-share.js';
+import { shareLink } from '../common/roster-share.js';
 import { createAgentPicker } from '../common/agent-picker.js';
 import {
     FAVORITES_CAP, TEAM_SIZE, teamKey, isFavorite, addMany, encodeFavorites, decodeFavorites, resolveTeam
@@ -148,10 +148,12 @@ function addTeams(incoming) {
     showToast(parts.join(' '));
 }
 
-async function shareLink() {
+async function shareFavorites() {
     const base = `${window.location.origin}${window.location.pathname}`;
-    const ok = await copyToClipboard(`${base}?teams=${encodeFavorites(getFavorites())}`);
-    showToast(ok ? 'Link copied.' : 'Could not copy the link.');
+    const result = await shareLink(`${base}?teams=${encodeFavorites(getFavorites())}`,
+        { title: 'My favorite ZZZ teams' });
+    if (result === 'copied') showToast('Link copied.');
+    else if (result === 'failed') showToast('Could not copy the link.');
 }
 
 // On your own list the star removes (with Undo); on a shared list it saves or unsaves that team.
@@ -161,7 +163,7 @@ function bindActions() {
         const ids = row?.dataset.team.split('|');
         if (event.target.closest('.fav-star') && ids) (sharedTeams ? toggleTeam(ids) : removeTeam(ids));
         else if (event.target.closest('[data-add-all]')) addTeams(sharedTeams);
-        else if (event.target.closest('[data-share]')) shareLink();
+        else if (event.target.closest('[data-share]')) shareFavorites();
     });
     window.addEventListener('favorites-changed', () => { render(); updateAddRow(); });
 }
