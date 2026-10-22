@@ -2065,6 +2065,80 @@ async function main() {
             'a proc-damage buff must never reach Remielle, whatever her morph');
     });
 
+    // TEST 45: a plain attacker doing the conventional job is paid in proportion to tier.
+    // Paid only on attacker + fit stunner + fit support, to a kit with no declared needs, no
+    // team-scoped conditional damage, no totalize and no carry-only join. [COMP-01]
+    run('TEST 45: conventional-fit credit — gates, need load, tier ladder, Orphie as the support', () => {
+        const boss = withBosses(bosses, 'Neutral').find(Boolean);
+        assert(boss, 'synthetic neutral boss not found');
+        const find = (n) => {
+            const u = allUnits.find(x => x.name === n);
+            assert(u, `fixture unit ${n} not found`);
+            return u;
+        };
+        const plain = (name, patch = {}) => {
+            const c = structuredClone(find('Nekomata'));
+            c.id = name.toLowerCase();
+            c.name = name;
+            c.join = ['stun', 'support'];
+            c.tier = patch.tier ?? 1;
+            c.mechanics = { ...c.mechanics, ...(patch.mechanics || {}) };
+            return c;
+        };
+        // The credit `carry` collects on this team, read off the debug trace (0 when absent).
+        const credit = (team, carry) => {
+            const real = console.log;
+            const lines = [];
+            console.log = (...a) => lines.push(a.join(' '));
+            let score;
+            try { score = scoreTeamForBoss(team, boss, { debug: true }); }
+            finally { console.log = real; }
+            const names = team.map(u => u.name).join('/');
+            assert(score > 0, `${names} scored ${score} — the fixture must be viable for the trace to mean anything`);
+            const line = lines.find(l => l.includes(`${carry} (conventional fit):`));
+            return line ? Number(line.split(':').pop()) : 0;
+        };
+        const [norma, sunna, lucia, astra, ellen] = ['Norma', 'Sunna', 'Lucia', 'Astra', 'Ellen'].map(find);
+
+        // (a) Paid on stunner + intended support.
+        const p = plain('PlainAtk');
+        const base = credit([norma, p, sunna], 'PlainAtk');
+        assert(base > 0, `PlainAtk with Norma and Sunna: expected a credit, got ${base}`);
+
+        // (b) Orphie resolves as the support, so the attack shape holds and the carry is paid.
+        const orphie = credit([norma, p, find('Orphie')], 'PlainAtk');
+        assert(Math.abs(orphie - base) < 0.05, `Norma/PlainAtk/Orphie: expected ${base} with Orphie as the support, got ${orphie}`);
+        const sev = allUnits.find(u => u.name === 'Severian');
+        if (sev) assert(credit([norma, sev, find('Orphie')], 'Severian') > 0, 'Norma/Severian/Orphie: Severian must collect the credit');
+
+        // (c) Each gate withholds it: an avoided support, a second attacker, no stunner.
+        assert(credit([norma, p, lucia], 'PlainAtk') === 0, 'Lucia avoids attack and must not qualify the team');
+        assert(credit([norma, p, ellen], 'PlainAtk') === 0, 'a second attacker breaks the conventional shape');
+        assert(credit([p, sunna, astra], 'PlainAtk') === 0, 'no stunner, no credit');
+
+        // (d) Need load: a weight-1 appetite halves it, weight 2 removes it.
+        const half = credit([norma, plain('NeedOne', { mechanics: { scaling: { chains: 1 } } }), sunna], 'NeedOne');
+        const none = credit([norma, plain('NeedTwo', { mechanics: { scaling: { buffs: 2 } } }), sunna], 'NeedTwo');
+        assert(Math.abs(half - base / 2) < 0.05, `weight-1 need: expected ${base / 2}, got ${half}`);
+        assert(none === 0, `weight-2 need: expected 0, got ${none}`);
+
+        // (e) A team-scoped conditional in `damage`, or totalize, is a hoop.
+        const cond = plain('CondDmg', { mechanics: { damage: { 'ultimate:strong': { cases: [{ when: { countTag: 'wind', minCount: 2 }, value: 2 }, { value: 0 }] } } } });
+        const tot = plain('TotalAtk', { mechanics: { damage: { totalize: 1 } } });
+        assert(credit([norma, cond, sunna], 'CondDmg') === 0, 'a team-scoped conditional damage entry must withhold the credit');
+        assert(credit([norma, tot, sunna], 'TotalAtk') === 0, 'a totalize carry must not collect the credit');
+
+        // (f) A carry-only join is a hoop even when a pseudo-support makes the shape conventional.
+        assert(credit([find('Trigger'), find('Cissia'), find('Seed')], 'Seed') === 0,
+            'Seed mandates a second carry and must not collect the credit beside a support-resolved Cissia');
+
+        // (g) The tier ladder: smaller at T2.5, gone at T3.
+        const t25 = credit([norma, plain('TierTwoFive', { tier: 2.5 }), sunna], 'TierTwoFive');
+        const t3 = credit([norma, plain('TierThree', { tier: 3 }), sunna], 'TierThree');
+        assert(t25 > 0 && t25 < base, `T2.5: expected a credit between 0 and the T1 value ${base}, got ${t25}`);
+        assert(t3 === 0, `T3: expected 0, got ${t3}`);
+    });
+
     // Summary
     console.log('');
 

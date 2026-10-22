@@ -111,6 +111,7 @@ Populated during the comment pass. One row per tag, newest last within a prefix.
 | `[COH-01]` | `../engine/cohesion.md` | A unit PLAYING support is judged as one, even with a DPS tag (Remielle/Orphie/Cissia) |
 | `[COH-02]` | `../engine/cohesion.md` | The element-buff menu, and why only Lighter can be moved by it |
 | `[COH-03]` | `../engine/cohesion.md` | Delivery is priced at the square root of the L4 coefficient |
+| `[COMP-01]` | `../engine/l4-components.md` | A plain attacker with a fit stunner and support is credited by tier — the Severian case |
 | `[TWM-01]` | `../engine/teamwork-multiplier.md` | Why SAnby is not double-charged (the pseudo-role alignment discount it once covered is gone) |
 | `[TWM-02]` | `../engine/teamwork-multiplier.md` | Two views of cohesion, so an unmet weight-2 need does not cost the boss matchup |
 | `[TWM-03]` | `../engine/teamwork-multiplier.md` | An idle DPS pseudo-role caps cohesion on a neutral carry only; intended and avoided are exempt |

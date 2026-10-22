@@ -2428,6 +2428,20 @@ async function main() {
             assert(sou > lucy, `${b.name}: Yidhari/Lucia/Soukaku (${sou.toFixed(1)}) must beat Yidhari/Lucia/Lucy (${lucy?.toFixed(1)})`);
         }
     });
+
+    // TEST 99: SCORE-146. Severian is a top attack carry whose kit wants nothing a teammate can
+    // feed. Beside the same stunner and support he must beat Evelyn, who is a tier worse and
+    // paid by her chain need. [COMP-01]
+    run('TEST 99: Norma/Severian/Sunna beats Norma/Evelyn/Sunna on Butcher and Marionettes', () => {
+        const bs = withBosses(bosses, 'Butcher,Marionettes');
+        assert(bs.length >= 2, `expected Butcher and Marionettes, got ${bs.length}`);
+        for (const b of bs) {
+            const m = scoreMapForBoss(scoreForTeamString('Norma/Severian/Sunna,Norma/Evelyn/Sunna', allUnits, { preview: true }), b);
+            const sev = m.get('Norma / Severian / Sunna'), eve = m.get('Norma / Evelyn / Sunna');
+            assert(sev > 0 && eve > 0, `${b.name}: both teams must be viable (Severian ${sev}, Evelyn ${eve})`);
+            assert(sev > eve, `${b.name}: Norma/Severian/Sunna (${sev.toFixed(1)}) must beat Norma/Evelyn/Sunna (${eve.toFixed(1)})`);
+        }
+    });
     // Summary
     console.log('');
 

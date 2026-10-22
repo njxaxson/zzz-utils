@@ -167,16 +167,18 @@ Starting constants:
 
 The anomaly half of the criteria is met. The Sigrid rung is not, because both mechanics pay every
 attacker the same and cannot separate Sigrid from Hugo. That gap is SCORE-146. NMY at #1 is not a
-requirement: once SCORE-146 lifts Sigrid (and Severian, once released), NMY may drop behind them,
+requirement: now that SCORE-146 lifts Severian, NMY may drop behind him,
 and that is fine.
 
 ## Sequencing
 
-**SCORE-146 should land first**
-([high-severian-ranks-below-evelyn-for-wanting-nothing](../issues/open/high-severian-ranks-below-evelyn-for-wanting-nothing.md)).
-It fixes L4 under-crediting top-tier attackers (YSG, Sigrid, Severian) across the whole corpus.
-That moves the Revenant attack rungs, and possibly the attack calibration anchor, so constants
-fitted before it would need refitting afterwards.
+**SCORE-146 has landed**
+([high-severian-ranks-below-evelyn-for-wanting-nothing](../issues/resolved/high-severian-ranks-below-evelyn-for-wanting-nothing.md),
+[COMP-01](../engine/l4-components.md#comp-01-the-conventional-fit-credit)). It turned out narrower
+than first expected. The fix credits plain attackers with no declared needs: Severian, Nekomata,
+Soldier 11, and a little for Ellen and Zhu Yuan. YSG and Sigrid declare needs, so they did not
+move. The attack calibration anchors were unchanged. On Revenant, Severian's best team moved
+from #104 to #61.
 
 If the order can't be kept, ship without the Sigrid assertion and add it alongside SCORE-146.
 Never park it in `KNOWN_RED`.

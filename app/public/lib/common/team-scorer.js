@@ -80,6 +80,8 @@ const MULT = {
     DAMAGE_TYPE_BUFF: 3,
     TOTALIZE_QTY: 5,
     STUN_EMERGENCE: 1.0,
+    // A plain attacker doing the conventional job, per point of fitTierCredit. [COMP-01]
+    CONVENTIONAL_FIT: 1.0,
     ELEMENT_BUFF: 2,
     ELEMENT_DEBUFF: 2,
     // `buffs.buildup` — anomaly buildup RATE. `buffs.disorders` is deliberately priced at the
@@ -2929,6 +2931,18 @@ function secondStunnerActsAsSupport(team) {
     return team.filter(isDPS).some(u => w(u.mechanics?.damage?.totalize) > 0);
 }
 
+// The attacker + stunner + support/defense shape, or null. Shared by the classifier and
+// [COMP-01] so the two cannot disagree about what "conventional" means.
+function conventionalAttackParts(team) {
+    const carryOnly = u => !isEffectiveSupport(u) && !isEffectiveDefense(u) && !isStun(u);
+    const attackers = team.filter(u => isAttacker(u) && carryOnly(u));
+    const stunners = team.filter(isStun);
+    const supports = team.filter(u => isEffectiveSupport(u) || isEffectiveDefense(u));
+    const otherCarries = team.filter(u => (isAnomaly(u) || isRupture(u) || isArmorer(u)) && carryOnly(u));
+    if (attackers.length !== 1 || stunners.length === 0 || supports.length === 0 || otherCarries.length > 0) return null;
+    return { carry: attackers[0], stunners, supports };
+}
+
 function classifyTeamStructure(team, debug) {
     const attackers = team.filter(u => isAttacker(u) && !isEffectiveSupport(u) && !isEffectiveDefense(u) && !isStun(u));
     const anomalyUnits = team.filter(u => isAnomaly(u) && !isEffectiveSupport(u) && !isEffectiveDefense(u) && !isStun(u));
@@ -2954,7 +2968,7 @@ function classifyTeamStructure(team, debug) {
     // --- CONVENTIONAL COMPOSITIONS ---
 
     // Attacker + Stunner + Support/Defense
-    if (nAtk === 1 && nStun >= 1 && nSup >= 1 && nAno === 0 && nRup === 0 && nArm === 0) {
+    if (conventionalAttackParts(team)) {
         if (debug) console.log('    Structure: CONVENTIONAL (attacker + stunner + support)');
         return STRUCTURE.CONVENTIONAL_BONUS;
     }
@@ -3699,6 +3713,39 @@ function scoreSelfBuffs(unit, debug) {
     return score;
 }
 
+// The L2 carry bonus down to T1, then a straight line to 0 at T3. [COMP-01]
+function fitTierCredit(tier) {
+    if (tier <= 0.5) return 40 - tier * 10;
+    return Math.max(0, 18 - 9 * (tier - 1));
+}
+
+// Declared scaling weights only, meta-flags included; `codependent` is not a weight. [COMP-01]
+const CONVENTIONAL_FIT_NEED_FULL = 2;
+function declaredNeedLoad(unit) {
+    let load = 0;
+    for (const [key, spec] of Object.entries(unit.mechanics?.scaling || {})) {
+        if (key === 'codependent') continue;
+        load += maxConditionalValue(spec);
+    }
+    return load;
+}
+
+// A plain attacker with a fit stunner and a fit support is paid for doing the job. [COMP-01]
+function scoreConventionalFit(consumer, team, debug) {
+    const parts = conventionalAttackParts(team);
+    if (!parts || parts.carry !== consumer || mandatesDualCarry(consumer)) return 0;
+    const damage = consumer._resolvedDamage || consumer.mechanics?.damage || {};
+    const rawDamage = consumer.mechanics?.damage || {};
+    if (w(damage.totalize) > 0 || Object.values(rawDamage).some(isTeamScopedConditional)) return 0;
+    const fits = u => getArchetypeFit(u, consumer) !== 'avoided';
+    if (!parts.stunners.some(u => getStunInfraWeight(u) > 0 && fits(u))) return 0;
+    if (!parts.supports.some(fits)) return 0;
+    const needFactor = 1 - Math.min(1, declaredNeedLoad(consumer) / CONVENTIONAL_FIT_NEED_FULL);
+    const score = fitTierCredit(consumer.tier ?? 2.5) * needFactor * MULT.CONVENTIONAL_FIT;
+    if (debug && score > 0) console.log(`      ${consumer.name} (conventional fit): ${score.toFixed(1)}`);
+    return score;
+}
+
 function scoreBaselineAffinity(supplier, consumer, debug, options = {}) {
     let score = 0;
     // Resolve conditional buff/debuff values against THIS (supplier, consumer) pair so
@@ -4351,6 +4398,7 @@ function scoreMechanicalSynergy(team, debug, options = {}) {
 
         // What the unit's kit gives itself joins what its teammates give it. [BUFF-09]
         consumerTotal += scoreSelfBuffs(consumer, debug);
+        consumerTotal += scoreConventionalFit(consumer, team, debug);
 
         // Everything the team pours INTO a codependent unit is worth less when its
         // composition need is unmet — buffs it cannot convert are not buffs.

@@ -13,6 +13,10 @@ damage contributors; stun infrastructure to window-dependent carries.
 beside another wind unit — adds that buff to what its teammates pour into it, priced exactly as a
 teammate's would be. See `[BUFF-09]` in [buffs and debuffs](../data-model/buffs-and-debuffs.md).
 
+**And one term for a plain attacker doing the conventional job.** A single attacker with a fit
+stunner and a fit support collects a credit in proportion to its tier, provided its kit asks for
+nothing a teammate can feed. See [COMP-01](#comp-01-the-conventional-fit-credit) below.
+
 **Need Fulfilment** — the supplier provides something the consumer explicitly *scales* with.
 The highest-value category, and where `replaces` and
 `converts` apply.
@@ -95,3 +99,92 @@ is damage dealt *by buffed teammates* — self-provision does not cover that.
 | **Constant** | Steady passive amplification, where a buff pays twice | Alice and Vivian convert AM into AP, making AM buffs doubly valuable |
 
 
+
+## Code notes
+
+### [COMP-01] The conventional-fit credit
+
+**The Severian case.** Severian is a top attack carry, and all he wants from a team is ordinary:
+a stunner to open windows and whatever ATK or crit damage the support brings. Before this rule the
+engine ranked him well below Evelyn, who is a tier worse. L4 pays a carry only when a teammate
+meets a need the carry declared. Evelyn declares chains, so Norma is paid for feeding her on
+every team they share. Severian declares nothing, so nothing on the team was counted as feeding
+him. On Butcher:
+
+| Pair | L2 | Norma's pair into the carry | L4 total |
+|----|----|----|----|
+| Norma / Evelyn / Sunna | +18 | 71.4 (recovery 35.8, chain need 16.8) | 80.8 |
+| Norma / Severian / Sunna | +35 | 22.2 | 38.0 |
+
+His 17 extra points of tier credit could not cover a 43-point L4 gap. In the owner's words, it
+scored a bazooka below a handgun because the handgun takes accessories.
+
+**The rule.** The carry earns a credit in proportion to its tier when **all** of these hold:
+
+1. The team is the conventional attack shape: one attacker, a stunner, and a support or defense
+   unit. The classifier and this term call the same helper, so they cannot disagree about it.
+2. The stunner provides stun infrastructure and does not `avoid` the carry's archetype.
+3. The support does not `avoid` it either. That is what separates Lucia (who avoids attack) from
+   Lucy. An unannotated support is neutral and qualifies.
+4. The kit is plain:
+   * nothing declared in `scaling` (a weight-1 appetite halves the credit, 2 or more removes it,
+     and the `buffs` and `greedy` meta-flags count);
+   * no team-scoped conditional in `damage`;
+   * no `totalize`;
+   * no `join` that mandates a second carry.
+
+The tier ladder is the L2 carry bonus down to T1. From there it runs as a straight line to 0 at
+T3, so Ellen and Zhu Yuan get a small credit for doing the job smoothly and T3–T4 get nothing.
+The credit joins the carry's L4 total beside its self-buffs. It is therefore scaled by the
+on-/off-element modifier, like the need credit it stands in for.
+
+**Why this is not "a mechanic's existence has value".** Nothing in the kit is being paid for
+existing. The consumer is the team: the credit is paid only when a fit stunner and a fit support
+are present to cash the carry's damage. That is the conventional job, done as planned. A carry
+with declared needs is already paid through the need channel, which is why need load switches the
+credit off rather than stacking on top of it.
+
+**Who is out, and why.**
+
+| Unit | Why |
+|----|----|
+| Seed | Her `join` is `["attack"]`. With Cissia or Orphie resolving as the support, `Trigger/Cissia/Seed` *is* the conventional shape, so the shape gate alone let her through. The first measurement caught 283 such rows |
+| Cissia | `scaling.buffs: 2` |
+| Pyrois | Their strong ultimate turns on only beside a wind provisioner, and s/he is totalize |
+| Hugo | Totalize. His real team is totalize plus double stun anyway |
+| Sigrid, Evelyn, YSG | Declared needs, paid by the need channel |
+
+**Measured** (preview corpus, rate 1.0): 4,532 team-boss rows moved, every one upward, signature
+`l4raw+l4` and nothing else. The prediction was that every mover contains Severian, Nekomata,
+Soldier 11, Ellen or Zhu Yuan; it had 0 exceptions. No Lucia, Seed, Pyrois or Hugo team moved.
+Calibration anchors were unchanged.
+
+What happened to Severian's best team as primary carry, per boss:
+
+| Comparison | Before | After |
+|----|----|----|
+| Beats Evelyn's best team | 3 / 14 | 11 / 14 |
+| Beats Sigrid's | 2 / 12 | 7 / 12 |
+| Beats Seed's | 7 / 14 | 11 / 14 |
+| Beats YSG's | 0 / 15 | 3 / 15 |
+
+**The rate.** The sweep ran 0.5, 0.75, 1.0, 1.25, 1.5 and 1.75. The rate chosen, 1.0, is the
+smallest that meets both targets: Severian's best team beats Evelyn's on Butcher, Marionettes
+and HollowVenger Truvia, and he passes Sigrid on about half the bosses. 1.25 and above add only
+one boss against each.
+
+**What stays as it was.**
+
+* `Lighter/Severian/Astra` still trails `Lighter/Evelyn/Astra` on Butcher, 291.5 to 301.9 raw.
+  **Owner ruling: that is correct.** Severian can't use Lighter's buffs and Evelyn can. Evelyn
+  also gains far more from Astra, while Severian wants Sunna more than Astra. Do not raise the
+  rate to flip it. Rankings TEST 99 pins the Norma pair, not this one.
+* Sigrid outranks Severian on ice-weak bosses such as Butcher and Marionettes. That is correct
+  too: she is ice.
+* Rupture (Yidhari, Starlight Billy) and armorer (Claret) are untouched by design. Rupture is
+  already fed by its baseline, and Claret has no peer to measure against.
+* Nekomata and Soldier 11 rise. That is predicted and wanted mechanically, but it has not been
+  checked against the owner's playtesting.
+
+Mechanics TEST 45 pins each gate, including Orphie standing in as the support. Rankings TEST 99
+pins the Severian / Evelyn ordering.

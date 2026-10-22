@@ -3,6 +3,24 @@
 What shipped, newest first. This file is history — nothing here is a statement about the
 current state of the engine. For that, see [STATUS.md](STATUS.md).
 
+**A plain attacker doing the conventional job is credited by tier**, 2026-10-21. Severian ranked
+below Evelyn because L4 pays a carry only when a teammate feeds a declared need, and he declares
+none. On Butcher Norma paid Evelyn 71.4 and him 22.2. The new L4 term [COMP-01] pays an attacker
+in proportion to its tier under four conditions:
+
+* the team is one attacker + stunner + support;
+* neither teammate `avoid`s the carry, so Lucia doesn't qualify the team but Lucy does;
+* the kit declares no `scaling`, has no team-scoped conditional `damage` and no totalize;
+* its `join` does not mandate a second carry.
+
+The dial is the new `MULT.CONVENTIONAL_FIT: 1.0`. Seed, Cissia, Pyrois and Hugo are out.
+4,532 rows moved (preview corpus), all up, `l4raw+l4` only, 0 exceptions against "every mover
+contains Severian, Nekomata, Soldier 11, Ellen or Zhu Yuan". Severian's best team now beats
+Evelyn's on 11 of 14 bosses (was 3) and Sigrid's on 7 of 12 (was 2). `Norma/Severian/Sunna`
+308.0 → 337.7 raw on Butcher, against Evelyn's 333.8. `Lighter/Severian/Astra` still trails Evelyn's, correctly: Severian can't use Lighter's buffs and wants Sunna more than Astra.
+Calibration anchors are unchanged. Added mechanics TEST 45 and rankings TEST 99. Resolved
+"Severian ranks below Evelyn for wanting nothing".
+
 **Phoenix's and Jane's anomaly crit stops posing as proc damage**, 2026-10-21. Both buffs are now
 `buffs["anomaly-crit"]` (Phoenix) and `buffs["anomaly-crit:physical"]` (Jane) ([BUFF-10]). A crit
 lands only on covered anomaly damage, including Remielle's luminize on a covered morph (the one
