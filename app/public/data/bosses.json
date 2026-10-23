@@ -327,5 +327,22 @@
             "chainParry": true,
             "control": 1
         }
+    },
+    {
+        "id": "truvia",
+        "name": "Blasphemer",
+        "shortName": "Blasphemer",
+        "image": "./assets/bosses/blasphemer.webp",
+        "released": 3.3,
+        "favored": ["Phoenix"],
+        "mechanics": {
+            "weaknesses": ["fire"],
+            "resistances": ["ice"],
+            "shill": "anomaly",
+            "anti": ["rupture"],
+            "assists": 3,
+            "chainParry": true,
+            "control": 2
+        }
     }
 ]
