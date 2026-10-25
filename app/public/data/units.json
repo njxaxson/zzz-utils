@@ -254,7 +254,7 @@
         "limited": true,
         "released": "3.2",
         "tier": 0.5,
-        "tags": ["armorer", "electric", "assist:defensive"],
+        "tags": ["armorer", "electric", "assist:defensive", "Roscaelifer"],
         "join": ["stun", "support", "armorer"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
@@ -680,8 +680,8 @@
         "limited": true,
         "released": "3.0",
         "tier": 0.5,
-        "tags": ["stun", "fire", "assist:defensive"],
-        "join": ["attack", "rupture", "faction"],
+        "tags": ["stun", "fire", "assist:defensive", "Roscaelifer"],
+        "join": ["attack", "rupture", "Roscaelifer"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
             "onfield": false,
@@ -948,7 +948,7 @@
         "limited": true,
         "released": "3.2",
         "tier": 0.5,
-        "tags": ["stun", "wind", "assist:defensive"],
+        "tags": ["stun", "wind", "assist:defensive", "Roscaelifer"],
         "join": ["attack", "armorer", "rupture"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
@@ -1062,7 +1062,7 @@
         "limited": true,
         "released": "3.1",
         "tier": 0.5,
-        "tags": ["attack", "ice", "assist:defensive"],
+        "tags": ["attack", "ice", "assist:defensive", "Roscaelifer"],
         "join": ["stun", "support"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
@@ -1181,7 +1181,7 @@
         "limited": true,
         "released": "3.0",
         "tier": 0,
-        "tags": ["anomaly", "wind", "assist:defensive"],
+        "tags": ["anomaly", "wind", "assist:defensive", "Roscaelifer"],
         "join": ["anomaly", "wind"],
         "synergy": { "units": [], "tags": [], "avoid": [] },
         "mechanics": {
